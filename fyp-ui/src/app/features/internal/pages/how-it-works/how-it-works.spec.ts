@@ -30,13 +30,14 @@ describe('HowItWorksComponent', () => {
     expect(element.textContent).toContain('up to 13 working days');
   });
 
-  it('links the three actions to their existing internal routes', () => {
+  it('links the four actions to their existing internal routes', () => {
     const links = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>('.how-button'),
     );
 
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
       '/app/forms/event-proposal',
+      '/app/events/explore-events',
       '/app/proposals/pending',
       '/app/inbox',
     ]);
