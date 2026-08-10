@@ -8,6 +8,11 @@
 // which returns 49 — NOT the stale "51" figure from the original design spec (Task 1.1
 // dropped campus_tour_area_options and campus_tour_map_options, taking 51 -> 49).
 
+const seedUsers = require('./db/seed-users');
+const seedCafeteria = require('./db/seed-cafeteria');
+const seedCategories = require('./db/seed-categories');
+const seedConfig = require('./db/seed-config');
+
 const TABLE_NAMES = [
   // Identity & Organization
   'users', 'staff', 'student', 'unit', 'unit_users', 'clubs', 'student_clubs',
@@ -51,5 +56,10 @@ function resetCounters() {
 }
 
 resetCounters();
+
+seedUsers(db, nextId);
+seedCafeteria(db, nextId);
+seedCategories(db, nextId);
+seedConfig(db, nextId);
 
 module.exports = { db, nextId, TABLE_NAMES };
