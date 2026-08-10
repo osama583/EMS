@@ -39,4 +39,12 @@ export class ProposalWorkflowService {
   cancelProposal(id: number, cancelledBy: string): Observable<ProposalReviewRecord> {
     return this.repository.cancelProposal(id, cancelledBy);
   }
+
+  approveFmbSelection(id: number, selectionId: number): Observable<ProposalReviewRecord> {
+    return this.repository.approveFmbSelection(id, selectionId);
+  }
+
+  resubmitFmbSelection(id: number, selectionId: number, comment: string): Observable<ProposalReviewRecord> {
+    return this.repository.resubmitFmbSelection(id, selectionId, comment);
+  }
 }

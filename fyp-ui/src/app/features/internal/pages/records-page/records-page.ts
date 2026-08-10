@@ -314,7 +314,7 @@ export class RecordsPageComponent {
   private stageForStatus(status: string, fallback: ProposalStage): ProposalStage {
     if (status === 'Approved' || status === 'Completed') return ProposalStage.Approved;
     if (status === 'Rejected' || status === 'Cancelled') return ProposalStage.Rejected;
-    if (status === 'Revision required' || status === 'Details missing' || status === 'Required action') return ProposalStage.NeedsRevision;
+    if (status === 'Revision required' || status === 'Details missing' || status === 'Required action') return ProposalStage.ResubmissionRequired;
     if (status === 'Department review' || status === 'In progress' || status === 'Assigned' || status === 'Scheduled' || status === 'Awaiting assignment') return ProposalStage.DepartmentReview;
     if (status === 'Additional approval' || status === 'CFO review') return ProposalStage.CfoReview;
     if (status === 'F&B review') return ProposalStage.FmbReview;
