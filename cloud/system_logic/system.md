@@ -40,7 +40,7 @@ easily to MySQL 8+.
 
 ## 2. Roles
 
-17 roles total. All can explore/register/save public events regardless of
+21 roles total. All can explore/register/save public events regardless of
 role; only the ones marked **Applicant** can submit a new proposal.
 
 | Role | Applicant? | What they do |
@@ -48,8 +48,12 @@ role; only the ones marked **Applicant** can submit a new proposal.
 | Student | Yes | Submits proposals; explores/registers/saves events |
 | Staff | Yes | Same as Student |
 | HOS/HOD | Yes | Reviews proposals from students/staff under their school (HOS) or department (HOD); approve/reject/resubmit. Cannot review their own submission — see workflow exception below. |
-| CFO | Yes | Reviews high-pax applications (pax > `HIGH_PAX_THRESHOLD`) alongside F&B, before the department stage. Self-applications skip straight to department review. |
-| F&B | Yes | Two duties: (1) high-pax reviewer alongside CFO; (2) reviews F&B/Cafeteria requirement requests, picks a cafeteria + specific menu item to fulfil them. Also manages the Mineral Water (Logo/Normal) and Dietary Information dropdowns. Self-applications skip straight to department review. |
+| CFO | Yes | Reviews high-pax applications (pax > `HIGH_PAX_THRESHOLD`), sequentially AFTER F&B has approved — not concurrently. Self-applications skip straight to department review. |
+| F&B | Yes | One merged role (previously split into "F&B Reviewer" and "FMB Manager" in an earlier draft — that split was a mistake). Three duties: (1) reviews high-pax applications first, sequentially before CFO; (2) reviews F&B/Cafeteria requirement requests (food AND Mineral Water together as one task), picks a cafeteria + specific menu item(s) to fulfil them, can split one request across multiple cafeterias; (3) manages the Mineral Water (Logo/Normal) and Dietary Information dropdowns. Self-applications skip straight to department review. |
+| Student Services Manager | Yes | Manages the Campus Tour Starting Points dropdown; reviews Campus Tour department-review requests, approves + assigns Student Services Member staff, or resubmits with comment. |
+| Student Services Member | No | Views and handles assigned Campus Tour tasks + history only. |
+| Club President | Yes | Same applicant capabilities as Student/Staff, representing a student club/society. |
+| External User | No | Public/guest account — can explore, register for, and save public events, but cannot submit proposals. |
 | Logistics Manager | Yes | Reviews Logistics requests, approves + assigns to available staff, or resubmits with comment. Manages the Logistics Items dropdown. |
 | Logistics Staff | No | Views and handles assigned tasks + history only |
 | Transportation Manager | Yes | Same pattern as Logistics Manager, for Transportation. Manages Transportation Types dropdown. |
@@ -62,12 +66,6 @@ role; only the ones marked **Applicant** can submit a new proposal.
 | Cafeteria Manager | No | Manages one or more specific cafeterias (assigned by Cafeteria Admin). Manages "My Menu" for their cafeteria(s), plus Serving Units. Receives F&B's food selection and routes it toward Cafeteria Staff fulfilment. |
 | Cafeteria Staff | No | Works from a **shared inbox** — an F&B fulfilment task is visible to every staff member assigned to that cafeteria; whoever claims it first owns it, and it moves into their own ongoing/history and out of everyone else's inbox. |
 | System Admin | No | Manages Units (create/deactivate), Users (create/deactivate), and system Config (pax threshold, cancellation deadline, max event categories). |
-
-**⚠️ Open gap:** the Dropdown Settings field doc names a **"Student
-Services Manager"** as the owner of the Campus Tour dropdowns. This role
-doesn't exist anywhere else in the confirmed role list — it was never
-added. Needs a decision: is this actually a distinct 18th role, or is it
-one of the existing roles under a different label?
 
 ---
 
@@ -87,63 +85,96 @@ Stored in one `config` table as admin-settable numbers:
 
 ```
 Applicant submits
-      │
-      ▼
+      |
+      v
+[Applicant is HOS/HOD of their own unit?] --yes--> skip to high-pax check
+      | no
+      v
 HOS/HOD of applicant's unit reviews (approve / reject / resubmit)
-      │  (approved)
-      ▼
+      | (approved)
+      v
+[Applicant is CFO or F&B?] --yes--> skip straight to DEPARTMENT REVIEW
+      | no
+      v
 total_pax > HIGH_PAX_THRESHOLD?
-      │                              │
+      |                              |
      yes                             no
-      │                              │
-      ▼                              │
-F&B reviews → CFO reviews            │
-      │  (approved)                  │
-      └──────────────┬───────────────┘
-                      ▼
+      |                              |
+      v                              |
+F&B reviews (approve/reject/         |
+  resubmit — single-actor, same      |
+  as HOS/HOD)                        |
+      | (approved)                   |
+      v                              |
+CFO reviews (approve/reject/         |
+  resubmit). If CFO resubmits,       |
+  resumes at CFO on re-submission —  |
+  F&B is NOT re-reviewed.            |
+      | (approved)                   |
+      +---------------+--------------+
+                       v
         DEPARTMENT REVIEW — one task per
         selected requirement, running in
         PARALLEL, fully independent
-                      │
-      ┌───────────────┼──────────────────┐
-      ▼               ▼                  ▼
-  Logistics       Transportation      ... (each requirement's
-  Manager          Manager             own manager approves +
-  approves+                            assigns staff, or
-  assigns staff                        resubmits with comment)
-      │
-      ▼
-  Assigned staff completes the task
+                       |
+      +----------------+-------------------+
+      v                v                   v
+  Logistics       Transportation        ... (each requirement's own
+  Manager          Manager               manager approves + assigns
+  approves+                              staff, or resubmits with
+  assigns staff                          comment — departments CANNOT
+                                          reject outright)
+      |
+      v
+  Assigned staff marks the task 'preparing' when started,
+  'completed' when done
 ```
 
 **F&B / Cafeteria is a longer sub-chain, not a single step:**
 ```
-F&B reviews the food request → picks a cafeteria + a real menu item
-    (from that cafeteria's "My Menu")
-      │
-      ▼
-Cafeteria Manager (of that cafeteria) reviews
-      │
-      ▼
-Cafeteria Staff — SHARED INBOX (no one pre-assigned; visible to
-    every staff member assigned to that cafeteria; first to claim
-    it owns it, it then leaves everyone else's inbox)
+F&B reviews the food + Mineral Water request together (one task) ->
+    picks a cafeteria + real menu item(s) — can split across MULTIPLE
+    cafeterias, creating one selection row per cafeteria
+      |
+      v
+EACH selection row's Cafeteria Manager independently reviews:
+  - approve -> row enters Cafeteria Staff SHARED INBOX for that cafeteria
+    (no one pre-assigned; visible to every staff member assigned to that
+    cafeteria; first to claim it owns it, it then leaves everyone else's
+    inbox and enters that person's ongoing/history)
+  - resubmit -> goes back to F&B (NOT the applicant — F&B is the one who
+    picked the specific cafeteria/dish). F&B edits the dish, quantity, or
+    switches to a different cafeteria, or cancels — for THAT ROW ONLY.
+    Saving the edit re-sends it straight to whichever cafeteria is now on
+    it (same one if unchanged, a different one if F&B switched it) — no
+    separate "re-approve" click needed. Other selection rows for the same
+    request are untouched.
 ```
 
 **Self-application exceptions (confirmed):**
-- Applicant IS the HOS/HOD of their own unit → skip the HOS/HOD step, F&B
-  reviews instead (unconditionally, not gated by pax). **Open:** does CFO
-  still get involved afterward if pax is also high? Not yet confirmed.
-- Applicant is CFO or F&B → skip **all** higher approval, straight to
+- Applicant IS the HOS/HOD of their own unit -> skip the HOS/HOD step,
+  F&B reviews next (unconditionally, not gated by pax). If pax is also
+  above the threshold, CFO still reviews after F&B, same as the normal
+  high-pax path.
+- Applicant is CFO or F&B -> skip **all** higher approval, straight to
   department review.
 
 **Parallel independence (confirmed):** if one department resubmits back to
 the applicant, the other departments' reviews continue unaffected — nothing
-pauses except that one department's own task.
+pauses except that one department's own task. (The F&B/Cafeteria chain's
+per-selection-row resubmit is a further exception within F&B's own task —
+see above; it goes back to F&B, not the applicant, and doesn't affect
+other selection rows.)
+
+**Departments cannot reject.** Only the single-actor sequential stages
+(HOS/HOD, F&B, CFO) can reject and end a proposal outright. A department
+manager's only pushback option is resubmit-with-comment.
 
 **Staff assignment:** a manager assigns one or more available staff
 (checked for no other overlapping assigned task at that time — this is a
-query at assignment time, not a stored "availability calendar").
+query at assignment time, not a stored "availability calendar"). Once
+assigned, staff mark their task 'preparing' when they start the work and
+'completed' when finished.
 
 **Cancellation:** applicant or designated co-owners can cancel up to
 `CANCELLATION_DEADLINE_DAYS` before the event date. After that, the
@@ -202,7 +233,7 @@ and a short (≤100 character) reason for attending.
 | Photographer/Videographer | Service (select), Personnel Quantity, Date, Start, End, Location, Coverage, Notes |
 | Sound & Light | Item/Service (select), Date, Start, End, Location, Notes |
 | F&B | Food Type (select), Pax, Date, Start, End, Location, Notes |
-| Campus Tour | Date, Start, End, Location, Pax, Starting Point (select), Tour Area (select), Campus Map (select), Notes |
+| Campus Tour | Date, Start, End, Location, Pax, Starting Point (select), Notes |
 | Mineral Water (Logo/Normal) | Quantity (select), Date, Start, End, Location, Notes |
 | Funding/Purchase | Main Item (select), Sub-item (select, depends on Main Item), Quantity, Unit RM, Notes |
 
@@ -250,12 +281,10 @@ Every option shares: **label** (required), **description**, **active**.
 | Cafeteria Manager | My Menu | Serving Unit (FK), Availability/Ordering Notes, Dietary Information (FK), Menu Image |
 | Cafeteria Manager | Dietary Information | none beyond common fields |
 | Cafeteria Manager | Serving Units | none beyond common fields |
-| *(role gap — see §2)* | Campus Tour Starting Points | Meeting Instructions, Maximum Group Size |
-| *(role gap — see §2)* | Campus Tour Areas | Estimated Duration (min), Access Restrictions/Availability Notes |
-| *(role gap — see §2)* | Campus Map Information | Campus Map URL, Map/Route Guidance |
-| F&B (FMB Manager) | Mineral Water (Logo) | Number of Bottles, Available Stock, Logo/Branding Requirement, Lead Time/Ordering Instructions |
-| F&B (FMB Manager) | Mineral Water (Normal) | Number of Bottles, Available Stock, Ordering/Delivery Instructions |
-| F&B (FMB Manager) | Dietary Information | shared with Cafeteria Manager, no extra fields |
+| Student Services Manager | Campus Tour Starting Points | Meeting Instructions, Maximum Group Size |
+| F&B | Mineral Water (Logo) | Number of Bottles, Available Stock, Logo/Branding Requirement, Lead Time/Ordering Instructions |
+| F&B | Mineral Water (Normal) | Number of Bottles, Available Stock, Ordering/Delivery Instructions |
+| F&B | Dietary Information | shared with Cafeteria Manager, no extra fields |
 | CFO | Funding Main Items | Budget Category/Finance Code, Purchasing Guidance |
 | CFO | Funding Sub-items | Parent Main Item (FK, required), Finance/Procurement Code, Default Unit/Purchasing Note |
 
@@ -289,10 +318,8 @@ Every option shares: **label** (required), **description**, **active**.
 - **sound_light_options**: sound_light_option_id, requirement_id, label, description, active, available_quantity, technical_description
 - **dietary_information_options**: dietary_information_option_id, label, description, active
 - **serving_unit_options**: serving_unit_option_id, label, description, active
-- **fnb_options**: fnb_option_id, requirement_id, cafeteria_id, label, description, active, serving_unit_option_id, dietary_information_option_id, availability_ordering_notes, menu_image_url
+- **fmb_options**: fmb_option_id, requirement_id, cafeteria_id, label, description, active, serving_unit_option_id, dietary_information_option_id, availability_ordering_notes, menu_image_url
 - **campus_tour_start_options**: campus_tour_start_option_id, requirement_id, label, description, active, meeting_instructions, max_group_size
-- **campus_tour_area_options**: campus_tour_area_option_id, requirement_id, label, description, active, estimated_duration_minutes, access_restrictions_notes
-- **campus_tour_map_options**: campus_tour_map_option_id, requirement_id, label, description, active, campus_map_url, map_route_guidance
 - **water_logo_options**: water_logo_option_id, requirement_id, label, description, active, number_of_bottles, available_stock, logo_branding_requirement, lead_time_ordering_instructions
 - **water_normal_options**: water_normal_option_id, requirement_id, label, description, active, number_of_bottles, available_stock, ordering_delivery_instructions
 - **funding_main_options**: funding_main_option_id, requirement_id, label, description, active, budget_category_finance_code, purchasing_guidance
@@ -311,9 +338,9 @@ Every option shares: **label** (required), **description**, **active**.
 - **request_transportation**: request_transportation_id, request_id, option_id, type, requested_pax, pickup, dropoff, date, start_time, end_time, location, notes
 - **request_photography_videography**: request_photography_videography_id, request_id, option_id, service, personnel_quantity, date, start_time, end_time, location, coverage, notes
 - **request_sound_light**: request_sound_light_id, request_id, option_id, item, date, start_time, end_time, location, notes
-- **request_fnb**: request_fnb_id, request_id, option_id, food_type, pax, date, start_time, end_time, location, notes
-- **request_fnb_selection**: request_fnb_selection_id, request_fnb_id, cafeteria_id, fnb_option_id, menu_item_label, quantity, notes
-- **request_campus_tour**: request_campus_tour_id, request_id, date, start_time, end_time, location, pax, start_point_option_id, start_point, tour_area_option_id, tour_area, campus_map_option_id, campus_map, notes
+- **request_fmb**: request_fmb_id, request_id, option_id, food_type, pax, date, start_time, end_time, location, notes
+- **request_fmb_selection**: request_fmb_selection_id, request_fmb_id, cafeteria_id, fmb_option_id, menu_item_label, quantity, status, notes
+- **request_campus_tour**: request_campus_tour_id, request_id, date, start_time, end_time, location, pax, start_point_option_id, start_point, notes
 - **request_mineral_water_logo**: request_mineral_water_logo_id, request_id, option_id, quantity, date, start_time, end_time, location, notes
 - **request_mineral_water_normal**: request_mineral_water_normal_id, request_id, option_id, quantity, date, start_time, end_time, location, notes
 - **request_funding_purchase**: request_funding_purchase_id, request_id, main_option_id, main_item, sub_option_id, sub_item, quantity, unit_price_rm, notes
@@ -332,7 +359,7 @@ Every option shares: **label** (required), **description**, **active**.
 - **saved_event**: user_id, request_id, saved_at
 
 ### Workflow — Tasks, Assignments, History
-- **request_task**: request_task_id, request_id, requirement_id, stage_code, sequence_no, assigned_role, assignment_mode, status, comment, created_at, resolved_at, resolved_by_user_id
+- **request_task**: request_task_id, request_id, requirement_id, stage_code, sequence_no, assigned_role, assignment_mode, status (pending/approved/resubmitted/preparing/completed/cancelled — no 'rejected'; only hos_hod_review/fmb_review/cfo_review can reject), comment, created_at, resolved_at, resolved_by_user_id
 - **task_assignment**: task_assignment_id, request_task_id, staff_user_id, assigned_by_user_id, assigned_at
 - **workflow_history**: workflow_history_id, request_id, request_task_id, requirement_id, action, actor_user_id, actor_role, comment, previous_status, new_status, created_at
 
@@ -341,23 +368,32 @@ this section is the field-name reference; that file is the exact DDL.
 
 ---
 
-## 7. Open Questions (not yet resolved — don't assume an answer)
+## 7. Resolved Questions (settled in the schema-alignment design session)
 
-- **Campus Tour structure**: built as 3 separate tables
-  (start/area/map) based on the detailed field doc, but an earlier message
-  said "only Starting Point." Needs a final call.
-- **"Student Services Manager"** role — appears in the dropdown field doc,
-  not in the confirmed 17-role list. Needs to be added or reconciled.
-- **HOS/HOD self-review + high pax**: when applicant = HOS/HOD, F&B reviews
-  instead of the HOS/HOD step. Unclear whether CFO still reviews afterward
-  if pax is also above threshold.
-- **Cafeteria Manager's decision options** at their step in the F&B chain
-  (approve/resubmit, same as other managers) — assumed, not confirmed.
-- **PK datatype convention** — using surrogate integer IDs throughout;
-  UUID was never explicitly ruled in or out.
-- **Exact allowed values** for `event_visibility`, `event_format`, and
-  `registration_approval` — left as free text since no fixed list was
-  given.
+All items previously listed here are now settled — see
+`docs/superpowers/specs/2026-08-10-ems-schema-alignment-and-mock-backend-design.md`
+in the `fyp-ui` project for the full design record. Summary:
+
+- **Campus Tour structure**: Starting Point only. Tour Area and Campus Map
+  were removed.
+- **"Student Services Manager"** role: confirmed as a real, distinct role
+  — added to §2 and the schema's `users.role` CHECK.
+- **HOS/HOD self-review + high pax**: F&B reviews in place of HOS/HOD when
+  applicant is HOS/HOD of their own unit; CFO still reviews after F&B if
+  pax is also above threshold.
+- **Cafeteria Manager's decision options**: approve or resubmit — but
+  resubmit routes back to F&B (who picked the cafeteria/dish), not the
+  applicant, and only affects that one selection row.
+- **PK datatype**: surrogate integers (`BIGSERIAL`), confirmed — no UUID.
+- **`event_visibility` / `event_format` / `registration_approval`**: fixed
+  option lists (sourced from the Angular frontend's existing dropdowns),
+  enforced via CHECK constraints rather than free text.
+- **F&B naming**: "fnb" was a mistake — the correct term is "F&B"
+  everywhere in prose; the code-safe token is `fmb`.
+- **F&B role split**: `FmbReviewer`/`FmbManager` as two roles was a
+  mistake — merged into one `fmb` role.
+- **Mineral Water ownership**: not a separate department-review lane —
+  reviewed by F&B together with food, as one task.
 
 ## 8. Suggested Additions Not Yet Covered
 
