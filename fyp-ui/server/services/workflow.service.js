@@ -55,7 +55,7 @@ function authorizeAction(requestId, actorUser, action) {
   const status = request.status;
 
   if (action === 'hos_hod_review' && status === 'hos_hod_review') {
-    if (actorUser.role !== 'hos_hod') throw new WorkflowError('Only HOS/HOD can act at this stage.', 403);
+    if (actorUser.role !== 'hos-hod') throw new WorkflowError('Only HOS/HOD can act at this stage.', 403);
     if (!isHosHodOfUnit(actorUser.user_id, request)) throw new WorkflowError('You are not the HOS/HOD for this applicant\'s unit.', 403);
     return;
   }
@@ -255,11 +255,11 @@ function createDepartmentTasks(requestId) {
   });
 
   const roleForRequirement = {
-    logistics: 'logistics_manager',
-    transportation: 'transportation_manager',
-    photoVideo: 'photo_video_manager',
-    soundLight: 'sound_light_manager',
-    campusTour: 'student_services_manager',
+    logistics: 'logistics-manager',
+    transportation: 'transport-manager',
+    photoVideo: 'photography-manager',
+    soundLight: 'av-manager',
+    campusTour: 'student-services-manager',
     fundingPurchase: 'cfo',
     fmb: 'fmb',
   };
