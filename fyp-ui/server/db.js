@@ -12,6 +12,7 @@ const seedUsers = require('./db/seed-users');
 const seedCafeteria = require('./db/seed-cafeteria');
 const seedCategories = require('./db/seed-categories');
 const seedConfig = require('./db/seed-config');
+const seedOptions = require('./db/seed-options');
 
 const TABLE_NAMES = [
   // Identity & Organization
@@ -61,5 +62,6 @@ seedUsers(db, nextId);
 seedCafeteria(db, nextId);
 seedCategories(db, nextId);
 seedConfig(db, nextId);
+seedOptions(db, nextId);
 
 module.exports = { db, nextId, TABLE_NAMES };
