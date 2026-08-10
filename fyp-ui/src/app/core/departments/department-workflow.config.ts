@@ -22,9 +22,8 @@ export interface DepartmentWorkflowConfig {
 
 export const DEPARTMENT_WORKFLOWS: readonly DepartmentWorkflowConfig[] = [
   { managerRole: UserRole.LogisticsManager, staffRole: UserRole.LogisticsStaff, requestKinds: ['logistics'], optionKinds: ['logistics'], assignmentRequired: true },
-  { managerRole: UserRole.StudentServicesManager, staffRole: UserRole.StudentServicesMember, requestKinds: ['campusTour'], optionKinds: ['campusTourStart', 'campusTourArea', 'campusTourMap'], assignmentRequired: true },
-  { managerRole: UserRole.FmbManager, staffRole: UserRole.FmbWaterServicesStaff, requestKinds: ['waterLogo', 'waterNormal'], optionKinds: ['dietaryInformation', 'waterLogo', 'waterNormal'], assignmentRequired: true },
-  { managerRole: UserRole.CafeteriaManager, requestKinds: ['fnb'], optionKinds: ['fnb', 'servingUnit'], assignmentRequired: false },
+  { managerRole: UserRole.StudentServicesManager, staffRole: UserRole.StudentServicesMember, requestKinds: ['campusTour'], optionKinds: ['campusTourStart'], assignmentRequired: true },
+  { managerRole: UserRole.Fmb, requestKinds: ['fmb', 'waterLogo', 'waterNormal'], optionKinds: ['fmb', 'servingUnit', 'dietaryInformation', 'waterLogo', 'waterNormal'], assignmentRequired: false },
   { managerRole: UserRole.AvManager, staffRole: UserRole.AvTechnician, requestKinds: ['soundLight'], optionKinds: ['soundLight'], assignmentRequired: true },
   { managerRole: UserRole.PhotographyManager, staffRole: UserRole.PhotographyStaff, requestKinds: ['photoVideo'], optionKinds: ['photoVideo'], assignmentRequired: true },
   { managerRole: UserRole.TransportManager, staffRole: UserRole.TransportStaff, requestKinds: ['transportation'], optionKinds: ['transportation'], assignmentRequired: true },
