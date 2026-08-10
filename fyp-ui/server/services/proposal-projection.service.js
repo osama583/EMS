@@ -6,6 +6,26 @@ const STAGE_LABELS = {
   completed_approved: 'Approved', completed_rejected: 'Rejected', cancelled: 'Cancelled', draft: 'Draft',
 };
 
+// Maps snake_case DB `request.status` (and `resume_stage`) values onto Angular's hyphenated
+// ProposalStage enum (fyp-ui/src/app/core/proposals/proposal-status.models.ts). The DB's two
+// terminal statuses (completed_approved / completed_rejected) collapse onto the enum's separate
+// Approved / Rejected members, which have no snake_case DB equivalent of their own.
+const DB_STATUS_TO_PROPOSAL_STAGE = {
+  submitted: 'submitted',
+  hos_hod_review: 'hos-hod-review',
+  fmb_review: 'fmb-review',
+  cfo_review: 'cfo-review',
+  department_review: 'department-review',
+  resubmission_required: 'resubmission-required',
+  completed_approved: 'approved',
+  completed_rejected: 'rejected',
+  cancelled: 'cancelled',
+};
+
+function dbStatusToProposalStage(dbStatus) {
+  return DB_STATUS_TO_PROPOSAL_STAGE[dbStatus] || dbStatus;
+}
+
 function editableRowsFromOrganizers(requestId) {
   return db.organizers.filter((o) => o.request_id === requestId).map((o) => ({ id: o.organizer_id, name: `${o.staff_first_name} ${o.staff_last_name}`, email: o.staff_email, role: o.staff_role, notes: o.note }));
 }
@@ -102,8 +122,8 @@ function projectProposal(request) {
     externalPax: Math.round(request.total_pax * 0.1),
     fmbSelections: fmbSelectionsFor(request.request_id),
     workflow: {
-      stage: request.status,
-      resumeStage: request.resume_stage || undefined,
+      stage: dbStatusToProposalStage(request.status),
+      resumeStage: request.resume_stage ? dbStatusToProposalStage(request.resume_stage) : undefined,
       reviewerComment: request.reviewer_comment || undefined,
       departmentConfirmations: db.request_task.filter((t) => t.request_id === request.request_id && t.stage_code === 'department_review').map((t) => ({
         department: db.event_requirements.find((r) => r.requirement_id === t.requirement_id).requirement_name,
