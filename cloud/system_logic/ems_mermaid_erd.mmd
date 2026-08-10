@@ -129,8 +129,8 @@ erDiagram
         int active
     }
 
-    FNB_OPTIONS {
-        int fnb_option_id PK
+    FMB_OPTIONS {
+        int fmb_option_id PK
         int requirement_id FK
         int cafeteria_id FK
         string label
@@ -150,26 +150,6 @@ erDiagram
         int active
         string meeting_instructions
         int max_group_size
-    }
-
-    CAMPUS_TOUR_AREA_OPTIONS {
-        int campus_tour_area_option_id PK
-        int requirement_id FK
-        string label
-        string description
-        int active
-        int estimated_duration_minutes
-        string access_restrictions_notes
-    }
-
-    CAMPUS_TOUR_MAP_OPTIONS {
-        int campus_tour_map_option_id PK
-        int requirement_id FK
-        string label
-        string description
-        int active
-        string campus_map_url
-        string map_route_guidance
     }
 
     WATER_LOGO_OPTIONS {
@@ -310,8 +290,8 @@ erDiagram
         string notes
     }
 
-    REQUEST_FNB {
-        int request_fnb_id PK
+    REQUEST_FMB {
+        int request_fmb_id PK
         int request_id FK
         int option_id FK
         string food_type
@@ -323,13 +303,14 @@ erDiagram
         string notes
     }
 
-    REQUEST_FNB_SELECTION {
-        int request_fnb_selection_id PK
-        int request_fnb_id FK
+    REQUEST_FMB_SELECTION {
+        int request_fmb_selection_id PK
+        int request_fmb_id FK
         int cafeteria_id FK
-        int fnb_option_id FK
+        int fmb_option_id FK
         string menu_item_label
         int quantity
+        string status
         string notes
     }
 
@@ -343,10 +324,6 @@ erDiagram
         int pax
         int start_point_option_id FK
         string start_point
-        int tour_area_option_id FK
-        string tour_area
-        int campus_map_option_id FK
-        string campus_map
         string notes
     }
 
@@ -519,13 +496,11 @@ erDiagram
     EVENT_REQUIREMENTS ||--o{ TRANSPORTATION_OPTIONS : "requirement_id"
     EVENT_REQUIREMENTS ||--o{ MEDIA_OPTIONS : "requirement_id"
     EVENT_REQUIREMENTS ||--o{ SOUND_LIGHT_OPTIONS : "requirement_id"
-    EVENT_REQUIREMENTS ||--o{ FNB_OPTIONS : "requirement_id"
-    CAFETERIA ||--o{ FNB_OPTIONS : "cafeteria_id"
-    SERVING_UNIT_OPTIONS ||--o{ FNB_OPTIONS : "serving_unit_option_id"
-    DIETARY_INFORMATION_OPTIONS ||--o{ FNB_OPTIONS : "dietary_information_option_id"
+    EVENT_REQUIREMENTS ||--o{ FMB_OPTIONS : "requirement_id"
+    CAFETERIA ||--o{ FMB_OPTIONS : "cafeteria_id"
+    SERVING_UNIT_OPTIONS ||--o{ FMB_OPTIONS : "serving_unit_option_id"
+    DIETARY_INFORMATION_OPTIONS ||--o{ FMB_OPTIONS : "dietary_information_option_id"
     EVENT_REQUIREMENTS ||--o{ CAMPUS_TOUR_START_OPTIONS : "requirement_id"
-    EVENT_REQUIREMENTS ||--o{ CAMPUS_TOUR_AREA_OPTIONS : "requirement_id"
-    EVENT_REQUIREMENTS ||--o{ CAMPUS_TOUR_MAP_OPTIONS : "requirement_id"
     EVENT_REQUIREMENTS ||--o{ WATER_LOGO_OPTIONS : "requirement_id"
     EVENT_REQUIREMENTS ||--o{ WATER_NORMAL_OPTIONS : "requirement_id"
     EVENT_REQUIREMENTS ||--o{ FUNDING_MAIN_OPTIONS : "requirement_id"
@@ -544,15 +519,13 @@ erDiagram
     MEDIA_OPTIONS ||--o{ REQUEST_PHOTOGRAPHY_VIDEOGRAPHY : "option_id"
     REQUEST ||--o{ REQUEST_SOUND_LIGHT : "request_id"
     SOUND_LIGHT_OPTIONS ||--o{ REQUEST_SOUND_LIGHT : "option_id"
-    REQUEST ||--o{ REQUEST_FNB : "request_id"
-    FNB_OPTIONS ||--o{ REQUEST_FNB : "option_id"
-    REQUEST_FNB ||--o{ REQUEST_FNB_SELECTION : "request_fnb_id"
-    CAFETERIA ||--o{ REQUEST_FNB_SELECTION : "cafeteria_id"
-    FNB_OPTIONS ||--o{ REQUEST_FNB_SELECTION : "fnb_option_id"
+    REQUEST ||--o{ REQUEST_FMB : "request_id"
+    FMB_OPTIONS ||--o{ REQUEST_FMB : "option_id"
+    REQUEST_FMB ||--o{ REQUEST_FMB_SELECTION : "request_fmb_id"
+    CAFETERIA ||--o{ REQUEST_FMB_SELECTION : "cafeteria_id"
+    FMB_OPTIONS ||--o{ REQUEST_FMB_SELECTION : "fmb_option_id"
     REQUEST ||--o{ REQUEST_CAMPUS_TOUR : "request_id"
     CAMPUS_TOUR_START_OPTIONS ||--o{ REQUEST_CAMPUS_TOUR : "start_point_option_id"
-    CAMPUS_TOUR_AREA_OPTIONS ||--o{ REQUEST_CAMPUS_TOUR : "tour_area_option_id"
-    CAMPUS_TOUR_MAP_OPTIONS ||--o{ REQUEST_CAMPUS_TOUR : "campus_map_option_id"
     REQUEST ||--o{ REQUEST_MINERAL_WATER_LOGO : "request_id"
     WATER_LOGO_OPTIONS ||--o{ REQUEST_MINERAL_WATER_LOGO : "option_id"
     REQUEST ||--o{ REQUEST_MINERAL_WATER_NORMAL : "request_id"
