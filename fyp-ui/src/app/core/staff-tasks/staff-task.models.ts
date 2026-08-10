@@ -1,7 +1,7 @@
 import { Observable } from 'rxjs';
 import { UserRole } from '../auth/auth.models';
 
-export type StaffTaskStatus = 'assigned' | 'in-progress' | 'completed';
+export type StaffTaskStatus = 'assigned' | 'preparing' | 'completed';
 
 export interface StaffTask {
   readonly id: string;

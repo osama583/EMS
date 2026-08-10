@@ -43,7 +43,7 @@ export class InboxComponent {
     { ...PROPOSAL_REVIEW_RECORDS[2], status: 'Additional approval' },
     { ...PROPOSAL_REVIEW_RECORDS[0], status: 'Department review', requestKind: 'logistics' },
     { ...PROPOSAL_REVIEW_RECORDS[3], status: 'Submitted' },
-    { ...PROPOSAL_REVIEW_RECORDS[4], status: 'Department review', requestKind: 'fnb' },
+    { ...PROPOSAL_REVIEW_RECORDS[4], status: 'Department review', requestKind: 'fmb' },
     { ...PROPOSAL_REVIEW_RECORDS[0], id: 906, proposalId: 'EVT-260142-T', status: 'Department review', requestKind: 'campusTour' },
     { ...PROPOSAL_REVIEW_RECORDS[0], id: 907, proposalId: 'EVT-260142-W', status: 'Department review', requestKind: 'waterLogo' },
     { ...PROPOSAL_REVIEW_RECORDS[0], id: 908, proposalId: 'EVT-260142-P', status: 'Department review', requestKind: 'photoVideo' },

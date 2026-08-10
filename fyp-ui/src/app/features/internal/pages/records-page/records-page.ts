@@ -130,7 +130,7 @@ const PAGE_DEFINITIONS: Readonly<Record<RecordsPageKind, RecordsPageDefinition>>
     categoryLabel: 'All services',
     actions: [{ key: 'view', label: 'View request', icon: 'visibility' }],
     records: [
-      { id: 501, title: 'APU Cultural Night 2026', summary: 'Catering request is being prepared for the event.', reference: 'REQ-260142', category: 'Catering', owner: 'Cafeteria Services', initials: 'CS', date: '31 Jul 2026, 4:18 PM', status: 'In progress', requestKind: 'fnb' },
+      { id: 501, title: 'APU Cultural Night 2026', summary: 'Catering request is being prepared for the event.', reference: 'REQ-260142', category: 'Catering', owner: 'Cafeteria Services', initials: 'CS', date: '31 Jul 2026, 4:18 PM', status: 'In progress', requestKind: 'fmb' },
       { id: 502, title: 'Future Tech Showcase', summary: 'Audio-visual equipment allocation is under review.', reference: 'REQ-260137', category: 'A/V Services', owner: 'A/V Services', initials: 'AV', date: '30 Jul 2026, 11:42 AM', status: 'Assigned', requestKind: 'soundLight' },
       { id: 503, title: 'APU Sports Carnival', summary: 'Transport routing is being coordinated.', reference: 'REQ-260129', category: 'Transport', owner: 'Transport Services', initials: 'TS', date: '29 Jul 2026, 5:27 PM', status: 'In progress', requestKind: 'transportation' },
       { id: 504, title: 'Career Connections Forum', summary: 'Venue layout and logistics support are scheduled.', reference: 'REQ-260121', category: 'Logistics', owner: 'Logistics and Facilities', initials: 'LF', date: '28 Jul 2026, 10:20 AM', status: 'Scheduled', requestKind: 'logistics' },
@@ -148,7 +148,7 @@ const PAGE_DEFINITIONS: Readonly<Record<RecordsPageKind, RecordsPageDefinition>>
     categoryLabel: 'All services',
     actions: [{ key: 'view', label: 'View request', icon: 'visibility' }],
     records: [
-      { id: 601, title: 'Graduate Networking Evening', summary: 'Catering service was delivered.', reference: 'REQ-260082', category: 'Catering', owner: 'Cafeteria Services', initials: 'CS', date: '23 Jul 2026, 6:02 PM', status: 'Completed', requestKind: 'fnb' },
+      { id: 601, title: 'Graduate Networking Evening', summary: 'Catering service was delivered.', reference: 'REQ-260082', category: 'Catering', owner: 'Cafeteria Services', initials: 'CS', date: '23 Jul 2026, 6:02 PM', status: 'Completed', requestKind: 'fmb' },
       { id: 602, title: 'Clubs and Societies Fair', summary: 'Photography service completed after the event.', reference: 'REQ-260074', category: 'Photography', owner: 'Photography Services', initials: 'PS', date: '18 Jul 2026, 3:44 PM', status: 'Completed', requestKind: 'photoVideo' },
       { id: 603, title: 'Wellness Weekend', summary: 'Transport arrangements completed successfully.', reference: 'REQ-260066', category: 'Transport', owner: 'Transport Services', initials: 'TS', date: '12 Jul 2026, 12:11 PM', status: 'Completed', requestKind: 'transportation' },
       { id: 604, title: 'Campus Film Screening', summary: 'A/V request was cancelled before delivery.', reference: 'REQ-260051', category: 'A/V Services', owner: 'A/V Services', initials: 'AV', date: '5 Jul 2026, 9:30 AM', status: 'Cancelled', requestKind: 'soundLight' },
@@ -317,7 +317,7 @@ export class RecordsPageComponent {
     if (status === 'Revision required' || status === 'Details missing' || status === 'Required action') return ProposalStage.NeedsRevision;
     if (status === 'Department review' || status === 'In progress' || status === 'Assigned' || status === 'Scheduled' || status === 'Awaiting assignment') return ProposalStage.DepartmentReview;
     if (status === 'Additional approval' || status === 'CFO review') return ProposalStage.CfoReview;
-    if (status === 'F&B review') return ProposalStage.FmbReviewerPending;
+    if (status === 'F&B review') return ProposalStage.FmbReview;
     if (status === 'Submitted' || status === 'HOS/HOD review') return ProposalStage.HosHodReview;
     return fallback;
   }
