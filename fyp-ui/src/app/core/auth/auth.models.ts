@@ -2,6 +2,8 @@ export enum UserRole {
   ExternalUser = 'external-user',
   Applicant = 'applicant',
   ClubPresident = 'club-president',
+  Student = 'student',
+  Staff = 'staff',
   HosHod = 'hos-hod',
   Cfo = 'cfo',
   Fmb = 'fmb',

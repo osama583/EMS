@@ -24,9 +24,9 @@ const ROLE_LABELS = {
   'transport-manager': { label: 'Transport Manager', department: 'Transport Services' },
   'transport-staff': { label: 'Transport Driver / Staff', department: 'Transport Services' },
   'system-admin': { label: 'System Admin', department: 'System Administration' },
-  // Not part of Angular's UserRole enum (plain seeded student/staff accounts from
-  // server/db/seed-users.js, used only as proposal applicants) — fallback labels so
-  // auth.routes.js/admin.routes.js never dereference `undefined` for these roles.
+  // Plain seeded student/staff accounts from server/db/seed-users.js, used as proposal
+  // applicants (Angular's UserRole enum now includes Student/Staff, mapped to the same
+  // proposal-owner navigation as Applicant/ClubPresident — Task 4.2 fix).
   student: { label: 'Student', department: 'APU Community' },
   staff: { label: 'Staff', department: 'General Staff' },
 };

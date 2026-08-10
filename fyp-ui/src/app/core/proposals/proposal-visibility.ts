@@ -5,7 +5,7 @@ import { ProposalStage, isReviewerStage } from './proposal-status.models';
 
 export type ProposalVisibilitySection = 'inbox' | 'ongoing' | 'history';
 
-const APPLICANT_ROLES: readonly UserRole[] = [UserRole.Applicant, UserRole.ClubPresident, UserRole.ExternalUser];
+const APPLICANT_ROLES: readonly UserRole[] = [UserRole.Applicant, UserRole.ClubPresident, UserRole.ExternalUser, UserRole.Student, UserRole.Staff];
 
 // The server owns workflow transitions; this is purely a display-layer mapping from "which stage
 // is active" to "which reviewer role's inbox it belongs in" — used only to decide what Angular

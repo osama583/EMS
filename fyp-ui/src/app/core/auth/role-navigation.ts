@@ -63,6 +63,8 @@ export const ROLE_NAVIGATION: Readonly<Record<UserRole, RoleNavigation>> = {
   [UserRole.ExternalUser]: { defaultRoute: '/my-events/saved', primary: [], sections: [] },
   [UserRole.Applicant]: proposalRole('My Proposals', true),
   [UserRole.ClubPresident]: proposalRole('My Proposals', true),
+  [UserRole.Student]: proposalRole('My Proposals', true),
+  [UserRole.Staff]: proposalRole('My Proposals', true),
   [UserRole.HosHod]: proposalRole('Event Proposals'),
   [UserRole.Cfo]: (() => { const navigation = proposalRole('Event Proposals'); return { ...navigation, sections: [...navigation.sections, dropdownSettings(UserRole.Cfo)] }; })(),
   [UserRole.Fmb]: (() => {
@@ -127,6 +129,8 @@ export function roleCanUseSavedEvents(role: UserRole): boolean {
     UserRole.ExternalUser,
     UserRole.Applicant,
     UserRole.ClubPresident,
+    UserRole.Student,
+    UserRole.Staff,
     UserRole.HosHod,
     UserRole.Cfo,
     UserRole.Fmb,

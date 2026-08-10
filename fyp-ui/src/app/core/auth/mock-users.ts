@@ -6,6 +6,8 @@ const roleDetails: Readonly<Record<UserRole, { label: string; department: string
   [UserRole.ExternalUser]: { label: 'Registered External User', department: 'External Community' },
   [UserRole.Applicant]: { label: 'Applicant', department: 'APU Community' },
   [UserRole.ClubPresident]: { label: 'Club President', department: 'Student Clubs and Societies' },
+  [UserRole.Student]: { label: 'Student', department: 'APU Community' },
+  [UserRole.Staff]: { label: 'Staff', department: 'General Staff' },
   [UserRole.HosHod]: { label: 'HOS / HOD', department: 'School Leadership' },
   [UserRole.Cfo]: { label: 'CFO', department: 'Finance Office' },
   [UserRole.Fmb]: { label: 'F&B', department: 'Food & Beverage Services' },
