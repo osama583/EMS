@@ -9,8 +9,6 @@ const dropdownSettingRoutes = [
   ['dietaryInformation', 'Dietary Information'],
   ['servingUnit', 'Serving Units'],
   ['campusTourStart', 'Campus Tour Starting Points'],
-  ['campusTourArea', 'Campus Tour Areas'],
-  ['campusTourMap', 'Campus Map Information'],
   ['waterLogo', 'Mineral Water with Logo'],
   ['waterNormal', 'Mineral Water Normal'],
   ['fundingMain', 'Funding Main Items'],
