@@ -345,6 +345,28 @@ interface ReviewerComment {
           F&amp;B will edit or reassign this specific order (dish, quantity, or cafeteria) and re-send it —
           other orders for this proposal are not affected.
         </p>
+        <div class="prv-comment-area">
+          <label class="prv-comment-area__label" for="selection-reviewer-comment">
+            <span class="material-symbols-rounded" aria-hidden="true">chat_bubble</span>
+            Reviewer comment
+            <span class="prv-comment-area__required">required for resubmit</span>
+          </label>
+          <textarea
+            id="selection-reviewer-comment"
+            class="prv-comment-area__input"
+            [class.prv-comment-area__input--required]="selectionCommentValidationError()"
+            rows="4"
+            placeholder="Explain what needs to change for this order…"
+            [value]="selectionComment()"
+            (input)="onSelectionCommentInput($event)"
+          ></textarea>
+          @if (selectionCommentValidationError()) {
+            <p class="prv-comment-area__error" role="alert">
+              <span class="material-symbols-rounded" aria-hidden="true">error</span>
+              Explain what needs to change so F&amp;B can fix this order.
+            </p>
+          }
+        </div>
       </div>
     </app-form-modal>
   `,
@@ -385,6 +407,8 @@ export class ProposalDepartmentViewComponent {
   readonly selectionActionPending = signal<number | null>(null);
   readonly approveSelectionConfirm = signal<FmbSelection | null>(null);
   readonly resubmitSelectionConfirm = signal<FmbSelection | null>(null);
+  readonly selectionComment = signal('');
+  readonly selectionCommentValidationError = signal(false);
 
   // The Cafeteria Manager reviews F&B's fmb department task differently from every other
   // manager: instead of one atomic approve/resubmit for the whole task, each cafeteria
@@ -394,7 +418,12 @@ export class ProposalDepartmentViewComponent {
     this.role() === UserRole.CafeteriaManager && this.departments().includes('fmb'),
   );
 
-  readonly myCafeteriaSelections = computed<readonly FmbSelection[]>(() => this.proposal()?.fmbSelections ?? []);
+  readonly myCafeteriaSelections = computed<readonly FmbSelection[]>(() => {
+    const cafeteriaId = this.auth.user()?.cafeteriaId;
+    const selections = this.proposal()?.fmbSelections ?? [];
+    if (cafeteriaId === undefined) return [];
+    return selections.filter((selection) => selection.cafeteriaId === cafeteriaId);
+  });
 
   readonly canAct = computed(() => {
     if (this.readOnly()) return false;
@@ -531,22 +560,37 @@ export class ProposalDepartmentViewComponent {
     });
   }
 
+  onSelectionCommentInput(event: Event): void {
+    this.selectionComment.set((event.target as HTMLTextAreaElement).value);
+    if (this.selectionCommentValidationError()) this.selectionCommentValidationError.set(false);
+  }
+
   openResubmitSelectionModal(selection: FmbSelection): void {
+    if (this.selectionComment().trim().length === 0) {
+      this.selectionCommentValidationError.set(true);
+      this.resubmitSelectionConfirm.set(selection);
+      return;
+    }
+    this.selectionCommentValidationError.set(false);
     this.resubmitSelectionConfirm.set(selection);
   }
 
   confirmResubmitSelection(): void {
+    if (this.selectionComment().trim().length === 0) {
+      this.selectionCommentValidationError.set(true);
+      return;
+    }
     const selection = this.resubmitSelectionConfirm();
     this.resubmitSelectionConfirm.set(null);
-    if (selection) this.resubmitSelection(selection);
+    if (selection) this.resubmitSelection(selection, this.selectionComment().trim());
   }
 
-  private resubmitSelection(selection: FmbSelection): void {
+  private resubmitSelection(selection: FmbSelection, comment: string): void {
     const proposal = this.proposal();
     if (!proposal) return;
     this.selectionActionPending.set(selection.id);
-    this.workflow.resubmitFmbSelection(proposal.id, selection.id).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.actionBannerKind.set('info'); this.actionMessage.set('Sent back to F&B for this order only.'); this.actionComplete.emit(proposal.id); },
+    this.workflow.resubmitFmbSelection(proposal.id, selection.id, comment).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.actionBannerKind.set('info'); this.actionMessage.set('Sent back to F&B for this order only.'); this.selectionComment.set(''); this.actionComplete.emit(proposal.id); },
       error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not resubmit this order. Please try again.'); },
     });
   }

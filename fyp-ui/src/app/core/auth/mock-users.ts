@@ -25,7 +25,7 @@ const roleDetails: Readonly<Record<UserRole, { label: string; department: string
   [UserRole.SystemAdmin]: { label: 'System Admin', department: 'System Administration' },
 };
 
-const account = (email: string, displayName: string, role: UserRole): MockAuthRecord => ({
+const account = (email: string, displayName: string, role: UserRole, cafeteriaId?: number): MockAuthRecord => ({
   email,
   displayName,
   username: email.split('@', 1)[0],
@@ -34,6 +34,7 @@ const account = (email: string, displayName: string, role: UserRole): MockAuthRe
   roleLabel: roleDetails[role].label,
   department: roleDetails[role].department,
   password: 'Demo@123',
+  ...(cafeteriaId !== undefined ? { cafeteriaId } : {}),
 });
 
 export const MOCK_AUTH_USERS: readonly MockAuthRecord[] = [
@@ -42,7 +43,7 @@ export const MOCK_AUTH_USERS: readonly MockAuthRecord[] = [
   account('hoshod@demo.apu.edu.my', 'HOS / HOD Demo', UserRole.HosHod),
   account('cfo@demo.apu.edu.my', 'CFO Demo', UserRole.Cfo),
   account('fmb@demo.apu.edu.my', 'F&B Demo', UserRole.Fmb),
-  account('cafeteria.manager@demo.apu.edu.my', 'Cafeteria Manager', UserRole.CafeteriaManager),
+  account('cafeteria.manager@demo.apu.edu.my', 'Cafeteria Manager', UserRole.CafeteriaManager, 1),
   account('cafeteria.staff@demo.apu.edu.my', 'Cafeteria Staff', UserRole.CafeteriaStaff),
   account('cafeteria.admin@demo.apu.edu.my', 'Cafeteria Admin', UserRole.CafeteriaAdmin),
   account('logistics.manager@demo.apu.edu.my', 'Logistics Manager', UserRole.LogisticsManager),

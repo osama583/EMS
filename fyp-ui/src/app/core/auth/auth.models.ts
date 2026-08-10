@@ -34,6 +34,11 @@ export interface AuthUser {
   readonly roleLabel: string;
   readonly department: string;
   readonly photoUrl?: string;
+  // Set only for UserRole.CafeteriaManager — identifies which cafeteria (FmbSelection.cafeteriaId)
+  // this manager is scoped to review. No cafeteria-management feature exists yet (Task 2.9 scope);
+  // this is the minimal lookup needed to correctly filter myCafeteriaSelections in
+  // proposal-department-view.ts. Undefined for every other role.
+  readonly cafeteriaId?: number;
 }
 
 export interface PersistedExternalAccount {
