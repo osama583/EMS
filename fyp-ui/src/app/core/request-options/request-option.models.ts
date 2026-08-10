@@ -3,12 +3,10 @@ export type RequestOptionKind =
   | 'transportation'
   | 'photoVideo'
   | 'soundLight'
-  | 'fnb'
+  | 'fmb'
   | 'dietaryInformation'
   | 'servingUnit'
   | 'campusTourStart'
-  | 'campusTourArea'
-  | 'campusTourMap'
   | 'waterLogo'
   | 'waterNormal'
   | 'fundingMain'
@@ -49,7 +47,7 @@ export interface SoundLightRequestOption extends RequestOptionBase {
 }
 
 export interface FoodRequestOption extends RequestOptionBase {
-  readonly kind: 'fnb';
+  readonly kind: 'fmb';
   readonly servingUnitId?: string;
   readonly orderingNotes?: string;
   readonly dietaryInformationId?: string;
@@ -67,18 +65,6 @@ export interface CampusTourStartOption extends RequestOptionBase {
   readonly kind: 'campusTourStart';
   readonly meetingInstructions?: string;
   readonly maximumGroupSize?: number;
-}
-
-export interface CampusTourAreaOption extends RequestOptionBase {
-  readonly kind: 'campusTourArea';
-  readonly estimatedDuration?: number;
-  readonly restrictions?: string;
-}
-
-export interface CampusTourMapOption extends RequestOptionBase {
-  readonly kind: 'campusTourMap';
-  readonly mapUrl?: string;
-  readonly accessNotes?: string;
 }
 
 export interface WaterRequestOption extends RequestOptionBase {
@@ -111,8 +97,6 @@ export type RequestOption =
   | DietaryInformationOption
   | ServingUnitOption
   | CampusTourStartOption
-  | CampusTourAreaOption
-  | CampusTourMapOption
   | WaterRequestOption
   | FundingMainOption
   | FundingSubOption;

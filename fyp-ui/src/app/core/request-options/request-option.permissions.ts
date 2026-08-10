@@ -6,6 +6,6 @@ export function managerOptionKinds(role: UserRole): readonly RequestOptionKind[]
 export function canManageRequestOptions(role: UserRole, cafeteriaPage: boolean): boolean {
   const kinds = managerOptionKinds(role);
   return cafeteriaPage
-    ? kinds.some((kind) => kind === 'fnb' || kind === 'servingUnit')
-    : kinds.some((kind) => kind !== 'fnb' && kind !== 'servingUnit');
+    ? kinds.some((kind) => kind === 'fmb' || kind === 'servingUnit')
+    : kinds.some((kind) => kind !== 'fmb' && kind !== 'servingUnit');
 }

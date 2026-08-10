@@ -44,11 +44,9 @@ export class RequestOptionService {
       case 'transportation': return `Capacity: ${option.passengerCapacity} passengers${option.description ? ` · ${option.description}` : ''}`;
       case 'photoVideo': return option.maximumPersonnel ? `Up to ${option.maximumPersonnel} personnel${option.description ? ` · ${option.description}` : ''}` : option.description;
       case 'soundLight': return option.availableQuantity !== undefined ? `${option.availableQuantity} available${option.description ? ` · ${option.description}` : ''}` : option.description;
-      case 'fnb': return option.description;
+      case 'fmb': return option.description;
       case 'dietaryInformation': case 'servingUnit': return option.description;
       case 'campusTourStart': return [option.maximumGroupSize ? `Maximum group: ${option.maximumGroupSize}` : '', option.meetingInstructions ?? option.description ?? ''].filter(Boolean).join(' · ') || undefined;
-      case 'campusTourArea': return [option.estimatedDuration ? `${option.estimatedDuration} minutes` : '', option.restrictions ?? option.description ?? ''].filter(Boolean).join(' · ') || undefined;
-      case 'campusTourMap': return [option.mapUrl ?? '', option.accessNotes ?? option.description ?? ''].filter(Boolean).join(' · ') || undefined;
       case 'waterLogo': case 'waterNormal': return [`${option.bottleCount || 'Custom'} bottles`, `${option.availableStock} in stock`, option.brandingRequirement ?? option.orderingInstructions ?? ''].filter(Boolean).join(' · ');
       case 'fundingMain': return option.purchasingGuidance ?? option.description;
       case 'fundingSub': return option.purchasingNote ?? option.description;

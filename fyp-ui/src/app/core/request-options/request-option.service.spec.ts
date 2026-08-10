@@ -16,27 +16,24 @@ describe('RequestOptionService', () => {
   it('keeps manager permissions centralized by role and page', () => {
     expect(managerOptionKinds(UserRole.LogisticsManager)).toEqual(['logistics']);
     expect(managerOptionKinds(UserRole.Cfo)).toEqual(['fundingMain', 'fundingSub']);
-    expect(managerOptionKinds(UserRole.FmbManager)).toEqual(['dietaryInformation', 'waterLogo', 'waterNormal']);
-    expect(managerOptionKinds(UserRole.StudentServicesManager)).toEqual(['campusTourStart', 'campusTourArea', 'campusTourMap']);
-    expect(managerOptionKinds(UserRole.CafeteriaManager)).toEqual(['fnb', 'servingUnit']);
-    expect(canManageRequestOptions(UserRole.CafeteriaManager, true)).toBe(true);
-    expect(canManageRequestOptions(UserRole.CafeteriaManager, false)).toBe(false);
+    expect(managerOptionKinds(UserRole.Fmb)).toEqual(['fmb', 'servingUnit', 'dietaryInformation', 'waterLogo', 'waterNormal']);
+    expect(managerOptionKinds(UserRole.StudentServicesManager)).toEqual(['campusTourStart']);
+    expect(canManageRequestOptions(UserRole.Fmb, true)).toBe(true);
+    expect(canManageRequestOptions(UserRole.Fmb, false)).toBe(true);
     expect(canManageRequestOptions(UserRole.Applicant, false)).toBe(false);
     expect(roleCanAccess(UserRole.LogisticsManager, '/app/dropdown-options')).toBe(true);
-    expect(roleCanAccess(UserRole.CafeteriaManager, '/app/menu')).toBe(true);
-    expect(roleCanAccess(UserRole.CafeteriaManager, '/app/dropdown-options')).toBe(false);
+    expect(roleCanAccess(UserRole.Fmb, '/app/menu')).toBe(true);
     expect(roleCanAccess(UserRole.Cfo, '/app/dropdown-options')).toBe(true);
-    expect(roleCanAccess(UserRole.FmbManager, '/app/dropdown-options')).toBe(true);
+    expect(roleCanAccess(UserRole.Fmb, '/app/dropdown-options')).toBe(true);
     expect(roleCanAccess(UserRole.LogisticsManager, '/app/dropdown-options/logistics')).toBe(true);
     expect(roleCanAccess(UserRole.LogisticsManager, '/app/dropdown-options/soundLight')).toBe(false);
     expect(roleCanAccess(UserRole.LogisticsManager, '/app/dropdown-options/campusTourStart')).toBe(false);
     expect(roleCanAccess(UserRole.LogisticsManager, '/app/dropdown-options/waterLogo')).toBe(false);
     expect(roleCanAccess(UserRole.AvManager, '/app/dropdown-options/soundLight')).toBe(true);
     expect(roleCanAccess(UserRole.StudentServicesManager, '/app/dropdown-options/campusTourStart')).toBe(true);
-    expect(roleCanAccess(UserRole.StudentServicesManager, '/app/dropdown-options/campusTourMap')).toBe(true);
-    expect(roleCanAccess(UserRole.FmbManager, '/app/dropdown-options/waterLogo')).toBe(true);
-    expect(roleCanAccess(UserRole.CafeteriaManager, '/app/dropdown-options/servingUnit')).toBe(true);
-    expect(roleCanAccess(UserRole.CafeteriaManager, '/app/dropdown-options/dietaryInformation')).toBe(false);
+    expect(roleCanAccess(UserRole.Fmb, '/app/dropdown-options/waterLogo')).toBe(true);
+    expect(roleCanAccess(UserRole.Fmb, '/app/dropdown-options/servingUnit')).toBe(true);
+    expect(roleCanAccess(UserRole.Fmb, '/app/dropdown-options/dietaryInformation')).toBe(true);
   });
 
   it('provides API-compatible serving-unit and dietary-information IDs', async () => {
@@ -52,12 +49,12 @@ describe('RequestOptionService', () => {
 
   it('removes an option after delete()', async () => {
     const service = TestBed.inject(RequestOptionService);
-    const before = await firstValueFrom(service.watchAll(['fnb']));
+    const before = await firstValueFrom(service.watchAll(['fmb']));
     expect(before.some((option) => option.id === 'food-other')).toBe(true);
 
     await firstValueFrom(service.delete('food-other'));
 
-    const after = await firstValueFrom(service.watchAll(['fnb']));
+    const after = await firstValueFrom(service.watchAll(['fmb']));
     expect(after.some((option) => option.id === 'food-other')).toBe(false);
   });
 });
