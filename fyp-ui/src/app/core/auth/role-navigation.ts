@@ -32,8 +32,6 @@ const OPTION_NAVIGATION: Readonly<Record<RequestOptionKind, AuthNavigationItem>>
   dietaryInformation: item('Dietary Information', 'nutrition', '/app/dropdown-options/dietaryInformation'),
   servingUnit: item('Serving Units', 'straighten', '/app/dropdown-options/servingUnit'),
   campusTourStart: item('Campus Tour Starting Points', 'location_on', '/app/dropdown-options/campusTourStart'),
-  campusTourArea: item('Campus Tour Areas', 'map', '/app/dropdown-options/campusTourArea'),
-  campusTourMap: item('Campus Map Information', 'map_search', '/app/dropdown-options/campusTourMap'),
   waterLogo: item('Mineral Water with Logo', 'water_bottle', '/app/dropdown-options/waterLogo'),
   waterNormal: item('Mineral Water Normal', 'water_drop', '/app/dropdown-options/waterNormal'),
   fundingMain: item('Funding Main Items', 'account_balance_wallet', '/app/dropdown-options/fundingMain'),

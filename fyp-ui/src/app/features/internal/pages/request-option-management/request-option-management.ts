@@ -31,15 +31,15 @@ interface ManagerField {
 }
 
 const KIND_LABELS: Readonly<Record<RequestOptionKind, string>> = {
-  logistics: 'Logistics', transportation: 'Transportation', photoVideo: 'Photographer / Videographer', soundLight: 'Sound & Light', fnb: 'My Menu',
+  logistics: 'Logistics', transportation: 'Transportation', photoVideo: 'Photographer / Videographer', soundLight: 'Sound & Light', fmb: 'My Menu',
   dietaryInformation: 'Dietary Information', servingUnit: 'Serving Unit',
-  campusTourStart: 'Campus Tour — Starting Points', campusTourArea: 'Campus Tour — Tour Areas', campusTourMap: 'Campus Map Information', waterLogo: 'Mineral Water with Logo', waterNormal: 'Mineral Water Normal',
+  campusTourStart: 'Campus Tour — Starting Points', waterLogo: 'Mineral Water with Logo', waterNormal: 'Mineral Water Normal',
   fundingMain: 'Funding — Main Items', fundingSub: 'Funding — Sub-items',
 };
 
 import { ImageUploadFieldComponent } from '../../../../shared/components/image-upload-field/image-upload-field';
 
-const CAFETERIA_OPTION_KINDS: readonly RequestOptionKind[] = ['fnb', 'servingUnit'];
+const CAFETERIA_OPTION_KINDS: readonly RequestOptionKind[] = ['fmb', 'servingUnit'];
 
 @Component({
   selector: 'app-request-option-management',
@@ -61,7 +61,7 @@ export class RequestOptionManagementComponent {
   private readonly explicitKind = this.route.snapshot.data['optionKind'] as RequestOptionKind | undefined;
   private readonly managerKinds = managerOptionKinds(this.auth.user()!.role);
   readonly permittedKinds: readonly RequestOptionKind[] = this.cafeteriaPage
-    ? this.managerKinds.filter((kind) => kind === 'fnb')
+    ? this.managerKinds.filter((kind) => kind === 'fmb')
     : this.explicitKind && this.managerKinds.includes(this.explicitKind)
       ? [this.explicitKind]
       : this.managerKinds.filter((kind) => !CAFETERIA_OPTION_KINDS.includes(kind));
@@ -99,7 +99,7 @@ export class RequestOptionManagementComponent {
   });
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filteredOptions().length / this.pageSize())));
   readonly visibleOptions = computed(() => this.filteredOptions().slice((this.page() - 1) * this.pageSize(), this.page() * this.pageSize()));
-  readonly showCardToggle = computed(() => ['fnb', 'logistics', 'transportation'].includes(this.selectedKind()));
+  readonly showCardToggle = computed(() => ['fmb', 'logistics', 'transportation'].includes(this.selectedKind()));
   readonly records = computed<readonly InternalDataRecord[]>(() => this.visibleOptions().map((option) => ({
     id: option.id,
     cells: {
@@ -112,7 +112,7 @@ export class RequestOptionManagementComponent {
       eyebrow: KIND_LABELS[option.kind], status: option.active ? 'Active' : 'Inactive', title: option.label,
       details: [{ icon: 'info', text: this.details(option) || 'No additional details' }],
     },
-    actionKeys: ['fnb', 'logistics', 'transportation'].includes(option.kind) ? ['edit', 'status', 'delete'] : ['edit', 'status'],
+    actionKeys: ['fmb', 'logistics', 'transportation'].includes(option.kind) ? ['edit', 'status', 'delete'] : ['edit', 'status'],
   })));
   readonly menuCardData = computed<readonly OptionCardViewModel[]>(() =>
     this.visibleOptions().map((option) => this.toCardViewModel(option)),
@@ -132,7 +132,7 @@ export class RequestOptionManagementComponent {
           ? 'Manage the dietary information applicants and cafeteria teams can select for menu items.'
           : 'Manage the options and operational information available in applicant request popups.',
       countLabel: `${this.filteredOptions().length} option${this.filteredOptions().length === 1 ? '' : 's'}`,
-      primaryActionLabel: this.selectedKind() === 'fnb' ? 'Add menu item' : this.selectedKind() === 'servingUnit' ? 'Add serving unit' : this.selectedKind() === 'dietaryInformation' ? 'Add dietary information' : 'Add option',
+      primaryActionLabel: this.selectedKind() === 'fmb' ? 'Add menu item' : this.selectedKind() === 'servingUnit' ? 'Add serving unit' : this.selectedKind() === 'dietaryInformation' ? 'Add dietary information' : 'Add option',
     },
     search: { ariaLabel: 'Search options', placeholder: 'Search option name or details' },
     columns: [{ key: 'name', label: 'Option' }, { key: 'details', label: 'Configuration' }, { key: 'status', label: 'Status' }, { key: 'actions', label: 'Actions', actions: true }],
@@ -228,7 +228,7 @@ export class RequestOptionManagementComponent {
   kindLabel(kind: RequestOptionKind): string { return KIND_LABELS[kind]; }
   imagePreview(): string { return String(this.draft()['imageDataUrl'] ?? ''); }
   imageFileName(): string { return String(this.draft()['imageFileName'] ?? ''); }
-  supportsImage(): boolean { return ['fnb', 'logistics', 'transportation'].includes(this.selectedKind()); }
+  supportsImage(): boolean { return ['fmb', 'logistics', 'transportation'].includes(this.selectedKind()); }
   imageFieldLabel(): string {
     switch (this.selectedKind()) {
       case 'logistics': return 'Logistics Item Image';
@@ -282,7 +282,7 @@ export class RequestOptionManagementComponent {
     return draft;
   }
   private fieldsFor(kind: RequestOptionKind): readonly ManagerField[] {
-    const common: readonly ManagerField[] = [{ key: 'label', label: kind === 'fnb' ? 'Food or Service Type' : 'Option Name', type: 'text', required: true }, { key: 'description', label: 'Description', type: 'textarea' }];
+    const common: readonly ManagerField[] = [{ key: 'label', label: kind === 'fmb' ? 'Food or Service Type' : 'Option Name', type: 'text', required: true }, { key: 'description', label: 'Description', type: 'textarea' }];
     const specific: Readonly<Record<RequestOptionKind, readonly ManagerField[]>> = {
       logistics: [{ key: 'availableQuantity', label: 'Available Quantity', type: 'number', required: true, min: 0 }, { key: 'quantityUnit', label: 'Quantity Unit', type: 'text', required: true }],
       transportation: [{ key: 'passengerCapacity', label: 'Passenger Capacity', type: 'number', required: true, min: 1 }, { key: 'availableVehicles', label: 'Available Vehicle Count', type: 'number', required: true, min: 0 }, { key: 'instructions', label: 'Instructions', type: 'textarea' }],
@@ -291,7 +291,7 @@ export class RequestOptionManagementComponent {
         { key: 'availableQuantity', label: 'Available Quantity', type: 'number', required: true, min: 0 },
         { key: 'setupRequirements', label: 'Technical Description / Setup Requirements', type: 'textarea', required: true },
       ],
-      fnb: [
+      fmb: [
         { key: 'servingUnitId', label: 'Serving Unit', type: 'select', required: true, options: this.managedSelectOptions('servingUnit') },
         { key: 'orderingNotes', label: 'Availability / Ordering Notes', type: 'textarea' },
         { key: 'dietaryInformationId', label: 'Dietary Information', type: 'select', required: true, options: this.managedSelectOptions('dietaryInformation') },
@@ -299,8 +299,6 @@ export class RequestOptionManagementComponent {
       dietaryInformation: [],
       servingUnit: [],
       campusTourStart: [{ key: 'meetingInstructions', label: 'Meeting Instructions', type: 'textarea' }, { key: 'maximumGroupSize', label: 'Maximum Group Size', type: 'number', min: 1 }],
-      campusTourArea: [{ key: 'estimatedDuration', label: 'Estimated Duration (minutes)', type: 'number', min: 1 }, { key: 'restrictions', label: 'Access Restrictions / Availability Notes', type: 'textarea' }],
-      campusTourMap: [{ key: 'mapUrl', label: 'Campus Map URL', type: 'text', required: true }, { key: 'accessNotes', label: 'Map / Route Guidance', type: 'textarea' }],
       waterLogo: [{ key: 'bottleCount', label: 'Number of Bottles', type: 'number', required: true, min: 0 }, { key: 'availableStock', label: 'Available Stock', type: 'number', required: true, min: 0 }, { key: 'brandingRequirement', label: 'Logo / Branding Requirement', type: 'textarea' }, { key: 'orderingInstructions', label: 'Lead Time / Ordering Instructions', type: 'textarea' }],
       waterNormal: [{ key: 'bottleCount', label: 'Number of Bottles', type: 'number', required: true, min: 0 }, { key: 'availableStock', label: 'Available Stock', type: 'number', required: true, min: 0 }, { key: 'orderingInstructions', label: 'Ordering / Delivery Instructions', type: 'textarea' }],
       fundingMain: [{ key: 'financeCode', label: 'Budget Category / Finance Code', type: 'text' }, { key: 'purchasingGuidance', label: 'Purchasing Guidance', type: 'textarea' }],
@@ -314,11 +312,9 @@ export class RequestOptionManagementComponent {
       case 'transportation': return [`${option.passengerCapacity} passengers`, `${option.availableVehicles} vehicle(s)`, option.imageFileName ? 'Image added' : ''].filter(Boolean).join(' · ');
       case 'photoVideo': return option.maximumPersonnel ? `Maximum ${option.maximumPersonnel} personnel` : '';
       case 'soundLight': return option.availableQuantity === undefined ? option.setupRequirements ?? '' : `${option.availableQuantity} available`;
-      case 'fnb': return [this.optionLabel(option.servingUnitId), this.optionLabel(option.dietaryInformationId), option.orderingNotes, option.imageFileName ? 'Image added' : ''].filter(Boolean).join(' · ');
+      case 'fmb': return [this.optionLabel(option.servingUnitId), this.optionLabel(option.dietaryInformationId), option.orderingNotes, option.imageFileName ? 'Image added' : ''].filter(Boolean).join(' · ');
       case 'dietaryInformation': case 'servingUnit': return option.description ?? '';
       case 'campusTourStart': return [option.maximumGroupSize ? `Maximum ${option.maximumGroupSize}` : '', option.meetingInstructions].filter(Boolean).join(' · ');
-      case 'campusTourArea': return [option.estimatedDuration ? `${option.estimatedDuration} minutes` : '', option.restrictions].filter(Boolean).join(' · ');
-      case 'campusTourMap': return [option.mapUrl, option.accessNotes].filter(Boolean).join(' · ');
       case 'waterLogo': case 'waterNormal': return `${option.bottleCount || 'Custom'} bottles · ${option.availableStock} in stock`;
       case 'fundingMain': return [option.financeCode, option.purchasingGuidance].filter(Boolean).join(' · ');
       case 'fundingSub': return [this.allOptions().find((item) => item.id === option.parentId)?.label, option.financeCode].filter(Boolean).join(' · ');
@@ -345,7 +341,7 @@ export class RequestOptionManagementComponent {
       imageFileName: option.imageFileName ?? '',
     };
     switch (option.kind) {
-      case 'fnb':
+      case 'fmb':
         const unit = this.optionLabel(option.servingUnitId);
         const dietary = this.optionLabel(option.dietaryInformationId);
         return {
