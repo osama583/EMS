@@ -458,10 +458,11 @@ function editFmbSelection(selectionId, updates, actorUserId) {
 }
 
 // First staff member to claim a shared-pool task owns it — it then leaves every other
-// eligible staff member's inbox. Modeled here at the selection level: claiming means creating
-// a task_assignment row against the PARENT request_task (all fmb selections for one proposal
-// share one request_task), scoped further by which cafeteria this specific staff member is
-// assigned to (checked by the routes layer before calling this, using cafeteria_assignment).
+// eligible staff member's inbox. Modeled here at the selection level: claiming stamps
+// claimed_by_user_id directly on the request_fmb_selection row (a mock-layer addition — see
+// staff-tasks.routes.js's claimingStaffEmail), scoped further by which cafeteria this specific
+// staff member is assigned to (checked by the routes layer before calling this, using
+// cafeteria_assignment).
 function claimSharedFmbSelection(selectionId, staffUserId) {
   const selection = findFmbSelection(selectionId);
   if (selection.status !== 'approved') throw new WorkflowError('This order is not available to claim.', 400);

@@ -148,8 +148,8 @@ router.get('/', async (req, res, next) => {
     }
 
     if (role === 'cafeteria-staff' && staffUser) {
-      // Rows this staff member has already claimed (preparing/fulfilled) — recovered via
-      // workflow_history since request_fmb_selection has no staff-identity column of its own.
+      // Rows this staff member has already claimed (preparing/fulfilled) — resolved via
+      // claimed_by_user_id, stamped directly on the selection row by claimSharedFmbSelection.
       for (const selection of db.request_fmb_selection) {
         if (selection.status !== 'preparing' && selection.status !== 'fulfilled') continue;
         if (claimingStaffEmail(selection.request_fmb_selection_id) === assignedToEmail) {

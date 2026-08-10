@@ -5,11 +5,18 @@ const { ROLE_LABELS } = require('../services/role-labels');
 const router = express.Router();
 
 // Only meaningful for a Cafeteria Manager — identifies which cafeteria (FmbSelection.cafeteriaId)
-// this manager is scoped to review (see AuthUser.cafeteriaId in auth.models.ts). Follows the
-// same cafeteria_assignment lookup pattern as staff-tasks.routes.js's shared-inbox scoping.
+// this manager is scoped to review (see AuthUser.cafeteriaId in auth.models.ts, documented as
+// "Set only for UserRole.CafeteriaManager"). Cafeteria-staff are intentionally excluded even
+// though they also have cafeteria_assignment rows, matching that contract. A manager can be
+// assigned to multiple cafeterias (see seed-cafeteria.js); pick the lowest cafeteria_id
+// deterministically rather than depending on array insertion order.
 function cafeteriaIdFor(user) {
-  const assignment = db.cafeteria_assignment.find((a) => a.user_id === user.user_id);
-  return assignment ? assignment.cafeteria_id : undefined;
+  if (user.role !== 'cafeteria-manager') return undefined;
+  const assignments = db.cafeteria_assignment.filter(
+    (a) => a.user_id === user.user_id && a.assignment_role === 'manager',
+  );
+  if (assignments.length === 0) return undefined;
+  return Math.min(...assignments.map((a) => a.cafeteria_id));
 }
 
 function departmentFor(user) {
