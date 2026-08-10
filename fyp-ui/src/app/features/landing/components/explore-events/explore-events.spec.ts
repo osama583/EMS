@@ -91,11 +91,20 @@ describe('ExploreEventsComponent', () => {
     saveButton.click();
     fixture.detectChanges();
 
+    httpMock.expectOne((req) => req.method === 'POST' && req.url === `${environment.eventEngagementApiUrl}/saved`)
+      .flush({ eventId: 'evt-1', saved: true });
+    fixture.detectChanges();
+
     expect(saveButton.getAttribute('aria-pressed')).toBe('true');
     expect(saveButton.classList.contains('save-event--saved')).toBe(true);
 
     saveButton.click();
     fixture.detectChanges();
+
+    httpMock.expectOne((req) => req.method === 'DELETE' && req.url.startsWith(`${environment.eventEngagementApiUrl}/saved/`))
+      .flush({ eventId: 'evt-1', saved: false });
+    fixture.detectChanges();
+
     expect(saveButton.getAttribute('aria-pressed')).toBe('false');
   });
 

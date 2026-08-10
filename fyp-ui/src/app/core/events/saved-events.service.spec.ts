@@ -43,14 +43,20 @@ describe('event engagement mock services', () => {
     const saved = TestBed.inject(SavedEventsService);
     loginViaMock(auth, httpMock);
 
-    await firstValueFrom(saved.saveEvent(auth.user()!.email, 'evt-1'));
+    const savePromise = firstValueFrom(saved.saveEvent(auth.user()!.email, 'evt-1'));
+    httpMock.expectOne(`${environment.eventEngagementApiUrl}/saved`).flush({ eventId: 'evt-1', saved: true });
+    await savePromise;
     expect(saved.isSaved('evt-1')).toBe(true);
 
     const savedEventsPromise = firstValueFrom(saved.getSavedEvents(auth.user()!.email));
-    httpMock.expectOne(environment.eventsApiUrl).flush([{ id: 'evt-1' }, { id: 'evt-2' }]);
+    httpMock.expectOne((req) => req.method === 'GET' && req.url === `${environment.eventEngagementApiUrl}/saved`)
+      .flush({ items: [{ id: 'evt-1' }, { id: 'evt-2' }], total: 2 });
     expect((await savedEventsPromise).items[0]?.id).toBe('evt-1');
 
-    await firstValueFrom(saved.removeSavedEvent(auth.user()!.email, 'evt-1'));
+    const removePromise = firstValueFrom(saved.removeSavedEvent(auth.user()!.email, 'evt-1'));
+    httpMock.expectOne((req) => req.method === 'DELETE' && req.url === `${environment.eventEngagementApiUrl}/saved/evt-1`)
+      .flush({ eventId: 'evt-1', saved: false });
+    await removePromise;
     expect(saved.isSaved('evt-1')).toBe(false);
   });
 

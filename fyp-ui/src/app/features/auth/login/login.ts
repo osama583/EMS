@@ -92,6 +92,8 @@ export class LoginComponent implements OnDestroy {
     const pendingEventId = this.guestFlow.pendingEventId();
     const requested = this.route.snapshot.queryParamMap.get('returnUrl');
 
+    this.savedEvents.refresh();
+
     if (pendingEventId && roleCanUseSavedEvents(user.role)) {
       this.savedEvents.saveEvent(user.email, pendingEventId).subscribe();
     }
