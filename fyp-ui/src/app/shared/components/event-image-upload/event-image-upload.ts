@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
-import { EventImageUploadApi, MockEventImageUploadService } from '../../../core/events/event-image-upload.service';
+import { EVENT_IMAGE_UPLOAD_API, EventImageUploadApi } from '../../../core/events/event-image-upload.service';
 import { EventImageAsset } from '../../../core/events/published-event.models';
 import { ValidationMessageComponent } from '../validation-message/validation-message';
 
 @Component({
   selector: 'app-event-image-upload',
   imports: [ValidationMessageComponent],
-  providers: [{ provide: EventImageUploadApi, useExisting: MockEventImageUploadService }],
+  providers: [{ provide: EventImageUploadApi, useFactory: () => inject(EVENT_IMAGE_UPLOAD_API) }],
   template: `
     <section class="event-image-upload" [class.event-image-upload--invalid]="!!error()" aria-labelledby="event-image-label">
       <header>

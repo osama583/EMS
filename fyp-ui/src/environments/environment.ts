@@ -13,4 +13,5 @@ export const environment = {
   configApiUrl: '/api/config',
   imageUploadApiUrl: '/api/uploads',
   mockUsers: MOCK_AUTH_USERS,
+  useMockImageUpload: true,
 } as const;
