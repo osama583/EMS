@@ -1,7 +1,7 @@
 import { EditableRow } from '../../shared/components/form-controls/form-controls.models';
 import { DepartmentRequestKind } from '../departments/department-workflow.config';
 import { ProposalDepartmentKey, ProposalDepartmentRequest, ProposalReviewRecord } from './proposal-review.models';
-import { ProposalStage, ProposalWorkflowState, initialWorkflowState } from './proposal-status.models';
+import { ProposalStage, ProposalWorkflowState } from './proposal-status.models';
 
 const REQUEST_DETAILS: Readonly<Record<ProposalDepartmentKey, readonly Omit<ProposalDepartmentRequest, 'id' | 'department'>[]>> = {
   campusTour: [{ item: 'Campus overview tour', quantity: '30 visitors', schedule: '8 Aug 2026 - 3:00 PM-4:00 PM', location: 'Main Lobby', notes: 'Include innovation labs and student spaces.' }],
@@ -11,14 +11,14 @@ const REQUEST_DETAILS: Readonly<Record<ProposalDepartmentKey, readonly Omit<Prop
   soundLight: [{ item: 'Main-stage sound and lighting', quantity: '1 complete setup', schedule: '8 Aug 2026 · 2:00 PM–10:00 PM', location: 'Atrium stage', notes: 'Wireless microphones, digital mixer and stage wash.' }],
   photoVideo: [{ item: 'Photography and videography coverage', quantity: '2 photographers · 1 videographer', schedule: '8 Aug 2026 · 4:00 PM–10:00 PM', location: 'Atrium', notes: 'Cover performances, guests and awards presentation.' }],
   transportation: [{ item: 'Campus shuttle', quantity: '28 pax · 40-seat bus', schedule: '8 Aug 2026 · 3:00 PM–10:30 PM', location: 'APU Residence ↔ Campus', notes: 'Two scheduled pickup windows.' }],
-  fnb: [{ item: 'International buffet service', quantity: '180 meals', schedule: '8 Aug 2026 · 6:00 PM–8:00 PM', location: 'Atrium dining zone', notes: 'Halal and vegetarian selections required.' }],
+  fmb: [{ item: 'International buffet service', quantity: '180 meals', schedule: '8 Aug 2026 · 6:00 PM–8:00 PM', location: 'Atrium dining zone', notes: 'Halal and vegetarian selections required.' }],
   fundingPurchase: [{ item: 'Event materials and participant kits', quantity: '180 kits', schedule: 'Required by 6 Aug 2026', location: 'Student Affairs', notes: 'Estimated total RM 3,600.' }],
 };
 
 // Every seed proposal requests the same representative set of departments so each mock record
 // exercises the full multi-department review flow; totalPax (per-proposal) decides whether the
-// F&B-reviewer/CFO stages apply.
-const SELECTED_REQUIREMENTS: readonly DepartmentRequestKind[] = ['logistics', 'fnb', 'photoVideo'];
+// F&B/CFO reviewer stages apply.
+const SELECTED_REQUIREMENTS: readonly DepartmentRequestKind[] = ['logistics', 'fmb', 'photoVideo'];
 
 const requests = (seed: number): readonly ProposalDepartmentRequest[] =>
   SELECTED_REQUIREMENTS.map((department, index) => ({ id: seed * 10 + index, department, ...REQUEST_DETAILS[department][0] }));
@@ -103,36 +103,43 @@ const proposal = (
 
 function workflowStatusLabel(workflow: ProposalWorkflowState): string {
   switch (workflow.stage) {
+    case ProposalStage.Submitted: return 'Submitted';
     case ProposalStage.HosHodReview: return 'HOS/HOD review';
-    case ProposalStage.FmbReviewerPending: return 'F&B review';
-    case ProposalStage.CfoReview: return 'Additional approval';
+    case ProposalStage.FmbReview: return 'F&B review';
+    case ProposalStage.CfoReview: return 'CFO review';
     case ProposalStage.DepartmentReview: return 'Department review';
+    case ProposalStage.ResubmissionRequired: return 'Revision required';
     case ProposalStage.Approved: return 'Approved';
     case ProposalStage.Rejected: return 'Rejected';
-    case ProposalStage.NeedsRevision: return 'Revision required';
+    case ProposalStage.Cancelled: return 'Cancelled';
     default: return 'Submitted';
   }
 }
 
-const workflowAt = (stage: ProposalStage, totalPax: number): ProposalWorkflowState => ({
-  ...initialWorkflowState(SELECTED_REQUIREMENTS),
+const workflowAt = (stage: ProposalStage): ProposalWorkflowState => ({
   stage,
+  departmentConfirmations: SELECTED_REQUIREMENTS.map((department) => ({ department, confirmed: false })),
+});
+
+const allConfirmed = (stage: ProposalStage): ProposalWorkflowState => ({
+  stage,
+  departmentConfirmations: SELECTED_REQUIREMENTS.map((department) => ({ department, confirmed: true, confirmedAt: new Date().toISOString(), confirmedBy: 'demo@apu.edu.my' })),
 });
 
 export const PROPOSAL_REVIEW_RECORDS: readonly ProposalReviewRecord[] = [
-  proposal(1, 'EVT-260142', 'APU Cultural Night 2026', 'Aina Rahman', '8 Aug 2026 · 4:00 PM–10:00 PM · Atrium', 'An evening celebrating APU’s international community through performances, food and student-led cultural showcases.', 'Strengthen cross-cultural understanding and create a welcoming platform for student communities.', 'Greater student participation, cultural awareness and stronger connections across the university.', 180, workflowAt(ProposalStage.DepartmentReview, 180), 'Culture & Community'),
-  proposal(2, 'EVT-260137', 'Future Tech Showcase', 'Daniel Wong', '12 Aug 2026 · 10:00 AM–5:00 PM · Design Studio', 'A showcase of student technology projects, demonstrations and industry conversations.', 'Connect student innovators with peers, academics and industry representatives.', 'Improved project visibility, professional feedback and collaboration opportunities.', 95, workflowAt(ProposalStage.HosHodReview, 95), 'Academic & Career'),
-  proposal(3, 'EVT-260129', 'APU Sports Carnival', 'Nur Izzati', '16 Aug 2026 · 8:00 AM–6:00 PM · Sports Centre', 'A university-wide day of team sports, wellness activities and friendly competition.', 'Encourage active lifestyles and collaboration between schools and departments.', 'Improved wellbeing, teamwork and community participation.', 320, workflowAt(ProposalStage.CfoReview, 320), 'Sports & Wellness'),
-  proposal(4, 'EVT-260121', 'Career Connections Forum', 'Marcus Lim', '20 Aug 2026 · 1:00 PM–6:00 PM · Auditorium 2', 'A networking forum connecting students with employers and alumni.', 'Help students understand career pathways and build professional networks.', 'Greater career awareness and direct employer engagement.', 140, workflowAt(ProposalStage.FmbReviewerPending, 140), 'Academic & Career'),
-  proposal(5, 'EVT-260114', 'Community Volunteer Day', 'Priya Nair', '24 Aug 2026 · 7:30 AM–5:00 PM · Klang', 'A coordinated volunteering programme supporting a local community partner.', 'Create meaningful service-learning opportunities for APU students.', 'Community impact, stronger civic awareness and practical teamwork experience.', 72, workflowAt(ProposalStage.DepartmentReview, 72), 'Volunteering'),
-  proposal(6, 'EVT-260082', 'Graduate Networking Evening', 'Sarah Tan', '23 Jul 2026 · 5:00 PM–8:30 PM · Auditorium 2', 'An evening for graduating students to connect with alumni and industry guests.', 'Support graduate employability and professional relationship-building.', 'New career connections and improved confidence in professional networking.', 90, { ...workflowAt(ProposalStage.Approved, 90), departmentConfirmations: initialWorkflowState(SELECTED_REQUIREMENTS).departmentConfirmations.map((entry) => ({ ...entry, confirmed: true })) }, 'Academic & Career'),
-  proposal(7, 'EVT-260074', 'Clubs and Societies Fair', 'Amir Hassan', '18 Jul 2026 · 10:00 AM–4:00 PM · Spine', 'A discovery fair introducing students to APU clubs, societies and communities.', 'Increase awareness and membership of student-led organisations.', 'Stronger campus participation and easier access to student communities.', 260, { ...workflowAt(ProposalStage.Approved, 260), departmentConfirmations: initialWorkflowState(SELECTED_REQUIREMENTS).departmentConfirmations.map((entry) => ({ ...entry, confirmed: true })) }, 'Clubs & Societies'),
-  proposal(8, 'EVT-260066', 'Wellness Weekend', 'Mei Chen', '12 Jul 2026 · 9:00 AM–5:00 PM · Sports Centre', 'A weekend programme focused on physical and mental wellbeing.', 'Give students practical ways to maintain healthy routines.', 'Improved wellbeing awareness and access to support activities.', 110, { ...workflowAt(ProposalStage.Approved, 110), departmentConfirmations: initialWorkflowState(SELECTED_REQUIREMENTS).departmentConfirmations.map((entry) => ({ ...entry, confirmed: true })) }, 'Sports & Wellness'),
+  proposal(1, 'EVT-260142', 'APU Cultural Night 2026', 'Aina Rahman', '8 Aug 2026 · 4:00 PM–10:00 PM · Atrium', 'An evening celebrating APU’s international community through performances, food and student-led cultural showcases.', 'Strengthen cross-cultural understanding and create a welcoming platform for student communities.', 'Greater student participation, cultural awareness and stronger connections across the university.', 180, workflowAt(ProposalStage.DepartmentReview), 'Culture & Community'),
+  proposal(2, 'EVT-260137', 'Future Tech Showcase', 'Daniel Wong', '12 Aug 2026 · 10:00 AM–5:00 PM · Design Studio', 'A showcase of student technology projects, demonstrations and industry conversations.', 'Connect student innovators with peers, academics and industry representatives.', 'Improved project visibility, professional feedback and collaboration opportunities.', 95, workflowAt(ProposalStage.HosHodReview), 'Academic & Career'),
+  proposal(3, 'EVT-260129', 'APU Sports Carnival', 'Nur Izzati', '16 Aug 2026 · 8:00 AM–6:00 PM · Sports Centre', 'A university-wide day of team sports, wellness activities and friendly competition.', 'Encourage active lifestyles and collaboration between schools and departments.', 'Improved wellbeing, teamwork and community participation.', 320, workflowAt(ProposalStage.CfoReview), 'Sports & Wellness'),
+  proposal(4, 'EVT-260121', 'Career Connections Forum', 'Marcus Lim', '20 Aug 2026 · 1:00 PM–6:00 PM · Auditorium 2', 'A networking forum connecting students with employers and alumni.', 'Help students understand career pathways and build professional networks.', 'Greater career awareness and direct employer engagement.', 140, workflowAt(ProposalStage.FmbReview), 'Academic & Career'),
+  proposal(5, 'EVT-260114', 'Community Volunteer Day', 'Priya Nair', '24 Aug 2026 · 7:30 AM–5:00 PM · Klang', 'A coordinated volunteering programme supporting a local community partner.', 'Create meaningful service-learning opportunities for APU students.', 'Community impact, stronger civic awareness and practical teamwork experience.', 72, workflowAt(ProposalStage.DepartmentReview), 'Volunteering'),
+  proposal(6, 'EVT-260082', 'Graduate Networking Evening', 'Sarah Tan', '23 Jul 2026 · 5:00 PM–8:30 PM · Auditorium 2', 'An evening for graduating students to connect with alumni and industry guests.', 'Support graduate employability and professional relationship-building.', 'New career connections and improved confidence in professional networking.', 90, allConfirmed(ProposalStage.Approved), 'Academic & Career'),
+  proposal(7, 'EVT-260074', 'Clubs and Societies Fair', 'Amir Hassan', '18 Jul 2026 · 10:00 AM–4:00 PM · Spine', 'A discovery fair introducing students to APU clubs, societies and communities.', 'Increase awareness and membership of student-led organisations.', 'Stronger campus participation and easier access to student communities.', 260, allConfirmed(ProposalStage.Approved), 'Clubs & Societies'),
+  proposal(8, 'EVT-260066', 'Wellness Weekend', 'Mei Chen', '12 Jul 2026 · 9:00 AM–5:00 PM · Sports Centre', 'A weekend programme focused on physical and mental wellbeing.', 'Give students practical ways to maintain healthy routines.', 'Improved wellbeing awareness and access to support activities.', 110, allConfirmed(ProposalStage.Approved), 'Sports & Wellness'),
 ];
 
 export function proposalForTitle(title: string, fallbackId = 1000): ProposalReviewRecord {
   return (
     PROPOSAL_REVIEW_RECORDS.find((record) => record.eventTitle === title) ??
-    proposal(fallbackId, `EVT-${String(fallbackId).padStart(6, '0')}`, title, 'APU Applicant', 'Schedule pending', 'Event proposal information submitted for review.', 'Deliver the planned event successfully.', 'Provide a valuable experience for the APU community.', 0, workflowAt(ProposalStage.HosHodReview, 0), 'General')
+    proposal(fallbackId, `EVT-${String(fallbackId).padStart(6, '0')}`, title, 'APU Applicant', 'Schedule pending', 'Event proposal information submitted for review.', 'Deliver the planned event successfully.', 'Provide a valuable experience for the APU community.', 0, workflowAt(ProposalStage.HosHodReview), 'General')
   );
 }

@@ -9,7 +9,7 @@ export type DepartmentRequestKind =
   | 'soundLight'
   | 'photoVideo'
   | 'transportation'
-  | 'fnb'
+  | 'fmb'
   | 'fundingPurchase';
 
 export interface DepartmentWorkflowConfig {
