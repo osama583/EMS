@@ -237,6 +237,7 @@ function seedRequests(db, nextId) {
     eventTitle: 'Clubs and Societies Fair', shortIntroduction: 'A discovery fair introducing students to APU clubs and societies.',
     goals: 'Increase awareness and membership of student-led organisations.', benefits: 'Stronger campus participation.',
     totalPax: 260, categories: ['Clubs & Societies'], requirements: ['logistics'],
+    registrationApproval: 'Approval Required',
     schedule: { date: '2026-07-18', start: '10:00', end: '16:00', location: 'Spine' },
   });
   addLogisticsRequest(db, nextId, r9, { item: 'Display booths', quantity: 24, date: '2026-07-18', start: '08:00', end: '16:00', location: 'Spine', notes: null });

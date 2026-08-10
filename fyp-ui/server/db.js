@@ -14,6 +14,7 @@ const seedCategories = require('./db/seed-categories');
 const seedConfig = require('./db/seed-config');
 const seedOptions = require('./db/seed-options');
 const { seedRequests } = require('./db/seed-requests');
+const seedRegistrations = require('./db/seed-registrations');
 const workflowService = require('./services/workflow.service');
 
 const TABLE_NAMES = [
@@ -67,5 +68,6 @@ seedConfig(db, nextId);
 seedOptions(db, nextId);
 workflowService.init(db, nextId);
 seedRequests(db, nextId);
+seedRegistrations(db, nextId);
 
 module.exports = { db, nextId, TABLE_NAMES };
