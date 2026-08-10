@@ -12,6 +12,12 @@ function init(dbRef, nextIdRef) {
   nextId = nextIdRef;
 }
 
+function assertInit() {
+  if (!db || !nextId) {
+    throw new Error('workflow.service: init(db, nextId) must be called once at startup before any other export is used.');
+  }
+}
+
 class WorkflowError extends Error {
   constructor(message, status = 400) {
     super(message);
