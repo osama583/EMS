@@ -1,25 +1,56 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { environment } from '../../../../../environments/environment';
+import { PublishedEvent } from '../../../../core/events/published-event.models';
 import { ExploreEventsComponent } from './explore-events';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { UserRole } from '../../../../core/auth/auth.models';
 
+const MOCK_PUBLISHED_EVENTS: readonly PublishedEvent[] = Array.from({ length: 8 }, (_, index) => ({
+  id: `evt-${index + 1}`,
+  eventTitle: `Mock Event ${index + 1}`,
+  shortIntroduction: 'Mock introduction.',
+  goals: 'Mock goals.',
+  expectedBenefits: 'Mock benefits.',
+  categories: ['Academic & Career'],
+  eventVisibility: 'Public',
+  eventFormat: 'On Campus',
+  eventImage: { url: '/assets/events/mock.jpg', fileName: 'mock.jpg', mimeType: 'image/jpeg', sizeBytes: 0, status: 'uploaded' },
+  schoolDepartment: 'Student Affairs',
+  audience: ['APU Community'],
+  schedule: [{ date: '2026-12-01', start: '10:00', end: '12:00', location: 'APU Atrium' }],
+  totalExpectedPax: 100,
+  registrationMode: 'Automatic',
+  confirmedRegistrationCount: 10,
+  pendingRegistrationCount: 0,
+  isFree: true,
+}));
+
 describe('ExploreEventsComponent', () => {
   let fixture: ComponentFixture<ExploreEventsComponent>;
   let component: ExploreEventsComponent;
+  let httpMock: HttpTestingController;
 
   beforeEach(async () => {
     localStorage.removeItem('apu-ems-auth-user');
     localStorage.removeItem('apu-ems-event-engagement');
     await TestBed.configureTestingModule({
       imports: [ExploreEventsComponent],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(ExploreEventsComponent);
     component = fixture.componentInstance;
+    httpMock = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+    httpMock.expectOne(environment.eventsApiUrl).flush(MOCK_PUBLISHED_EVENTS);
     fixture.detectChanges();
   });
 
   afterEach(() => {
+    httpMock.verify();
     fixture.destroy();
     TestBed.resetTestingModule();
     document.body.classList.remove('filters-open');

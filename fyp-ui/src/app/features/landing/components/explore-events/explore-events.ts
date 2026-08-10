@@ -12,7 +12,8 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { PublishedEvent } from '../../../../core/events/published-event.models';
+import { forkJoin } from 'rxjs';
+import { PublishedEvent, RegistrationStatus } from '../../../../core/events/published-event.models';
 import { SystemConfigService } from '../../../../core/config/system-config.service';
 import { PublishedEventService } from '../../../../core/events/published-event.service';
 import { EventFavouriteService } from '../../../../core/events/event-favourite.service';
@@ -252,9 +253,12 @@ export class ExploreEventsComponent {
   readonly currentPage = signal(1);
   readonly pageSize = signal(9);
 
-  registrationCount(id: number): number { return this.publishedEventService.events().find((event) => event.id === `evt-${id}`)?.confirmedRegistrationCount ?? 0; }
-  publishedEvent(id: number): PublishedEvent { return this.publishedEventService.events().find((event) => event.id === `evt-${id}`)!; }
-  openEvent(id: number): void { this.selectedPublishedEvent.set(this.publishedEventService.events().find((event) => event.id === `evt-${id}`) ?? null); }
+  private readonly publishedEventsById = signal<ReadonlyMap<string, PublishedEvent>>(new Map());
+  private readonly registrationStatusByEventId = signal<ReadonlyMap<string, RegistrationStatus | null>>(new Map());
+
+  registrationCount(id: number): number { return this.publishedEventsById().get(`evt-${id}`)?.confirmedRegistrationCount ?? 0; }
+  publishedEvent(id: number): PublishedEvent | undefined { return this.publishedEventsById().get(`evt-${id}`); }
+  openEvent(id: number): void { this.selectedPublishedEvent.set(this.publishedEventsById().get(`evt-${id}`) ?? null); }
   closeEvent(): void { this.selectedPublishedEvent.set(null); }
 
   readonly schoolOptions = computed(() =>
@@ -356,6 +360,37 @@ export class ExploreEventsComponent {
     this.destroyRef.onDestroy(() => {
       this.document.body.classList.remove('filters-open');
     });
+    this.loadPublishedEvents();
+  }
+
+  private loadPublishedEvents(): void {
+    this.publishedEventService.getPublishedEvents().subscribe({
+      next: (events) => {
+        this.publishedEventsById.set(new Map(events.map((event) => [event.id, event])));
+        this.loadRegistrationStatuses(events);
+      },
+      error: () => this.publishedEventsById.set(new Map()),
+    });
+  }
+
+  private loadRegistrationStatuses(events: readonly PublishedEvent[]): void {
+    const email = this.auth.user()?.email;
+    if (!email || events.length === 0) {
+      this.registrationStatusByEventId.set(new Map());
+      return;
+    }
+    forkJoin(
+      events.map((event) =>
+        this.publishedEventService.getMyRegistration(event.id, email),
+      ),
+    ).subscribe({
+      next: (registrations) => {
+        this.registrationStatusByEventId.set(
+          new Map(events.map((event, index) => [event.id, registrations[index]?.status ?? null])),
+        );
+      },
+      error: () => this.registrationStatusByEventId.set(new Map()),
+    });
   }
 
   @HostListener('document:keydown.escape')
@@ -455,9 +490,8 @@ export class ExploreEventsComponent {
   toggleSaved(eventId: string): void { this.favourites.toggle(eventId); }
   isSaved(eventId: string): boolean { return this.favourites.isSaved(eventId); }
 
-  registrationStatus(eventId: string) {
-    const email = this.auth.user()?.email;
-    return email ? this.publishedEventService.registrationStatus(eventId, email) : null;
+  registrationStatus(eventId: string): RegistrationStatus | null {
+    return this.registrationStatusByEventId().get(eventId) ?? null;
   }
 
   registerForEvent(eventId: string): void {
@@ -470,7 +504,10 @@ export class ExploreEventsComponent {
     if (this.registeringEventId()) return;
     this.registeringEventId.set(eventId);
     this.publishedEventService.registerForEvent(eventId, user.email).subscribe({
-      next: () => this.registeringEventId.set(null),
+      next: () => {
+        this.registeringEventId.set(null);
+        this.loadRegistrationStatuses([...this.publishedEventsById().values()]);
+      },
       error: () => this.registeringEventId.set(null),
     });
   }

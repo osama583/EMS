@@ -45,7 +45,10 @@ describe('event engagement mock services', () => {
 
     await firstValueFrom(saved.saveEvent(auth.user()!.email, 'evt-1'));
     expect(saved.isSaved('evt-1')).toBe(true);
-    expect((await firstValueFrom(saved.getSavedEvents(auth.user()!.email))).items[0]?.id).toBe('evt-1');
+
+    const savedEventsPromise = firstValueFrom(saved.getSavedEvents(auth.user()!.email));
+    httpMock.expectOne(environment.eventsApiUrl).flush([{ id: 'evt-1' }, { id: 'evt-2' }]);
+    expect((await savedEventsPromise).items[0]?.id).toBe('evt-1');
 
     await firstValueFrom(saved.removeSavedEvent(auth.user()!.email, 'evt-1'));
     expect(saved.isSaved('evt-1')).toBe(false);

@@ -70,15 +70,17 @@
     @if (pagedEvents().length > 0) {
       <div class="explore-grid">
         @for (event of pagedEvents(); track event.id) {
-          <app-event-card
-            [event]="publishedEvent(event.id)"
-            [saved]="isSaved(publishedEvent(event.id).id)"
-            [registrationStatus]="registrationStatus(publishedEvent(event.id).id)"
-            [registering]="registeringEventId() === publishedEvent(event.id).id"
-            (favourite)="toggleSaved($event)"
-            (explore)="selectedPublishedEvent.set($event)"
-            (register)="registerForEvent($event)"
-          />
+          @if (publishedEvent(event.id); as pub) {
+            <app-event-card
+              [event]="pub"
+              [saved]="isSaved(pub.id)"
+              [registrationStatus]="registrationStatus(pub.id)"
+              [registering]="registeringEventId() === pub.id"
+              (favourite)="toggleSaved($event)"
+              (explore)="selectedPublishedEvent.set($event)"
+              (register)="registerForEvent($event)"
+            />
+          }
         }
       </div>
 
@@ -105,15 +107,17 @@
     @if (pagedEvents().length > 0) {
       <div class="explore-grid">
         @for (event of pagedEvents(); track event.id) {
-          <app-event-card
-            [event]="publishedEvent(event.id)"
-            [saved]="isSaved(publishedEvent(event.id).id)"
-            [registrationStatus]="registrationStatus(publishedEvent(event.id).id)"
-            [registering]="registeringEventId() === publishedEvent(event.id).id"
-            (favourite)="toggleSaved($event)"
-            (explore)="selectedPublishedEvent.set($event)"
-            (register)="registerForEvent($event)"
-          />
+          @if (publishedEvent(event.id); as pub) {
+            <app-event-card
+              [event]="pub"
+              [saved]="isSaved(pub.id)"
+              [registrationStatus]="registrationStatus(pub.id)"
+              [registering]="registeringEventId() === pub.id"
+              (favourite)="toggleSaved($event)"
+              (explore)="selectedPublishedEvent.set($event)"
+              (register)="registerForEvent($event)"
+            />
+          }
         }
       </div>
 

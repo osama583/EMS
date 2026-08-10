@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import { AuthService } from '../../../core/auth/auth.service';
-import { PublishedEvent } from '../../../core/events/published-event.models';
+import { EventRegistration, PublishedEvent } from '../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../core/events/published-event.service';
 import { FormFieldComponent } from '../form-controls/form-field';
 import { FormModalComponent } from '../form-modal/form-modal';
@@ -131,11 +131,9 @@ export class EventDetailsModalComponent {
   readonly resultTone = signal<'success' | 'error'>('success');
   readonly registering = signal(false);
   readonly emailValid = () => /^\S+@\S+\.\S+$/.test(this.email().trim());
+  private readonly myRegistrationStatus = signal<EventRegistration['status'] | null>(null);
   readonly alreadyRegistered = computed(() => {
-    const item = this.event();
-    const userEmail = this.auth.user()?.email;
-    if (!item || !userEmail) return null;
-    const status = this.service.registrationStatus(item.id, userEmail);
+    const status = this.myRegistrationStatus();
     return status === 'confirmed' || status === 'pending' ? status : null;
   });
   private readonly imageTrigger = viewChild<ElementRef<HTMLButtonElement>>('imageTrigger');
@@ -147,9 +145,21 @@ export class EventDetailsModalComponent {
         this.email.set(this.auth.user()?.email ?? '');
         this.emailError.set('');
         this.message.set('');
+        this.loadMyRegistration();
       } else {
         this.imagePreviewOpen.set(false);
       }
+    });
+  }
+
+  private loadMyRegistration(): void {
+    const item = this.event();
+    const userEmail = this.auth.user()?.email;
+    this.myRegistrationStatus.set(null);
+    if (!item || !userEmail) return;
+    this.service.getMyRegistration(item.id, userEmail).subscribe({
+      next: (registration) => this.myRegistrationStatus.set(registration?.status ?? null),
+      error: () => this.myRegistrationStatus.set(null),
     });
   }
 
@@ -185,6 +195,7 @@ export class EventDetailsModalComponent {
         this.registering.set(false);
         this.message.set(result.message);
         this.resultTone.set(result.status === 'rejected' || result.status === 'duplicate' ? 'error' : 'success');
+        this.loadMyRegistration();
       },
       error: () => {
         this.registering.set(false);

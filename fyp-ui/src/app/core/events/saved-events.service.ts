@@ -1,6 +1,6 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, effect, inject, signal } from '@angular/core';
-import { Observable, delay, of } from 'rxjs';
+import { Observable, delay, map, of } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
 import { PublishedEventService } from './published-event.service';
 import {
@@ -45,8 +45,13 @@ export class SavedEventsService implements SavedEventsApi {
 
   getSavedEvents(userEmail: string): Observable<SavedEventsResponse> {
     const ids = new Set(this.state.savedByUser[this.key(userEmail)] ?? []);
-    const items = this.events.events().filter((event) => ids.has(event.id));
-    return of({ items, total: items.length }).pipe(delay(120));
+    return this.events.getPublishedEvents().pipe(
+      delay(120),
+      map((events) => {
+        const items = events.filter((event) => ids.has(event.id));
+        return { items, total: items.length };
+      }),
+    );
   }
 
   saveEvent(userEmail: string, eventId: string): Observable<SavedEventMutationResponse> {

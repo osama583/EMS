@@ -182,10 +182,18 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
   readonly progressCycle = signal(0);
   readonly isProgressPaused = signal(true);
   readonly selectedPublishedEvent = signal<PublishedEvent | null>(null);
+  private readonly publishedEventsByTitle = signal<ReadonlyMap<string, PublishedEvent>>(new Map());
 
-  registrationCount(title: string): number { return this.publishedEventService.events().find((event) => event.eventTitle === title)?.confirmedRegistrationCount ?? 0; }
-  openEvent(): void { this.selectedPublishedEvent.set(this.publishedEventService.events().find((event) => event.eventTitle === this.activeEvent().title) ?? null); }
+  registrationCount(title: string): number { return this.publishedEventsByTitle().get(title)?.confirmedRegistrationCount ?? 0; }
+  openEvent(): void { this.selectedPublishedEvent.set(this.publishedEventsByTitle().get(this.activeEvent().title) ?? null); }
   closeEvent(): void { this.selectedPublishedEvent.set(null); }
+
+  constructor() {
+    this.publishedEventService.getPublishedEvents().subscribe({
+      next: (events) => this.publishedEventsByTitle.set(new Map(events.map((event) => [event.eventTitle, event]))),
+      error: () => this.publishedEventsByTitle.set(new Map()),
+    });
+  }
 
   ngAfterViewInit(): void {
     const section = this.host.nativeElement.querySelector<HTMLElement>('.happening');

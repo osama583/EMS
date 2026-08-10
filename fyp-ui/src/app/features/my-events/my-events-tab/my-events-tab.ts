@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
-import { map } from 'rxjs';
+import { forkJoin, map, of, switchMap } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import { PublishedEvent, RegistrationStatus } from '../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../core/events/published-event.service';
@@ -53,10 +53,16 @@ export class MyEventsTabComponent {
     this.error.set('');
 
     const request = this.mode() === 'saved'
-      ? this.savedEvents.getSavedEvents(user.email).pipe(map((response): readonly TabEntry[] =>
-          response.items
-            .filter((item) => this.eventService.registrationStatus(item.id, user.email) !== 'confirmed')
-            .map((item) => ({ event: item, status: this.eventService.registrationStatus(item.id, user.email) }))))
+      ? this.savedEvents.getSavedEvents(user.email).pipe(switchMap((response) => {
+          if (response.items.length === 0) return of<readonly TabEntry[]>([]);
+          return forkJoin(
+            response.items.map((item) =>
+              this.eventService.getMyRegistration(item.id, user.email).pipe(
+                map((registration): TabEntry => ({ event: item, status: registration?.status ?? null })),
+              ),
+            ),
+          ).pipe(map((entries) => entries.filter((entry) => entry.status !== 'confirmed')));
+        }))
       : this.mode() === 'registered'
         ? this.eventService.getActiveRegistrations(user.email).pipe(map((response): readonly TabEntry[] =>
             response.items
