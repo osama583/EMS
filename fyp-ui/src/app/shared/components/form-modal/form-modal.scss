@@ -1,0 +1,131 @@
+:host { display: contents; }
+.shared-form-modal__backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--space-4);
+  place-items: center;
+  overscroll-behavior: contain;
+  background: rgb(3 19 39 / 62%);
+  backdrop-filter: blur(4px);
+  animation: form-modal-fade var(--motion-control) var(--ease-standard);
+  box-sizing: border-box;
+}
+
+.shared-form-modal {
+  display: grid;
+  width: min(53rem, 100%);
+  max-height: min(44rem, calc(100dvh - 2rem));
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid rgb(15 35 60 / 9%);
+  border-radius: var(--radius-container);
+  background: var(--apu-white);
+  box-shadow: var(--shadow-overlay);
+  animation: form-modal-enter var(--motion-hover) var(--ease-standard);
+  box-sizing: border-box;
+}
+
+.shared-form-modal--fixed {
+  width: min(38rem, 100%);
+  height: min(40rem, calc(100dvh - 2rem));
+}
+.shared-form-modal--fixed .shared-form-modal__body { display: grid; align-content: start; }
+
+.shared-form-modal__header {
+  display: flex;
+  padding: var(--space-4) var(--space-5);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--apu-border);
+  box-sizing: border-box;
+}
+.shared-form-modal__header h2 { margin: 0; color: var(--apu-blue-600); font-size: clamp(1.35rem, 2vw, 1.75rem); letter-spacing: -.025em; }
+.shared-form-modal__close { display: grid; width: 2.5rem; height: 2.5rem; flex: 0 0 2.5rem; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--apu-text-muted); cursor: pointer; transition: background var(--motion-control) var(--ease-standard), color var(--motion-control) var(--ease-standard); }
+.shared-form-modal__close:hover,.shared-form-modal__close:focus-visible { outline: 0; background: var(--apu-surface-muted); color: var(--apu-blue-700); }
+
+.shared-form-modal__body {
+  min-height: 0;
+  padding: var(--space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.shared-form-modal__footer {
+  display: flex;
+  padding: var(--space-3) var(--space-5);
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  border-top: 1px solid var(--apu-border);
+  background: var(--apu-surface-muted);
+  box-sizing: border-box;
+  width: 100%;
+}
+.shared-form-modal__warning { display: flex; padding: .9rem 1rem; align-items: center; gap: .7rem; border: 1px solid #f4d47a; border-radius: var(--radius-control); background: #fff3cd; color: #b87800; }
+.shared-form-modal__warning .material-symbols-rounded { flex: 0 0 auto; font-size: 1.25rem; }
+.shared-form-modal__warning p { margin: 0; font-size: .9rem; }
+.shared-form-modal__spin { animation: form-modal-spin 1s linear infinite; }
+.shared-form-modal__primary--disabled { opacity: .58; cursor: not-allowed; }
+.shared-form-modal__primary--disabled:hover { border-color: var(--apu-blue-600); background: var(--apu-blue-600); transform: none; }
+
+@keyframes form-modal-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes form-modal-enter { from { opacity: 0; transform: translateY(.35rem) scale(.99); } to { opacity: 1; transform: none; } }
+@keyframes form-modal-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 48rem) {
+  .shared-form-modal__backdrop {
+    padding: .5rem;
+    place-items: center;
+    touch-action: pan-y;
+  }
+  .shared-form-modal,
+  .shared-form-modal--fixed {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 1rem);
+    height: auto;
+    border-radius: 1rem;
+    box-sizing: border-box;
+  }
+  .shared-form-modal__header {
+    padding: .85rem 1rem;
+    box-sizing: border-box;
+  }
+  .shared-form-modal__header h2 {
+    font-size: 1.15rem;
+  }
+  .shared-form-modal__body {
+    padding: 1rem;
+    box-sizing: border-box;
+    max-width: 100%;
+  }
+  .shared-form-modal__footer {
+    padding: .75rem 1rem;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: .5rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .shared-form-modal__footer .table-control,
+  .shared-form-modal__footer button {
+    width: 100%;
+    justify-content: center;
+    min-height: 2.65rem;
+    box-sizing: border-box;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shared-form-modal__backdrop,
+  .shared-form-modal { animation: none; }
+  .shared-form-modal__spin { animation-duration: 0.01ms; }
+}

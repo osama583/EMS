@@ -1,0 +1,68 @@
+import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
+import { AuthService } from '../auth/auth.service';
+import { ExternalRegistrationService, GuestRegistrationFlowService } from '../auth/external-registration.service';
+import { UserRole } from '../auth/auth.models';
+import { SavedEventsService } from './saved-events.service';
+
+describe('event engagement mock services', () => {
+  beforeEach(() => {
+    localStorage.removeItem('apu-ems-auth-user');
+    localStorage.removeItem('apu-ems-external-accounts');
+    localStorage.removeItem('apu-ems-event-engagement');
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+  });
+
+  afterEach(() => TestBed.resetTestingModule());
+
+  it('saves and removes proposal-backed events for the authenticated user', async () => {
+    const auth = TestBed.inject(AuthService);
+    const saved = TestBed.inject(SavedEventsService);
+    auth.login('applicant@demo.apu.edu.my', 'Demo@123');
+
+    await firstValueFrom(saved.saveEvent(auth.user()!.email, 'evt-1'));
+    expect(saved.isSaved('evt-1')).toBe(true);
+    expect((await firstValueFrom(saved.getSavedEvents(auth.user()!.email))).items[0]?.id).toBe('evt-1');
+
+    await firstValueFrom(saved.removeSavedEvent(auth.user()!.email, 'evt-1'));
+    expect(saved.isSaved('evt-1')).toBe(false);
+  });
+
+  it('creates an external session only after the development OTP is verified', async () => {
+    const auth = TestBed.inject(AuthService);
+    const registration = TestBed.inject(ExternalRegistrationService);
+    const challenge = await firstValueFrom(registration.registerExternalUser({
+      email: 'guest@example.com', firstName: 'Guest', age: 21, gender: 'Prefer not to say', password: 'Password1',
+    }));
+
+    expect(auth.authenticated()).toBe(false);
+    const result = await firstValueFrom(registration.verifyOtp({ challengeId: challenge.challengeId, otp: challenge.developmentOtp! }));
+    expect(result.status).toBe('verified');
+    expect(auth.user()?.role).toBe(UserRole.ExternalUser);
+    expect(auth.user()?.accountType).toBe('external');
+    expect(localStorage.getItem('apu-ems-auth-user')).toContain('guest@example.com');
+    expect(localStorage.getItem('apu-ems-external-accounts')).toContain('guest@example.com');
+  });
+
+  it('restores the saved account type and permissions after the application is recreated', () => {
+    const auth = TestBed.inject(AuthService);
+    expect(auth.login('applicant@demo.apu.edu.my', 'Demo@123').success).toBe(true);
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    const restored = TestBed.inject(AuthService);
+
+    expect(restored.authenticated()).toBe(true);
+    expect(restored.isInternalUser()).toBe(true);
+    expect(restored.user()?.role).toBe(UserRole.Applicant);
+    expect(restored.defaultRoute()).toBe('/app/dashboard');
+  });
+
+  it('keeps the event that initiated guest registration in the flow context', () => {
+    const flow = TestBed.inject(GuestRegistrationFlowService);
+    flow.requestForEvent('evt-3');
+    expect(flow.open()).toBe(false);
+    expect(flow.pendingEventId()).toBe('evt-3');
+  });
+});

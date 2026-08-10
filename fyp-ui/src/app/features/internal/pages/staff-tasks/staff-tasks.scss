@@ -1,0 +1,7 @@
+:host { display: grid; gap: var(--space-3); }
+.task-confirmation { margin: 0 0 var(--space-4); color: var(--apu-text-muted); line-height: 1.6; }
+.task-details { display: grid; margin: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.task-details div { padding: var(--space-3); border: 1px solid var(--apu-border); border-radius: var(--radius-card); background: var(--apu-surface-muted); }
+.task-details dt { color: var(--apu-text-muted); font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.task-details dd { margin: .35rem 0 0; color: var(--apu-navy-900); font-weight: 650; overflow-wrap: anywhere; }
+@media (max-width: 48rem) { .task-details { grid-template-columns: 1fr; } }

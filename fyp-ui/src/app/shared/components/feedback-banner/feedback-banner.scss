@@ -1,0 +1,4 @@
+.shared-feedback-banner { display: flex; padding: .75rem 1rem; margin: 0 0 var(--space-3); align-items: center; gap: .5rem; border-radius: var(--radius-control); font-size: .88rem; font-weight: 600; }
+.shared-feedback-banner[data-tone='success'] { background: rgb(22 132 91 / 10%); color: var(--form-success); }
+.shared-feedback-banner[data-tone='error'] { background: var(--form-error-soft); color: var(--form-error); }
+.shared-feedback-banner .material-symbols-rounded { font-size: 1.15rem; }

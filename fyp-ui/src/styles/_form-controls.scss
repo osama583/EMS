@@ -1,0 +1,120 @@
+.shared-form-field {
+  position: relative;
+  display: grid;
+  gap: var(--form-field-gap);
+  min-width: 0;
+}
+
+.shared-form-field__label {
+  color: var(--apu-navy-900);
+  font-size: var(--type-label);
+  font-weight: var(--weight-label);
+}
+
+.shared-form-field__label > span {
+  color: var(--form-error);
+}
+
+.shared-form-field__input-wrap { position: relative; display: block; min-width: 0; }
+.shared-form-field__input-wrap > input { display: block; }
+.shared-form-field__input-wrap--password > input { padding-right: 3rem; }
+.shared-form-field__password-toggle { position: absolute; top: 50%; right: .45rem; display: grid; width: 2.35rem; height: 2.35rem; padding: 0; place-items: center; transform: translateY(-50%); border: 0; border-radius: 50%; background: transparent; color: var(--apu-text-muted); cursor: pointer; }
+.shared-form-field__password-toggle:hover,.shared-form-field__password-toggle:focus-visible { outline: 0; background: rgb(42 131 255 / 9%); color: var(--apu-blue-700); }
+.shared-form-field__password-toggle .material-symbols-rounded { font-size: 1.2rem; }
+
+.shared-form-field :is(input, textarea, select),
+.shared-editable-table :is(input, textarea, select) {
+  width: 100%;
+  min-height: var(--internal-control-height);
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-control);
+  outline: 0;
+  background: var(--apu-white);
+  color: var(--apu-navy-950);
+  font: inherit;
+  transition: border-color var(--motion-control) var(--ease-standard), box-shadow var(--motion-control) var(--ease-standard), background var(--motion-control) var(--ease-standard);
+}
+
+.shared-form-field textarea,
+.shared-editable-table textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.shared-form-field :is(input, textarea, select):hover,
+.shared-editable-table :is(input, textarea, select):hover {
+  border-color: var(--internal-control-border-hover);
+}
+
+.shared-form-field :is(input, textarea, select):focus,
+.shared-editable-table :is(input, textarea, select):focus {
+  border-color: var(--apu-blue-600);
+  box-shadow: var(--internal-focus-ring);
+}
+
+.shared-form-field :is(input, textarea)[readonly],
+.shared-editable-table :is(input, textarea)[readonly] {
+  background: var(--apu-surface-muted);
+  color: var(--apu-text-muted);
+}
+
+.shared-form-field > small {
+  color: var(--apu-text-muted);
+  font-size: 0.78rem;
+}
+
+.shared-form-field__error,
+.shared-editable-table__cell-error,
+.shared-editable-table__error,
+.shared-editable-table__mobile label small {
+  color: var(--form-error) !important;
+}
+
+.shared-form-field--invalid :is(input, textarea, select),
+.shared-editable-table .is-invalid {
+  border-color: var(--form-error);
+  box-shadow: var(--form-error-ring);
+  background: var(--apu-white);
+}
+
+.shared-editable-table {
+  overflow: hidden;
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-card);
+  background: var(--apu-white);
+}
+
+.shared-editable-table__heading {
+  display: flex;
+  padding: var(--space-3) var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--apu-border);
+}
+.shared-editable-table__heading h3 { margin: 0; font-size: 1.1rem; }
+.shared-editable-table__heading p { margin: 0.3rem 0 0; color: var(--apu-text-muted); font-size: 0.82rem; }
+.shared-editable-table__desktop { overflow-x: auto; }
+.shared-editable-table .shared-data-table { min-width: 48rem; }
+.shared-editable-table .shared-data-table th { white-space: nowrap; }
+.shared-editable-table .shared-data-table td { vertical-align: top; }
+.shared-editable-table .shared-data-table :is(input, select) { min-width: 8rem; }
+.shared-editable-table__delete { display: grid; width: 2.5rem; height: 2.5rem; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--form-error); cursor: pointer; }
+.shared-editable-table__delete:hover { background: var(--form-error-soft); }
+.shared-editable-table__cell-error { display: block; margin-top: 0.3rem; font-size: 0.72rem; }
+.shared-editable-table__error { margin: 0; padding: var(--space-2) var(--space-4); border-top: 1px solid rgb(201 54 79 / 18%); background: var(--form-error-soft); font-size: 0.82rem; }
+.shared-editable-table__total { display: flex; padding: var(--space-3) var(--space-4); align-items: center; justify-content: flex-end; gap: var(--space-3); border-top: 1px solid var(--apu-border); background: var(--apu-surface-muted); }
+.shared-editable-table__total strong { color: var(--apu-blue-700); font-size: 1.15rem; }
+.shared-editable-table__mobile { display: none; }
+
+@media (max-width: 48rem) {
+  .shared-editable-table__heading { align-items: flex-start; flex-direction: column; }
+  .shared-editable-table__heading .table-control { width: 100%; justify-content: center; }
+  .shared-editable-table__desktop { display: none; }
+  .shared-editable-table__mobile { display: grid; padding: var(--space-2); gap: var(--space-2); }
+  .shared-editable-table__mobile article { display: grid; padding: var(--space-3); gap: var(--space-2); border: 1px solid var(--apu-border); border-radius: var(--radius-card); background: var(--apu-surface-muted); }
+  .shared-editable-table__mobile label { display: grid; gap: 0.35rem; font-size: 0.78rem; font-weight: 600; }
+  .shared-editable-table__mobile-number { color: var(--apu-blue-700); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+  .shared-editable-table__remove-mobile { display: flex; min-height: 2.75rem; align-items: center; justify-content: center; gap: 0.4rem; border: 0; border-radius: var(--radius-control); background: var(--form-error-soft); color: var(--form-error); font-weight: 700; }
+}

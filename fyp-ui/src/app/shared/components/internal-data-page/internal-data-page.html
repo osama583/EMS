@@ -1,0 +1,82 @@
+<app-internal-table-workspace
+  class="shared-data-page"
+  [ariaLabel]="config().ariaLabel"
+  [paginationLabel]="config().paginationLabel"
+  [rowsPerPageLabel]="config().rowsPerPageLabel"
+  [totalPages]="totalPages()"
+  [page]="page()"
+  [pageSize]="pageSize()"
+  [pageSizeOptions]="config().pageSizeOptions ?? [5, 10, 25]"
+  [hideHeader]="hideHeader()"
+  [hideControls]="hideControls()"
+  (pageChange)="pageChange.emit($event)"
+  (pageSizeChange)="pageSizeChange.emit($event)"
+>
+  @if (!hideHeader()) {
+    <app-internal-page-header workspaceHeader [config]="config().header" (primaryAction)="primaryAction.emit()" />
+  }
+
+  @if (!hideControls()) {
+    <div workspaceControls class="shared-page-controls">
+      <app-internal-search-field
+        workspaceControlWide
+        [config]="config().search"
+        [value]="searchValue()"
+        (valueChange)="searchChange.emit($event)"
+      />
+      <div workspaceControlRight class="shared-page-controls__right">
+        <app-internal-filter-controls
+          [filters]="filters()"
+          (filterChange)="filterChange.emit($event)"
+        />
+        <app-internal-reset-button (reset)="reset.emit()" />
+      </div>
+    </div>
+  }
+
+  @if (!loading() && records().length > 0) {
+    <app-internal-data-table
+      workspaceTable
+      [ariaLabel]="config().ariaLabel"
+      [columns]="config().columns"
+      [records]="records()"
+      [actions]="config().actions"
+      (actionSelect)="rowAction.emit($event)"
+    />
+  }
+
+  @if (loading() || records().length === 0) {
+    <app-internal-page-state
+      workspaceEmptyState
+      [loading]="loading()"
+      [title]="config().emptyTitle"
+      [description]="config().emptyDescription"
+      [showClear]="shouldShowClear()"
+      (clear)="reset.emit()"
+    />
+  }
+
+  <div
+    workspaceMobile
+    class="shared-mobile-region"
+    role="region"
+    [attr.aria-label]="config().mobileListLabel"
+  >
+    @if (loading() || records().length === 0) {
+      <app-internal-page-state
+        [loading]="loading()"
+        [title]="config().emptyTitle"
+        [description]="config().emptyDescription"
+        [showClear]="shouldShowClear()"
+        (clear)="reset.emit()"
+      />
+    } @else {
+      <app-internal-mobile-record-list
+        [records]="records()"
+        [actions]="config().actions"
+        (open)="recordOpen.emit($event)"
+        (actionSelect)="rowAction.emit($event)"
+      />
+    }
+  </div>
+</app-internal-table-workspace>

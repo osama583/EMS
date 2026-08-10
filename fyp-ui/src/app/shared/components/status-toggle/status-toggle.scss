@@ -1,0 +1,5 @@
+.shared-status-toggle { display: flex; padding: var(--space-3); align-items: center; gap: var(--space-3); border: 1px solid var(--apu-border); border-radius: var(--radius-card); background: var(--apu-surface-muted); cursor: pointer; }
+.shared-status-toggle input { width: 1.2rem; height: 1.2rem; accent-color: var(--apu-blue-600); }
+.shared-status-toggle span { display: grid; gap: .15rem; }
+.shared-status-toggle strong { color: var(--apu-navy-900); }
+.shared-status-toggle small { color: var(--apu-text-muted); }

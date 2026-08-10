@@ -1,0 +1,26 @@
+@if (publicLayout) { <app-site-header [forceCompact]="true" /> }
+
+<main class="my-events-page" [class.my-events-page--internal]="!publicLayout">
+  <div class="my-events-page__inner">
+    <header class="my-events-page__header">
+      <h1>My Events</h1>
+      <span>Everything you have saved, registered for, or attended in one place.</span>
+    </header>
+
+    <nav class="my-events-tabs" aria-label="My Events sections">
+      @for (tab of tabs; track tab.key) {
+        <a
+          class="my-events-tabs__tab"
+          [routerLink]="[basePath, tab.path]"
+          routerLinkActive="my-events-tabs__tab--active"
+        >
+          {{ tab.label }}
+        </a>
+      }
+    </nav>
+
+    <router-outlet />
+  </div>
+</main>
+
+@if (publicLayout) { <app-site-footer /> }

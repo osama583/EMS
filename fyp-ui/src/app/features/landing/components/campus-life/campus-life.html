@@ -1,0 +1,30 @@
+<section id="campus-life" class="campus-life" aria-labelledby="campus-life-title">
+  <div class="campus-life__inner">
+    <div class="campus-life__intro">
+      <p class="campus-life__eyebrow section-title">Life at APU</p>
+
+      <h2 id="campus-life-title">
+        <span>Study. Connect. Create.</span>
+      </h2>
+
+      <p class="campus-life__lead">
+        University life is more than lectures. It is where you discover new interests, meet people
+        from around the world and become more of who you want to be.
+      </p>
+    </div>
+
+    <div class="campus-life__pillars" aria-label="The APU student experience">
+      @for (pillar of pillars; track pillar.number) {
+        <article class="life-pillar">
+          <span class="life-pillar__number" aria-hidden="true">{{ pillar.number }}</span>
+          <div>
+            <h3>{{ pillar.title }}</h3>
+            <p>{{ pillar.detail }}</p>
+          </div>
+        </article>
+      }
+    </div>
+  </div>
+
+  <p class="campus-life__statement" aria-hidden="true">More to learn. More to live.</p>
+</section>

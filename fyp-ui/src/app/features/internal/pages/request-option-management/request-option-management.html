@@ -1,0 +1,110 @@
+<section class="option-management">
+  <app-feedback-banner [message]="successMessage()" tone="success" />
+  <app-feedback-banner [message]="errorMessage()" tone="error" />
+
+  @if (showCardToggle()) {
+    <app-internal-page-header [config]="cardHeaderConfig()" (primaryAction)="openAdd()" />
+
+    <div class="option-management__view-row">
+      <div class="option-management__view-toggle" role="group" aria-label="Choose view">
+        <button type="button" [class.active]="viewMode() === 'table'" (click)="setViewMode('table')">
+          <span class="material-symbols-rounded" aria-hidden="true">table_rows</span>
+          Table
+        </button>
+        <button type="button" [class.active]="viewMode() === 'card'" (click)="setViewMode('card')">
+          <span class="material-symbols-rounded" aria-hidden="true">grid_view</span>
+          Card View
+        </button>
+      </div>
+      <button type="button" class="table-control table-control--primary option-management__add-desktop" (click)="openAdd()">
+        <span class="material-symbols-rounded" aria-hidden="true">add</span>
+        {{ config().header.primaryActionLabel }}
+      </button>
+    </div>
+
+    <section class="internal-table-workspace__controls option-management__controls">
+      <div workspaceControls class="shared-page-controls">
+        <app-internal-search-field
+          workspaceControlWide
+          [config]="{ ariaLabel: 'Search options', placeholder: 'Search option name or details' }"
+          [value]="search()"
+          (valueChange)="setSearch($event)"
+        />
+        <div workspaceControlRight class="shared-page-controls__right">
+          <app-internal-filter-controls [filters]="filters()" (filterChange)="setFilter($event)" />
+          <div class="shared-page-controls__actions">
+            <button type="button" class="table-control table-control--primary option-management__add-mobile" (click)="openAdd()">
+              <span class="material-symbols-rounded" aria-hidden="true">add</span>
+              {{ config().header.primaryActionLabel }}
+            </button>
+            <app-internal-reset-button (reset)="reset()" />
+          </div>
+        </div>
+      </div>
+    </section>
+  }
+
+  @if (showCardToggle() && viewMode() === 'card') {
+    <app-option-card-grid
+      [items]="menuCardData()" [loading]="loading()"
+      emptyTitle="No options found" emptyDescription="Add an option or change the search and status filters."
+      (edit)="editMenuItem($event)"
+      (toggleActive)="toggleMenuItemActive($event)"
+      (delete)="deleteMenuItem($event)"
+      (viewDetails)="viewMenuItemDetails($event)"
+    />
+  } @else {
+    <app-internal-data-page
+      [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+      [hideHeader]="showCardToggle()"
+      [hideControls]="showCardToggle()"
+      (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
+      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+      (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit option', icon: 'edit' }, record: $event })"
+      (primaryAction)="openAdd()"
+    />
+  }
+</section>
+
+<app-form-modal
+  [open]="modalOpen()" [title]="editingId() ? 'Edit ' + kindLabel(selectedKind()) : 'Add ' + kindLabel(selectedKind())"
+  [primaryLabel]="editingId() ? 'Save Changes' : 'Add Option'" [loading]="saving()" [disabled]="!formValid()"
+  (close)="closeModal()" (cancel)="closeModal()" (submit)="save()"
+>
+  <div class="option-management__form">
+    @for (field of fields(); track field.key) {
+      @if (field.type === 'select') {
+        <app-searchable-dropdown [controlId]="'option-' + field.key" [label]="field.label" [required]="field.required ?? false" [options]="fieldOptions(field)" [value]="$any(fieldValue(field.key))" (valueChange)="setDraft(field.key, $any($event))" />
+      } @else {
+        <app-form-field [controlId]="'option-' + field.key" [label]="field.label" [type]="$any(field.type)" [required]="field.required ?? false" [min]="field.min ?? ''" [value]="fieldValue(field.key)" [rows]="4" (valueChange)="setDraft(field.key, $event)" />
+      }
+    }
+    @if (supportsImage()) {
+      <app-image-upload-field
+        controlId="managed-option-image"
+        [label]="imageFieldLabel()"
+        hint="PNG, JPG or WebP · maximum 5 MB"
+        [emptyMessage]="imageEmptyMessage()"
+        [imagePreview]="imagePreview()"
+        [imageFileName]="imageFileName()"
+        [error]="imageError()"
+        (fileSelect)="selectImageFile($event)"
+        (remove)="removeImage()"
+      />
+    }
+    <app-status-toggle [active]="$any(draft()['active'])" label="Active option" description="Only active options appear in applicant dropdowns." (activeChange)="setDraft('active', $event)" />
+  </div>
+</app-form-modal>
+
+<app-confirm-dialog
+  [open]="!!deleteTarget()" title="Delete menu item" [danger]="true"
+  [message]="'Are you sure you want to delete \'' + (deleteTarget()?.label ?? '') + '\'? This cannot be undone.'"
+  confirmLabel="Delete" [loading]="deleting()"
+  (confirm)="confirmDelete()" (cancel)="cancelDelete()"
+/>
+
+<app-option-item-details-modal
+  [open]="!!detailsTarget()" [item]="detailsTarget()"
+  (close)="closeDetails()"
+/>

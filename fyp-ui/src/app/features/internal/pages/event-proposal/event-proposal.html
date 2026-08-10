@@ -1,0 +1,271 @@
+<section class="proposal-page">
+  <header class="proposal-page__header">
+    <div class="proposal-title-banner">Event Proposal</div>
+  </header>
+
+  @if (reviewerComment()) {
+    <app-feedback-banner tone="error" [message]="'Reviewer comment: ' + reviewerComment()" />
+  }
+
+  <app-step-indicator [currentStep]="currentStep() + 1" [steps]="steps" [stepStatuses]="stepStatuses()" [submitAttempted]="submitAttempted()" [guidanceVisible]="validationGuidanceVisible()" [guidanceVersion]="validationGuidanceVersion()" (stepClick)="goToStep($event - 1)" (missingFieldClick)="goToMissingField($event)" />
+
+  <form class="proposal-form" novalidate (submit)="$event.preventDefault()">
+    @if (currentStep() === 0) {
+      <section class="proposal-step" aria-labelledby="applicant-step-title">
+        <header><span class="material-symbols-rounded">person</span><div><h2 id="applicant-step-title">Applicant Info</h2></div></header>
+        <section class="proposal-card">
+          <div class="proposal-card__title"><h3>Applicant Details</h3><p>Loaded automatically from your signed-in APU profile.</p></div>
+          <div class="proposal-grid proposal-grid--2">
+            <app-form-field controlId="applicant-name" label="Applicant Name" [required]="true" [readOnly]="true" [value]="applicantName()" [error]="error('applicantName')" />
+            <app-form-field controlId="department" label="School / Department" [required]="true" [readOnly]="true" [value]="department()" [error]="error('department')" />
+            <app-form-field controlId="applicant-email" label="Email" type="email" [required]="true" [readOnly]="true" [value]="email()" [error]="error('email')" />
+          </div>
+        </section>
+        <section class="co-requesters-section">
+          <header class="co-requesters-section__header">
+            <h3>Co-requesters / Co-owners</h3>
+            <p>Minimum 1, maximum 5. Co-requesters can edit, respond, and resubmit.</p>
+            <button id="co-owners-add" type="button" class="table-control table-control--primary" [disabled]="coOwnerEditorVisible() && coOwners().length >= 5" (click)="addCoOwner()">
+              <span class="material-symbols-rounded" aria-hidden="true">person_add</span>
+              Add Co-requester
+            </button>
+          </header>
+
+          <app-proposal-table tableId="co-owners" [columns]="coOwnerDisplayColumns" [rows]="coOwners()" avatarKey="name" [maxRows]="5" emptyMessage="No co-requesters have been added. Add at least one before continuing." (edit)="editCoOwner($event)" (deleteRow)="removeCoOwner($event)" />
+          @if (error('coOwners')) { <app-validation-message controlId="co-owners" [message]="error('coOwners')" /> }
+
+          <app-form-modal
+            [title]="editingCoOwnerIndex() === null ? 'Add Co-requester / Co-owner' : 'Edit Co-requester / Co-owner'"
+            [primaryLabel]="editingCoOwnerIndex() === null ? 'Add Co-requester' : 'Save changes'"
+            secondaryLabel="Cancel"
+            [open]="coOwnerModalOpen()"
+            [disabled]="!coOwnerFormValid()"
+            (close)="closeCoOwnerModal()"
+            (cancel)="closeCoOwnerModal()"
+            (submit)="confirmAddCoOwner()"
+          >
+            <div class="co-requester-modal-form">
+              <app-searchable-dropdown controlId="co-owner-staff" label="Staff Name" placeholder="Select a staff member" [required]="true" [options]="staff" [value]="coOwnerStaff()" [error]="coOwnerFormError()" (valueChange)="coOwnerStaff.set($any($event)); coOwnerFormError.set('')" />
+              <app-form-field controlId="co-owner-email" label="Email" [value]="selectedCoOwner()?.email ?? ''" [readOnly]="true" />
+              <app-form-field controlId="co-owner-role" label="Role" [value]="selectedCoOwner()?.role ?? ''" [readOnly]="true" />
+            </div>
+          </app-form-modal>
+        </section>
+      </section>
+    }
+
+    @if (currentStep() === 1) {
+      <section class="proposal-step" aria-labelledby="general-step-title">
+        <header><span class="material-symbols-rounded">event</span><div><h2 id="general-step-title">General Event Info</h2></div></header>
+        <section class="proposal-card"><div class="proposal-card__title"><h3>Event Identity</h3><p>Give your event a clear, recognisable title.</p></div><app-form-field controlId="event-title" label="Event Title" placeholder="Enter event title" [required]="true" [value]="eventTitle()" [error]="error('eventTitle')" (valueChange)="setEventTitle($event)" /></section>
+        <section class="proposal-request-table"><header class="proposal-request-table__header"><div><h3 id="schedule-title">Event Schedule</h3><p>Minimum one complete row. End times after midnight are supported.</p></div><button id="schedule-add" type="button" class="table-control table-control--primary" [disabled]="isTableAtLimit('schedule')" (click)="openTableEditor('schedule')"><span class="material-symbols-rounded">add</span>Add row</button></header><app-proposal-table tableId="schedule" emptyIcon="calendar_month" [columns]="proposalColumns(scheduleColumns)" [rows]="schedule()" (edit)="editTableRow('schedule', $event)" (deleteRow)="removeRow('schedule', $event)" />@if (error('schedule')) { <app-validation-message controlId="schedule" [message]="error('schedule')" /> }</section>
+        <section class="proposal-request-table"><header class="proposal-request-table__header"><div><h3 id="organizers-title">Organizer / PIC</h3><p>Select recognised APU staff to fill email and role automatically.</p></div><button id="organizers-add" type="button" class="table-control table-control--primary" [disabled]="isTableAtLimit('organizers')" (click)="openTableEditor('organizers')"><span class="material-symbols-rounded">add</span>Add row</button></header><app-proposal-table tableId="organizers" [columns]="proposalColumns(organizerColumns)" [rows]="organizers()" (edit)="editTableRow('organizers', $event)" (deleteRow)="removeRow('organizers', $event)" />@if (error('organizers')) { <app-validation-message controlId="organizers" [message]="error('organizers')" /> }</section>
+        <section class="proposal-request-table"><header class="proposal-request-table__header"><div><h3>Important People</h3><p>Each populated person adds one to Total Expected Pax.</p></div><button type="button" class="table-control table-control--primary" [disabled]="isTableAtLimit('importantPeople')" (click)="openTableEditor('importantPeople')"><span class="material-symbols-rounded">add</span>Add row</button></header><app-proposal-table tableId="important-people" [columns]="proposalColumns(importantColumns)" [rows]="importantPeople()" (edit)="editTableRow('importantPeople', $event)" (deleteRow)="removeRow('importantPeople', $event)" /></section>
+        <section class="proposal-request-table"><header class="proposal-request-table__header"><div><h3>General Guest / Pax</h3><p>Counts must be zero or greater.</p></div><button type="button" class="table-control table-control--primary" [disabled]="isTableAtLimit('guests')" (click)="openTableEditor('guests')"><span class="material-symbols-rounded">add</span>Add row</button></header><app-proposal-table tableId="guests" [columns]="proposalColumns(guestColumns)" [rows]="guests()" (edit)="editTableRow('guests', $event)" (deleteRow)="removeRow('guests', $event)" /><p class="proposal-request-table__total">Total Expected Pax <strong>{{ totalPax() }}</strong></p></section>
+      </section>
+    }
+
+    @if (currentStep() === 2) {
+      <section class="proposal-step" aria-labelledby="requirements-step-title">
+        <header><span class="material-symbols-rounded">checklist</span><div><h2 id="requirements-step-title">Required for Event</h2></div></header>
+        <section id="requirements-selection" class="proposal-card proposal-card--requirements shared-validation-container" [class.is-invalid]="!!error('requirements')" [attr.aria-invalid]="error('requirements') ? 'true' : null" (focusout)="leaveRequirements($event)">
+          <div class="proposal-card__title"><h3>Select event requirements</h3><p>Only selected services will appear in Request Details.</p></div>
+          <div class="requirement-grid">
+            @for (requirement of requirements; track requirement.key) {
+              <label [class.requirement-option--selected]="selectedRequirements().includes(requirement.key)"><input type="checkbox" [checked]="selectedRequirements().includes(requirement.key)" (change)="toggleRequirement(requirement.key, $any($event.target).checked)" /><span class="material-symbols-rounded">{{ selectedRequirements().includes(requirement.key) ? 'check_circle' : 'circle' }}</span><strong>{{ requirement.label }}</strong></label>
+            }
+          </div>
+          @if (error('requirements')) { <app-validation-message controlId="requirements-selection" [message]="error('requirements')" /> }
+        </section>
+      </section>
+    }
+
+    @if (currentStep() === 3) {
+      <section class="proposal-step" aria-labelledby="requests-step-title">
+        <header><span class="material-symbols-rounded">request_page</span><div><h2 id="requests-step-title">Request Details</h2></div></header>
+        @if (!selectedDefinitions().length) {
+          <section class="proposal-empty"><span class="material-symbols-rounded">playlist_remove</span><h3>No requirements selected yet</h3><p>Return to Required for Event and select the services your event needs.</p><button type="button" class="table-control" (click)="goToStep(2)">Choose requirements</button></section>
+        } @else {
+          @for (definition of selectedDefinitions(); track definition.key) {
+            <section class="proposal-request-table">
+              <header class="proposal-request-table__header">
+                <div><h3 [id]="'request-' + definition.key + '-title'">{{ definition.label }}</h3><p>Complete the service details required by the reviewing department.</p></div>
+                <button [id]="'request-' + definition.key + '-add'" type="button" class="table-control table-control--primary" [disabled]="requestRows()[definition.key].length >= 20" (click)="openRequestEditor(definition)"><span class="material-symbols-rounded" aria-hidden="true">add</span>Add request</button>
+              </header>
+              <app-proposal-table [tableId]="'request-' + definition.key" [columns]="proposalColumns(definition.columns)" [rows]="requestRows()[definition.key]" [emptyMessage]="'No ' + definition.label + ' requests have been added yet.'" (edit)="editRequestRow(definition, $event)" (deleteRow)="removeRequestRow(definition.key, $event)" />
+              @if (requestError(definition.key)) { <app-validation-message [controlId]="'request-' + definition.key" [message]="requestError(definition.key)" /> }
+            </section>
+          }
+          <app-form-modal
+            [title]="requestModalTitle()"
+            [primaryLabel]="requestEditingIndex() === null ? 'Add request' : 'Save changes'"
+            secondaryLabel="Cancel"
+            [open]="requestModalOpen()"
+            [disabled]="!requestFormValid()"
+            (close)="closeRequestModal()"
+            (cancel)="closeRequestModal()"
+            (submit)="saveRequestRow()"
+          >
+            <div class="co-requester-modal-form">
+              @for (column of requestModalDefinition()?.columns ?? []; track column.key) {
+                @if (column.type === 'select') {
+                  <app-searchable-dropdown
+                    [controlId]="'request-editor-' + column.key"
+                    [label]="column.label"
+                    [placeholder]="requestFieldPlaceholder(column)"
+                    [required]="!!column.required"
+                    [disabled]="requestFieldDisabled(column)"
+                    [loading]="requestFieldLoading(column)"
+                    [error]="requestFieldError(column)"
+                    [options]="requestFieldOptions(column)"
+                    [value]="requestDraftValue(column.key).toString()"
+                    (valueChange)="setRequestDraftValue(column.key, $any($event))"
+                  />
+                  @if (requestModalDefinition()?.key === 'logistics' && column.key === 'item' && logisticsAvailableQuantity() !== null) {
+                    <p class="request-field-context"><span class="material-symbols-rounded" aria-hidden="true">inventory_2</span>{{ logisticsAvailableQuantity() }} {{ logisticsQuantityUnit() }}{{ logisticsAvailableQuantity() === 1 ? '' : 's' }} available</p>
+                  }
+                  @if (requestModalDefinition()?.key === 'transportation' && column.key === 'type' && transportationCapacity() !== null) {
+                    <p class="request-field-context"><span class="material-symbols-rounded" aria-hidden="true">airline_seat_recline_normal</span>Passenger capacity: {{ transportationCapacity() }}</p>
+                  }
+                  @if (requestOptionContext(column)) {
+                    <p class="request-field-context"><span class="material-symbols-rounded" aria-hidden="true">info</span>{{ requestOptionContext(column) }}</p>
+                  }
+                } @else {
+                  <app-form-field
+                    [controlId]="'request-editor-' + column.key"
+                    [label]="column.label"
+                    [type]="requestFieldType(column)"
+                    [required]="!!column.required"
+                    [readOnly]="column.type === 'readonly'"
+                    [min]="column.min ?? ''"
+                    [step]="column.step ?? ''"
+                    [value]="requestDraftValue(column.key)"
+                    [error]="requestFieldError(column)"
+                    (valueChange)="setRequestDraftValue(column.key, $event)"
+                  />
+                  @if (requestModalDefinition()?.key === 'logistics' && column.key === 'quantity' && logisticsAvailableQuantity() !== null) {
+                    <p class="request-quantity-indicator" [class.request-quantity-indicator--warning]="logisticsExceedsAvailability()" role="status">
+                      @if (logisticsExceedsAvailability()) { <span class="material-symbols-rounded" aria-hidden="true">warning</span> }
+                      <strong>{{ logisticsRequestedQuantity() }} / {{ logisticsAvailableQuantity() }}</strong>
+                      <span>{{ logisticsExceedsAvailability() ? 'Requested quantity exceeds current availability.' : 'Requested / available' }}</span>
+                    </p>
+                  }
+                }
+              }
+            </div>
+          </app-form-modal>
+        }
+      </section>
+    }
+
+    @if (currentStep() === 4) {
+      <section class="proposal-step" aria-labelledby="details-step-title">
+        <header><span class="material-symbols-rounded">article</span><div><h2 id="details-step-title">Detailed Event Info</h2></div></header>
+        <section class="proposal-card"><div class="proposal-card__title"><h3>Event Narrative</h3><p>Explain the event’s purpose and expected impact.</p></div><div class="proposal-grid">
+          <app-form-field controlId="short-intro" label="Short Introduction" type="textarea" [required]="true" [value]="shortIntro()" [error]="error('shortIntro')" (valueChange)="setShortIntro($event)" />
+          <app-form-field controlId="goals" label="Goals & Objectives" type="textarea" [required]="true" [value]="goals()" [error]="error('goals')" (valueChange)="setGoals($event)" />
+          <app-form-field controlId="benefits" label="Expected Benefits" type="textarea" [required]="true" [value]="benefits()" [error]="error('benefits')" (valueChange)="setBenefits($event)" />
+          @if (eventVisibility() === 'Public') {
+            <app-searchable-dropdown controlId="event-categories" label="Event Categories" placeholder="Select one or two categories" [required]="true" [isMulti]="true" [maxSelections]="2" [options]="categoryOptions()" [value]="eventCategories()" [error]="error('eventCategories')" (valueChange)="setEventCategories($event)" />
+          }
+          <app-searchable-dropdown controlId="event-visibility" label="Event Visibility" [required]="true" [searchable]="false" [options]="visibilityOptions" [value]="eventVisibility()" [error]="error('eventVisibility')" (valueChange)="setEventVisibility($event)" />
+          <app-searchable-dropdown controlId="event-format" label="Event Format" [required]="true" [searchable]="false" [options]="formatOptions" [value]="eventFormat()" (valueChange)="setEventFormat($event)" />
+          <app-searchable-dropdown controlId="registration-mode" label="Registration Approval" [required]="true" [searchable]="false" [options]="registrationModeOptions" [value]="registrationMode()" (valueChange)="setRegistrationMode($event)" />
+          <app-event-image-upload [value]="eventImage()" (valueChange)="eventImage.set($event)" />
+          @if (isPublic()) { <app-form-field controlId="publicity" label="Promotion / Publicity Method" type="textarea" placeholder="How will people be informed or invited?" [required]="true" [value]="publicity()" [error]="error('publicity')" (valueChange)="setPublicity($event)" /> }
+        </div></section>
+        @if (agendaRequired()) { <section class="proposal-request-table"><header class="proposal-request-table__header"><div><h3 id="agenda-title">Brief Agenda</h3><p>Required because {{ agendaReasons().join(', ') }}.</p></div><button id="agenda-add" type="button" class="table-control table-control--primary" [disabled]="isTableAtLimit('agenda')" (click)="openTableEditor('agenda')"><span class="material-symbols-rounded">add</span>Add row</button></header><app-proposal-table tableId="agenda" [columns]="proposalColumns(agendaColumns)" [rows]="agenda()" (edit)="editTableRow('agenda', $event)" (deleteRow)="removeRow('agenda', $event)" />@if (error('agenda')) { <app-validation-message controlId="agenda" [message]="error('agenda')" /> }</section> }
+        @if (discussionRequired()) { <section class="proposal-request-table"><header class="proposal-request-table__header"><div><h3 id="discussions-title">Discussion Topics</h3><p>Required for this small external or VIP/partner discussion.</p></div><button id="discussions-add" type="button" class="table-control table-control--primary" [disabled]="isTableAtLimit('discussions')" (click)="openTableEditor('discussions')"><span class="material-symbols-rounded">add</span>Add row</button></header><app-proposal-table tableId="discussions" [columns]="proposalColumns(discussionColumns)" [rows]="discussions()" (edit)="editTableRow('discussions', $event)" (deleteRow)="removeRow('discussions', $event)" />@if (error('discussions')) { <app-validation-message controlId="discussions" [message]="error('discussions')" /> }</section> }
+      </section>
+    }
+
+    @if (currentStep() === 5) {
+      <section class="proposal-step" aria-labelledby="final-step-title">
+        <header><span class="material-symbols-rounded">task_alt</span><div><h2 id="final-step-title">Final Actions</h2></div></header>
+        <section class="proposal-card proposal-review">
+          <div class="proposal-card__title"><h3>Live Review Summary</h3><p>Review the essential event information you entered before submission.</p></div>
+          <div class="proposal-review__sections">
+            @for (section of reviewSections(); track section.title) {
+              <section class="proposal-review__section" [attr.aria-labelledby]="'review-' + $index">
+                <h4 [id]="'review-' + $index"><span class="material-symbols-rounded" aria-hidden="true">{{ section.icon }}</span>{{ section.title }}</h4>
+                <div class="proposal-summary">
+                  @for (item of section.items; track item.label) { <article [class.proposal-summary__wide]="item.wide"><span>{{ item.label }}</span><strong>{{ item.value }}</strong></article> }
+                </div>
+              </section>
+            }
+          </div>
+        </section>
+      </section>
+    }
+
+    <footer class="proposal-actions">
+      <div class="proposal-actions__previous">
+        <button type="button" class="table-control proposal-actions__button proposal-actions__button--previous" [disabled]="currentStep() === 0" (click)="previous()">
+          <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+          Previous
+        </button>
+      </div>
+      <span class="proposal-actions__step" aria-live="polite">Step {{ currentStep() + 1 }} of {{ steps.length }}</span>
+      <div class="proposal-actions__right">
+        <button type="button" class="table-control proposal-actions__button proposal-actions__button--draft" (click)="saveDraft()">
+          <span class="material-symbols-rounded" aria-hidden="true">download</span>
+          Save as Draft
+        </button>
+        @if (currentStep() < steps.length - 1) {
+          <button type="button" class="table-control table-control--primary proposal-actions__button" (click)="next()">
+            Next
+            <span class="material-symbols-rounded" aria-hidden="true">arrow_forward</span>
+          </button>
+        } @else {
+          <button type="button" class="table-control table-control--primary proposal-actions__button" [disabled]="resubmitting()" (click)="submit()">
+            {{ resubmitProposalId() !== null ? (resubmitting() ? 'Resubmitting…' : 'Resubmit Proposal') : 'Submit Proposal' }}
+            <span class="material-symbols-rounded" aria-hidden="true">task_alt</span>
+          </button>
+        }
+      </div>
+    </footer>
+  </form>
+</section>
+
+<app-form-modal
+  [title]="tableModalTitle()"
+  [primaryLabel]="tableEditingIndex() === null ? 'Add row' : 'Save changes'"
+  secondaryLabel="Cancel"
+  [open]="tableModalOpen()"
+  [disabled]="!tableFormValid()"
+  (close)="closeTableModal()"
+  (cancel)="closeTableModal()"
+  (submit)="saveTableRow()"
+>
+  <div class="co-requester-modal-form">
+    @for (column of tableEditorColumns(); track column.key) {
+      @if (column.type === 'staff') {
+        <app-searchable-dropdown [controlId]="'table-editor-' + column.key" [label]="column.label" placeholder="Select a staff member" [required]="!!column.required" [options]="staff" [value]="tableDraftValue(column.key).toString()" (valueChange)="setTableDraftValue(column.key, $any($event))" />
+      } @else if (column.type === 'select') {
+        <app-searchable-dropdown [controlId]="'table-editor-' + column.key" [label]="column.label" placeholder="Select an option" [required]="!!column.required" [options]="tableFieldOptions(column)" [value]="tableDraftValue(column.key).toString()" (valueChange)="setTableDraftValue(column.key, $any($event))" />
+      } @else {
+        <app-form-field [controlId]="'table-editor-' + column.key" [label]="column.label" [type]="tableFieldType(column)" [required]="!!column.required" [readOnly]="column.type === 'readonly'" [min]="column.min ?? ''" [step]="column.step ?? ''" [value]="tableDraftValue(column.key)" (valueChange)="setTableDraftValue(column.key, $event)" />
+      }
+    }
+  </div>
+</app-form-modal>
+
+@if (previewOpen()) {
+  <div class="proposal-modal" role="presentation" (click)="closePreview()"><section role="dialog" aria-modal="true" aria-labelledby="preview-title" (click)="$event.stopPropagation()"><header><div><p>Proposal preview</p><h2 id="preview-title">{{ eventTitle() || 'Untitled Event' }}</h2></div><button type="button" aria-label="Close preview" (click)="closePreview()"><span class="material-symbols-rounded">close</span></button></header><div class="proposal-review__sections proposal-review__sections--preview">@for (section of reviewSections(); track section.title) { <section class="proposal-review__section"><h4><span class="material-symbols-rounded" aria-hidden="true">{{ section.icon }}</span>{{ section.title }}</h4><div class="proposal-summary">@for (item of section.items; track item.label) { <article [class.proposal-summary__wide]="item.wide"><span>{{ item.label }}</span><strong>{{ item.value }}</strong></article> }</div></section> }</div><footer><button type="button" class="table-control" (click)="closePreview()">Close</button><button type="button" class="table-control table-control--primary" (click)="submit()">Submit Proposal</button></footer></section></div>
+}
+<app-form-modal
+  title="Missing Required Fields"
+  primaryLabel="Review Fields"
+  secondaryLabel="Close"
+  [open]="validationModalOpen()"
+  (close)="closeValidationModal()"
+  (cancel)="closeValidationModal()"
+  (submit)="reviewValidation()"
+>
+  <div class="shared-form-modal__warning">
+    <span class="material-symbols-rounded" aria-hidden="true">warning</span>
+    <p>Your proposal has missing or invalid information. Please review the highlighted steps before submitting.</p>
+  </div>
+</app-form-modal>
+@if (toast()) { <div class="proposal-toast" role="status">{{ toast() }}</div> }
+

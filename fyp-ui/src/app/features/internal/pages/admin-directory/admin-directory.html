@@ -1,0 +1,30 @@
+<section class="admin-directory">
+  <app-feedback-banner [message]="successMessage()" tone="success" />
+  <app-feedback-banner [message]="errorMessage()" tone="error" />
+  <app-internal-data-page
+    [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
+    [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+    (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
+    (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+    (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit', icon: 'edit' }, record: $event })" (primaryAction)="openAdd()"
+  />
+</section>
+
+<app-form-modal [open]="modalOpen()" [title]="editingId() ? (entity === 'users' ? 'Edit User' : 'Edit Unit') : (entity === 'users' ? 'Add User' : 'Add Unit')" [primaryLabel]="editingId() ? 'Save Changes' : (entity === 'users' ? 'Add User' : 'Add Unit')" [loading]="saving()" [disabled]="!formValid()" (close)="closeModal()" (cancel)="closeModal()" (submit)="save()">
+  <div class="admin-directory__form">
+    @if (entity === 'users') {
+      <app-form-field controlId="admin-user-name" label="Full Name" [required]="true" [value]="value('displayName')" (valueChange)="setDraft('displayName', $event)" />
+      <app-form-field controlId="admin-user-username" label="Username" [required]="true" [value]="value('username')" [error]="fieldError('username')" (valueChange)="setDraft('username', $event)" />
+      <app-form-field controlId="admin-user-email" label="Email" type="email" [required]="true" [value]="value('email')" [error]="fieldError('email')" (valueChange)="setDraft('email', $event)" />
+      <app-searchable-dropdown controlId="admin-user-role" label="Role" [required]="true" [options]="roleOptions()" [value]="value('role')" (valueChange)="setDraft('role', $any($event))" />
+      <app-searchable-dropdown controlId="admin-user-unit" label="Unit" [required]="true" [options]="unitOptions()" [value]="value('unitId')" (valueChange)="setDraft('unitId', $any($event))" />
+      <app-status-toggle [active]="$any(draft()['active'])" label="Active user" description="Inactive users remain listed but cannot access the internal application." (activeChange)="setDraft('active', $event)" />
+    } @else {
+      <app-form-field controlId="admin-unit-name" label="Unit Name" [required]="true" [value]="value('name')" [error]="fieldError('name')" (valueChange)="setDraft('name', $event)" />
+      <app-form-field controlId="admin-unit-code" label="Unit Code" [required]="true" [value]="value('code')" [error]="fieldError('code')" (valueChange)="setDraft('code', $event)" />
+      <app-form-field controlId="admin-unit-description" label="Description" type="textarea" [value]="value('description')" [rows]="4" (valueChange)="setDraft('description', $event)" />
+      <app-status-toggle [active]="$any(draft()['active'])" label="Active unit" description="Active units are available when assigning internal users." (activeChange)="setDraft('active', $event)" />
+    }
+  </div>
+</app-form-modal>
+

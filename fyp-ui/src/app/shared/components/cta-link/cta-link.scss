@@ -1,0 +1,91 @@
+:host {
+  display: inline-block;
+}
+
+.cta-link {
+  display: inline-flex;
+  min-height: var(--control-height-large);
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-3) 0 var(--space-4);
+  border: 1px solid var(--apu-blue-600);
+  border-radius: var(--radius-pill);
+  background-color: var(--apu-blue-600);
+  color: var(--apu-white);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--type-button);
+  font-weight: var(--weight-heading);
+  text-decoration: none;
+  box-shadow:
+    0 0.8rem 1.8rem rgb(0 31 74 / 26%),
+    inset 0 1px rgb(255 255 255 / 25%);
+  transition:
+    transform var(--motion-hover) var(--ease-standard),
+    box-shadow var(--motion-hover) var(--ease-standard),
+    background-color var(--motion-control) var(--ease-standard),
+    border-color var(--motion-control) var(--ease-standard);
+}
+
+.cta-link:hover,
+.cta-link:focus-visible {
+  background-color: var(--apu-blue-700);
+  border-color: var(--apu-blue-700);
+  box-shadow:
+    0 0 1.6rem rgb(42 131 255 / 34%),
+    0 0.9rem 2rem rgb(0 24 60 / 30%),
+    inset 0 1px rgb(255 255 255 / 20%);
+  transform: translateY(-2px);
+}
+
+.cta-link:focus-visible {
+  outline: 0;
+}
+
+.cta-link__arrow {
+  display: inline-flex;
+  width: 2.3rem;
+  height: 2.3rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--apu-white);
+  color: var(--apu-blue-700);
+  font-size: 1.22rem;
+  transition: transform var(--motion-control) var(--ease-standard);
+}
+
+.cta-link:hover .cta-link__arrow,
+.cta-link:focus-visible .cta-link__arrow {
+  transform: translateX(0.12rem);
+}
+
+/* Compact variant — matches the site-header "Request an Event" and the
+   happening-soon "Explore Event" buttons, which sit in tighter layouts. */
+.cta-link--compact {
+  min-height: var(--control-height);
+  gap: 0.65rem;
+  padding: 0 var(--space-2) 0 var(--space-4);
+}
+
+.cta-link--compact .cta-link__arrow {
+  width: 1.75rem;
+  height: 1.75rem;
+  background: rgb(255 255 255 / 18%);
+  color: inherit;
+  font-size: 0.9rem;
+}
+
+.cta-link--compact:hover .cta-link__arrow,
+.cta-link--compact:focus-visible .cta-link__arrow {
+  background: rgb(255 255 255 / 24%);
+}
+
+@media (max-width: 48rem) {
+  .cta-link--compact {
+    width: 100%;
+    min-height: 3.5rem;
+    justify-content: space-between;
+    padding-inline: 1.25rem;
+  }
+}

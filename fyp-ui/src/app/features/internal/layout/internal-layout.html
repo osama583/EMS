@@ -1,0 +1,285 @@
+<div
+  class="internal-shell"
+  [class.internal-shell--expanded]="expanded()"
+  [class.internal-shell--pinned]="pinned()"
+  [class.internal-shell--compact]="isCompactScreen()"
+>
+  @if (isCompactScreen()) {
+    <header class="mobile-topbar" [class.mobile-topbar--scrolled]="isScrolled()">
+      <button
+        type="button"
+        class="mobile-topbar__menu-btn"
+        [class.mobile-topbar__menu-btn--active]="mobileNavOpen()"
+        aria-label="Toggle navigation menu"
+        aria-controls="mobile-nav-panel"
+        [attr.aria-expanded]="mobileNavOpen()"
+        (click)="toggleMobileNav()"
+      >
+        <span class="mobile-topbar__menu-icon" [class.mobile-topbar__menu-icon--open]="mobileNavOpen()">
+          <i></i><i></i><i></i>
+        </span>
+      </button>
+
+      <a class="mobile-topbar__brand" [routerLink]="defaultRoute()" aria-label="APU internal application" (click)="closeMobileDrawer()">
+        <img class="mobile-topbar__logo" src="/assets/media/apu-logo-only.png" alt="" width="1254" height="1254" />
+        <span class="mobile-topbar__title">EMS</span>
+      </a>
+
+      <a class="mobile-topbar__avatar" routerLink="/app/profile" (click)="closeMobileDrawer()" [attr.aria-label]="'Profile: ' + (currentUserName() || 'Account')">
+        <span class="material-symbols-rounded" aria-hidden="true">account_circle</span>
+      </a>
+    </header>
+
+    <nav
+      id="mobile-nav-panel"
+      class="mobile-nav-panel"
+      [class.mobile-nav-panel--open]="mobileNavOpen()"
+      aria-label="Mobile navigation menu"
+      [attr.aria-hidden]="!mobileNavOpen()"
+      [attr.inert]="!mobileNavOpen() ? '' : null"
+    >
+      <div class="mobile-nav-panel__scroll">
+        <div class="mobile-nav-panel__items">
+          @for (item of primaryItems(); track item.route) {
+            <a
+              class="mobile-nav-item"
+              routerLinkActive="mobile-nav-item--active"
+              [routerLinkActiveOptions]="{ exact: true }"
+              [routerLink]="item.route"
+              (click)="onNavigate()"
+            >
+              <span class="mobile-nav-item__icon material-symbols-rounded" aria-hidden="true">{{ item.icon }}</span>
+              <span class="mobile-nav-item__label">{{ item.label }}</span>
+              <span class="mobile-nav-item__chevron material-symbols-rounded" aria-hidden="true">chevron_right</span>
+            </a>
+          }
+
+          @for (section of sections(); track section.key) {
+            <div class="mobile-nav-group" [class.mobile-nav-group--active]="isGroupActive(section)">
+              <button
+                type="button"
+                class="mobile-nav-item mobile-nav-group__trigger"
+                [attr.aria-expanded]="isGroupOpen(section.key)"
+                [attr.aria-controls]="'mobile-submenu-' + section.key"
+                (click)="toggleGroup(section.key)"
+              >
+                <span class="mobile-nav-item__icon material-symbols-rounded" aria-hidden="true">{{ section.icon }}</span>
+                <span class="mobile-nav-item__label">{{ section.label }}</span>
+                <span class="mobile-nav-item__chevron mobile-nav-item__chevron--collapse material-symbols-rounded" aria-hidden="true">expand_more</span>
+              </button>
+
+              <div
+                [id]="'mobile-submenu-' + section.key"
+                class="mobile-submenu"
+                [class.mobile-submenu--open]="isGroupOpen(section.key)"
+                [attr.aria-hidden]="!isGroupOpen(section.key)"
+              >
+                <div class="mobile-submenu__inner">
+                  @for (item of section.items; track item.route) {
+                    <a
+                      class="mobile-submenu__link"
+                      routerLinkActive="mobile-submenu__link--active"
+                      [routerLink]="item.route"
+                      (click)="onNavigate()"
+                    >
+                      <span class="material-symbols-rounded" aria-hidden="true">{{ item.icon }}</span>
+                      <span>{{ item.label }}</span>
+                    </a>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <div class="mobile-nav-panel__footer">
+          <a class="mobile-nav-item" routerLink="/app/profile" routerLinkActive="mobile-nav-item--active" (click)="onNavigate()">
+            <span class="mobile-nav-item__icon material-symbols-rounded" aria-hidden="true">account_circle</span>
+            <span class="mobile-nav-item__label">Profile</span>
+          </a>
+          <a class="mobile-nav-item mobile-nav-item--logout" routerLink="/app/logout" routerLinkActive="mobile-nav-item--active" (click)="onNavigate()">
+            <span class="mobile-nav-item__icon material-symbols-rounded" aria-hidden="true">logout</span>
+            <span class="mobile-nav-item__label">Logout</span>
+          </a>
+        </div>
+      </div>
+    </nav>
+
+    @if (mobileNavOpen()) {
+      <button
+        class="mobile-nav-backdrop"
+        type="button"
+        aria-label="Close navigation"
+        (click)="closeMobileDrawer()"
+      ></button>
+    }
+  }
+
+  <aside
+    class="internal-sidebar"
+    [class.internal-sidebar--expanded]="expanded()"
+    aria-label="Internal application navigation"
+    (mouseenter)="onSidebarEnter()"
+    (mouseleave)="onSidebarLeave()"
+  >
+    <header class="internal-sidebar__header">
+      <a
+        class="internal-brand"
+        [routerLink]="defaultRoute()"
+        aria-label="APU internal application"
+        [attr.aria-expanded]="expanded()"
+        (click)="onBrandClick($event)"
+      >
+        <img
+          class="internal-brand__globe"
+          src="/assets/media/apu-logo-only.png"
+          alt=""
+          width="1254"
+          height="1254"
+        />
+        <span class="brand__text-frame" aria-hidden="true">
+          <img
+            class="brand__text"
+            src="assets/media/logo-text-black.webp"
+            alt=""
+            width="1536"
+            height="1024"
+          />
+        </span>
+      </a>
+
+      @if (expanded() && !isCompactScreen()) {
+        <button
+          type="button"
+          class="sidebar-pin"
+          [class.sidebar-pin--active]="pinned()"
+          [attr.aria-pressed]="pinned()"
+          [attr.aria-label]="pinned() ? 'Unpin sidebar' : 'Pin sidebar open'"
+          [title]="pinned() ? 'Unpin sidebar' : 'Pin sidebar open'"
+          (click)="togglePinned()"
+        >
+          <span class="material-symbols-rounded" aria-hidden="true">keep</span>
+        </button>
+      }
+    </header>
+
+    <div class="internal-sidebar__main">
+      <nav class="internal-nav" aria-label="Internal user menu">
+        @for (item of primaryItems(); track item.route) {
+          <a
+            class="internal-nav__item"
+            routerLinkActive="internal-nav__item--active"
+            [routerLinkActiveOptions]="{ exact: true }"
+            [routerLink]="item.route"
+            [attr.title]="item.label"
+            (click)="onNavigate()"
+          >
+            <span class="internal-nav__icon material-symbols-rounded" aria-hidden="true">
+              {{ item.icon }}
+            </span>
+            <span class="internal-nav__label">{{ item.label }}</span>
+          </a>
+        }
+
+        @for (section of sections(); track section.key) {
+          <div
+            class="internal-nav__group"
+            [class.internal-nav__group--active]="isGroupActive(section)"
+            [class.internal-nav__group--open]="isGroupOpen(section.key)"
+          >
+            <button
+              type="button"
+              class="internal-nav__item internal-nav__group-trigger"
+              [attr.aria-expanded]="isGroupOpen(section.key)"
+              [attr.aria-controls]="expanded() ? 'sidebar-submenu-' + section.key : null"
+              [attr.title]="section.label"
+              (click)="toggleGroup(section.key)"
+            >
+              <span class="internal-nav__icon material-symbols-rounded" aria-hidden="true">
+                {{ section.icon }}
+              </span>
+              <span class="internal-nav__label">{{ section.label }}</span>
+              @if (expanded()) {
+                <span class="internal-nav__chevron material-symbols-rounded" aria-hidden="true">
+                  expand_more
+                </span>
+              }
+            </button>
+
+            @if (expanded()) {
+              <div
+                [id]="'sidebar-submenu-' + section.key"
+                class="sidebar-submenu"
+                [class.sidebar-submenu--open]="isGroupOpen(section.key)"
+                [attr.aria-hidden]="!isGroupOpen(section.key)"
+                [attr.inert]="!isGroupOpen(section.key) ? '' : null"
+              >
+                <div class="sidebar-submenu__inner">
+                  @for (item of section.items; track item.route) {
+                    <a
+                      routerLinkActive="sidebar-submenu__link--active"
+                      [routerLink]="item.route"
+                      [attr.title]="item.label"
+                      (click)="onNavigate()"
+                    >
+                      <span class="material-symbols-rounded" aria-hidden="true">
+                        {{ item.icon }}
+                      </span>
+                      <span>{{ item.label }}</span>
+                    </a>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </nav>
+    </div>
+
+    <nav class="internal-sidebar__footer" aria-label="Account navigation">
+      <a
+        class="internal-nav__item"
+        routerLink="/app/profile"
+        routerLinkActive="internal-nav__item--active"
+        title="Profile"
+        (click)="onNavigate()"
+      >
+        <span class="internal-nav__icon material-symbols-rounded" aria-hidden="true">
+          account_circle
+        </span>
+        <span class="internal-nav__label">Profile</span>
+      </a>
+      <a
+        class="internal-nav__item internal-nav__item--logout"
+        routerLink="/app/logout"
+        routerLinkActive="internal-nav__item--active"
+        title="Logout"
+        (click)="onNavigate()"
+      >
+        <span class="internal-nav__icon material-symbols-rounded" aria-hidden="true">logout</span>
+        <span class="internal-nav__label">Logout</span>
+      </a>
+    </nav>
+  </aside>
+
+  <main class="internal-workspace">
+    <header class="internal-topbar" [class.internal-topbar--scrolled]="isScrolled()">
+      <nav class="internal-breadcrumb" aria-label="Breadcrumb">
+        <a [routerLink]="defaultRoute()">EMS</a>
+        @for (item of breadcrumbItems(); track item; let isLast = $last) {
+          <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+          <span
+            [class.internal-breadcrumb__current]="isLast"
+            [attr.aria-current]="isLast ? 'page' : null"
+          >
+            {{ item }}
+          </span>
+        }
+      </nav>
+    </header>
+
+    <div class="internal-workspace__content">
+      <router-outlet />
+    </div>
+  </main>
+</div>

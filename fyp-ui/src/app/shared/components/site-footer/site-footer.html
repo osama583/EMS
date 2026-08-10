@@ -1,0 +1,68 @@
+<footer class="site-footer" aria-label="APU website footer">
+  <div class="site-footer__inner">
+    <section class="site-footer__identity" aria-label="APU accreditation and social media">
+      <div class="site-footer__awards" aria-label="APU accreditations and awards">
+        @for (award of awards; track award.src) {
+          <div [class]="'site-footer__badge site-footer__badge--' + award.kind">
+            <img [src]="award.src" [alt]="award.alt" loading="lazy" decoding="async" />
+          </div>
+        }
+      </div>
+
+      <nav class="site-footer__socials" aria-label="APU social media">
+        @for (social of socialLinks; track social.href) {
+          <a
+            [href]="social.href"
+            [attr.aria-label]="social.label + ' (opens in a new tab)'"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <img [src]="social.icon" alt="" width="32" height="32" loading="lazy" />
+          </a>
+        }
+      </nav>
+    </section>
+
+    <nav class="site-footer__navigation" aria-label="Footer navigation">
+      @for (group of linkGroups; track group.title) {
+        <section class="site-footer__group">
+          <h2>{{ group.title }}</h2>
+          <ul>
+            @for (link of group.links; track link.label) {
+              <li>
+                <a
+                  [href]="link.href"
+                  [attr.target]="link.external ? '_blank' : null"
+                  [attr.rel]="link.external ? 'noopener noreferrer' : null"
+                >
+                  {{ link.label }}
+                </a>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    </nav>
+
+    <div class="site-footer__legal">
+      <div class="site-footer__legal-copy">
+        <p>
+          Copyright 2026 © Asia Pacific University of Technology &amp; Innovation |
+          JPT/BPP(U)1000-801/63/Jld 3(18) DU030(W)
+        </p>
+        <p>
+          Registered address as per MOHE registration:<br />
+          Blok A (Aras 3 - 8), Blok B (Aras B, 3 &amp; 5 - 8), Blok D, Blok E (Aras 3 - 6 &amp; 8 -
+          10), Blok H &amp; J2, Spine,<br />
+          No. 11, Jalan Teknologi 5, Taman Teknologi Malaysia, Bukit Jalil, 57000 Kuala Lumpur,
+          Wilayah Persekutuan Kuala Lumpur.
+        </p>
+      </div>
+
+      <nav class="site-footer__policies" aria-label="Legal links">
+        <a href="https://www.apu.edu.my/privacy-policy">Privacy Policy</a>
+        <a href="https://www.apu.edu.my/terms-of-use">Terms of Use</a>
+      </nav>
+    </div>
+  </div>
+</footer>

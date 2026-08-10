@@ -1,0 +1,144 @@
+<section class="how-page" aria-labelledby="internal-page-title">
+  <header class="how-intro">
+    <p class="how-intro__eyebrow">How It Works</p>
+    <h1 id="internal-page-title">Create and Submit Your Event Proposal</h1>
+    <p class="how-intro__description">
+      Complete the event proposal form with your event details and required services. After
+      submission, the proposal will move through the required approval and department-review stages.
+      You can track its progress from your dashboard.
+    </p>
+    <div class="how-intro__actions">
+      <a class="how-button how-button--primary" routerLink="/app/forms/event-proposal">
+        <span>Start New Proposal</span>
+        <span class="material-symbols-rounded" aria-hidden="true">arrow_forward</span>
+      </a>
+      <a class="how-button how-button--secondary" routerLink="/app/events/explore-events">
+        <span>View Events</span>
+      </a>
+    </div>
+  </header>
+
+  <div #timeline class="process-timeline" aria-label="Event proposal approval process">
+    <svg
+      class="process-route"
+      [attr.viewBox]="processViewBox()"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <path class="process-route__base" [attr.d]="processPath()"></path>
+      <path
+        class="process-route__progress"
+        [attr.d]="processPath()"
+        pathLength="1"
+        stroke-dasharray="1"
+        [attr.stroke-dashoffset]="1 - timelineProgress() / 100"
+      ></path>
+
+      @for (marker of pathMarkers(); track marker.progress) {
+        <line
+          class="process-route__marker"
+          [class.process-route__marker--active]="marker.progress <= timelineProgress() / 100"
+          x1="-5"
+          y1="0"
+          x2="5"
+          y2="0"
+          [attr.transform]="
+            'translate(' + marker.x + ' ' + marker.y + ') rotate(' + (marker.angle + 90) + ')'
+          "
+        ></line>
+      }
+
+      <g
+        class="process-route__tracker"
+        [class.process-route__tracker--visible]="timelineProgress() > 0"
+        [attr.transform]="trackerTransform()"
+      >
+        <rect
+          class="process-route__tracker-shell"
+          x="-22"
+          y="-7"
+          width="44"
+          height="14"
+          rx="7"
+        ></rect>
+        <rect
+          class="process-route__tracker-core"
+          x="-16"
+          y="-2"
+          width="32"
+          height="4"
+          rx="2"
+        ></rect>
+      </g>
+    </svg>
+
+    @for (step of steps; track step.number; let index = $index) {
+      <article
+        class="process-step"
+        [class.process-step--reverse]="index % 2 === 1"
+        [class.process-step--active]="isStepActive(index)"
+        [class.process-step--current]="isCurrentStep(index)"
+        [attr.data-step-index]="index"
+      >
+        <div class="process-step__content">
+          <div class="process-step__copy">
+            <span class="process-step__label">Step {{ step.number }}</span>
+            @if (step.condition) {
+              <span class="process-step__condition">{{ step.condition }}</span>
+            }
+            <h2>{{ step.title }}</h2>
+            <p>{{ step.description }}</p>
+
+            <div class="process-step__timing">
+              <span class="material-symbols-rounded" aria-hidden="true">schedule</span>
+              <div>
+                <small>{{ step.timingLabel }}</small>
+                @if (step.timing) {
+                  <strong>{{ step.timing }}</strong>
+                }
+              </div>
+            </div>
+
+            @if (step.totals) {
+              <ul class="process-step__totals">
+                @for (total of step.totals; track total) {
+                  <li>{{ total }}</li>
+                }
+              </ul>
+            }
+            @if (step.note) {
+              <p class="process-step__note">{{ step.note }}</p>
+            }
+          </div>
+
+          <div class="process-step__visual" aria-hidden="true">
+            <span class="process-step__visual-orbit"></span>
+            <span class="process-step__visual-icon material-symbols-rounded">
+              {{ step.icon }}
+            </span>
+            <span class="process-step__visual-dot process-step__visual-dot--one"></span>
+            <span class="process-step__visual-dot process-step__visual-dot--two"></span>
+          </div>
+        </div>
+      </article>
+    }
+  </div>
+
+  <section class="delay-help" aria-labelledby="delay-help-title">
+    <div>
+      <p class="delay-help__eyebrow">Proposal support</p>
+      <h2 id="delay-help-title">Taking Longer Than Expected?</h2>
+      <p>
+        Check the proposal status and latest comments first. If a stage has exceeded its maximum
+        processing time, contact the responsible reviewer through the Inbox and include the proposal
+        ID.
+      </p>
+    </div>
+    <div class="delay-help__actions">
+      <a class="how-button how-button--primary" routerLink="/app/proposals/pending">
+        Check Proposal Status
+      </a>
+      <a class="how-button how-button--secondary" routerLink="/app/inbox">Open Inbox</a>
+    </div>
+  </section>
+</section>

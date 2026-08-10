@@ -1,0 +1,276 @@
+<main class="shared-library">
+  <header class="shared-library__hero">
+    <p>Private development reference</p>
+    <h1>Shared Components Library</h1>
+    <span>
+      Search and inspect the reusable Angular components, global classes, and responsive patterns
+      already available in the APU Event Management System.
+    </span>
+  </header>
+
+  <section class="shared-library__finder" aria-label="Find shared components">
+    <label class="shared-library__search">
+      <span class="material-symbols-rounded" aria-hidden="true">search</span>
+      <input
+        type="search"
+        aria-label="Search the shared components library"
+        placeholder="Search by name, selector, class, or purpose"
+        [value]="query()"
+        (input)="updateQuery($event)"
+      />
+    </label>
+    <label>
+      <span class="visually-hidden">Filter by category</span>
+      <select aria-label="Filter by category" [value]="category()" (change)="updateCategory($event)">
+        @for (item of categories; track item) {
+          <option [value]="item">{{ item }}</option>
+        }
+      </select>
+    </label>
+    <span class="shared-library__result-count">{{ filteredEntries().length }} items</span>
+  </section>
+
+  <nav class="shared-library__categories" aria-label="Component categories">
+    @for (item of categories; track item) {
+      <button
+        type="button"
+        [class.shared-library__category--active]="category() === item"
+        (click)="category.set(item)"
+      >
+        {{ item }}
+      </button>
+    }
+  </nav>
+
+  <section class="shared-library__grid" aria-live="polite">
+    @for (item of filteredEntries(); track item.key) {
+      <article class="library-card" [attr.data-category]="item.category">
+        <header class="library-card__header">
+          <div>
+            <span>{{ item.category }}</span>
+            <h2>{{ item.name }}</h2>
+            <p>{{ item.purpose }}</p>
+          </div>
+          <code>{{ item.selector }}</code>
+        </header>
+
+        <section class="library-card__preview" [class.library-card__preview--wide]="item.key === 'table' || item.key === 'site-header' || item.key === 'site-footer'">
+          @switch (item.key) {
+            @case ('authentication') {
+              <div class="library-container-stack"><span class="shared-data-cell__badge" data-tone="success">Authenticated</span><code>AuthService.user()</code></div>
+            }
+            @case ('role-navigation') {
+              <div class="library-container-stack"><span class="shared-data-cell__badge" data-tone="blue">Role-controlled</span><code>ROLE_NAVIGATION[user.role]</code></div>
+            }
+            @case ('user-avatar') {
+              <app-user-avatar name="APU user" />
+            }
+            @case ('form-field') {
+              <div class="library-form-row">
+                <app-form-field controlId="library-form-title" label="Event title" hint="Use a clear public-facing title." [required]="true" [value]="formValue()" (valueChange)="formValue.set($event)" />
+                <app-form-field controlId="library-form-invalid" label="Email" type="email" value="invalid-address" error="Enter a valid email address." />
+                <app-form-field controlId="library-form-readonly" label="Applicant role" value="Student" [readOnly]="true" />
+              </div>
+            }
+            @case ('event-image-upload') {
+              <app-event-image-upload />
+            }
+            @case ('character-counter') {
+              <app-character-counter [value]="formValue()" [maxLength]="100" />
+            }
+            @case ('row-counter') {
+              <app-row-counter [count]="3" [maximum]="20" />
+            }
+            @case ('searchable-dropdown') {
+              <div class="library-form-row">
+                <app-searchable-dropdown label="School / Department" [options]="formOptions" [value]="formSelection()" (valueChange)="formSelection.set($event)" />
+                <app-searchable-dropdown label="Multiple selection" [options]="formOptions" [isMulti]="true" [value]="['Computing', 'Business']" />
+              </div>
+            }
+            @case ('step-indicator') {
+              <app-step-indicator [steps]="librarySteps" [stepStatuses]="libraryStepStatuses" [currentStep]="2" />
+            }
+            @case ('form-modal') {
+              <button type="button" class="table-control table-control--primary" (click)="modalDemoOpen.set(true)">Open live modal example</button>
+              <app-form-modal title="Add shared item" primaryLabel="Add item" [open]="modalDemoOpen()" (close)="modalDemoOpen.set(false)" (cancel)="modalDemoOpen.set(false)" (submit)="modalDemoOpen.set(false)">
+                <app-form-field controlId="library-modal-name" label="Component name" [required]="true" value="Form modal" />
+              </app-form-modal>
+            }
+            @case ('editable-table') {
+              <app-data-table tableId="library-editable" title="Requested items" hint="The same component becomes editable cards on mobile." [columns]="editableColumns" [rows]="editableRows()" footerLabel="Total rows" [footerValue]="editableRows().length.toString()" (rowsChange)="editableRows.set($event)" (add)="addEditableRow()" (remove)="removeEditableRow($event)" />
+            }
+            @case ('proposal-table') {
+              <app-proposal-table [columns]="proposalColumns" [rows]="proposalRows()" avatarKey="name" (edit)="handleProposalTableEdit($event)" (deleteRow)="handleProposalTableDelete($event)" />
+            }
+            @case ('typography') {
+              <div class="library-type-sample">
+                <p class="section-title">Section label</p>
+                <h3>Plan Your APU Experience</h3>
+                <p>Shared body copy stays readable and consistent across the system.</p>
+                <span>Supporting label</span>
+              </div>
+            }
+            @case ('page-header') {
+              <app-internal-page-header [config]="headerConfig" />
+            }
+            @case ('buttons') {
+              <div class="library-button-row internal-table-workspace__controls">
+                <button class="table-control table-control--primary" type="button">Primary action</button>
+                <button class="table-control" type="button">Secondary action</button>
+                <app-internal-reset-button />
+                <button class="table-control" type="button" disabled>Disabled</button>
+              </div>
+            }
+            @case ('inputs') {
+              <div class="library-form-row internal-table-workspace__controls">
+                <label><span>Text input</span><input placeholder="Enter a value" /></label>
+                <label><span>Select</span><select><option>Choose an option</option></select></label>
+                <label><span>Disabled</span><input value="Unavailable" disabled /></label>
+              </div>
+            }
+            @case ('search') {
+              <div class="internal-table-workspace__controls">
+                <app-internal-search-field
+                  workspaceControlWide
+                  [config]="searchConfig"
+                  [value]="demoSearch()"
+                  (valueChange)="demoSearch.set($event)"
+                />
+              </div>
+            }
+            @case ('filters') {
+              <div class="library-filter-row internal-table-workspace__controls">
+                <app-internal-filter-controls [filters]="demoFilters()" (filterChange)="updateDemoFilter($event)" />
+                <app-internal-reset-button (reset)="resetDemoFilters()" />
+              </div>
+            }
+            @case ('containers') {
+              <div class="library-container-stack">
+                <section class="internal-table-workspace__controls">Controls surface</section>
+                <section class="internal-table-workspace__table-card">Content surface</section>
+              </div>
+            }
+            @case ('table') {
+              <div class="internal-table-workspace__table-card">
+                <div class="internal-table-workspace__table-scroll">
+                  <app-internal-data-table
+                    workspaceTable
+                    ariaLabel="Shared table example"
+                    [columns]="columns"
+                    [records]="records"
+                    [actions]="actions"
+                    (actionSelect)="handleAction($event)"
+                  />
+                </div>
+              </div>
+            }
+            @case ('badges') {
+              <div class="library-badge-row">
+                <span class="shared-data-cell__badge" data-tone="neutral">Neutral</span>
+                <span class="shared-data-cell__badge" data-tone="blue">In review</span>
+                <span class="shared-data-cell__badge" data-tone="success">Approved</span>
+                <span class="shared-data-cell__badge" data-tone="warning">Action required</span>
+                <span class="shared-data-cell__badge" data-tone="danger">Rejected</span>
+              </div>
+            }
+            @case ('pagination') {
+              <div class="library-pagination-row">
+                <app-internal-pagination
+                  paginationLabel="Library pagination example"
+                  rowsPerPageLabel="Items per page"
+                  [totalPages]="16"
+                  [page]="demoPage()"
+                  [pageSize]="10"
+                  [pageSizeOptions]="[10, 25, 50]"
+                  (pageChange)="demoPage.set($event)"
+                />
+              </div>
+            }
+            @case ('states') {
+              <div class="library-state-controls">
+                <button type="button" [class.library-state-controls__active]="!showLoading()" (click)="showLoading.set(false)">Empty</button>
+                <button type="button" [class.library-state-controls__active]="showLoading()" (click)="showLoading.set(true)">Loading</button>
+              </div>
+              <div class="internal-table-workspace__table-card">
+                <app-internal-page-state
+                  [loading]="showLoading()"
+                  title="No records found"
+                  description="Try changing the current search or filters."
+                />
+              </div>
+            }
+            @case ('sidebar') {
+              <div class="library-sidebar-stage">
+                <aside class="internal-sidebar" aria-label="Sidebar component example">
+                  <nav class="internal-nav">
+                    <a class="internal-nav__item" href="/shared" title="Dashboard">
+                      <span class="internal-nav__icon material-symbols-rounded" aria-hidden="true">space_dashboard</span>
+                      <span class="internal-nav__label">Dashboard</span>
+                    </a>
+                    <a class="internal-nav__item internal-nav__item--active" href="/shared" title="Inbox">
+                      <span class="internal-nav__icon material-symbols-rounded" aria-hidden="true">inbox</span>
+                      <span class="internal-nav__label">Inbox</span>
+                    </a>
+                    <a class="internal-nav__item" href="/shared" title="Notifications">
+                      <span class="internal-nav__icon material-symbols-rounded" aria-hidden="true">notifications</span>
+                      <span class="internal-nav__label">Notifications</span>
+                    </a>
+                  </nav>
+                </aside>
+              </div>
+            }
+            @case ('icons') {
+              <div class="library-icon-grid">
+                @for (icon of ['search', 'filter_alt', 'inbox', 'notifications', 'edit', 'visibility', 'delete', 'done']; track icon) {
+                  <span><span class="material-symbols-rounded" aria-hidden="true">{{ icon }}</span><small>{{ icon }}</small></span>
+                }
+              </div>
+            }
+            @case ('mobile') {
+              <div class="library-phone-frame">
+                <app-internal-mobile-record-list
+                  [records]="records"
+                  [actions]="actions"
+                  (actionSelect)="handleAction($event)"
+                />
+              </div>
+            }
+            @case ('site-header') {
+              <div class="library-site-header-preview"><app-site-header /></div>
+            }
+            @case ('site-footer') {
+              <details class="library-footer-disclosure">
+                <summary>Open live footer preview</summary>
+                <div class="library-site-footer-preview"><app-site-footer /></div>
+              </details>
+            }
+          }
+        </section>
+
+        <div class="library-card__details">
+          <div>
+            <h3>Available states</h3>
+            <span class="library-card__chips">
+              @for (state of item.states; track state) { <span>{{ state }}</span> }
+            </span>
+          </div>
+          <div>
+            <h3>Responsive behavior</h3>
+            <p>{{ item.responsive }}</p>
+          </div>
+        </div>
+
+        <div class="library-card__usage">
+          <span>Usage</span>
+          <pre><code>{{ item.usage }}</code></pre>
+        </div>
+      </article>
+    } @empty {
+      <div class="shared-library__empty">
+        <span class="material-symbols-rounded" aria-hidden="true">search_off</span>
+        <h2>No shared items found</h2>
+        <p>Try another name, selector, class, or category.</p>
+      </div>
+    }
+  </section>
+</main>

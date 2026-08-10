@@ -1,0 +1,10 @@
+@if (message()) { <app-feedback-banner tone="success" [message]="message()" /> }
+@if (error()) { <app-feedback-banner tone="error" [message]="error()" /> }
+<app-internal-data-page [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()" [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()" (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()" (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)" (recordOpen)="openRecord($event)" />
+
+<app-form-modal [open]="modalOpen()" [title]="modalTitle()" [primaryLabel]="pendingStatus() ? 'Confirm' : 'Close'" [secondaryLabel]="'Cancel'" [showSecondary]="!!pendingStatus()" [loading]="saving()" [fixedSize]="true" (close)="closeModal()" (cancel)="closeModal()" (submit)="confirm()">
+  @if (selected(); as task) {
+    @if (pendingStatus()) { <p class="task-confirmation">Confirm this status change for <strong>{{ task.eventTitle }}</strong>. The task list and History will update immediately.</p> }
+    <dl class="task-details"><div><dt>Event</dt><dd>{{ task.eventTitle }} · {{ task.eventCode }}</dd></div><div><dt>Request</dt><dd>{{ task.request }}</dd></div><div><dt>{{ task.detailLabel }}</dt><dd>{{ task.detail }}</dd></div>@if (task.quantity) { <div><dt>Quantity</dt><dd>{{ task.quantity }}</dd></div> }<div><dt>Schedule</dt><dd>{{ task.schedule }}</dd></div><div><dt>Location</dt><dd>{{ task.location }}</dd></div></dl>
+  }
+</app-form-modal>

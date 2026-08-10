@@ -1,0 +1,94 @@
+:host {
+  display: block;
+}
+
+.hero {
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: 8.5rem var(--layout-gutter) var(--space-5);
+  align-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--apu-navy-950);
+  color: var(--apu-white);
+}
+
+.hero-media,
+.hero-video,
+.hero-media__soften,
+.hero-media__overlay,
+.hero-media__glow {
+  position: absolute;
+  inset: 0;
+}
+
+.hero-media {
+  z-index: -2;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 75% 35%, rgb(24 63 112 / 52%), transparent 45%),
+    url('/assets/media/video-start-iamge.jpg') center / cover no-repeat,
+    var(--apu-navy-900);
+}
+
+.hero-video {
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0;
+  filter: blur(2px) saturate(0.94) contrast(1.04);
+  transform: scale(1.035);
+  transition: opacity 650ms linear;
+}
+
+.hero-video--active {
+  z-index: 2;
+  opacity: 1;
+}
+
+.hero-video--outgoing {
+  z-index: 1;
+  opacity: 1;
+}
+
+.hero-media__soften {
+  z-index: 3;
+  background: rgb(5 32 64 / 16%);
+}
+
+.hero-media__overlay {
+  z-index: 4;
+  background: var(--apu-dark-section-shade);
+}
+
+.hero-media__glow {
+  z-index: 5;
+  background:
+    radial-gradient(circle at 18% 57%, rgb(42 131 255 / 17%), transparent 28%),
+    linear-gradient(115deg, transparent 50%, rgb(42 131 255 / 8%) 100%);
+}
+
+.hero-content {
+  width: min(100%, 58rem);
+  padding-block: 0;
+}
+
+h1 {
+  max-width: 16.5ch;
+  margin: 0;
+  font-family: var(--apu-font-family);
+  font-size: var(--type-hero);
+  font-weight: var(--weight-heading);
+  letter-spacing: -0.055em;
+  line-height: 1;
+  text-wrap: balance;
+  text-shadow: 0 0.25rem 2.5rem rgb(3 28 60 / 65%);
+}
+
+app-cta-link {
+  margin-top: var(--space-5);
+}

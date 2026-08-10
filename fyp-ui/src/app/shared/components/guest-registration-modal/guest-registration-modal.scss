@@ -1,0 +1,16 @@
+:host { display: contents; }
+.guest-registration-form { display: grid; gap: var(--space-4); }
+.guest-registration-form__intro,
+.guest-registration-form--otp > p { margin: 0; color: var(--apu-text-muted); }
+.guest-registration-form__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.guest-registration-form__grid--single { grid-template-columns: 1fr; }
+.guest-registration-form__wide { grid-column: 1 / -1; }
+.guest-registration-form__development { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3); border: 1px solid rgb(42 131 255 / 25%); border-radius: var(--radius-card); background: rgb(42 131 255 / 8%); color: var(--apu-blue-700); }
+.guest-registration-form__development span { font-size: .8rem; font-weight: 700; text-transform: uppercase; }
+.guest-registration-form__development strong { font-size: 1.35rem; letter-spacing: .15em; }
+.guest-registration-form__error { margin: 0; color: var(--form-error); font-weight: 600; }
+.guest-registration-form__switch { display: flex; align-items: center; justify-content: center; gap: .45rem; padding-top: var(--space-2); border-top: 1px solid var(--apu-border); color: var(--apu-text-muted); }
+.guest-registration-form__switch button { padding: .35rem .5rem; border: 0; background: transparent; color: var(--apu-blue-700); font: inherit; font-weight: 700; cursor: pointer; }
+.guest-registration-form__switch button:hover,
+.guest-registration-form__switch button:focus-visible { color: var(--apu-blue-600); text-decoration: underline; outline: 0; }
+@media (max-width: 40rem) { .guest-registration-form__grid { grid-template-columns: 1fr; } .guest-registration-form__wide { grid-column: auto; } }

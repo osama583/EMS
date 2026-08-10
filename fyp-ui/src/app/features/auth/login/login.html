@@ -1,0 +1,70 @@
+<main class="login-page">
+  <section class="login-marketing" aria-label="APU Event Management System benefits">
+    <h1 aria-live="polite">
+      <span>{{ typedMessage() }}</span><span class="login-marketing__cursor" [class.login-marketing__cursor--static]="reducedMotion()" aria-hidden="true"></span>
+    </h1>
+  </section>
+
+  <section class="login-access">
+    <form class="login-form" novalidate (submit)="$event.preventDefault(); submit()">
+      <header class="login-form__header">
+        <a class="login-brand" href="/" aria-label="Return to APU Events home">
+          <img src="/assets/media/apu-logo-only.png" alt="" width="1254" height="1254" />
+          <img src="/assets/media/apu-logo-text-dark.png" alt="Asia Pacific University" width="2008" height="783" />
+        </a>
+        <p>APU Event Management System</p>
+        <h2>Welcome back</h2>
+        <span>Sign in with your assigned APU account to continue.</span>
+      </header>
+
+      <div class="login-form__fields">
+        <app-form-field controlId="login-email" name="email" label="Email" type="email" placeholder="name@apu.edu.my" autocomplete="username" [required]="true" [showRequiredIndicator]="false" [validateOnBlur]="false" [value]="email()" [error]="emailError()" (valueChange)="setEmail($event)" />
+        <app-form-field controlId="login-password" name="password" label="Password" type="password" placeholder="Enter your password" autocomplete="current-password" [required]="true" [showRequiredIndicator]="false" [validateOnBlur]="false" [value]="password()" [error]="passwordError()" (valueChange)="setPassword($event)" />
+      </div>
+
+      @if (demoAuthEnabled) {
+        <section class="login-demo-users" aria-labelledby="demo-users-heading">
+          <div class="login-demo-users__heading">
+            <span id="demo-users-heading">Development demo users</span>
+            <small>Click an account to fill the form</small>
+          </div>
+          <div class="login-demo-users__list" role="listbox" aria-label="Development demo users">
+            @for (user of demoUsers; track user.email) {
+              <button
+                type="button"
+                class="login-demo-user"
+                [class.login-demo-user--selected]="selectedDemoEmail() === user.email"
+                [attr.aria-selected]="selectedDemoEmail() === user.email"
+                role="option"
+                (click)="selectDemoUser(user)"
+              >
+                <span class="login-demo-user__identity">
+                  <strong>{{ user.displayName }}</strong>
+                  <small>{{ user.email }}</small>
+                </span>
+                <span class="material-symbols-rounded login-demo-user__check" aria-hidden="true">check_circle</span>
+              </button>
+            }
+          </div>
+        </section>
+      }
+
+      @if (loginError()) {
+        <div class="login-form__error" role="alert"><span class="material-symbols-rounded" aria-hidden="true">warning</span><span>{{ loginError() }}</span></div>
+      }
+
+      <button class="table-control table-control--primary login-form__submit" type="submit" [disabled]="submitting()">
+        @if (submitting()) { <span class="material-symbols-rounded login-form__spinner" aria-hidden="true">progress_activity</span> }
+        {{ submitting() ? 'Signing in...' : 'Sign In' }}
+      </button>
+
+      <p class="login-form__register">
+        Not an APU staff member or student? <button type="button" (click)="openRegister()">Register as a guest</button>
+      </p>
+
+      <footer class="login-form__footer">Copyright {{ year }} Asia Pacific University of Technology & Innovation</footer>
+    </form>
+  </section>
+</main>
+
+<app-guest-registration-modal />

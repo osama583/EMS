@@ -1,0 +1,16 @@
+:host { display: block; }
+
+/* Re-export / include review dashboard layout & panel styles */
+@import '../proposal-reviewer-view/proposal-reviewer-view.scss';
+
+.proposal-department-view__assignment-controls {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.proposal-department-view__assignment-message {
+  margin: 0.25rem 0 0;
+  color: var(--apu-blue-700);
+  font-size: 0.8rem;
+  font-weight: 700;
+}

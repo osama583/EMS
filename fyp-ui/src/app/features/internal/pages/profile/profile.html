@@ -1,0 +1,29 @@
+<section class="profile-page" aria-labelledby="profile-page-title">
+  <h1 id="profile-page-title">My Profile</h1>
+
+  @if (user(); as currentUser) {
+    <article class="profile-card">
+      <section class="profile-photo" aria-label="Profile photo">
+        <p>Profile photo</p>
+        <app-user-avatar [name]="currentUser.displayName" [imageUrl]="currentUser.photoUrl" />
+      </section>
+
+      <section class="profile-information" aria-labelledby="profile-information-title">
+        <h2 id="profile-information-title">Profile information</h2>
+
+        <dl class="profile-details">
+          <div class="profile-detail profile-detail--full-name">
+            <dt>Full name</dt>
+            <dd>{{ currentUser.displayName }}</dd>
+          </div>
+          @for (detail of details(); track detail.label) {
+            <div class="profile-detail">
+              <dt>{{ detail.label }}</dt>
+              <dd>{{ detail.value }}</dd>
+            </div>
+          }
+        </dl>
+      </section>
+    </article>
+  }
+</section>

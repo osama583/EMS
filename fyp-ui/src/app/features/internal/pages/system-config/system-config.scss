@@ -1,0 +1,22 @@
+:host { display: block; padding: 2rem; max-width: 64rem; margin: 0 auto; box-sizing: border-box; }
+.system-config { display: grid; gap: 2.5rem; }
+.system-config__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--apu-border); padding-bottom: 1.5rem; }
+.system-config__header h2 { margin: 0 0 .25rem; font-size: 1.75rem; color: var(--apu-navy-950); letter-spacing: -.025em; }
+.system-config__header p { margin: 0; color: var(--apu-text-muted); font-size: 1rem; }
+
+.system-config__save-btn { display: inline-flex; align-items: center; gap: .5rem; height: 2.75rem; padding: 0 1.25rem; border: 0; border-radius: 999px; background: var(--apu-blue-600); color: #fff; font: inherit; font-weight: 700; cursor: pointer; transition: background .2s ease; }
+.system-config__save-btn:hover { background: var(--apu-blue-700); }
+.system-config__save-btn--saved { background: #128a5b; }
+.system-config__save-btn .material-symbols-rounded { font-size: 1.25rem; }
+
+.system-config__section h3 { margin: 0 0 .25rem; font-size: 1.15rem; color: var(--apu-navy-900); }
+.system-config__desc { margin: 0 0 1.25rem; font-size: .95rem; color: var(--apu-text-muted); }
+
+.system-config__card { padding: 1.5rem; background: #fff; border: 1px solid var(--apu-border); border-radius: 1rem; display: grid; gap: 1rem; box-shadow: 0 1px 3px rgb(0 0 0 / 4%); }
+.system-config__note { margin: 0; padding: .75rem 1rem; font-size: .88rem; line-height: 1.5; color: var(--apu-blue-800); background: rgb(42 131 255 / 8%); border-radius: .5rem; }
+
+.system-config__form { display: grid; gap: var(--space-4); }
+
+@media (max-width: 48rem) {
+  :host { padding: 1rem; }
+}

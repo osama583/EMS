@@ -1,0 +1,64 @@
+<aside class="ai-assistant" [class.ai-assistant--open]="open()" aria-label="APU assistant">
+  @if (open()) {
+    <section id="apu-ai-chat" class="ai-chat" role="dialog" aria-modal="false" aria-labelledby="ai-chat-title">
+      <header class="ai-chat__header">
+        <span class="ai-chat__mini-orb" aria-hidden="true"><i></i><i></i></span>
+        <span class="ai-chat__heading"><strong id="ai-chat-title">APU Assistant</strong><small>Event and proposal help</small></span>
+        <button type="button" class="ai-chat__icon-btn" aria-label="Start a new chat" title="New chat" (click)="newChat()"><span class="material-symbols-rounded" aria-hidden="true">add_comment</span></button>
+        <button type="button" class="ai-chat__icon-btn" aria-label="Close assistant" (click)="closePanel()"><span class="material-symbols-rounded" aria-hidden="true">close</span></button>
+      </header>
+      <div #messageArea class="ai-chat__messages" role="log" aria-live="polite" aria-relevant="additions">
+        @for (message of messages(); track message.id) { <p class="ai-chat__message" [class.ai-chat__message--user]="message.sender === 'user'">{{ message.text }}</p> }
+        @if (typing()) { <div class="ai-chat__typing" role="status" aria-label="Assistant is typing"><i></i><i></i><i></i></div> }
+
+        @if (!hasInteracted()) {
+          <div class="ai-suggestions" aria-label="Suggested questions">
+            <p class="ai-suggestions__label">What would you like to know?</p>
+            <div class="ai-suggestions__track">
+              @for (page of cardPages; track $index) {
+                <div class="ai-suggestions__page">
+                  @for (card of page; track card.title) {
+                    <button type="button" class="ai-suggestion-card" (click)="selectCard(card)">
+                      <span class="ai-suggestion-card__icon material-symbols-rounded" aria-hidden="true">{{ card.icon }}</span>
+                      <span class="ai-suggestion-card__title">{{ card.title }}</span>
+                      <span class="ai-suggestion-card__description">{{ card.description }}</span>
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+            <div class="ai-suggestions__dots" aria-hidden="true"><i></i><i></i></div>
+          </div>
+        }
+      </div>
+      <footer class="ai-chat__composer">
+        <label><span class="visually-hidden">Message APU Assistant</span><textarea #composer rows="1" maxlength="500" placeholder="Ask a question…" [value]="draft()" (input)="updateDraft($event)" (keydown)="composerKeydown($event)"></textarea></label>
+        <button type="button" class="ai-chat__send" aria-label="Send message" [disabled]="!draft().trim() || typing()" (click)="send()"><span class="material-symbols-rounded" aria-hidden="true">arrow_upward</span></button>
+        @if (error()) { <p class="ai-chat__error" role="alert">{{ error() }}</p> }
+      </footer>
+    </section>
+  }
+
+  <div class="ai-assistant__launcher-row">
+    @if (!open() && promptVisible() && phase() === 'visible') {
+      <div class="ai-prompt" [class.ai-prompt--changing]="promptChanging()">
+        <button type="button" class="ai-prompt__open" (click)="openPanel()"><span class="ai-prompt__text">{{ prompt() }}</span></button>
+        <button type="button" class="ai-prompt__dismiss" aria-label="Dismiss assistant prompt" (click)="dismissPrompt($event)"><span class="material-symbols-rounded" aria-hidden="true">close</span></button>
+      </div>
+    }
+    <button #launcher type="button" class="ai-orb-button"
+      [class.ai-orb-button--peeking]="phase() === 'peeking' && !open()"
+      [class.ai-orb-button--waking]="waking()"
+      [class.ai-orb-button--gesture-wave]="gesture() === 'wave'"
+      [attr.aria-expanded]="open()" aria-controls="apu-ai-chat"
+      [attr.aria-label]="open() ? 'APU Assistant is open' : 'Open APU Assistant'"
+      (click)="onOrbClick()">
+      <span #orb class="ai-orb" [class]="'ai-orb--gesture-' + gesture()" [style.--eye-x.px]="eyeX()" [style.--eye-y.px]="eyeY()" [style.--tilt.deg]="tiltDeg()" aria-hidden="true">
+        <span class="ai-orb__shine"></span>
+        <span class="ai-orb__face">
+          <span class="ai-orb__eyes"><i></i><i></i></span>
+        </span>
+      </span>
+    </button>
+  </div>
+</aside>

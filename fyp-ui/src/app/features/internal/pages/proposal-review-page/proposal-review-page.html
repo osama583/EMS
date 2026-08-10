@@ -1,0 +1,57 @@
+<div class="proposal-review-page">
+
+  <!-- Top bar: back + proposal identity -->
+  <div class="proposal-review-page__topbar">
+    <button type="button" class="proposal-review-page__back" (click)="goBack()">
+      <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+      Back
+    </button>
+    @if (proposal()) {
+      <div class="proposal-review-page__heading">
+        <p class="proposal-review-page__eyebrow">Proposal review</p>
+        <h1 class="proposal-review-page__title">
+          <span class="proposal-review-page__proposal-id">{{ proposal()!.proposalId }}</span>
+          <span class="proposal-review-page__event-title">{{ proposal()!.eventTitle }}</span>
+        </h1>
+      </div>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="proposal-review-page__state" role="status">
+      <span class="material-symbols-rounded" aria-hidden="true">progress_activity</span>
+      <p>Loading proposal…</p>
+    </div>
+  } @else if (!proposal()) {
+    <div class="proposal-review-page__state" role="status">
+      <span class="material-symbols-rounded" aria-hidden="true">search_off</span>
+      <h2>Proposal not found</h2>
+      <p>This proposal is no longer available or could not be loaded.</p>
+    </div>
+  } @else if (!canView()) {
+    <div class="proposal-review-page__state" role="status">
+      <span class="material-symbols-rounded" aria-hidden="true">block</span>
+      <h2>Proposal unavailable</h2>
+      <p>This proposal is not related to your current role or account.</p>
+    </div>
+  } @else if (viewKind() === 'applicant') {
+    @if (applicantCanResubmit()) {
+      <button type="button" class="proposal-review-page__back" (click)="resubmitAsApplicant()">
+        <span class="material-symbols-rounded" aria-hidden="true">edit_note</span>
+        Resubmit application
+      </button>
+    }
+    <app-proposal-reviewer-view [proposal]="proposal()" [role]="role()!" [readOnly]="readOnly()" (actionComplete)="handleActionComplete($event)" />
+  } @else if (viewKind() === 'reviewer') {
+    <app-proposal-reviewer-view [proposal]="proposal()" [role]="role()!" [readOnly]="readOnly()" (actionComplete)="handleActionComplete($event)" />
+  } @else if (viewKind() === 'department') {
+    <app-proposal-department-view [proposal]="proposal()" [role]="role()!" [readOnly]="readOnly()" [allowAssignment]="allowAssignment" (actionComplete)="handleActionComplete($event)" />
+  } @else {
+    <div class="proposal-review-page__state" role="status">
+      <span class="material-symbols-rounded" aria-hidden="true">block</span>
+      <h2>No view available</h2>
+      <p>Your account role does not have a proposal detail view.</p>
+    </div>
+  }
+
+</div>

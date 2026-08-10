@@ -1,0 +1,16 @@
+<app-internal-data-page
+  [config]="pageConfig()"
+  [records]="sharedRecords()"
+  [filters]="filterConfigs()"
+  [searchValue]="searchDraft()"
+  [totalPages]="totalPages()"
+  [page]="currentPage()"
+  [pageSize]="pageSize()"
+  (searchChange)="updateSearchDraft($event)"
+  (filterChange)="updateFilter($event)"
+  (reset)="resetFilters()"
+  (pageChange)="updatePage($event)"
+  (pageSizeChange)="updatePageSize($event)"
+  (rowAction)="handleRowAction($event)"
+  (recordOpen)="openRecord($event)"
+/>

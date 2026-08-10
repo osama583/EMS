@@ -1,0 +1,95 @@
+<header
+  #siteHeader
+  class="site-header"
+  [class.site-header--scrolled]="isScrolled() || forceCompact()"
+  [class.site-header--menu-open]="menuOpen()"
+  [class.site-header--external]="isExternalUser()"
+>
+  <div class="site-header__inner">
+    <a
+      class="brand"
+      href="#home"
+      aria-label="APU Events home"
+      (click)="navigateToSection($event, '#home')"
+    >
+      <img
+        class="brand__icon"
+        src="assets/media/apu-logo-only.png"
+        alt=""
+        width="1254"
+        height="1254"
+      />
+      <span class="brand__text-frame">
+        <img
+          class="brand__text"
+          src="assets/media/apu-logo-text-dark.png"
+          alt=""
+          width="2008"
+          height="783"
+        />
+      </span>
+    </a>
+
+    <button
+      #menuToggle
+      class="menu-toggle"
+      type="button"
+      aria-label="Toggle navigation"
+      aria-controls="primary-navigation"
+      [attr.aria-expanded]="menuOpen()"
+      (click)="toggleMenu()"
+    >
+      <span></span>
+      <span></span>
+    </button>
+
+    <nav
+      id="primary-navigation"
+      class="site-nav"
+      aria-label="Primary navigation"
+      [class.site-nav--open]="menuOpen()"
+    >
+      <div class="site-nav__links">
+        @for (item of navItems; track item.href) {
+          @if (!isExternalUser() || item.label === 'Home' || item.label === 'Explore Events') {
+          <a
+            #firstNavLink
+            class="nav-link"
+            [class.nav-link--active]="activeSection() === item.href"
+            [attr.aria-current]="activeSection() === item.href ? 'location' : null"
+            [href]="item.href"
+            (click)="navigateToSection($event, item.href)"
+          >
+            {{ item.label }}
+          </a>
+          }
+        }
+        @if (isExternalUser()) {
+          <a class="nav-link" href="/my-events/saved" (click)="closeMenu()">My Events</a>
+        } @else {
+          <a class="nav-link" [href]="savedEventsHref()" (click)="openSavedEvents($event)">Saved Events</a>
+        }
+      </div>
+
+      @if (isExternalUser()) {
+        <button class="apply-link apply-link--logout" type="button" (click)="logout()">
+          <span>Logout</span>
+          <span class="apply-link__arrow material-symbols-rounded" aria-hidden="true">logout</span>
+        </button>
+      } @else {
+      <div class="site-nav__actions">
+        @if (showLoginButton()) {
+          <a class="nav-login-link" href="/login" (click)="openLogin($event)">Login</a>
+        }
+        <app-cta-link
+          label="Request an Event"
+          href="/login?returnUrl=%2Fapp%2Fhow-it-works"
+          arrow="↗"
+          [compact]="true"
+          (activated)="openLogin($event, '/app/how-it-works')"
+        />
+      </div>
+      }
+    </nav>
+  </div>
+</header>

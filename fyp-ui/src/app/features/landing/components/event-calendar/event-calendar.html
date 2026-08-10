@@ -1,0 +1,363 @@
+<section id="event-calendar" class="event-calendar" aria-labelledby="event-calendar-title">
+  <div class="event-calendar__intro">
+    <div>
+      <p class="event-calendar__eyebrow section-title">Event Calendar</p>
+      <h2 id="event-calendar-title">Plan Your APU Experience</h2>
+    </div>
+    <p>See what is ahead, organise your month and make space for the experiences that matter.</p>
+  </div>
+
+  <div class="calendar-shell">
+    <header class="calendar-toolbar">
+      <div class="calendar-toolbar__actions">
+        <div class="calendar-nav" aria-label="Calendar navigation">
+          <button type="button" aria-label="Previous period" (click)="navigate(-1)">‹</button>
+          <button type="button" aria-label="Next period" (click)="navigate(1)">›</button>
+        </div>
+
+        <button type="button" class="calendar-today" (click)="goToToday()">Today</button>
+
+        <label class="calendar-view">
+          <span class="sr-only">Calendar view</span>
+          <select [value]="viewMode()" (change)="changeView($event)">
+            <option value="month">Month view</option>
+            <option value="week">Week view</option>
+            <option value="agenda">Agenda view</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="calendar-toolbar__title">
+        <h3>{{ displayTitle() }}</h3>
+        <p>{{ visibleRange() }}</p>
+      </div>
+    </header>
+
+    <div class="calendar-discovery">
+      <div class="calendar-discovery__controls" role="search">
+        <app-filter-button
+          label="Filters"
+          ariaLabel="Open calendar filters"
+          [count]="appliedFilterCount()"
+          [expanded]="calendarFilterOpen()"
+          (triggered)="openCalendarFilters()"
+        />
+
+        <app-expandable-search
+          ariaLabel="Search calendar events"
+          placeholder="Search calendar events"
+          [value]="searchTerm()"
+          (valueChange)="onSearch($event)"
+        />
+      </div>
+
+      <div class="calendar-top-legend" aria-label="Event category legend">
+        <span><i class="legend-dot legend-dot--academic"></i>Academic &amp; Career</span>
+        <span><i class="legend-dot legend-dot--workshop"></i>Workshops</span>
+        <span><i class="legend-dot legend-dot--culture"></i>Culture</span>
+        <span><i class="legend-dot legend-dot--sports"></i>Wellness</span>
+      </div>
+    </div>
+
+    @if (viewMode() === 'month') {
+      <div class="calendar-month-view">
+        <div class="calendar-weekdays" aria-hidden="true">
+          @for (dayName of weekDayLabels; track dayName) {
+            <span>{{ dayName }}</span>
+          }
+        </div>
+
+        <div class="calendar-grid" role="grid" aria-label="Monthly event calendar">
+          @for (day of monthDays(); track day.key) {
+            <article
+              class="calendar-day"
+              [class.calendar-day--outside]="!day.isCurrentMonth"
+              [class.calendar-day--today]="day.isToday"
+              role="gridcell"
+              [attr.aria-label]="formatFullDate(day.date)"
+            >
+              <time [attr.datetime]="day.key">{{ day.dayNumber }}</time>
+              <div class="calendar-day__events">
+                @for (event of visibleEvents(day); track event.id) {
+                  <button
+                    type="button"
+                    [class]="'calendar-event calendar-event--' + event.categoryClass"
+                    (click)="openEvent(event)"
+                  >
+                    <span class="calendar-event__title">{{ event.title }}</span>
+                    <span class="calendar-event__time">{{ event.time }}</span>
+                  </button>
+                }
+                @if (remainingEventCount(day) > 0) {
+                  <button type="button" class="calendar-more" (click)="openDay(day)">
+                    +{{ remainingEventCount(day) }} more events
+                  </button>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      </div>
+
+      <div class="calendar-mobile-agenda" aria-label="Mobile monthly event calendar">
+        <div class="calendar-mobile-dates" role="listbox" aria-label="Choose a date">
+          @for (day of mobileMonthDays(); track day.key) {
+            <button
+              type="button"
+              role="option"
+              class="calendar-mobile-date"
+              [class.calendar-mobile-date--selected]="day.key === mobileFocusedDay().key"
+              [class.calendar-mobile-date--today]="day.isToday"
+              [attr.aria-selected]="day.key === mobileFocusedDay().key"
+              [attr.aria-label]="
+                formatFullDate(day.date) +
+                ', ' +
+                day.events.length +
+                (day.events.length === 1 ? ' event' : ' events')
+              "
+              (click)="selectMobileDate(day)"
+            >
+              <span>{{ day.date | date: 'EEE' }}</span>
+              <strong>{{ day.dayNumber }}</strong>
+              @if (day.events.length > 0) {
+                <i aria-hidden="true"></i>
+              }
+            </button>
+          }
+        </div>
+
+        <section class="calendar-mobile-day" aria-live="polite">
+          <header class="calendar-mobile-day__header">
+            <div>
+              <span>Selected day</span>
+              <h4>{{ formatFullDate(mobileFocusedDay().date) }}</h4>
+            </div>
+            <strong>
+              {{ mobileFocusedDay().events.length }}
+              {{ mobileFocusedDay().events.length === 1 ? 'event' : 'events' }}
+            </strong>
+          </header>
+
+          <div class="calendar-mobile-day__events">
+            @for (event of mobileFocusedDay().events; track event.id) {
+              <button type="button" class="agenda-event" (click)="openEvent(event)">
+                <span
+                  [class]="'agenda-event__dot agenda-event__dot--' + event.categoryClass"
+                ></span>
+                <span>
+                  <strong>{{ event.title }}</strong>
+                  <small>{{ event.time }} · {{ event.venue }}</small>
+                </span>
+              </button>
+            } @empty {
+              <div class="calendar-mobile-day__empty">
+                <span aria-hidden="true">○</span>
+                <strong>No events on this day</strong>
+                <p>Swipe the dates above to explore another day.</p>
+              </div>
+            }
+          </div>
+        </section>
+      </div>
+
+      <div class="calendar-mobile-agenda--legacy" hidden>
+        @for (day of agendaDays(); track day.key) {
+          <article class="agenda-day">
+            <div class="agenda-day__date">
+              <strong>{{ day.date | date: 'dd' }}</strong>
+              <span>{{ day.date | date: 'MMM' }}</span>
+            </div>
+            <div class="agenda-day__events">
+              @for (event of day.events; track event.id) {
+                <button type="button" class="agenda-event" (click)="openEvent(event)">
+                  <span
+                    [class]="'agenda-event__dot agenda-event__dot--' + event.categoryClass"
+                  ></span>
+                  <span>
+                    <strong>{{ event.title }}</strong>
+                    <small>{{ event.time }} · {{ event.venue }}</small>
+                  </span>
+                </button>
+              }
+            </div>
+          </article>
+        } @empty {
+          <p class="calendar-empty">No events match this calendar view.</p>
+        }
+      </div>
+    } @else if (viewMode() === 'week') {
+      <div class="calendar-week-view" aria-label="Weekly event calendar">
+        @for (day of weekDays(); track day.key) {
+          <article class="week-day" [class.week-day--today]="day.isToday">
+            <header>
+              <span>{{ day.date | date: 'EEE' }}</span>
+              <strong>{{ day.dayNumber }}</strong>
+            </header>
+            <div>
+              @for (event of day.events; track event.id) {
+                <button
+                  type="button"
+                  [class]="'week-event week-event--' + event.categoryClass"
+                  (click)="openEvent(event)"
+                >
+                  <span>{{ event.time }}</span>
+                  <strong>{{ event.title }}</strong>
+                </button>
+              } @empty {
+                <span class="week-day__empty">No events</span>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    } @else {
+      <div class="calendar-agenda-view" aria-label="Event agenda">
+        @for (day of agendaDays(); track day.key) {
+          <article class="agenda-row">
+            <time [attr.datetime]="day.key">
+              <strong>{{ day.date | date: 'dd' }}</strong>
+              <span>{{ day.date | date: 'EEE, MMM' }}</span>
+            </time>
+            <div>
+              @for (event of day.events; track event.id) {
+                <button type="button" class="agenda-row__event" (click)="openEvent(event)">
+                  <span
+                    [class]="'agenda-event__dot agenda-event__dot--' + event.categoryClass"
+                  ></span>
+                  <span>
+                    <strong>{{ event.title }}</strong>
+                    <small>{{ event.time }} · {{ event.venue }}</small>
+                  </span>
+                  <span>{{ event.category }}</span>
+                </button>
+              }
+            </div>
+          </article>
+        } @empty {
+          <p class="calendar-empty">No events match this calendar view.</p>
+        }
+      </div>
+    }
+  </div>
+</section>
+
+@if (calendarFilterOpen()) {
+  <div class="calendar-filter-overlay" role="presentation" (click)="closeCalendarFilters()">
+    <section
+      class="calendar-filter-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="calendar-filter-title"
+      (click)="$event.stopPropagation()"
+    >
+      <header class="calendar-filter-dialog__header">
+        <div>
+          <p>Refine calendar</p>
+          <h2 id="calendar-filter-title">Filter events</h2>
+        </div>
+        <button
+          #calendarFilterClose
+          type="button"
+          aria-label="Close calendar filters"
+          (click)="closeCalendarFilters()"
+        >
+          ×
+        </button>
+      </header>
+
+      <div class="calendar-filter-dialog__body">
+        <fieldset>
+          <legend>Event Category</legend>
+          <div class="calendar-filter-options">
+            @for (category of categoryOptions(); track category) {
+              <button
+                type="button"
+                class="calendar-filter-option"
+                [class.calendar-filter-option--selected]="isDraftCategorySelected(category)"
+                [attr.aria-pressed]="isDraftCategorySelected(category)"
+                (click)="toggleDraftCategory(category)"
+              >
+                @if (isDraftCategorySelected(category)) {
+                  <span aria-hidden="true">✓</span>
+                }
+                {{ category }}
+              </button>
+            }
+          </div>
+        </fieldset>
+      </div>
+
+      <footer class="calendar-filter-dialog__footer">
+        <button type="button" class="calendar-filter-reset" (click)="resetCalendarFilters()">
+          Reset Filters
+        </button>
+        <button type="button" class="calendar-filter-apply" (click)="applyCalendarFilters()">
+          Show {{ draftResultCount() }} {{ draftResultCount() === 1 ? 'Result' : 'Results' }}
+        </button>
+      </footer>
+    </section>
+  </div>
+}
+
+@if (selectedEvent() || selectedDay()) {
+  <div class="calendar-dialog-overlay" role="presentation" (click)="closeDialog()">
+    <section
+      class="calendar-dialog"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-labelledby]="selectedEvent() ? 'event-dialog-title' : 'day-dialog-title'"
+      (click)="$event.stopPropagation()"
+    >
+      <button
+        #modalCloseButton
+        type="button"
+        class="calendar-dialog__close"
+        aria-label="Close calendar dialog"
+        (click)="closeDialog()"
+      >
+        ×
+      </button>
+
+      @if (selectedEvent(); as event) {
+        <div
+          [class]="'calendar-dialog__accent calendar-dialog__accent--' + event.categoryClass"
+        ></div>
+        <p class="calendar-dialog__category">{{ event.category }}</p>
+        <h2 id="event-dialog-title">{{ event.title }}</h2>
+        <p class="calendar-dialog__date">{{ formatFullDate(event.date) }}</p>
+        <dl class="calendar-dialog__details">
+          <div>
+            <dt>Time</dt>
+            <dd>{{ event.time }}</dd>
+          </div>
+          <div>
+            <dt>Venue</dt>
+            <dd>{{ event.venue }}</dd>
+          </div>
+          <div>
+            <dt>Category</dt>
+            <dd>{{ event.category }}</dd>
+          </div>
+        </dl>
+        <p class="calendar-dialog__description">{{ event.description }}</p>
+        <a class="calendar-dialog__action" href="#explore-events" (click)="closeDialog()">
+          Explore Event
+        </a>
+      } @else if (selectedDay(); as day) {
+        <p class="calendar-dialog__category">Day agenda</p>
+        <h2 id="day-dialog-title">{{ formatFullDate(day.date) }}</h2>
+        <div class="day-dialog__events">
+          @for (event of day.events; track event.id) {
+            <button type="button" (click)="openEvent(event)">
+              <span [class]="'agenda-event__dot agenda-event__dot--' + event.categoryClass"></span>
+              <span>
+                <strong>{{ event.title }}</strong>
+                <small>{{ event.time }} · {{ event.venue }}</small>
+              </span>
+            </button>
+          }
+        </div>
+      }
+    </section>
+  </div>
+}

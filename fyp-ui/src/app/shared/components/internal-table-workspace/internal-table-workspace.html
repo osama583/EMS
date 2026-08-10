@@ -1,0 +1,36 @@
+<section class="internal-table-workspace" [attr.aria-label]="ariaLabel()">
+  @if (!hideHeader()) {
+    <header class="internal-table-workspace__header">
+      <ng-content select="[workspaceHeader]"></ng-content>
+    </header>
+  }
+
+  @if (!hideControls()) {
+    <section class="internal-table-workspace__controls">
+      <ng-content select="[workspaceControls]"></ng-content>
+    </section>
+  }
+
+  <section class="internal-table-workspace__table-card">
+    <div class="internal-table-workspace__table-scroll">
+      <ng-content select="[workspaceTable]"></ng-content>
+    </div>
+    <ng-content select="[workspaceEmptyState]"></ng-content>
+  </section>
+
+  <ng-content select="[workspaceMobile]"></ng-content>
+
+  <footer class="internal-table-workspace__pagination">
+    <span class="internal-table-workspace__pagination-spacer" aria-hidden="true"></span>
+    <app-internal-pagination
+      [paginationLabel]="paginationLabel()"
+      [rowsPerPageLabel]="rowsPerPageLabel()"
+      [totalPages]="totalPages()"
+      [page]="page()"
+      [pageSize]="pageSize()"
+      [pageSizeOptions]="pageSizeOptions()"
+      (pageChange)="page.set($event)"
+      (pageSizeChange)="updatePageSize($event)"
+    />
+  </footer>
+</section>

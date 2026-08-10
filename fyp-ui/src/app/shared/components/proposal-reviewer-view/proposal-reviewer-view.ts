@@ -1,0 +1,406 @@
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, output, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { finalize } from 'rxjs';
+import { UserRole } from '../../../core/auth/auth.models';
+import { DepartmentRequestKind } from '../../../core/departments/department-workflow.config';
+import { ProposalReviewRecord } from '../../../core/proposals/proposal-review.models';
+import { ProposalStage, reviewerRoleForStage, stageLabel } from '../../../core/proposals/proposal-status.models';
+import { ProposalWorkflowService } from '../../../core/proposals/proposal-workflow.service';
+import { EditableRow } from '../form-controls/form-controls.models';
+import { FormModalComponent } from '../form-modal/form-modal';
+import { ProposalFieldComponent } from '../proposal-field/proposal-field';
+import { ProposalKpiBarComponent } from '../proposal-kpi-bar/proposal-kpi-bar';
+import { ProposalSectionComponent } from '../proposal-section/proposal-section';
+import { ProposalTableColumn, ProposalTableComponent } from '../proposal-table/proposal-table';
+
+import { AuthService } from '../../../core/auth/auth.service';
+import { SystemConfigService } from '../../../core/config/system-config.service';
+
+interface RequirementTable {
+  readonly key: DepartmentRequestKind;
+  readonly label: string;
+  readonly rows: readonly EditableRow[];
+}
+
+interface TimelineStep {
+  readonly stage: string;
+  readonly label: string;
+  readonly note: string;
+  readonly active: boolean;
+  readonly done: boolean;
+}
+
+interface ReviewerComment {
+  readonly stage: string;
+  readonly reviewer: string;
+  readonly initials: string;
+  readonly text: string;
+}
+
+const REQUIREMENT_LABELS: Readonly<Record<DepartmentRequestKind, string>> = {
+  logistics: 'Logistics',
+  campusTour: 'Campus Tour',
+  waterLogo: 'Mineral Water (with Logo)',
+  waterNormal: 'Mineral Water (Normal)',
+  soundLight: 'Sound & Light',
+  photoVideo: 'Photography / Videography',
+  transportation: 'Transportation',
+  fnb: 'Food & Beverage',
+  fundingPurchase: 'Funding / Purchase',
+};
+
+const ROLE_LABELS: Partial<Record<UserRole, string>> = {
+  [UserRole.HosHod]: 'HOS/HOD',
+  [UserRole.FmbReviewer]: 'F&B Reviewer',
+  [UserRole.Cfo]: 'CFO',
+};
+
+const STAGE_ORDER: readonly ProposalStage[] = [
+  ProposalStage.HosHodReview,
+  ProposalStage.FmbReviewerPending,
+  ProposalStage.CfoReview,
+  ProposalStage.DepartmentReview,
+  ProposalStage.Approved,
+];
+
+function parseEventDate(rawStr: string): Date | null {
+  if (!rawStr) return null;
+  const clean = rawStr.split(',')[0].split('·')[0].trim();
+  const parsed = new Date(clean);
+  if (!isNaN(parsed.getTime())) return parsed;
+
+  const match = clean.match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
+  if (match) {
+    const day = parseInt(match[1], 10);
+    const monthStr = match[2].slice(0, 3).toLowerCase();
+    const year = parseInt(match[3], 10);
+    const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    const monthIndex = months.indexOf(monthStr);
+    if (monthIndex !== -1) {
+      return new Date(year, monthIndex, day);
+    }
+  }
+  return null;
+}
+
+@Component({
+  selector: 'app-proposal-reviewer-view',
+  imports: [ProposalTableComponent, FormModalComponent, ProposalKpiBarComponent, ProposalSectionComponent, ProposalFieldComponent],
+  templateUrl: './proposal-reviewer-view.html',
+  styleUrl: './proposal-reviewer-view.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class ProposalReviewerViewComponent {
+  private readonly workflow = inject(ProposalWorkflowService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(AuthService);
+  private readonly configService = inject(SystemConfigService);
+
+  readonly proposal = input<ProposalReviewRecord | null>(null);
+  readonly role = input.required<UserRole>();
+  readonly readOnly = input(false);
+  readonly actionComplete = output<number>();
+
+  readonly approving = signal(false);
+  readonly rejecting = signal(false);
+  readonly resubmitting = signal(false);
+  readonly cancelling = signal(false);
+  readonly approveConfirm = signal(false);
+  readonly resubmitConfirm = signal(false);
+  readonly rejectConfirm = signal(false);
+  readonly cancelConfirm = signal(false);
+  readonly rejectCommentError = signal(false);
+  readonly actionMessage = signal('');
+  readonly actionBannerKind = signal<'success' | 'error' | 'info'>('info');
+  readonly comment = signal('');
+  readonly commentValidationError = signal(false);
+
+  readonly stage = computed<ProposalStage | null>(() => this.proposal()?.workflow.stage ?? null);
+  readonly stageLabel = computed(() => this.stage() ? stageLabel(this.stage()!) : '');
+  readonly canAct = computed(() => {
+    if (this.readOnly()) return false;
+    const stage = this.stage();
+    return stage !== null && reviewerRoleForStage(stage) === this.role();
+  });
+
+  readonly currentUser = computed(() => this.auth.user());
+
+  readonly isSubmitterOrCoOwner = computed(() => {
+    const user = this.currentUser();
+    const proposal = this.proposal();
+    if (!user || !proposal) return false;
+
+    const userEmail = (user.email || '').trim().toLowerCase();
+    const userName = (user.displayName || '').trim().toLowerCase();
+    const userHandle = userEmail.split('@')[0] || '';
+
+    const applicantEmail = (proposal.applicantEmail || '').trim().toLowerCase();
+    const applicantName = (proposal.applicant || '').trim().toLowerCase();
+    const isSubmitter = (
+      (userEmail && applicantEmail && userEmail === applicantEmail) ||
+      (userName && applicantName && userName === applicantName) ||
+      (userHandle && applicantEmail && applicantEmail.startsWith(userHandle))
+    );
+    if (isSubmitter) return true;
+
+    if (proposal.coOwners && proposal.coOwners.length) {
+      const isCoOwner = proposal.coOwners.some((coOwner) => {
+        const coEmail = String(coOwner['email'] || '').trim().toLowerCase();
+        const coName = String(coOwner['name'] || '').trim().toLowerCase();
+        return (
+          (userEmail && coEmail && userEmail === coEmail) ||
+          (userName && coName && userName === coName) ||
+          (userHandle && coEmail && coEmail.startsWith(userHandle))
+        );
+      });
+      if (isCoOwner) return true;
+    }
+
+    return false;
+  });
+
+  readonly isWithinCancellationWindow = computed(() => {
+    const proposal = this.proposal();
+    if (!proposal) return false;
+    const limitDays = this.configService.cancellationDaysLimit();
+
+    let dateStr = proposal.scheduleRows?.[0]?.['date'] as string | undefined;
+    if (!dateStr && proposal.schedule) {
+      dateStr = proposal.schedule.split('·')[0]?.trim();
+    }
+    if (!dateStr) return false;
+
+    const eventDate = parseEventDate(dateStr);
+    if (!eventDate || isNaN(eventDate.getTime())) return false;
+
+    const deadline = new Date(eventDate);
+    deadline.setDate(deadline.getDate() - limitDays);
+    deadline.setHours(23, 59, 59, 999);
+
+    const now = new Date();
+    return now.getTime() <= deadline.getTime();
+  });
+
+  readonly canCancel = computed(() => {
+    const proposal = this.proposal();
+    if (!proposal) return false;
+    if (proposal.status === 'Cancelled' || proposal.status === 'Rejected' || proposal.workflow.stage === ProposalStage.Rejected) {
+      return false;
+    }
+    return !this.readOnly() && this.isSubmitterOrCoOwner() && this.isWithinCancellationWindow();
+  });
+
+  readonly commentRequired = computed(() =>
+    this.comment().trim().length === 0
+  );
+
+  readonly actionBannerIcon = computed(() => {
+    const kind = this.actionBannerKind();
+    if (kind === 'success') return 'check_circle';
+    if (kind === 'error') return 'error';
+    return 'info';
+  });
+
+  /** Timeline steps for approval history sidebar */
+  readonly timelineSteps = computed<readonly TimelineStep[]>(() => {
+    const proposal = this.proposal();
+    if (!proposal) return [];
+    const currentStage = proposal.workflow.stage;
+    const currentIndex = STAGE_ORDER.indexOf(currentStage as ProposalStage);
+
+    const steps: TimelineStep[] = STAGE_ORDER.map((stage, index) => ({
+      stage,
+      label: stageLabel(stage),
+      note: this.noteForStage(proposal, stage),
+      active: stage === currentStage,
+      done: index < currentIndex || currentStage === ProposalStage.Approved,
+    }));
+
+    // Add terminal states if applicable
+    if (currentStage === ProposalStage.Rejected) {
+      steps.push({ stage: ProposalStage.Rejected, label: 'Rejected', note: proposal.workflow.rejectedReason ?? '', active: true, done: false });
+    }
+    if (currentStage === ProposalStage.NeedsRevision) {
+      steps.push({ stage: ProposalStage.NeedsRevision, label: 'Revision Required', note: 'Awaiting applicant resubmission.', active: true, done: false });
+    }
+
+    return steps;
+  });
+
+  /** Comments left by reviewers visible to all */
+  readonly reviewerComments = computed<readonly ReviewerComment[]>(() => {
+    const proposal = this.proposal();
+    if (!proposal?.workflow.reviewerComment) return [];
+    const roleLabel = ROLE_LABELS[proposal.workflow.rejectedBy as UserRole] ?? 'Reviewer';
+    const initials = roleLabel.split(/[\s\/&]+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+    return [{
+      stage: stageLabel(proposal.workflow.stage),
+      reviewer: roleLabel,
+      initials,
+      text: proposal.workflow.reviewerComment,
+    }];
+  });
+
+  readonly coOwnerColumns: readonly ProposalTableColumn[] = [
+    { key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'role', label: 'Role' },
+  ];
+  readonly organizerColumns: readonly ProposalTableColumn[] = [
+    { key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'role', label: 'Role' }, { key: 'notes', label: 'Notes' },
+  ];
+  readonly importantPeopleColumns: readonly ProposalTableColumn[] = [
+    { key: 'name', label: 'Name' }, { key: 'type', label: 'Type' }, { key: 'organization', label: 'Organization' }, { key: 'designation', label: 'Designation' },
+  ];
+  readonly guestColumns: readonly ProposalTableColumn[] = [
+    { key: 'guestType', label: 'Guest Type' }, { key: 'count', label: 'Count' }, { key: 'notes', label: 'Notes' },
+  ];
+  readonly scheduleColumns: readonly ProposalTableColumn[] = [
+    { key: 'date', label: 'Date' }, { key: 'start', label: 'Start' }, { key: 'end', label: 'End' }, { key: 'location', label: 'Location' },
+  ];
+  readonly agendaColumns: readonly ProposalTableColumn[] = [
+    { key: 'time', label: 'Time' }, { key: 'activity', label: 'Activity' }, { key: 'location', label: 'Location' }, { key: 'pic', label: 'PIC' }, { key: 'notes', label: 'Notes' },
+  ];
+  readonly discussionColumns: readonly ProposalTableColumn[] = [{ key: 'topic', label: 'Topic' }];
+  readonly requestColumns: readonly ProposalTableColumn[] = [
+    { key: 'item', label: 'Requirement / Item', width: '15rem' },
+    { key: 'quantity', label: 'Quantity', width: '10rem' },
+    { key: 'schedule', label: 'Schedule', width: '15rem' },
+    { key: 'location', label: 'Location', width: '12rem' },
+    { key: 'notes', label: 'Notes', width: '17rem' },
+  ];
+
+  readonly requirementTables = computed<readonly RequirementTable[]>(() => {
+    const proposal = this.proposal();
+    if (!proposal) return [];
+    return proposal.selectedRequirements.map((key) => ({
+      key,
+      label: REQUIREMENT_LABELS[key],
+      rows: proposal.requests.filter((request) => request.department === key).map((request) => ({ ...request })),
+    }));
+  });
+
+  onCommentInput(event: Event): void {
+    this.comment.set((event.target as HTMLTextAreaElement).value);
+    if (this.commentValidationError()) this.commentValidationError.set(false);
+  }
+
+  openCancelModal(): void {
+    this.cancelConfirm.set(true);
+  }
+
+  confirmCancel(): void {
+    const proposal = this.proposal();
+    const user = this.currentUser();
+    if (!proposal || !user) return;
+    this.cancelling.set(true);
+    this.workflow.cancelProposal(proposal.id, user.email).pipe(
+      finalize(() => this.cancelling.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: () => {
+        this.cancelConfirm.set(false);
+        this.actionBannerKind.set('info');
+        this.actionMessage.set('Application cancelled successfully.');
+        this.actionComplete.emit(proposal.id);
+      },
+      error: () => {
+        this.actionBannerKind.set('error');
+        this.actionMessage.set('Could not cancel application. Please try again.');
+      },
+    });
+  }
+
+  openApproveModal(): void {
+    this.approveConfirm.set(true);
+  }
+
+  confirmApprove(): void {
+    this.approveConfirm.set(false);
+    this.approve();
+  }
+
+  approve(): void {
+    const proposal = this.proposal();
+    if (!proposal) return;
+    this.approving.set(true);
+    this.actionMessage.set('');
+    this.workflow.approveAsReviewer(proposal.id, this.role()).pipe(
+      finalize(() => this.approving.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: () => { this.actionBannerKind.set('success'); this.actionMessage.set('Proposal approved — moved to the next stage.'); this.actionComplete.emit(proposal.id); },
+      error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not approve. Please try again.'); },
+    });
+  }
+
+  openResubmitModal(): void {
+    if (this.comment().trim().length === 0) {
+      this.commentValidationError.set(true);
+      return;
+    }
+    this.commentValidationError.set(false);
+    this.resubmitConfirm.set(true);
+  }
+
+  confirmResubmit(): void {
+    this.resubmitConfirm.set(false);
+    this.resubmit(this.comment().trim());
+  }
+
+  openRejectModal(): void {
+    if (this.comment().trim().length === 0) {
+      this.rejectCommentError.set(true);
+      return;
+    }
+    this.rejectCommentError.set(false);
+    this.rejectConfirm.set(true);
+  }
+
+  confirmReject(): void {
+    this.confirmRejectAction();
+  }
+
+  private confirmRejectAction(): void {
+    if (this.comment().trim().length === 0) {
+      this.rejectCommentError.set(true);
+      return;
+    }
+    this.reject(this.comment().trim());
+  }
+
+  reject(reason: string): void {
+    const proposal = this.proposal();
+    if (!proposal) return;
+    this.rejecting.set(true);
+    this.workflow.rejectAsReviewer(proposal.id, this.role(), reason).pipe(
+      finalize(() => this.rejecting.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: () => { this.rejectConfirm.set(false); this.actionBannerKind.set('error'); this.actionMessage.set('Proposal rejected.'); this.actionComplete.emit(proposal.id); },
+      error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not reject. Please try again.'); },
+    });
+  }
+
+  private resubmit(comment: string): void {
+    const proposal = this.proposal();
+    if (!proposal) return;
+    this.resubmitting.set(true);
+    this.workflow.resubmitAsReviewer(proposal.id, this.role(), comment).pipe(
+      finalize(() => this.resubmitting.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: () => { this.actionBannerKind.set('info'); this.actionMessage.set('Sent back to the applicant with your comment.'); this.comment.set(''); this.actionComplete.emit(proposal.id); },
+      error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not resubmit. Please try again.'); },
+    });
+  }
+
+  private noteForStage(proposal: ProposalReviewRecord, stage: ProposalStage): string {
+    if (stage === ProposalStage.Approved) return proposal.workflow.stage === ProposalStage.Approved ? 'All confirmations received.' : '';
+    if (stage === ProposalStage.DepartmentReview) {
+      const confirmations = proposal.workflow.departmentConfirmations;
+      if (!confirmations.length) return '';
+      const done = confirmations.filter(c => c.confirmed).length;
+      return `${done} / ${confirmations.length} departments confirmed`;
+    }
+    return '';
+  }
+}

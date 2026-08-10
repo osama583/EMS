@@ -1,0 +1,308 @@
+@if (proposal(); as item) {
+  <!-- KPI Summary Bar -->
+  <app-proposal-kpi-bar [proposal]="item" [stageLabel]="stageLabel()" />
+
+  <!-- Two-column content -->
+  <div class="prv-layout">
+
+    <!-- LEFT — Proposal Details -->
+    <div class="prv-main">
+
+      @if (actionMessage()) {
+        <div class="prv-status-banner" role="status" [attr.data-kind]="actionBannerKind()">
+          <span class="material-symbols-rounded" aria-hidden="true">{{ actionBannerIcon() }}</span>
+          {{ actionMessage() }}
+        </div>
+      }
+
+      <!-- Section: Applicant -->
+      <app-proposal-section icon="person" title="Applicant" description="Submitter details and co-owners.">
+        <div class="prv-grid prv-grid--3">
+          <app-proposal-field label="Full Name" [value]="item.applicant" />
+          <app-proposal-field label="Email" [value]="item.applicantEmail" />
+          <app-proposal-field label="Department / School" [value]="item.applicantDepartment" />
+        </div>
+        @if (item.coOwners.length) {
+          <div class="prv-table-wrap">
+            <h4 class="prv-table-wrap__label">Co-owners</h4>
+            <app-proposal-table tableId="prv-co-owners" [columns]="coOwnerColumns" [rows]="item.coOwners" [readOnly]="true" emptyIcon="group_add" emptyMessage="No co-owners were added." />
+          </div>
+        }
+      </app-proposal-section>
+
+      <!-- Section: Event Overview -->
+      <app-proposal-section icon="description" title="Event Overview" description="General information, registration and publicity.">
+        <div class="prv-grid prv-grid--3">
+          <app-proposal-field label="Event Title" [value]="item.eventTitle" span="2" />
+          <app-proposal-field label="Visibility" [value]="item.eventVisibility" />
+          <app-proposal-field label="Format" [value]="item.eventFormat" />
+          <app-proposal-field label="Registration" [value]="item.registrationMode" />
+          <app-proposal-field label="Total Pax" [value]="item.totalPax" />
+          <div class="prv-grid-row--2 prv-field--full">
+            <app-proposal-field label="External Pax" [value]="item.externalPax" />
+            <app-proposal-field label="Categories" [value]="item.eventCategories.join(', ')" />
+          </div>
+          <app-proposal-field label="Publicity" [value]="item.publicity" span="full" />
+          <app-proposal-field label="Short Introduction" [value]="item.shortIntroduction" span="full" />
+          <app-proposal-field label="Goals &amp; Objectives" [value]="item.goals" span="full" />
+          <app-proposal-field label="Expected Benefits" [value]="item.benefits" span="full" />
+        </div>
+        @if (item.eventImage) {
+          <img class="prv-event-image" [src]="item.eventImage.url" [alt]="item.eventTitle + ' event image'" />
+        }
+      </app-proposal-section>
+
+      <!-- Section: People -->
+      <app-proposal-section icon="supervised_user_circle" title="People" description="Organizers, important attendees and guest breakdown.">
+        <div class="prv-table-wrap">
+          <h4 class="prv-table-wrap__label">Organizers</h4>
+          <app-proposal-table tableId="prv-organizers" [columns]="organizerColumns" [rows]="item.organizers" [readOnly]="true" emptyIcon="group_add" emptyMessage="No organizers were added." />
+        </div>
+        <div class="prv-table-wrap">
+          <h4 class="prv-table-wrap__label">Important People</h4>
+          <app-proposal-table tableId="prv-important-people" [columns]="importantPeopleColumns" [rows]="item.importantPeople" [readOnly]="true" emptyIcon="group_add" emptyMessage="No important people were added." />
+        </div>
+        <div class="prv-table-wrap">
+          <h4 class="prv-table-wrap__label">Guest Breakdown</h4>
+          <app-proposal-table tableId="prv-guests" [columns]="guestColumns" [rows]="item.guests" [readOnly]="true" emptyIcon="group_add" emptyMessage="No guest breakdown was added." />
+        </div>
+      </app-proposal-section>
+
+      <!-- Section: Schedule & Agenda -->
+      <app-proposal-section icon="calendar_month" title="Schedule &amp; Agenda" description="Event dates, times, locations and agenda flow.">
+        <div class="prv-table-wrap">
+          <h4 class="prv-table-wrap__label">Schedule</h4>
+          <app-proposal-table tableId="prv-schedule" [columns]="scheduleColumns" [rows]="item.scheduleRows" [readOnly]="true" emptyIcon="event" emptyMessage="No schedule rows were added." />
+        </div>
+        <div class="prv-table-wrap">
+          <h4 class="prv-table-wrap__label">Agenda</h4>
+          <app-proposal-table tableId="prv-agenda" [columns]="agendaColumns" [rows]="item.agenda" [readOnly]="true" emptyIcon="event_note" emptyMessage="No agenda rows were added." />
+        </div>
+        @if (item.discussions.length) {
+          <div class="prv-table-wrap">
+            <h4 class="prv-table-wrap__label">Discussion Topics</h4>
+            <app-proposal-table tableId="prv-discussions" [columns]="discussionColumns" [rows]="item.discussions" [readOnly]="true" emptyIcon="forum" emptyMessage="No discussion topics were added." />
+          </div>
+        }
+      </app-proposal-section>
+
+      <!-- Section: Requested Services -->
+      @if (requirementTables().length) {
+        <app-proposal-section icon="inventory_2" title="Requested Services" description="Department requests submitted by the applicant.">
+          @for (table of requirementTables(); track table.key) {
+            <div class="prv-table-wrap">
+              <h4 class="prv-table-wrap__label">{{ table.label }}</h4>
+              <app-proposal-table [tableId]="'prv-req-' + table.key" [columns]="requestColumns" [rows]="table.rows" [readOnly]="true" emptyIcon="assignment_late" emptyMessage="No details were provided." />
+            </div>
+          }
+        </app-proposal-section>
+      }
+
+    </div><!-- /prv-main -->
+
+    <!-- RIGHT — Reviewer Panel (sticky) -->
+    <aside class="prv-panel">
+
+      <!-- Workflow Actions card -->
+      <div class="prv-panel-card prv-panel-card--actions">
+        <div class="prv-panel-card__head">
+          <span class="prv-panel-card__icon material-symbols-rounded" aria-hidden="true">gavel</span>
+          <div>
+            <h3 class="prv-panel-card__title">Workflow Actions</h3>
+            <p class="prv-panel-card__subtitle">Available decisions for the current stage.</p>
+          </div>
+        </div>
+
+        @if (canAct()) {
+          <!-- Reviewer comment (shared by all three actions) -->
+          <div class="prv-comment-area">
+            <label class="prv-comment-area__label" for="prv-reviewer-comment">
+              <span class="material-symbols-rounded" aria-hidden="true">chat_bubble</span>
+              Reviewer comment
+              @if (rejectConfirm() || commentValidationError()) {
+                <span class="prv-comment-area__required">{{ rejectConfirm() ? 'required for reject' : 'required for resubmit' }}</span>
+              }
+            </label>
+            <textarea
+              id="prv-reviewer-comment"
+              class="prv-comment-area__input"
+              [class.prv-comment-area__input--required]="commentValidationError() || rejectCommentError()"
+              rows="4"
+              placeholder="Add a comment visible to all reviewers…"
+              [value]="comment()"
+              (input)="onCommentInput($event)"
+            ></textarea>
+            @if (commentValidationError()) {
+              <p class="prv-comment-area__error" role="alert">
+                <span class="material-symbols-rounded" aria-hidden="true">error</span>
+                A comment is required before sending back to the applicant.
+              </p>
+            }
+            @if (rejectCommentError()) {
+              <p class="prv-comment-area__error" role="alert">
+                <span class="material-symbols-rounded" aria-hidden="true">error</span>
+                A reason is required to reject this proposal.
+              </p>
+            }
+          </div>
+
+          <!-- Primary actions: Approve + Resubmit side by side -->
+          <div class="prv-actions prv-actions--row">
+            <button
+              type="button"
+              class="prv-btn prv-btn--approve"
+              [disabled]="approving() || rejecting() || resubmitting()"
+              (click)="openApproveModal()"
+            >
+              <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">check_circle</span>
+              <span class="prv-btn__label">Approve</span>
+            </button>
+            <button
+              type="button"
+              class="prv-btn prv-btn--resubmit"
+              [disabled]="approving() || rejecting() || resubmitting()"
+              (click)="openResubmitModal()"
+            >
+              <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">rate_review</span>
+              <span class="prv-btn__label">Resubmit</span>
+            </button>
+          </div>
+
+          <!-- Reject button -->
+          <button
+            type="button"
+            class="prv-btn prv-btn--reject"
+            [disabled]="approving() || rejecting() || resubmitting()"
+            (click)="openRejectModal()"
+          >
+            <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">cancel</span>
+            <span class="prv-btn__label">Reject proposal</span>
+          </button>
+        } @else if (canCancel()) {
+          <button
+            type="button"
+            class="prv-btn prv-btn--reject"
+            [disabled]="cancelling()"
+            (click)="openCancelModal()"
+          >
+            <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">cancel_schedule</span>
+            <span class="prv-btn__label">Cancel Application</span>
+          </button>
+        } @else {
+          <div class="prv-no-action">
+            <span class="material-symbols-rounded" aria-hidden="true">lock</span>
+            <p>This application is read-only.</p>
+          </div>
+        }
+      </div>
+
+      <!-- Reviewer Comments card -->
+      @if (reviewerComments().length) {
+        <div class="prv-panel-card prv-panel-card--comments">
+          <div class="prv-panel-card__head">
+            <span class="prv-panel-card__icon material-symbols-rounded" aria-hidden="true">forum</span>
+            <div>
+              <h3 class="prv-panel-card__title">Reviewer Comments</h3>
+              <p class="prv-panel-card__subtitle">Comments left by reviewers in this chain.</p>
+            </div>
+          </div>
+          <ul class="prv-comments-list">
+            @for (entry of reviewerComments(); track entry.stage) {
+              <li class="prv-comment-entry">
+                <div class="prv-comment-entry__avatar" aria-hidden="true">{{ entry.initials }}</div>
+                <div class="prv-comment-entry__body">
+                  <div class="prv-comment-entry__meta">
+                    <strong>{{ entry.reviewer }}</strong>
+                    <span class="prv-comment-entry__stage">{{ entry.stage }}</span>
+                  </div>
+                  <p class="prv-comment-entry__text">{{ entry.text }}</p>
+                </div>
+              </li>
+            }
+          </ul>
+        </div>
+      }
+
+    </aside><!-- /prv-panel -->
+
+  </div><!-- /prv-layout -->
+}
+
+<!-- Approve confirmation modal popup -->
+<app-form-modal
+  [open]="approveConfirm()"
+  title="Approve proposal"
+  primaryLabel="Confirm Approval"
+  secondaryLabel="Cancel"
+  [loading]="approving()"
+  (close)="approveConfirm.set(false)"
+  (cancel)="approveConfirm.set(false)"
+  (submit)="confirmApprove()"
+>
+  <div class="prv-action-modal-body">
+    <p class="prv-action-modal__info">
+      <span class="material-symbols-rounded" aria-hidden="true">check_circle</span>
+      Are you sure you want to approve this proposal? It will move forward to the next stage in the review workflow.
+    </p>
+  </div>
+</app-form-modal>
+
+<!-- Resubmit confirmation modal popup -->
+<app-form-modal
+  [open]="resubmitConfirm()"
+  title="Resubmit with comment"
+  primaryLabel="Confirm Resubmit"
+  secondaryLabel="Cancel"
+  [loading]="resubmitting()"
+  (close)="resubmitConfirm.set(false)"
+  (cancel)="resubmitConfirm.set(false)"
+  (submit)="confirmResubmit()"
+>
+  <div class="prv-action-modal-body">
+    <p class="prv-action-modal__warn prv-action-modal__warn--amber">
+      <span class="material-symbols-rounded" aria-hidden="true">rate_review</span>
+      This proposal will be sent back to the applicant. Your comment will be attached to guide their updates.
+    </p>
+  </div>
+</app-form-modal>
+
+<!-- Reject confirmation modal popup -->
+<app-form-modal
+  [open]="rejectConfirm()"
+  title="Reject proposal"
+  primaryLabel="Confirm Reject"
+  secondaryLabel="Cancel"
+  [danger]="true"
+  [loading]="rejecting()"
+  (close)="rejectConfirm.set(false)"
+  (cancel)="rejectConfirm.set(false)"
+  (submit)="confirmReject()"
+>
+  <div class="prv-action-modal-body">
+    <p class="prv-action-modal__warn prv-action-modal__warn--red">
+      <span class="material-symbols-rounded" aria-hidden="true">warning</span>
+      This permanently ends the proposal. The comment above will be sent as the rejection reason.
+    </p>
+  </div>
+</app-form-modal>
+
+<!-- Cancel confirmation modal popup -->
+<app-form-modal
+  [open]="cancelConfirm()"
+  title="Cancel Application"
+  primaryLabel="Confirm Cancel"
+  secondaryLabel="Keep Application"
+  [danger]="true"
+  [loading]="cancelling()"
+  (close)="cancelConfirm.set(false)"
+  (cancel)="cancelConfirm.set(false)"
+  (submit)="confirmCancel()"
+>
+  <div class="prv-action-modal-body">
+    <p class="prv-action-modal__warn prv-action-modal__warn--red">
+      <span class="material-symbols-rounded" aria-hidden="true">warning</span>
+      Are you sure you want to cancel this application? This action cannot be undone and will cancel all linked department requests.
+    </p>
+  </div>
+</app-form-modal>
+

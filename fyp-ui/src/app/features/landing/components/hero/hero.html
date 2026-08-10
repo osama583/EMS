@@ -1,0 +1,60 @@
+<section #heroSection id="home" class="hero" aria-labelledby="hero-title">
+  <div class="hero-media" aria-hidden="true">
+    <video
+      #videoA
+      class="hero-video"
+      [class.hero-video--active]="activeVideo() === 0"
+      [class.hero-video--outgoing]="outgoingVideo() === 0"
+      autoplay
+      [muted]="true"
+      playsinline
+      preload="auto"
+      poster="assets/media/video-start-iamge.jpg"
+      disablepictureinpicture
+      (timeupdate)="onTimeUpdate(0)"
+    >
+      <source src="assets/media/video-hero-section.mp4" type="video/mp4" />
+    </video>
+
+    <video
+      #videoB
+      class="hero-video"
+      [class.hero-video--active]="activeVideo() === 1"
+      [class.hero-video--outgoing]="outgoingVideo() === 1"
+      [muted]="true"
+      playsinline
+      preload="auto"
+      poster="assets/media/video-start-iamge.jpg"
+      disablepictureinpicture
+      (timeupdate)="onTimeUpdate(1)"
+    >
+      <source src="assets/media/video-hero-section.mp4" type="video/mp4" />
+    </video>
+
+    <div class="hero-media__soften"></div>
+    <div class="hero-media__overlay"></div>
+    <div class="hero-media__glow"></div>
+  </div>
+
+  <div class="hero-content">
+    <h1 id="hero-title" [attr.aria-label]="headline">
+      <span class="headline-line" aria-hidden="true">
+        <span class="headline-line__text">There’s always</span>
+      </span>
+      <span class="headline-line" aria-hidden="true">
+        <span class="headline-line__text">something happening</span>
+      </span>
+      <span class="headline-line headline-line--accent" aria-hidden="true">
+        <span class="headline-line__text">at APU</span>
+      </span>
+    </h1>
+
+    <p class="hero-support">
+      Discover upcoming activities, celebrations and experiences across APU.
+    </p>
+
+    <div class="hero-cta-reveal">
+      <app-cta-link label="Explore Events" href="#explore-events" arrow="→" />
+    </div>
+  </div>
+</section>

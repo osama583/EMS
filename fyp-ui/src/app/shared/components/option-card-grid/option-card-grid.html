@@ -1,0 +1,120 @@
+@if (loading()) {
+  <div class="menu-card-grid__loading" role="status" aria-label="Loading items">
+    @for (line of [1, 2, 3]; track line) {
+      <span></span>
+    }
+  </div>
+} @else if (items().length === 0) {
+  <div class="menu-card-grid__empty" role="status">
+    <span class="material-symbols-rounded" aria-hidden="true">grid_view</span>
+    <h2>{{ emptyTitle() }}</h2>
+    <p>{{ emptyDescription() }}</p>
+  </div>
+} @else {
+  <div class="menu-card-grid">
+    @for (item of items(); track item.id) {
+      <article class="menu-card" [class.menu-card--inactive]="!item.active">
+        <div class="menu-card__media">
+          @if (item.imageDataUrl && !failedImages()[item.id]) {
+            <img
+              class="menu-card__image"
+              [src]="item.imageDataUrl"
+              [alt]="item.imageFileName || item.label"
+              loading="lazy"
+              (error)="onImageError(item.id)"
+            />
+          } @else {
+            <div class="menu-card__image menu-card__image--placeholder" aria-hidden="true">
+              <span class="material-symbols-rounded">category</span>
+            </div>
+          }
+          <span class="menu-card__status" [attr.data-active]="item.active">
+            <span class="menu-card__status-dot" aria-hidden="true"></span>
+            {{ item.active ? 'Active' : 'Inactive' }}
+          </span>
+
+          <div class="menu-card__quick-actions">
+            <button type="button" class="menu-card__icon-btn" [attr.aria-label]="'Edit ' + item.label" title="Edit" (click)="edit.emit(item.id)">
+              <span class="material-symbols-rounded" aria-hidden="true">edit</span>
+            </button>
+            <button
+              type="button"
+              class="menu-card__icon-btn"
+              [attr.aria-label]="(item.active ? 'Deactivate ' : 'Activate ') + item.label"
+              [title]="item.active ? 'Deactivate' : 'Activate'"
+              (click)="toggleActive.emit(item.id)"
+            >
+              <span class="material-symbols-rounded" aria-hidden="true">power_settings_new</span>
+            </button>
+            <button type="button" class="menu-card__icon-btn menu-card__icon-btn--danger" [attr.aria-label]="'Delete ' + item.label" title="Delete" (click)="delete.emit(item.id)">
+              <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="menu-card__body">
+          <h3 class="menu-card__title">{{ item.label }}</h3>
+          @if (item.description) {
+            <p class="menu-card__description">{{ item.description }}</p>
+          }
+          <div class="menu-card__meta-chips">
+            @if (item.metaFields && item.metaFields.length > 0) {
+              @for (field of item.metaFields; track field.label) {
+                @if (field.isNotes) {
+                  <div class="menu-card__notes-callout">
+                    <span class="material-symbols-rounded" aria-hidden="true">{{ field.icon || 'info' }}</span>
+                    <div>
+                      <strong>{{ field.label }}</strong>
+                      <p>{{ field.value }}</p>
+                    </div>
+                  </div>
+                } @else {
+                  <div class="menu-card__chip" [attr.data-tone]="field.badgeTone || 'blue'">
+                    <span class="material-symbols-rounded" aria-hidden="true">{{ field.icon || 'info' }}</span>
+                    <div class="menu-card__chip-content">
+                      <span class="menu-card__chip-label">{{ field.label }}</span>
+                      <span class="menu-card__chip-value">{{ field.value }}</span>
+                    </div>
+                  </div>
+                }
+              }
+            } @else {
+              @if (item.servingUnitLabel) {
+                <div class="menu-card__chip" data-tone="blue">
+                  <span class="material-symbols-rounded" aria-hidden="true">restaurant</span>
+                  <div class="menu-card__chip-content">
+                    <span class="menu-card__chip-label">Serving unit</span>
+                    <span class="menu-card__chip-value">{{ item.servingUnitLabel }}</span>
+                  </div>
+                </div>
+              }
+              @if (item.dietaryInformationLabel) {
+                <div class="menu-card__chip" data-tone="emerald">
+                  <span class="material-symbols-rounded" aria-hidden="true">nutrition</span>
+                  <div class="menu-card__chip-content">
+                    <span class="menu-card__chip-label">Dietary info</span>
+                    <span class="menu-card__chip-value">{{ item.dietaryInformationLabel }}</span>
+                  </div>
+                </div>
+              }
+              @if (item.orderingNotes) {
+                <div class="menu-card__notes-callout">
+                  <span class="material-symbols-rounded" aria-hidden="true">notes</span>
+                  <div>
+                    <strong>Ordering notes</strong>
+                    <p>{{ item.orderingNotes }}</p>
+                  </div>
+                </div>
+              }
+            }
+          </div>
+
+          <button type="button" class="menu-card__details-btn" (click)="viewDetails.emit(item.id)">
+            View More Details
+            <span class="material-symbols-rounded" aria-hidden="true">arrow_forward</span>
+          </button>
+        </div>
+      </article>
+    }
+  </div>
+}
