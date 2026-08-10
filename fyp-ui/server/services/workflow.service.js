@@ -1,4 +1,16 @@
-const { db, nextId } = require('../db');
+// db/nextId are bound via init(), not required directly from '../db' at top-level:
+// db.js requires seed-requests.js, which requires this module — a circular require
+// where require('../db') at load time would return the partially-initialized module
+// (module.exports not yet assigned), leaving `db`/`nextId` undefined. db.js calls
+// init(db, nextId) with its own live references before any seed module runs, and
+// every other consumer of this module (e.g. the Express routes layer) does the same
+// once at startup, right after require('../db').
+let db;
+let nextId;
+function init(dbRef, nextIdRef) {
+  db = dbRef;
+  nextId = nextIdRef;
+}
 
 class WorkflowError extends Error {
   constructor(message, status = 400) {
@@ -486,6 +498,7 @@ function checkFmbTaskResolved(selectionId) {
 }
 
 module.exports = {
+  init,
   WorkflowError,
   findRequest,
   isHosHodOfUnit,

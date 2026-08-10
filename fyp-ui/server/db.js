@@ -13,6 +13,8 @@ const seedCafeteria = require('./db/seed-cafeteria');
 const seedCategories = require('./db/seed-categories');
 const seedConfig = require('./db/seed-config');
 const seedOptions = require('./db/seed-options');
+const { seedRequests } = require('./db/seed-requests');
+const workflowService = require('./services/workflow.service');
 
 const TABLE_NAMES = [
   // Identity & Organization
@@ -63,5 +65,7 @@ seedCafeteria(db, nextId);
 seedCategories(db, nextId);
 seedConfig(db, nextId);
 seedOptions(db, nextId);
+workflowService.init(db, nextId);
+seedRequests(db, nextId);
 
 module.exports = { db, nextId, TABLE_NAMES };
