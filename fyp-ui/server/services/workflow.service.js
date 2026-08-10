@@ -386,6 +386,12 @@ function createFmbSelection(requestFmbId, cafeteriaId, fmbOptionId, menuItemLabe
     quantity: Number(quantity),
     status: 'pending',
     notes: notes || null,
+    // NOT part of the original ems_database_schema.sql request_fmb_selection table — a
+    // mock-layer addition (mirrors request.resume_stage's precedent) so the staff-tasks router
+    // can resolve "who claimed/fulfilled THIS specific selection" without misattributing across
+    // sibling selections on the same request (workflow_history's request_id-scoped rows can't
+    // distinguish between multiple concurrently-claimed selections on one request).
+    claimed_by_user_id: null,
   };
   db.request_fmb_selection.push(selection);
   return selection;
@@ -460,6 +466,7 @@ function claimSharedFmbSelection(selectionId, staffUserId) {
   const selection = findFmbSelection(selectionId);
   if (selection.status !== 'approved') throw new WorkflowError('This order is not available to claim.', 400);
   selection.status = 'preparing';
+  selection.claimed_by_user_id = Number(staffUserId);
   const requestId = requestIdForFmbSelection(selectionId);
   recordHistory(requestId, null, null, 'claim-selection', staffUserId, 'cafeteria_staff', null, 'approved', 'preparing');
   return selection;
@@ -469,6 +476,7 @@ function fulfilFmbSelection(selectionId, actorUserId) {
   const selection = findFmbSelection(selectionId);
   const previousStatus = selection.status;
   selection.status = 'fulfilled';
+  selection.claimed_by_user_id = Number(actorUserId);
   recordHistory(requestIdForFmbSelection(selectionId), null, null, 'fulfil-selection', actorUserId, 'cafeteria_staff', null, previousStatus, 'fulfilled');
   checkFmbTaskResolved(selectionId);
   return selection;

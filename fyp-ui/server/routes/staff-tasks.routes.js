@@ -5,6 +5,21 @@ const { WorkflowError } = workflow;
 
 const router = express.Router();
 
+// request_task.assigned_role is always set to the MANAGER role token (see workflow.service.js's
+// createDepartmentTasks -> roleForRequirement). But Angular sends the STAFF member's own role
+// (e.g. 'logistics-staff') both when a staff member lists their tasks (staff-tasks.ts, sends
+// auth.user().role) and when a manager assigns work (proposal-department-view.ts's
+// assignRequests(), sends staffRoleForManager(managerRole) — the STAFF role, not the manager's
+// own role, per department-workflow.config.ts). Map staff role -> manager role so both routes
+// below compare against assigned_role correctly.
+const STAFF_TO_MANAGER_ROLE = {
+  'logistics-staff': 'logistics-manager',
+  'student-services-member': 'student-services-manager',
+  'av-technician': 'av-manager',
+  'photography-staff': 'photography-manager',
+  'transport-staff': 'transport-manager',
+};
+
 // Maps a department requirement key (request_task.assigned_role space, per
 // workflow.service.js's createDepartmentTasks) onto the human labels used in the StaffTask
 // projection. Mirrors proposal-projection.service.js's departmentRequestsFor per-department item
@@ -59,7 +74,9 @@ function mapTaskStatus(status) {
 
 function projectDepartmentTask(task, assignedToEmail) {
   const request = db.request.find((r) => r.request_id === task.request_id);
+  if (!request) throw new WorkflowError('Proposal not found for this task.', 404);
   const requirement = db.event_requirements.find((r) => r.requirement_id === task.requirement_id);
+  if (!requirement) throw new WorkflowError('Event requirement not found for this task.', 404);
   const details = departmentTaskDetails(task.request_id, requirement.requirement_name) || { request: requirement.requirement_name, quantity: undefined, schedule: '', location: '', detail: '' };
   return {
     id: String(task.request_task_id),
@@ -78,31 +95,24 @@ function projectDepartmentTask(task, assignedToEmail) {
   };
 }
 
-// request_fmb_selection has no staff-identity column of its own — claimSharedFmbSelection /
-// fulfilFmbSelection (workflow.service.js) only mutate the selection's status, they don't
-// write a task_assignment row (that table is scoped to request_task, not per-selection). The
-// claiming staff member's identity is only ever recorded as workflow_history's actor_user_id
-// on the 'claim-selection'/'fulfil-selection' action rows — recover it from there.
+// claimSharedFmbSelection / fulfilFmbSelection (workflow.service.js) stamp claimed_by_user_id
+// directly on the selection row — a mock-layer addition to request_fmb_selection (not part of
+// the original schema, mirrors request.resume_stage's precedent). Resolving identity via
+// workflow_history's request_id-scoped rows was tried first but is WRONG when a request has
+// multiple F&B selections (e.g. several cafeterias) claimed by different staff members, since
+// history rows aren't scoped to a specific selection — only to the parent request.
 function claimingStaffEmail(selectionId) {
-  const requestId = (() => {
-    const selection = db.request_fmb_selection.find((s) => s.request_fmb_selection_id === selectionId);
-    if (!selection) return null;
-    const fmbRow = db.request_fmb.find((f) => f.request_fmb_id === selection.request_fmb_id);
-    return fmbRow ? fmbRow.request_id : null;
-  })();
-  if (requestId === null) return '';
-  const claimEntries = db.workflow_history
-    .filter((h) => h.request_id === requestId && (h.action === 'claim-selection' || h.action === 'fulfil-selection') && h.actor_user_id)
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  const latest = claimEntries[0];
-  if (!latest) return '';
-  const user = db.users.find((u) => u.user_id === latest.actor_user_id);
+  const selection = db.request_fmb_selection.find((s) => s.request_fmb_selection_id === selectionId);
+  if (!selection || !selection.claimed_by_user_id) return '';
+  const user = db.users.find((u) => u.user_id === selection.claimed_by_user_id);
   return user ? user.email : '';
 }
 
 function projectFmbSelection(selection, assignedToEmail) {
   const fmbRow = db.request_fmb.find((f) => f.request_fmb_id === selection.request_fmb_id);
+  if (!fmbRow) throw new WorkflowError('F&B request not found for this selection.', 404);
   const request = db.request.find((r) => r.request_id === fmbRow.request_id);
+  if (!request) throw new WorkflowError('Proposal not found for this selection.', 404);
   const cafeteria = db.cafeteria.find((c) => c.cafeteria_id === selection.cafeteria_id);
   return {
     id: `fmb-selection:${selection.request_fmb_selection_id}`,
@@ -127,10 +137,13 @@ router.get('/', async (req, res, next) => {
     const tasks = [];
 
     if (staffUser) {
+      // `role` is the STAFF member's own role (e.g. 'logistics-staff'), but request_task rows
+      // are stamped with the MANAGER role (e.g. 'logistics-manager') — map before comparing.
+      const managerRole = STAFF_TO_MANAGER_ROLE[role] || role;
       const myAssignments = db.task_assignment.filter((a) => a.staff_user_id === staffUser.user_id);
       for (const assignment of myAssignments) {
         const task = db.request_task.find((t) => t.request_task_id === assignment.request_task_id);
-        if (task && task.assigned_role === role) tasks.push(projectDepartmentTask(task, assignedToEmail));
+        if (task && task.assigned_role === managerRole) tasks.push(projectDepartmentTask(task, assignedToEmail));
       }
     }
 
@@ -166,7 +179,11 @@ router.post('/assignments', async (req, res, next) => {
     const { role, assignedToEmail, eventCode } = req.body;
     const request = db.request.find((r) => r.request_code === eventCode);
     if (!request) throw new WorkflowError('Event not found for the given eventCode.', 400);
-    const task = db.request_task.find((t) => t.request_id === request.request_id && t.assigned_role === role && t.stage_code === 'department_review');
+    // `role` here is the STAFF role being assigned (assignRequests() sends
+    // staffRoleForManager(this.role()), not the manager's own role) — map to the manager role
+    // that request_task.assigned_role is actually stamped with before looking up the task.
+    const managerRoleForTask = STAFF_TO_MANAGER_ROLE[role] || role;
+    const task = db.request_task.find((t) => t.request_id === request.request_id && t.assigned_role === managerRoleForTask && t.stage_code === 'department_review');
     if (!task) throw new WorkflowError('Department task not found for the given role.', 400);
     const staffUser = db.users.find((u) => u.email === assignedToEmail);
     if (!staffUser) throw new WorkflowError('Staff member not found for the given assignedToEmail.', 400);
