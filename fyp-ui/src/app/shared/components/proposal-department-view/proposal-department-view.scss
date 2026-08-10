@@ -14,3 +14,64 @@
   font-size: 0.8rem;
   font-weight: 700;
 }
+
+.prv-fmb-selections {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.prv-fmb-selections__empty {
+  margin: 0;
+  color: var(--apu-text-muted);
+  font-size: 0.9rem;
+}
+
+.prv-fmb-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--apu-border);
+  border-radius: 0.75rem;
+  background: var(--apu-surface);
+}
+
+.prv-fmb-selection[data-status='resubmitted'] {
+  border: 1px solid rgb(224 144 16 / 22%);
+  background: rgb(224 144 16 / 8%);
+}
+
+.prv-fmb-selection[data-status='fulfilled'],
+.prv-fmb-selection[data-status='cancelled'] {
+  opacity: 0.7;
+}
+
+.prv-fmb-selection__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.prv-fmb-selection__row {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.prv-fmb-selection__label {
+  min-width: 6rem;
+  color: var(--apu-text-muted);
+}
+
+.prv-fmb-selection__status {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--apu-blue-700);
+}
+
+.prv-fmb-selection__actions {
+  display: flex;
+  gap: 0.5rem;
+}

@@ -5,7 +5,7 @@ import { AdminDirectoryService } from '../../../core/admin-directory/admin-direc
 import { AuthService } from '../../../core/auth/auth.service';
 import { UserRole } from '../../../core/auth/auth.models';
 import { staffRoleForManager } from '../../../core/departments/department-workflow.config';
-import { departmentsForRole, ProposalReviewRecord } from '../../../core/proposals/proposal-review.models';
+import { departmentsForRole, FmbSelection, ProposalReviewRecord } from '../../../core/proposals/proposal-review.models';
 import { ProposalWorkflowService } from '../../../core/proposals/proposal-workflow.service';
 import { StaffTaskService } from '../../../core/staff-tasks/staff-task.service';
 import { EditableRow } from '../form-controls/form-controls.models';
@@ -88,77 +88,123 @@ interface ReviewerComment {
             </div>
           </app-proposal-section>
 
+          <!-- Section: F&B Cafeteria Selections (Cafeteria Manager only, on the fmb department) -->
+          @if (isCafeteriaSelectionView()) {
+            <app-proposal-section icon="restaurant" title="Cafeteria Order Selections" description="F&B has picked a cafeteria and menu item for each order. Approve or resubmit each one independently.">
+              <div class="prv-fmb-selections">
+                @for (selection of myCafeteriaSelections(); track selection.id) {
+                  <div class="prv-fmb-selection" [attr.data-status]="selection.status">
+                    <div class="prv-fmb-selection__body">
+                      <div class="prv-fmb-selection__row">
+                        <span class="prv-fmb-selection__label">Menu item</span>
+                        <strong>{{ selection.menuItemLabel }}</strong>
+                      </div>
+                      <div class="prv-fmb-selection__row">
+                        <span class="prv-fmb-selection__label">Quantity</span>
+                        <span>{{ selection.quantity }}</span>
+                      </div>
+                      @if (selection.notes) {
+                        <div class="prv-fmb-selection__row">
+                          <span class="prv-fmb-selection__label">Notes</span>
+                          <span>{{ selection.notes }}</span>
+                        </div>
+                      }
+                      <span class="prv-fmb-selection__status">{{ selectionStatusLabel(selection.status) }}</span>
+                    </div>
+                    @if (selection.status === 'pending') {
+                      <div class="prv-fmb-selection__actions">
+                        <button type="button" class="prv-btn prv-btn--approve" [disabled]="selectionActionPending() === selection.id" (click)="openApproveSelectionModal(selection)">
+                          <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">task_alt</span>
+                          <span class="prv-btn__label">Approve</span>
+                        </button>
+                        <button type="button" class="prv-btn prv-btn--resubmit" [disabled]="selectionActionPending() === selection.id" (click)="openResubmitSelectionModal(selection)">
+                          <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">rate_review</span>
+                          <span class="prv-btn__label">Resubmit to F&amp;B</span>
+                        </button>
+                      </div>
+                    }
+                  </div>
+                }
+                @if (!myCafeteriaSelections().length) {
+                  <p class="prv-fmb-selections__empty">No orders have been placed with your cafeteria yet for this proposal.</p>
+                }
+              </div>
+            </app-proposal-section>
+          }
+
         </div><!-- /prv-main -->
 
         <!-- RIGHT — Sticky Reviewer Panel -->
         <aside class="prv-panel">
 
-          <!-- Workflow Actions card -->
-          <div class="prv-panel-card prv-panel-card--actions">
-            <div class="prv-panel-card__head">
-              <span class="prv-panel-card__icon material-symbols-rounded" aria-hidden="true">gavel</span>
-              <div>
-                <h3 class="prv-panel-card__title">Workflow Actions</h3>
-                <p class="prv-panel-card__subtitle">Fulfilment confirmation for your department.</p>
+          @if (!isCafeteriaSelectionView()) {
+            <!-- Workflow Actions card (hidden entirely for the per-selection Cafeteria Manager view — its actions live inline above, per selection row) -->
+            <div class="prv-panel-card prv-panel-card--actions">
+              <div class="prv-panel-card__head">
+                <span class="prv-panel-card__icon material-symbols-rounded" aria-hidden="true">gavel</span>
+                <div>
+                  <h3 class="prv-panel-card__title">Workflow Actions</h3>
+                  <p class="prv-panel-card__subtitle">Fulfilment confirmation for your department.</p>
+                </div>
               </div>
+
+              @if (canAct()) {
+                <!-- Comment area -->
+                <div class="prv-comment-area">
+                  <label class="prv-comment-area__label" for="dept-reviewer-comment">
+                    <span class="material-symbols-rounded" aria-hidden="true">chat_bubble</span>
+                    Reviewer comment
+                    @if (commentRequired()) { <span class="prv-comment-area__required">required for resubmit</span> }
+                  </label>
+                  <textarea
+                    id="dept-reviewer-comment"
+                    class="prv-comment-area__input"
+                    [class.prv-comment-area__input--required]="commentValidationError()"
+                    rows="4"
+                    placeholder="Add a comment visible to all reviewers…"
+                    [value]="comment()"
+                    (input)="onCommentInput($event)"
+                  ></textarea>
+                  @if (commentValidationError()) {
+                    <p class="prv-comment-area__error" role="alert">
+                      <span class="material-symbols-rounded" aria-hidden="true">error</span>
+                      Explain what needs to change so the applicant can fix it.
+                    </p>
+                  }
+                </div>
+
+                <!-- Action buttons -->
+                <div class="prv-actions prv-actions--row">
+                  <button
+                    type="button"
+                    class="prv-btn prv-btn--approve"
+                    [disabled]="confirming() || resubmitting()"
+                    (click)="openApproveModal()"
+                  >
+                    <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">task_alt</span>
+                    <span class="prv-btn__label">Approve</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="prv-btn prv-btn--resubmit"
+                    [disabled]="confirming() || resubmitting()"
+                    (click)="openResubmitModal()"
+                  >
+                    <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">rate_review</span>
+                    <span class="prv-btn__label">Resubmit</span>
+                  </button>
+                </div>
+              } @else {
+                <div class="prv-no-action">
+                  <span class="material-symbols-rounded" aria-hidden="true">check_circle</span>
+                  <p>Fulfilment confirmed for your department.</p>
+                </div>
+              }
             </div>
-
-            @if (canAct()) {
-              <!-- Comment area -->
-              <div class="prv-comment-area">
-                <label class="prv-comment-area__label" for="dept-reviewer-comment">
-                  <span class="material-symbols-rounded" aria-hidden="true">chat_bubble</span>
-                  Reviewer comment
-                  @if (commentRequired()) { <span class="prv-comment-area__required">required for resubmit</span> }
-                </label>
-                <textarea
-                  id="dept-reviewer-comment"
-                  class="prv-comment-area__input"
-                  [class.prv-comment-area__input--required]="commentValidationError()"
-                  rows="4"
-                  placeholder="Add a comment visible to all reviewers…"
-                  [value]="comment()"
-                  (input)="onCommentInput($event)"
-                ></textarea>
-                @if (commentValidationError()) {
-                  <p class="prv-comment-area__error" role="alert">
-                    <span class="material-symbols-rounded" aria-hidden="true">error</span>
-                    Explain what needs to change so the applicant can fix it.
-                  </p>
-                }
-              </div>
-
-              <!-- Action buttons -->
-              <div class="prv-actions prv-actions--row">
-                <button
-                  type="button"
-                  class="prv-btn prv-btn--approve"
-                  [disabled]="confirming() || resubmitting()"
-                  (click)="openApproveModal()"
-                >
-                  <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">task_alt</span>
-                  <span class="prv-btn__label">Approve</span>
-                </button>
-                <button
-                  type="button"
-                  class="prv-btn prv-btn--resubmit"
-                  [disabled]="confirming() || resubmitting()"
-                  (click)="openResubmitModal()"
-                >
-                  <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">rate_review</span>
-                  <span class="prv-btn__label">Resubmit</span>
-                </button>
-              </div>
-            } @else {
-              <div class="prv-no-action">
-                <span class="material-symbols-rounded" aria-hidden="true">check_circle</span>
-                <p>Fulfilment confirmed for your department.</p>
-              </div>
-            }
-          </div>
+          }
 
           <!-- Section: Assign Department Work -->
-          @if (!readOnly() && allowAssignment() && staffRole(); as assignmentRole) {
+          @if (!readOnly() && allowAssignment() && !isCafeteriaSelectionView() && staffRole(); as assignmentRole) {
             <div class="prv-panel-card">
               <div class="prv-panel-card__head">
                 <span class="prv-panel-card__icon material-symbols-rounded" aria-hidden="true">person_add</span>
@@ -225,7 +271,7 @@ interface ReviewerComment {
       </div><!-- /prv-layout -->
     }
 
-    <!-- Approve confirmation modal popup -->
+    <!-- Approve confirmation modal popup (whole-department flow) -->
     <app-form-modal
       [open]="approveConfirm()"
       title="Confirm department fulfilment"
@@ -244,7 +290,7 @@ interface ReviewerComment {
       </div>
     </app-form-modal>
 
-    <!-- Resubmit confirmation modal popup -->
+    <!-- Resubmit confirmation modal popup (whole-department flow) -->
     <app-form-modal
       [open]="resubmitConfirm()"
       title="Resubmit with comment"
@@ -259,6 +305,45 @@ interface ReviewerComment {
         <p class="prv-action-modal__warn prv-action-modal__warn--amber">
           <span class="material-symbols-rounded" aria-hidden="true">rate_review</span>
           Explain what needs to change so the applicant can update their submission before this continues.
+        </p>
+      </div>
+    </app-form-modal>
+
+    <!-- Approve confirmation modal popup (per-selection Cafeteria Manager flow) -->
+    <app-form-modal
+      [open]="approveSelectionConfirm() !== null"
+      title="Approve this order"
+      primaryLabel="Confirm Approval"
+      secondaryLabel="Cancel"
+      [loading]="selectionActionPending() !== null"
+      (close)="approveSelectionConfirm.set(null)"
+      (cancel)="approveSelectionConfirm.set(null)"
+      (submit)="confirmApproveSelection()"
+    >
+      <div class="prv-action-modal-body">
+        <p class="prv-action-modal__info">
+          <span class="material-symbols-rounded" aria-hidden="true">task_alt</span>
+          This order moves into your Cafeteria Staff's shared task inbox for preparation.
+        </p>
+      </div>
+    </app-form-modal>
+
+    <!-- Resubmit confirmation modal popup (per-selection Cafeteria Manager flow) -->
+    <app-form-modal
+      [open]="resubmitSelectionConfirm() !== null"
+      title="Resubmit this order to F&B"
+      primaryLabel="Send to F&B"
+      secondaryLabel="Cancel"
+      [loading]="selectionActionPending() !== null"
+      (close)="resubmitSelectionConfirm.set(null)"
+      (cancel)="resubmitSelectionConfirm.set(null)"
+      (submit)="confirmResubmitSelection()"
+    >
+      <div class="prv-action-modal-body">
+        <p class="prv-action-modal__warn prv-action-modal__warn--amber">
+          <span class="material-symbols-rounded" aria-hidden="true">rate_review</span>
+          F&amp;B will edit or reassign this specific order (dish, quantity, or cafeteria) and re-send it —
+          other orders for this proposal are not affected.
         </p>
       </div>
     </app-form-modal>
@@ -295,6 +380,21 @@ export class ProposalDepartmentViewComponent {
   readonly actionBannerKind = signal<'success' | 'error' | 'info'>('info');
   readonly comment = signal('');
   readonly commentValidationError = signal(false);
+
+  // Per-selection F&B/Cafeteria state — only relevant when isCafeteriaSelectionView() is true.
+  readonly selectionActionPending = signal<number | null>(null);
+  readonly approveSelectionConfirm = signal<FmbSelection | null>(null);
+  readonly resubmitSelectionConfirm = signal<FmbSelection | null>(null);
+
+  // The Cafeteria Manager reviews F&B's fmb department task differently from every other
+  // manager: instead of one atomic approve/resubmit for the whole task, each cafeteria
+  // selection (request_fmb_selection row) has its own independent lifecycle. This flag
+  // switches the template from the shared department-wide panel to the per-selection list.
+  readonly isCafeteriaSelectionView = computed(() =>
+    this.role() === UserRole.CafeteriaManager && this.departments().includes('fmb'),
+  );
+
+  readonly myCafeteriaSelections = computed<readonly FmbSelection[]>(() => this.proposal()?.fmbSelections ?? []);
 
   readonly canAct = computed(() => {
     if (this.readOnly()) return false;
@@ -352,6 +452,17 @@ export class ProposalDepartmentViewComponent {
     if (this.commentValidationError()) this.commentValidationError.set(false);
   }
 
+  selectionStatusLabel(status: FmbSelection['status']): string {
+    switch (status) {
+      case 'pending': return 'Awaiting your review';
+      case 'approved': return 'Approved — in Cafeteria Staff inbox';
+      case 'resubmitted': return 'Sent back to F&B';
+      case 'preparing': return 'Being prepared';
+      case 'fulfilled': return 'Fulfilled';
+      case 'cancelled': return 'Cancelled';
+    }
+  }
+
   openApproveModal(): void {
     this.approveConfirm.set(true);
   }
@@ -396,6 +507,47 @@ export class ProposalDepartmentViewComponent {
     this.workflow.resubmitAsDepartment(proposal.id, department, comment).pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.actionBannerKind.set('info'); this.actionMessage.set('Sent back to the applicant with your comment.'); this.comment.set(''); this.actionComplete.emit(proposal.id); },
       error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not resubmit. Please try again.'); },
+    });
+  }
+
+  openApproveSelectionModal(selection: FmbSelection): void {
+    this.approveSelectionConfirm.set(selection);
+  }
+
+  confirmApproveSelection(): void {
+    const selection = this.approveSelectionConfirm();
+    this.approveSelectionConfirm.set(null);
+    if (selection) this.approveSelection(selection);
+  }
+
+  private approveSelection(selection: FmbSelection): void {
+    const proposal = this.proposal();
+    if (!proposal) return;
+    this.selectionActionPending.set(selection.id);
+    this.actionMessage.set('');
+    this.workflow.approveFmbSelection(proposal.id, selection.id).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.actionBannerKind.set('success'); this.actionMessage.set('Order approved and sent to Cafeteria Staff.'); this.actionComplete.emit(proposal.id); },
+      error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not approve this order. Please try again.'); },
+    });
+  }
+
+  openResubmitSelectionModal(selection: FmbSelection): void {
+    this.resubmitSelectionConfirm.set(selection);
+  }
+
+  confirmResubmitSelection(): void {
+    const selection = this.resubmitSelectionConfirm();
+    this.resubmitSelectionConfirm.set(null);
+    if (selection) this.resubmitSelection(selection);
+  }
+
+  private resubmitSelection(selection: FmbSelection): void {
+    const proposal = this.proposal();
+    if (!proposal) return;
+    this.selectionActionPending.set(selection.id);
+    this.workflow.resubmitFmbSelection(proposal.id, selection.id).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.actionBannerKind.set('info'); this.actionMessage.set('Sent back to F&B for this order only.'); this.actionComplete.emit(proposal.id); },
+      error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not resubmit this order. Please try again.'); },
     });
   }
 

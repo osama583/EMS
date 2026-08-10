@@ -4,7 +4,7 @@ import { finalize } from 'rxjs';
 import { UserRole } from '../../../core/auth/auth.models';
 import { DepartmentRequestKind } from '../../../core/departments/department-workflow.config';
 import { ProposalReviewRecord } from '../../../core/proposals/proposal-review.models';
-import { ProposalStage, reviewerRoleForStage, stageLabel } from '../../../core/proposals/proposal-status.models';
+import { ProposalStage, stageLabel } from '../../../core/proposals/proposal-status.models';
 import { ProposalWorkflowService } from '../../../core/proposals/proposal-workflow.service';
 import { EditableRow } from '../form-controls/form-controls.models';
 import { FormModalComponent } from '../form-modal/form-modal';
@@ -45,19 +45,19 @@ const REQUIREMENT_LABELS: Readonly<Record<DepartmentRequestKind, string>> = {
   soundLight: 'Sound & Light',
   photoVideo: 'Photography / Videography',
   transportation: 'Transportation',
-  fnb: 'Food & Beverage',
+  fmb: 'Food & Beverage',
   fundingPurchase: 'Funding / Purchase',
 };
 
 const ROLE_LABELS: Partial<Record<UserRole, string>> = {
   [UserRole.HosHod]: 'HOS/HOD',
-  [UserRole.FmbReviewer]: 'F&B Reviewer',
+  [UserRole.Fmb]: 'F&B',
   [UserRole.Cfo]: 'CFO',
 };
 
 const STAGE_ORDER: readonly ProposalStage[] = [
   ProposalStage.HosHodReview,
-  ProposalStage.FmbReviewerPending,
+  ProposalStage.FmbReview,
   ProposalStage.CfoReview,
   ProposalStage.DepartmentReview,
   ProposalStage.Approved,
@@ -117,11 +117,13 @@ export class ProposalReviewerViewComponent {
 
   readonly stage = computed<ProposalStage | null>(() => this.proposal()?.workflow.stage ?? null);
   readonly stageLabel = computed(() => this.stage() ? stageLabel(this.stage()!) : '');
-  readonly canAct = computed(() => {
-    if (this.readOnly()) return false;
-    const stage = this.stage();
-    return stage !== null && reviewerRoleForStage(stage) === this.role();
-  });
+  // Which stage a role owns is now a server-side authorization decision (system.md's "the
+  // backend owns the workflow" principle). The client-side approximation below exists only to
+  // decide whether to render the action panel at all — the server still validates and rejects
+  // any action from a role that doesn't actually own the current stage, regardless of what the
+  // UI shows. `readOnly` (an explicit input from the parent dispatch component) is the primary
+  // signal; this computed is a display convenience, not a security boundary.
+  readonly canAct = computed(() => !this.readOnly());
 
   readonly currentUser = computed(() => this.auth.user());
 
@@ -184,7 +186,7 @@ export class ProposalReviewerViewComponent {
   readonly canCancel = computed(() => {
     const proposal = this.proposal();
     if (!proposal) return false;
-    if (proposal.status === 'Cancelled' || proposal.status === 'Rejected' || proposal.workflow.stage === ProposalStage.Rejected) {
+    if (proposal.workflow.stage === ProposalStage.Cancelled || proposal.workflow.stage === ProposalStage.Rejected) {
       return false;
     }
     return !this.readOnly() && this.isSubmitterOrCoOwner() && this.isWithinCancellationWindow();
@@ -220,8 +222,8 @@ export class ProposalReviewerViewComponent {
     if (currentStage === ProposalStage.Rejected) {
       steps.push({ stage: ProposalStage.Rejected, label: 'Rejected', note: proposal.workflow.rejectedReason ?? '', active: true, done: false });
     }
-    if (currentStage === ProposalStage.NeedsRevision) {
-      steps.push({ stage: ProposalStage.NeedsRevision, label: 'Revision Required', note: 'Awaiting applicant resubmission.', active: true, done: false });
+    if (currentStage === ProposalStage.ResubmissionRequired) {
+      steps.push({ stage: ProposalStage.ResubmissionRequired, label: 'Revision Required', note: 'Awaiting applicant resubmission.', active: true, done: false });
     }
 
     return steps;

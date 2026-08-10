@@ -16,6 +16,18 @@ export interface ProposalDepartmentRequest {
   readonly notes: string;
 }
 
+export type FmbSelectionStatus = 'pending' | 'approved' | 'resubmitted' | 'preparing' | 'fulfilled' | 'cancelled';
+
+export interface FmbSelection {
+  readonly id: number;
+  readonly cafeteriaId: number;
+  readonly cafeteriaName: string;
+  readonly menuItemLabel: string;
+  readonly quantity: number;
+  readonly notes: string;
+  readonly status: FmbSelectionStatus;
+}
+
 export interface ProposalReviewRecord {
   readonly id: number;
   readonly proposalId: string;
@@ -50,6 +62,7 @@ export interface ProposalReviewRecord {
   readonly publicity: string;
   readonly selectedRequirements: readonly DepartmentRequestKind[];
   readonly externalPax: number;
+  readonly fmbSelections?: readonly FmbSelection[];
 
   readonly workflow: ProposalWorkflowState;
 }
