@@ -9,5 +9,5 @@ export class StaffTaskService {
   private readonly repository = inject(STAFF_TASK_REPOSITORY);
   list(role: UserRole, assignedToEmail: string): Observable<readonly StaffTask[]> { return this.repository.list(role, assignedToEmail); }
   assign(draft: StaffTaskAssignmentDraft): Observable<StaffTask> { return this.repository.assign(draft); }
-  updateStatus(id: string, status: StaffTaskStatus): Observable<StaffTask> { return this.repository.updateStatus(id, status); }
+  updateStatus(id: string, status: StaffTaskStatus, staffEmail: string): Observable<StaffTask> { return this.repository.updateStatus(id, status, staffEmail); }
 }

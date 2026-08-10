@@ -11,7 +11,7 @@ export class ApiStaffTaskRepository implements StaffTaskRepository {
   private readonly baseUrl = environment.staffTasksApiUrl;
   list(role: UserRole, assignedToEmail: string): Observable<readonly StaffTask[]> { return this.http.get<readonly StaffTask[]>(this.baseUrl, { params: { role, assignedToEmail } }); }
   assign(draft: StaffTaskAssignmentDraft): Observable<StaffTask> { return this.http.post<StaffTask>(`${this.baseUrl}/assignments`, draft); }
-  updateStatus(id: string, status: StaffTaskStatus): Observable<StaffTask> { return this.http.patch<StaffTask>(`${this.baseUrl}/${encodeURIComponent(id)}/status`, { status }); }
+  updateStatus(id: string, status: StaffTaskStatus, staffEmail: string): Observable<StaffTask> { return this.http.patch<StaffTask>(`${this.baseUrl}/${encodeURIComponent(id)}/status`, { status, staffEmail }); }
 }
 
 export const STAFF_TASK_REPOSITORY = new InjectionToken<StaffTaskRepository>('STAFF_TASK_REPOSITORY', {

@@ -24,5 +24,5 @@ export type StaffTaskAssignmentDraft = Omit<StaffTask, 'id' | 'status' | 'comple
 export interface StaffTaskRepository {
   list(role: UserRole, assignedToEmail: string): Observable<readonly StaffTask[]>;
   assign(draft: StaffTaskAssignmentDraft): Observable<StaffTask>;
-  updateStatus(id: string, status: StaffTaskStatus): Observable<StaffTask>;
+  updateStatus(id: string, status: StaffTaskStatus, staffEmail: string): Observable<StaffTask>;
 }
