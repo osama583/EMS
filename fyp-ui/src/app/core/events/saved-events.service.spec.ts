@@ -1,25 +1,47 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { environment } from '../../../environments/environment';
 import { AuthService } from '../auth/auth.service';
 import { ExternalRegistrationService, GuestRegistrationFlowService } from '../auth/external-registration.service';
-import { UserRole } from '../auth/auth.models';
+import { AuthUser, UserRole } from '../auth/auth.models';
 import { SavedEventsService } from './saved-events.service';
+
+const APPLICANT_USER: AuthUser = {
+  email: 'applicant@demo.apu.edu.my',
+  displayName: 'Demo Applicant',
+  username: 'applicant',
+  role: UserRole.Applicant,
+  accountType: 'internal',
+  roleLabel: 'Applicant',
+  department: 'School of Computing',
+};
+
+function loginViaMock(auth: AuthService, httpMock: HttpTestingController): void {
+  auth.login('applicant@demo.apu.edu.my', 'Demo@123').subscribe();
+  httpMock.expectOne(`${environment.authApiUrl}/login`).flush(APPLICANT_USER);
+}
 
 describe('event engagement mock services', () => {
   beforeEach(() => {
     localStorage.removeItem('apu-ems-auth-user');
     localStorage.removeItem('apu-ems-external-accounts');
     localStorage.removeItem('apu-ems-event-engagement');
-    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()] });
   });
 
-  afterEach(() => TestBed.resetTestingModule());
+  afterEach(() => {
+    TestBed.inject(HttpTestingController).verify();
+    TestBed.resetTestingModule();
+  });
 
   it('saves and removes proposal-backed events for the authenticated user', async () => {
     const auth = TestBed.inject(AuthService);
+    const httpMock = TestBed.inject(HttpTestingController);
     const saved = TestBed.inject(SavedEventsService);
-    auth.login('applicant@demo.apu.edu.my', 'Demo@123');
+    loginViaMock(auth, httpMock);
 
     await firstValueFrom(saved.saveEvent(auth.user()!.email, 'evt-1'));
     expect(saved.isSaved('evt-1')).toBe(true);
@@ -42,15 +64,19 @@ describe('event engagement mock services', () => {
     expect(auth.user()?.role).toBe(UserRole.ExternalUser);
     expect(auth.user()?.accountType).toBe('external');
     expect(localStorage.getItem('apu-ems-auth-user')).toContain('guest@example.com');
-    expect(localStorage.getItem('apu-ems-external-accounts')).toContain('guest@example.com');
   });
 
   it('restores the saved account type and permissions after the application is recreated', () => {
     const auth = TestBed.inject(AuthService);
-    expect(auth.login('applicant@demo.apu.edu.my', 'Demo@123').success).toBe(true);
+    const httpMock = TestBed.inject(HttpTestingController);
+    let success = false;
+    auth.login('applicant@demo.apu.edu.my', 'Demo@123').subscribe((result) => { success = result.success; });
+    httpMock.expectOne(`${environment.authApiUrl}/login`).flush(APPLICANT_USER);
+    expect(success).toBe(true);
 
+    TestBed.inject(HttpTestingController).verify();
     TestBed.resetTestingModule();
-    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()] });
     const restored = TestBed.inject(AuthService);
 
     expect(restored.authenticated()).toBe(true);

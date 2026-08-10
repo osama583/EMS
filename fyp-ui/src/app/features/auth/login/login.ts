@@ -75,9 +75,17 @@ export class LoginComponent implements OnDestroy {
     this.passwordError.set(!password ? 'Password is required.' : '');
     if (this.emailError() || this.passwordError()) return;
     this.submitting.set(true);
-    const result = this.auth.login(email, password);
-    if (!result.success) { this.loginError.set(result.message); this.submitting.set(false); return; }
-    this.completeAuthentication(result.user);
+    this.auth.login(email, password).subscribe({
+      next: (result) => {
+        this.submitting.set(false);
+        if (!result.success) { this.loginError.set(result.message); return; }
+        this.completeAuthentication(result.user);
+      },
+      error: () => {
+        this.submitting.set(false);
+        this.loginError.set('Something went wrong. Please try again.');
+      },
+    });
   }
 
   private completeAuthentication(user: AuthUser): void {

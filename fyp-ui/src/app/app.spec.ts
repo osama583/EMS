@@ -106,7 +106,16 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const { AuthService } = await import('./core/auth/auth.service');
-    TestBed.inject(AuthService).login('applicant@demo.apu.edu.my', 'Demo@123');
+    const { UserRole } = await import('./core/auth/auth.models');
+    TestBed.inject(AuthService).establishSession({
+      email: 'applicant@demo.apu.edu.my',
+      displayName: 'Demo Applicant',
+      username: 'applicant',
+      role: UserRole.Applicant,
+      accountType: 'internal',
+      roleLabel: 'Applicant',
+      department: 'School of Computing',
+    });
     await TestBed.inject(Router).navigateByUrl('/app/how-it-works');
     await fixture.whenStable();
     fixture.detectChanges();

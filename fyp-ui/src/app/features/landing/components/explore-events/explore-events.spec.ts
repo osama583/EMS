@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ExploreEventsComponent } from './explore-events';
 import { AuthService } from '../../../../core/auth/auth.service';
+import { UserRole } from '../../../../core/auth/auth.models';
 
 describe('ExploreEventsComponent', () => {
   let fixture: ComponentFixture<ExploreEventsComponent>;
@@ -44,7 +45,15 @@ describe('ExploreEventsComponent', () => {
   });
 
   it('toggles clear saved and unsaved states', () => {
-    TestBed.inject(AuthService).login('applicant@demo.apu.edu.my', 'Demo@123');
+    TestBed.inject(AuthService).establishSession({
+      email: 'applicant@demo.apu.edu.my',
+      displayName: 'Demo Applicant',
+      username: 'applicant',
+      role: UserRole.Applicant,
+      accountType: 'internal',
+      roleLabel: 'Applicant',
+      department: 'School of Computing',
+    });
     const saveButton = fixture.nativeElement.querySelector('.save-event') as HTMLButtonElement;
 
     expect(saveButton.getAttribute('aria-pressed')).toBe('false');

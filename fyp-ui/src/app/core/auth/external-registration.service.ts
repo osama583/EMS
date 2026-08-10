@@ -1,7 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Observable, delay, of } from 'rxjs';
-import { AuthUser, EXTERNAL_ACCOUNTS_STORAGE_KEY, PersistedExternalAccount, UserRole } from './auth.models';
-import { DOCUMENT } from '@angular/common';
+import { AuthUser, UserRole } from './auth.models';
 import { AuthService } from './auth.service';
 import {
   ExternalRegistrationApi,
@@ -16,7 +15,6 @@ interface PendingChallenge { readonly request: ExternalUserRegistrationRequest; 
 @Injectable({ providedIn: 'root' })
 export class ExternalRegistrationService implements ExternalRegistrationApi {
   private readonly auth = inject(AuthService);
-  private readonly document = inject(DOCUMENT);
   private readonly challenges = new Map<string, PendingChallenge>();
 
   registerExternalUser(request: ExternalUserRegistrationRequest): Observable<ExternalUserRegistrationResponse> {
@@ -45,7 +43,6 @@ export class ExternalRegistrationService implements ExternalRegistrationApi {
       roleLabel: 'Registered External User',
       department: 'External Community',
     };
-    this.persistAccount({ user, password: challenge.request.password });
     this.challenges.delete(request.challengeId);
     this.auth.establishSession(user);
     return of<VerifyExternalOtpResponse>({ status: 'verified', user, message: 'Your account has been verified.' }).pipe(delay(220));
@@ -54,16 +51,6 @@ export class ExternalRegistrationService implements ExternalRegistrationApi {
   private maskEmail(email: string): string {
     const [name = '', domain = ''] = email.trim().split('@');
     return `${name.slice(0, 2)}${'*'.repeat(Math.max(2, name.length - 2))}@${domain}`;
-  }
-
-  private persistAccount(account: PersistedExternalAccount): void {
-    try {
-      const storage = this.document.defaultView?.localStorage;
-      if (!storage) return;
-      const current = JSON.parse(storage.getItem(EXTERNAL_ACCOUNTS_STORAGE_KEY) ?? '[]') as PersistedExternalAccount[];
-      const next = [...current.filter((item) => item.user.email !== account.user.email), account];
-      storage.setItem(EXTERNAL_ACCOUNTS_STORAGE_KEY, JSON.stringify(next));
-    } catch { /* Development storage may be unavailable. */ }
   }
 }
 

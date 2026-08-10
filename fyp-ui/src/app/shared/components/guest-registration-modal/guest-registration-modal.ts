@@ -149,10 +149,17 @@ export class GuestRegistrationModalComponent {
     this.loginPasswordError.set(!password ? 'Password is required.' : '');
     if (this.emailError() || this.loginPasswordError()) return;
     this.loading.set(true);
-    const result = this.auth.login(email, password);
-    this.loading.set(false);
-    if (!result.success) { this.serviceError.set(result.message); return; }
-    this.completeAuthentication(result.user);
+    this.auth.login(email, password).subscribe({
+      next: (result) => {
+        this.loading.set(false);
+        if (!result.success) { this.serviceError.set(result.message); return; }
+        this.completeAuthentication(result.user);
+      },
+      error: () => {
+        this.loading.set(false);
+        this.serviceError.set('Something went wrong. Please try again.');
+      },
+    });
   }
 
   private verify(): void {

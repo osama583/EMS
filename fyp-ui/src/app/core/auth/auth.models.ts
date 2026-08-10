@@ -23,8 +23,6 @@ export enum UserRole {
 
 export type UserAccountType = 'internal' | 'external';
 
-export const EXTERNAL_ACCOUNTS_STORAGE_KEY = 'apu-ems-external-accounts';
-
 export interface AuthUser {
   readonly email: string;
   readonly displayName: string;
@@ -39,11 +37,6 @@ export interface AuthUser {
   // this is the minimal lookup needed to correctly filter myCafeteriaSelections in
   // proposal-department-view.ts. Undefined for every other role.
   readonly cafeteriaId?: number;
-}
-
-export interface PersistedExternalAccount {
-  readonly user: AuthUser;
-  readonly password: string;
 }
 
 export interface AuthNavigationItem {
