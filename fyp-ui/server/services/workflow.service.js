@@ -66,7 +66,9 @@ function authorizeAction(requestId, actorUser, action) {
 }
 
 function highPaxThreshold() {
-  return db.config.find((c) => c.code === 'HIGH_PAX_THRESHOLD').number;
+  const config = db.config.find((c) => c.code === 'HIGH_PAX_THRESHOLD');
+  if (!config) throw new WorkflowError('HIGH_PAX_THRESHOLD config not found.', 404);
+  return config.number;
 }
 
 function recordHistory(requestId, requestTaskId, requirementId, action, actorUserId, actorRole, comment, previousStatus, newStatus) {
@@ -142,6 +144,9 @@ function rejectReviewerStage(requestId, actorUserId, reason) {
   const request = findRequest(requestId);
   const actor = db.users.find((u) => u.user_id === Number(actorUserId));
   const previousStatus = request.status;
+  if (!['hos_hod_review', 'fmb_review', 'cfo_review'].includes(previousStatus)) {
+    throw new WorkflowError(`Cannot reject from status ${previousStatus}.`, 400);
+  }
   request.status = 'completed_rejected';
   request.updated_at = new Date().toISOString();
   recordHistory(request.request_id, null, null, 'reject', actorUserId, actor.role, reason, previousStatus, 'completed_rejected');
@@ -164,9 +169,37 @@ function resubmitReviewerStage(requestId, actorUserId, comment) {
   return request;
 }
 
+// Fields a legitimate applicant-resubmit may touch: proposal content columns from the
+// `request` table (see cloud/system_logic/ems_database_schema.sql). Explicitly excludes
+// identity/workflow-control columns (request_id, applicant_user_id, status, resume_stage,
+// reviewer_comment, timestamps, cancellation fields) so a caller can't smuggle those through.
+const APPLICANT_RESUBMIT_ALLOWED_FIELDS = [
+  'applicant_name',
+  'applicant_email',
+  'applicant_department_or_school',
+  'event_title',
+  'short_introduction',
+  'goals_objectives',
+  'expected_benefits',
+  'event_visibility',
+  'event_format',
+  'registration_approval',
+  'promotion_publicity_method',
+  'event_image',
+  'total_pax',
+  'max_pax',
+];
+
 function applicantResubmit(requestId, updates) {
   const request = findRequest(requestId);
-  Object.assign(request, updates);
+  if (request.status !== 'resubmission_required') {
+    throw new WorkflowError(`Cannot resubmit from status ${request.status}.`, 400);
+  }
+  if (updates) {
+    for (const field of APPLICANT_RESUBMIT_ALLOWED_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(updates, field)) request[field] = updates[field];
+    }
+  }
   const resumeStatus = request.resume_stage || 'hos_hod_review';
   const previousStatus = request.status;
   request.status = resumeStatus;
@@ -181,6 +214,9 @@ function cancelProposal(requestId, actorUserId) {
   const request = findRequest(requestId);
   const actor = db.users.find((u) => u.user_id === Number(actorUserId));
   const previousStatus = request.status;
+  if (['completed_approved', 'completed_rejected', 'cancelled'].includes(previousStatus)) {
+    throw new WorkflowError(`Cannot cancel from status ${previousStatus}.`, 400);
+  }
   request.status = 'cancelled';
   request.cancelled_at = new Date().toISOString();
   request.cancelled_by_user_id = Number(actorUserId);
@@ -194,7 +230,11 @@ function cancelProposal(requestId, actorUserId) {
 // the SAME task as fmb (Phase 1's correction: F&B reviews food + water together, one task).
 function createDepartmentTasks(requestId) {
   const applicationRequirements = db.application_requirements.filter((ar) => ar.request_id === Number(requestId));
-  const requirementNames = applicationRequirements.map((ar) => db.event_requirements.find((r) => r.requirement_id === ar.requirement_id).requirement_name);
+  const requirementNames = applicationRequirements.map((ar) => {
+    const requirement = db.event_requirements.find((r) => r.requirement_id === ar.requirement_id);
+    if (!requirement) throw new WorkflowError('Event requirement not found.', 404);
+    return requirement.requirement_name;
+  });
 
   const roleForRequirement = {
     logistics: 'logistics_manager',
@@ -214,6 +254,7 @@ function createDepartmentTasks(requestId) {
 
   for (const requirementName of distinctTaskRequirements) {
     const requirement = db.event_requirements.find((r) => r.requirement_name === requirementName);
+    if (!requirement) throw new WorkflowError('Event requirement not found.', 404);
     db.request_task.push({
       request_task_id: nextId('request_task'),
       request_id: Number(requestId),
@@ -239,6 +280,7 @@ function createDepartmentTasks(requestId) {
 
 function findDepartmentTask(requestId, requirementKey) {
   const requirement = db.event_requirements.find((r) => r.requirement_name === requirementKey);
+  if (!requirement) throw new WorkflowError('Department task not found.', 404);
   const task = db.request_task.find((t) => t.request_id === Number(requestId) && t.requirement_id === requirement.requirement_id && t.stage_code === 'department_review');
   if (!task) throw new WorkflowError('Department task not found.', 404);
   return task;
@@ -419,7 +461,17 @@ function fulfilFmbSelection(selectionId, actorUserId) {
 // pattern but scoped to this one task's selection rows instead of sibling request_task rows.
 function checkFmbTaskResolved(selectionId) {
   const requestId = requestIdForFmbSelection(selectionId);
-  const fmbTask = findDepartmentTask(requestId, 'fmb');
+  // Internal resolution check, not a user-facing lookup: if data inconsistency means no
+  // 'fmb' department task exists, there's nothing to resolve — soft no-op rather than
+  // letting the 404 WorkflowError from findDepartmentTask crash the calling
+  // approve/edit/fulfil operation.
+  let fmbTask;
+  try {
+    fmbTask = findDepartmentTask(requestId, 'fmb');
+  } catch (err) {
+    if (err instanceof WorkflowError && err.status === 404) return;
+    throw err;
+  }
   const allFmbRows = db.request_fmb
     .filter((f) => f.request_id === Number(requestId))
     .flatMap((f) => db.request_fmb_selection.filter((s) => s.request_fmb_id === f.request_fmb_id));
