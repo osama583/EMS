@@ -19,12 +19,12 @@
 --     one dedicated table per dropdown "page" instead of a shared generic
 --     shape, because the real fields differ too much between pages to
 --     merge cleanly.
---   - fnb_options is now "My Menu" — scoped to a specific cafeteria via
+--   - fmb_options is now "My Menu" — scoped to a specific cafeteria via
 --     cafeteria_id, with FKs into two new shared lookup tables
 --     (dietary_information_options, serving_unit_options).
---   - request_fnb_selection now properly FKs into fnb_options (the real
+--   - request_fmb_selection now properly FKs into fmb_options (the real
 --     menu item) instead of a free-text guess.
---   - request_fnb.quantity renamed to pax (it's "how many people", not a
+--   - request_fmb.quantity renamed to pax (it's "how many people", not a
 --     quantity of food units).
 --   - Added cafeteria_admin / cafeteria_manager / cafeteria_staff roles,
 --     and a cafeteria_assignment bridge table (a manager/staff can run
@@ -38,10 +38,27 @@
 --   - Fixed event_registration's unique constraint so cancelling and
 --     re-registering is actually possible (partial unique index).
 --
--- STILL AN OPEN QUESTION (see chat message):
---   campus_tour_start/area/map — built as 3 separate tables based on your
---   detailed field list, even though an earlier line in the same message
---   said "only Starting Point." Confirm which one you meant.
+-- CHANGES IN THIS SESSION (schema alignment pass):
+--   - Renamed every fnb_* identifier to fmb_* (fmb_options, request_fmb,
+--     request_fmb_selection, etc.) — "F&B" is the correct APU term.
+--   - users.role: added student_services_manager, student_services_member,
+--     external_user, club_president; fnb -> fmb.
+--   - request_fmb_selection gained a status column (own lifecycle,
+--     independent of its parent request_task) — see chk_fmb_selection_status.
+--   - Dropped campus_tour_area_options and campus_tour_map_options plus
+--     their columns on request_campus_tour — Campus Tour is Starting
+--     Point only.
+--   - request.status: high_pax_review split into two sequential values,
+--     fmb_review and cfo_review (see chk_request_status comment).
+--   - request_task.status (chk_task_status): removed 'rejected' (only
+--     hos_hod_review/fmb_review/cfo_review can reject — departments can
+--     only approve or resubmit), added 'preparing'.
+--   - water_logo_options / water_normal_options are UNCHANGED as
+--     manager-configured option tables; what changed is only that their
+--     REQUEST rows (request_mineral_water_logo / request_mineral_water_normal)
+--     now attach to the SAME request_task as request_fmb (shared
+--     request_task_id under stage_code='department_review'), not an
+--     independent department-review task per requirement.
 --
 -- WORKFLOW RULES CONFIRMED THIS ROUND (backend logic, not schema changes):
 --   - Applicant = HOS/HOD of their own unit -> skip HOS_HOD_REVIEW,
@@ -70,12 +87,14 @@ CREATE TABLE users (
     role          VARCHAR(30) NOT NULL,
     is_active     BOOLEAN NOT NULL DEFAULT TRUE,
     CONSTRAINT chk_users_role CHECK (role IN (
-        'student','staff','hos_hod','cfo','fnb',
+        'student','staff','hos_hod','cfo','fmb',
         'logistics_manager','logistics_staff',
         'transportation_manager','transportation_staff',
         'photo_video_manager','photo_video_staff',
         'sound_light_manager','sound_light_staff',
+        'student_services_manager','student_services_member',
         'cafeteria_admin','cafeteria_manager','cafeteria_staff',
+        'external_user','club_president',
         'system_admin'
     ))
 );
@@ -207,7 +226,7 @@ CREATE TABLE sound_light_options (
     technical_description           TEXT NOT NULL
 );
 
--- Shared lookup lists used by fnb_options below (editable by Cafeteria
+-- Shared lookup lists used by fmb_options below (editable by Cafeteria
 -- Manager and F&B/FMB Manager both — that's a permissions detail, not a
 -- schema one; there's just one shared table either way).
 CREATE TABLE dietary_information_options (
@@ -225,9 +244,9 @@ CREATE TABLE serving_unit_options (
 );
 
 -- "My Menu" — scoped to ONE cafeteria. This is what F&B picks from when
--- fulfilling a food request (see request_fnb_selection further down).
-CREATE TABLE fnb_options (
-    fnb_option_id                  BIGSERIAL PRIMARY KEY,
+-- fulfilling a food request (see request_fmb_selection further down).
+CREATE TABLE fmb_options (
+    fmb_option_id                  BIGSERIAL PRIMARY KEY,
     requirement_id                   BIGINT NOT NULL REFERENCES event_requirements(requirement_id),
     cafeteria_id                       BIGINT NOT NULL REFERENCES cafeteria(cafeteria_id),
     label                                VARCHAR(150) NOT NULL,
@@ -239,7 +258,7 @@ CREATE TABLE fnb_options (
     menu_image_url                                      VARCHAR(255)
 );
 
--- Campus Tour — 3 separate tables (see the open question in the header).
+-- Campus Tour — Starting Point only.
 CREATE TABLE campus_tour_start_options (
     campus_tour_start_option_id  BIGSERIAL PRIMARY KEY,
     requirement_id                 BIGINT NOT NULL REFERENCES event_requirements(requirement_id),
@@ -248,26 +267,6 @@ CREATE TABLE campus_tour_start_options (
     active                               BOOLEAN NOT NULL DEFAULT TRUE,
     meeting_instructions                  TEXT,
     max_group_size                          INTEGER CHECK (max_group_size >= 1)
-);
-
-CREATE TABLE campus_tour_area_options (
-    campus_tour_area_option_id  BIGSERIAL PRIMARY KEY,
-    requirement_id                BIGINT NOT NULL REFERENCES event_requirements(requirement_id),
-    label                           VARCHAR(150) NOT NULL,
-    description                       TEXT,
-    active                              BOOLEAN NOT NULL DEFAULT TRUE,
-    estimated_duration_minutes           INTEGER CHECK (estimated_duration_minutes >= 1),
-    access_restrictions_notes              TEXT
-);
-
-CREATE TABLE campus_tour_map_options (
-    campus_tour_map_option_id  BIGSERIAL PRIMARY KEY,
-    requirement_id                BIGINT NOT NULL REFERENCES event_requirements(requirement_id),
-    label                           VARCHAR(150) NOT NULL,
-    description                       TEXT,
-    active                              BOOLEAN NOT NULL DEFAULT TRUE,
-    campus_map_url                       VARCHAR(255) NOT NULL,
-    map_route_guidance                     TEXT
 );
 
 -- Mineral Water — kept as 2 tables (Logo has an extra field Normal doesn't).
@@ -357,15 +356,22 @@ CREATE TABLE request (
     created_at              TIMESTAMP NOT NULL DEFAULT now(),
     updated_at                TIMESTAMP NOT NULL DEFAULT now(),
     CONSTRAINT chk_request_status CHECK (status IN (
-        'draft','submitted','hos_hod_review','high_pax_review',
+        'draft','submitted','hos_hod_review','fmb_review','cfo_review',
         'department_review','resubmission_required',
         'completed_approved','completed_rejected','cancelled'
     ))
 );
 -- status = 'resubmission_required' only applies during the single-actor
--- sequential stages. During department_review, status STAYS
--- 'department_review' even if one department resubmits — that department's
--- own resubmission lives in its request_task row, not here.
+-- sequential stages (hos_hod_review / fmb_review / cfo_review). During
+-- department_review, status STAYS 'department_review' even if one
+-- department resubmits — that department's own resubmission lives in its
+-- request_task row, not here.
+--
+-- fmb_review and cfo_review are sequential, not concurrent: F&B reviews
+-- first, and only on F&B's approval does the request move to cfo_review.
+-- If CFO resubmits, the request resumes at cfo_review (not fmb_review) —
+-- F&B's approval-level review for this proposal is permanently done once
+-- given.
 
 CREATE TABLE request_categories (
     request_id    BIGINT NOT NULL REFERENCES request(request_id),
@@ -440,10 +446,10 @@ CREATE TABLE request_sound_light (
 );
 
 -- The applicant's original food ask.
-CREATE TABLE request_fnb (
-    request_fnb_id  BIGSERIAL PRIMARY KEY,
+CREATE TABLE request_fmb (
+    request_fmb_id  BIGSERIAL PRIMARY KEY,
     request_id          BIGINT NOT NULL REFERENCES request(request_id),
-    option_id                BIGINT REFERENCES fnb_options(fnb_option_id),
+    option_id                BIGINT REFERENCES fmb_options(fmb_option_id),
     food_type                    VARCHAR(150) NOT NULL,
     pax                              INTEGER NOT NULL,   -- renamed from quantity: "how many people", not units of food
     date                                 DATE NOT NULL,
@@ -454,14 +460,18 @@ CREATE TABLE request_fnb (
 );
 
 -- F&B's actual fulfilment action: picks a cafeteria + a real menu item.
-CREATE TABLE request_fnb_selection (
-    request_fnb_selection_id  BIGSERIAL PRIMARY KEY,
-    request_fnb_id                BIGINT NOT NULL REFERENCES request_fnb(request_fnb_id),
+CREATE TABLE request_fmb_selection (
+    request_fmb_selection_id  BIGSERIAL PRIMARY KEY,
+    request_fmb_id                BIGINT NOT NULL REFERENCES request_fmb(request_fmb_id),
     cafeteria_id                      BIGINT NOT NULL REFERENCES cafeteria(cafeteria_id),
-    fnb_option_id                         BIGINT NOT NULL REFERENCES fnb_options(fnb_option_id),
-    menu_item_label                           VARCHAR(150) NOT NULL,  -- snapshot of fnb_options.label at pick time
+    fmb_option_id                         BIGINT NOT NULL REFERENCES fmb_options(fmb_option_id),
+    menu_item_label                           VARCHAR(150) NOT NULL,  -- snapshot of fmb_options.label at pick time
     quantity                                       INTEGER NOT NULL,
-    notes                                                TEXT
+    status                                             VARCHAR(20) NOT NULL DEFAULT 'pending',
+    notes                                                TEXT,
+    CONSTRAINT chk_fmb_selection_status CHECK (
+        status IN ('pending','approved','resubmitted','preparing','fulfilled','cancelled')
+    )
 );
 
 CREATE TABLE request_campus_tour (
@@ -474,11 +484,7 @@ CREATE TABLE request_campus_tour (
     pax                                              INTEGER NOT NULL,
     start_point_option_id                                BIGINT REFERENCES campus_tour_start_options(campus_tour_start_option_id),
     start_point                                              VARCHAR(150) NOT NULL,
-    tour_area_option_id                                          BIGINT REFERENCES campus_tour_area_options(campus_tour_area_option_id),
-    tour_area                                                        VARCHAR(150),   -- nullable: drop if you trim to Starting-Point-only
-    campus_map_option_id                                                 BIGINT REFERENCES campus_tour_map_options(campus_tour_map_option_id),
-    campus_map                                                               VARCHAR(150),   -- nullable, same reason
-    notes                                                                        TEXT
+    notes                                                        TEXT
 );
 
 CREATE TABLE request_mineral_water_logo (
@@ -635,6 +641,10 @@ CREATE TABLE saved_event (
 -- audit file for the exact query shape. Unchanged from the previous version
 -- except for the renamed PK.
 
+-- Departments cannot reject a proposal outright — only the earlier
+-- single-actor stages (hos_hod_review / fmb_review / cfo_review) can.
+-- A department's only pushback is resubmit-with-comment. 'preparing'
+-- means the assigned staff has started the work but not finished.
 CREATE TABLE request_task (
     request_task_id     BIGSERIAL PRIMARY KEY,
     request_id               BIGINT NOT NULL REFERENCES request(request_id),
@@ -650,7 +660,7 @@ CREATE TABLE request_task (
     resolved_by_user_id                                              BIGINT REFERENCES users(user_id),
     CONSTRAINT chk_task_assignment_mode CHECK (assignment_mode IN ('assigned','shared_pool')),
     CONSTRAINT chk_task_status CHECK (
-        status IN ('pending','approved','resubmitted','rejected','completed','cancelled')
+        status IN ('pending','approved','resubmitted','preparing','completed','cancelled')
     )
 );
 
