@@ -28,7 +28,7 @@ const OPTION_NAVIGATION: Readonly<Record<RequestOptionKind, AuthNavigationItem>>
   transportation: item('Transportation Types', 'directions_bus', '/app/dropdown-options/transportation'),
   photoVideo: item('Photography Services', 'photo_camera', '/app/dropdown-options/photoVideo'),
   soundLight: item('Sound & Light', 'settings_input_component', '/app/dropdown-options/soundLight'),
-  fnb: item('My Menu', 'restaurant_menu', '/app/menu'),
+  fmb: item('My Menu', 'restaurant_menu', '/app/menu'),
   dietaryInformation: item('Dietary Information', 'nutrition', '/app/dropdown-options/dietaryInformation'),
   servingUnit: item('Serving Units', 'straighten', '/app/dropdown-options/servingUnit'),
   campusTourStart: item('Campus Tour Starting Points', 'location_on', '/app/dropdown-options/campusTourStart'),
@@ -67,8 +67,10 @@ export const ROLE_NAVIGATION: Readonly<Record<UserRole, RoleNavigation>> = {
   [UserRole.ClubPresident]: proposalRole('My Proposals', true),
   [UserRole.HosHod]: proposalRole('Event Proposals'),
   [UserRole.Cfo]: (() => { const navigation = proposalRole('Event Proposals'); return { ...navigation, sections: [...navigation.sections, dropdownSettings(UserRole.Cfo)] }; })(),
-  [UserRole.FmbReviewer]: proposalRole('Event Proposals'),
-  [UserRole.FmbManager]: managerRole(UserRole.FmbManager, 'service'),
+  [UserRole.Fmb]: (() => {
+    const navigation = proposalRole('Event Proposals');
+    return { ...navigation, sections: [...navigation.sections, dropdownSettings(UserRole.Fmb)] };
+  })(),
   [UserRole.CafeteriaManager]: managerRole(UserRole.CafeteriaManager, 'cafeteria'),
   [UserRole.CafeteriaStaff]: { defaultRoute: '/app/tasks', primary: [myTasks, taskHistory], sections: [eventsSection(UserRole.CafeteriaStaff)] },
   [UserRole.CafeteriaAdmin]: { defaultRoute: '/app/dashboard', primary: [dashboard], sections: [eventsSection(UserRole.CafeteriaAdmin)] },
@@ -76,7 +78,6 @@ export const ROLE_NAVIGATION: Readonly<Record<UserRole, RoleNavigation>> = {
   [UserRole.LogisticsStaff]: { defaultRoute: '/app/tasks', primary: [myTasks, taskHistory], sections: [eventsSection(UserRole.LogisticsStaff)] },
   [UserRole.StudentServicesManager]: managerRole(UserRole.StudentServicesManager, 'service'),
   [UserRole.StudentServicesMember]: { defaultRoute: '/app/tasks', primary: [myTasks, taskHistory], sections: [eventsSection(UserRole.StudentServicesMember)] },
-  [UserRole.FmbWaterServicesStaff]: { defaultRoute: '/app/tasks', primary: [myTasks, taskHistory], sections: [eventsSection(UserRole.FmbWaterServicesStaff)] },
   [UserRole.AvManager]: managerRole(UserRole.AvManager, 'service'),
   [UserRole.AvTechnician]: { defaultRoute: '/app/tasks', primary: [myTasks, taskHistory], sections: [eventsSection(UserRole.AvTechnician)] },
   [UserRole.PhotographyManager]: managerRole(UserRole.PhotographyManager, 'service'),
@@ -117,7 +118,7 @@ export function roleCanAccess(role: UserRole, url: string): boolean {
   if (cleanUrl.startsWith('/app/proposals/review/')) return true;
   if (cleanUrl === '/app/events/saved-events' || cleanUrl === '/app/saved-events') return roleCanUseSavedEvents(role);
   if (cleanUrl === '/app/events/my-events' || cleanUrl.startsWith('/app/events/my-events/')) return roleCanUseSavedEvents(role);
-  if (cleanUrl === '/app/dropdown-options') return managerOptionKinds(role).some((kind) => kind !== 'fnb' && kind !== 'servingUnit');
+  if (cleanUrl === '/app/dropdown-options') return managerOptionKinds(role).some((kind) => kind !== 'fmb' && kind !== 'servingUnit');
   const navigation = ROLE_NAVIGATION[role];
   return [...navigation.primary, ...navigation.sections.flatMap((section) => section.items)]
     .some((entry) => cleanUrl === entry.route || cleanUrl.startsWith(`${entry.route}/`));
@@ -130,7 +131,6 @@ export function roleCanUseSavedEvents(role: UserRole): boolean {
     UserRole.ClubPresident,
     UserRole.HosHod,
     UserRole.Cfo,
-    UserRole.FmbReviewer,
-    UserRole.FmbManager,
+    UserRole.Fmb,
   ].includes(role);
 }
