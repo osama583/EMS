@@ -4,7 +4,7 @@
       <h2>System Configuration</h2>
       <p>Manage global business rules and master data used across the application.</p>
     </div>
-    <button type="button" class="system-config__save-btn" [class.system-config__save-btn--saved]="policiesSaved()" (click)="savePolicies()">
+    <button type="button" class="system-config__save-btn" [class.system-config__save-btn--saved]="policiesSaved()" [disabled]="saving()" (click)="savePolicies()">
       <span class="material-symbols-rounded" aria-hidden="true">{{ policiesSaved() ? 'check' : 'save' }}</span>
       {{ policiesSaved() ? 'Saved' : 'Save Changes' }}
     </button>
@@ -61,7 +61,7 @@
 
 <app-form-modal
   [open]="modalOpen()" [title]="editingIndex() === null ? 'Add Event Category' : 'Edit Event Category'"
-  [primaryLabel]="editingIndex() === null ? 'Add Category' : 'Save Changes'" [disabled]="!formValid()"
+  [primaryLabel]="editingIndex() === null ? 'Add Category' : 'Save Changes'" [loading]="saving()" [disabled]="!formValid()"
   (close)="closeModal()" (cancel)="closeModal()" (submit)="save()"
 >
   <div class="system-config__form">

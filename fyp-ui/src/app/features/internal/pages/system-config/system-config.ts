@@ -1,4 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { finalize } from 'rxjs';
 import { SystemConfigService } from '../../../../core/config/system-config.service';
 import { FormFieldComponent } from '../../../../shared/components/form-controls/form-field';
 import { FeedbackBannerComponent } from '../../../../shared/components/feedback-banner/feedback-banner';
@@ -16,9 +18,11 @@ import { InternalDataPageConfig, InternalDataRecord, InternalRowActionEvent } fr
 })
 export class SystemConfigComponent {
   private readonly configService = inject(SystemConfigService);
+  private readonly destroyRef = inject(DestroyRef);
   readonly paxThreshold = signal(this.configService.paxReviewerThreshold());
   readonly cancellationDays = signal(this.configService.cancellationDaysLimit());
   readonly policiesSaved = signal(false);
+  readonly saving = signal(false);
 
   readonly categories = signal<readonly string[]>([...this.configService.eventCategories()]);
   readonly search = signal('');
@@ -73,9 +77,10 @@ export class SystemConfigComponent {
   }
 
   savePolicies(): void {
-    this.persist();
-    this.policiesSaved.set(true);
-    setTimeout(() => this.policiesSaved.set(false), 2000);
+    this.persist(() => {
+      this.policiesSaved.set(true);
+      setTimeout(() => this.policiesSaved.set(false), 2000);
+    });
   }
 
   setSearch(value: string): void { this.search.set(value); this.page.set(1); }
@@ -117,7 +122,7 @@ export class SystemConfigComponent {
     return clashes ? 'This category already exists.' : '';
   }
 
-  closeModal(): void { this.modalOpen.set(false); }
+  closeModal(): void { if (!this.saving()) this.modalOpen.set(false); }
 
   save(): void {
     if (!this.formValid()) return;
@@ -129,9 +134,10 @@ export class SystemConfigComponent {
       else next[index] = name;
       return next;
     });
-    this.persist();
-    this.modalOpen.set(false);
-    this.successMessage.set(index === null ? 'Category added successfully.' : 'Category updated successfully.');
+    this.persist(() => {
+      this.modalOpen.set(false);
+      this.successMessage.set(index === null ? 'Category added successfully.' : 'Category updated successfully.');
+    });
   }
 
   cancelDelete(): void { this.deleteTarget.set(null); }
@@ -140,19 +146,25 @@ export class SystemConfigComponent {
     const name = this.deleteTarget();
     if (name === null) return;
     this.categories.update((items) => items.filter((item) => item !== name));
-    this.persist();
-    this.deleteTarget.set(null);
-    this.successMessage.set(`${name} was deleted.`);
-    this.page.set(Math.max(1, Math.min(this.page(), this.totalPages())));
+    this.persist(() => {
+      this.deleteTarget.set(null);
+      this.successMessage.set(`${name} was deleted.`);
+      this.page.set(Math.max(1, Math.min(this.page(), this.totalPages())));
+    });
   }
 
   private clearMessages(): void { this.successMessage.set(''); this.errorMessage.set(''); }
 
-  private persist(): void {
+  private persist(onSuccess: () => void): void {
+    this.clearMessages();
+    this.saving.set(true);
     this.configService.updateConfig({
       paxReviewerThreshold: this.paxThreshold(),
       cancellationDaysLimit: this.cancellationDays(),
       eventCategories: this.categories(),
+    }).pipe(finalize(() => this.saving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => onSuccess(),
+      error: () => this.errorMessage.set('The configuration could not be saved. Please try again.'),
     });
   }
 }
