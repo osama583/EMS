@@ -22,7 +22,7 @@ import { ProposalReviewRecord } from '../../../../core/proposals/proposal-review
 
 import { SystemConfigService } from '../../../../core/config/system-config.service';
 
-type RequirementKey = 'logistics' | 'transportation' | 'photoVideo' | 'soundLight' | 'fnb' | 'campusTour' | 'waterLogo' | 'waterNormal' | 'fundingPurchase';
+type RequirementKey = 'logistics' | 'transportation' | 'photoVideo' | 'soundLight' | 'fmb' | 'campusTour' | 'waterLogo' | 'waterNormal' | 'fundingPurchase';
 type RowCollection = 'coOwners' | 'schedule' | 'organizers' | 'importantPeople' | 'guests' | 'agenda' | 'discussions';
 type TableEditorCollection = Exclude<RowCollection, 'coOwners'>;
 
@@ -130,7 +130,7 @@ export class EventProposalComponent implements OnDestroy {
   readonly agenda = signal<readonly EditableRow[]>([]);
   readonly discussions = signal<readonly EditableRow[]>([]);
   readonly requestRows = signal<Readonly<Record<RequirementKey, readonly EditableRow[]>>>({
-    logistics: [], transportation: [], photoVideo: [], soundLight: [], fnb: [], campusTour: [], waterLogo: [], waterNormal: [], fundingPurchase: [],
+    logistics: [], transportation: [], photoVideo: [], soundLight: [], fmb: [], campusTour: [], waterLogo: [], waterNormal: [], fundingPurchase: [],
   });
 
   constructor() {
@@ -166,7 +166,7 @@ export class EventProposalComponent implements OnDestroy {
     this.discussions.set(record.discussions);
     this.selectedRequirements.set(record.selectedRequirements);
     this.requestRows.set({
-      logistics: [], transportation: [], photoVideo: [], soundLight: [], fnb: [], campusTour: [], waterLogo: [], waterNormal: [], fundingPurchase: [],
+      logistics: [], transportation: [], photoVideo: [], soundLight: [], fmb: [], campusTour: [], waterLogo: [], waterNormal: [], fundingPurchase: [],
       ...Object.fromEntries(
         record.selectedRequirements.map((key) => [key, record.requests.filter((request) => request.department === key).map((request) => ({ ...request }))]),
       ),
@@ -517,11 +517,9 @@ export class EventProposalComponent implements OnDestroy {
     switch (option.kind) {
       case 'photoVideo': return [option.maximumPersonnel ? `Maximum personnel available: ${option.maximumPersonnel}` : '', option.description].filter(Boolean).join(' · ');
       case 'soundLight': return [option.availableQuantity !== undefined ? `${option.availableQuantity} available` : '', option.setupRequirements ?? option.description].filter(Boolean).join(' · ');
-      case 'fnb': return [option.servingUnitId ? `Serving unit: ${this.requestOptionLabel(option.servingUnitId)}` : '', option.dietaryInformationId ? `Dietary information: ${this.requestOptionLabel(option.dietaryInformationId)}` : '', option.orderingNotes].filter(Boolean).join(' · ');
+      case 'fmb': return [option.servingUnitId ? `Serving unit: ${this.requestOptionLabel(option.servingUnitId)}` : '', option.dietaryInformationId ? `Dietary information: ${this.requestOptionLabel(option.dietaryInformationId)}` : '', option.orderingNotes].filter(Boolean).join(' · ');
       case 'dietaryInformation': case 'servingUnit': return option.description ?? '';
       case 'campusTourStart': return [option.maximumGroupSize ? `Maximum group size: ${option.maximumGroupSize}` : '', option.meetingInstructions].filter(Boolean).join(' · ');
-      case 'campusTourArea': return [option.estimatedDuration ? `Estimated duration: ${option.estimatedDuration} minutes` : '', option.restrictions].filter(Boolean).join(' · ');
-      case 'campusTourMap': return [option.mapUrl ? `Map: ${option.mapUrl}` : '', option.accessNotes].filter(Boolean).join(' · ');
       case 'waterLogo': case 'waterNormal': return [`${option.bottleCount || 'Custom'} bottles`, `${option.availableStock} in stock`, option.brandingRequirement, option.orderingInstructions].filter(Boolean).join(' · ');
     }
   }
@@ -826,8 +824,8 @@ export class EventProposalComponent implements OnDestroy {
       { key: 'transportation', label: 'Transportation', columns: [{ key: 'type', label: 'Transportation Type', type: 'select', required: true, options: this.activeSelectOptions('transportation') }, { key: 'requestedPax', label: 'Requested Pax', type: 'number', min: 1, step: 1, required: true }, { key: 'pickup', label: 'Pickup', type: 'text', required: true }, { key: 'dropoff', label: 'Drop-off', type: 'text', required: true }, date, start, end, location, notes] },
       { key: 'photoVideo', label: 'Photographer / Videographer', columns: [{ key: 'service', label: 'Service', type: 'select', required: true, options: this.activeSelectOptions('photoVideo') }, { key: 'personnelQuantity', label: 'Number of Personnel Required', type: 'number', min: 1, step: 1, required: true }, date, start, end, location, { key: 'coverage', label: 'Coverage', type: 'text', required: true }, notes] },
       { key: 'soundLight', label: 'Sound & Light', columns: [{ key: 'item', label: 'Item / Service', type: 'select', required: true, options: this.activeSelectOptions('soundLight') }, date, start, end, location, notes] },
-      { key: 'fnb', label: 'F&B', columns: [{ key: 'foodType', label: 'Food Type', type: 'select', required: true, options: this.activeSelectOptions('fnb') }, { key: 'quantity', label: 'Pax / Quantity', type: 'number', min: 0, required: true }, date, start, end, location, notes] },
-      { key: 'campusTour', label: 'Campus Tour', columns: [date, start, end, location, { key: 'pax', label: 'Pax', type: 'number', min: 0, required: true }, { key: 'startPoint', label: 'Starting Point', type: 'select', required: true, options: this.activeSelectOptions('campusTourStart') }, { key: 'tourArea', label: 'Tour Area', type: 'select', required: true, options: this.activeSelectOptions('campusTourArea') }, { key: 'campusMap', label: 'Campus Map', type: 'select', required: true, options: this.activeSelectOptions('campusTourMap') }, notes] },
+      { key: 'fmb', label: 'F&B', columns: [{ key: 'foodType', label: 'Food Type', type: 'select', required: true, options: this.activeSelectOptions('fmb') }, { key: 'quantity', label: 'Pax / Quantity', type: 'number', min: 0, required: true }, date, start, end, location, notes] },
+      { key: 'campusTour', label: 'Campus Tour', columns: [date, start, end, location, { key: 'pax', label: 'Pax', type: 'number', min: 0, required: true }, { key: 'startPoint', label: 'Starting Point', type: 'select', required: true, options: this.activeSelectOptions('campusTourStart') }, notes] },
       ...(['waterLogo', 'waterNormal'] as const).map((key) => ({ key, label: key === 'waterLogo' ? 'Mineral Water with Logo' : 'Mineral Water Normal', columns: [{ key: 'quantity', label: 'Quantity', type: 'select' as const, required: true, options: this.activeSelectOptions(key) }, date, start, end, location, notes] })),
       { key: 'fundingPurchase', label: 'Funding / Purchase Requirement', columns: [{ key: 'mainItem', label: 'Main Item', type: 'select', required: true, options: this.activeSelectOptions('fundingMain') }, { key: 'subItem', label: 'Sub-item', type: 'select', required: true, parentKey: 'mainItem' }, { key: 'quantity', label: 'Quantity', type: 'number', min: 0, required: true }, { key: 'unit', label: 'Unit RM', type: 'number', min: 0, step: 0.01, required: true }, notes] },
     ];
@@ -839,10 +837,8 @@ export class EventProposalComponent implements OnDestroy {
     if (key === 'transportation' && columnKey === 'type') return 'transportation';
     if (key === 'photoVideo' && columnKey === 'service') return 'photoVideo';
     if (key === 'soundLight' && columnKey === 'item') return 'soundLight';
-    if (key === 'fnb' && columnKey === 'foodType') return 'fnb';
+    if (key === 'fmb' && columnKey === 'foodType') return 'fmb';
     if (key === 'campusTour' && columnKey === 'startPoint') return 'campusTourStart';
-    if (key === 'campusTour' && columnKey === 'tourArea') return 'campusTourArea';
-    if (key === 'campusTour' && columnKey === 'campusMap') return 'campusTourMap';
     if ((key === 'waterLogo' || key === 'waterNormal') && columnKey === 'quantity') return key;
     if (key === 'fundingPurchase' && columnKey === 'mainItem') return 'fundingMain';
     if (key === 'fundingPurchase' && columnKey === 'subItem') return 'fundingSub';
