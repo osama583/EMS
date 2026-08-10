@@ -19,6 +19,11 @@ function createComponent(): ComponentFixture<EventProposalComponent> {
   const fixture = TestBed.createComponent(EventProposalComponent);
   const httpMock = TestBed.inject(HttpTestingController);
   httpMock.expectOne((request) => request.url === environment.requestOptionsApiUrl).flush(CATALOG_SEED);
+  httpMock.expectOne((request) => request.url === environment.configApiUrl).flush({
+    paxReviewerThreshold: 50,
+    cancellationDaysLimit: 3,
+    eventCategories: [],
+  });
   return fixture;
 }
 

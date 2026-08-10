@@ -51,6 +51,12 @@ describe('ProposalReviewPageComponent', () => {
     httpMock.expectOne(`${environment.proposalWorkflowApiUrl}/${pendingProposal.id}`).flush(pendingProposal);
     fixture.componentInstance.proposal.set(pendingProposal);
     fixture.detectChanges();
+    httpMock.expectOne(environment.configApiUrl).flush({
+      paxReviewerThreshold: 50,
+      cancellationDaysLimit: 3,
+      eventCategories: [],
+    });
+    fixture.detectChanges();
 
     const approveButton = fixture.nativeElement.querySelector(
       'app-proposal-reviewer-view .prv-btn--approve',

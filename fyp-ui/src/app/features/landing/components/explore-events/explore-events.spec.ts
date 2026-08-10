@@ -46,6 +46,11 @@ describe('ExploreEventsComponent', () => {
     httpMock = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
     httpMock.expectOne(environment.eventsApiUrl).flush(MOCK_PUBLISHED_EVENTS);
+    httpMock.expectOne(environment.configApiUrl).flush({
+      paxReviewerThreshold: 50,
+      cancellationDaysLimit: 3,
+      eventCategories: [],
+    });
     fixture.detectChanges();
   });
 
