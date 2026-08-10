@@ -16,5 +16,7 @@ export const environment = {
   useMockProposalWorkflow: false,
   proposalWorkflowApiUrl: '/api/proposal-workflow',
   configApiUrl: '/api/config',
+  useMockImageUpload: false,
+  imageUploadApiUrl: '/api/uploads',
   mockUsers: [] as readonly MockAuthRecord[],
 } as const;
