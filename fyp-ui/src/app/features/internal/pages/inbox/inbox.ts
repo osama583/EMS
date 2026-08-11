@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../../core/auth/auth.service';
-import { PROPOSAL_REVIEW_RECORDS } from '../../../../core/proposals/proposal-review.mock-data';
 import { ProposalReviewRecord } from '../../../../core/proposals/proposal-review.models';
+import { ProposalWorkflowService } from '../../../../core/proposals/proposal-workflow.service';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
 import {
   InternalCellTone,
@@ -12,13 +13,14 @@ import {
   InternalFilterConfig,
   InternalRowActionEvent,
 } from '../../../../shared/components/internal-data-page/internal-data-page.models';
-import { DepartmentRequestKind, requestKindsForRole } from '../../../../core/departments/department-workflow.config';
 import { userOwnsCurrentProposalAction } from '../../../../core/proposals/proposal-visibility';
 import { UserRole } from '../../../../core/auth/auth.models';
 
-interface InboxItem extends ProposalReviewRecord {
-  readonly requestKind?: DepartmentRequestKind;
-}
+// Real `ProposalReviewRecord`s carry no per-department "requestKind" tag of their own (unlike the
+// old hardcoded demo rows) — department ownership is derived purely from
+// `userOwnsCurrentProposalAction`'s own reading of `workflow.departmentConfirmations` /
+// `selectedRequirements`, so `filteredItems` no longer needs a `requestKind` per row to filter on.
+type InboxItem = ProposalReviewRecord;
 
 const INBOX_STATUSES: readonly string[] = ['Revision required', 'Department review', 'HOS/HOD review', 'Additional approval', 'Submitted'];
 
@@ -32,44 +34,39 @@ const INBOX_STATUSES: readonly string[] = ['Revision required', 'Department revi
 export class InboxComponent {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly service = inject(ProposalWorkflowService);
+  private readonly destroyRef = inject(DestroyRef);
   readonly role = this.auth.user()?.role ?? UserRole.Applicant;
   readonly searchDraft = signal('');
   readonly statusFilter = signal('All');
   readonly page = signal(1);
   readonly pageSize = signal(10);
 
-  readonly items = signal<readonly InboxItem[]>([
-    { ...PROPOSAL_REVIEW_RECORDS[1], status: 'Revision required' },
-    { ...PROPOSAL_REVIEW_RECORDS[2], status: 'Additional approval' },
-    { ...PROPOSAL_REVIEW_RECORDS[0], status: 'Department review', requestKind: 'logistics' },
-    { ...PROPOSAL_REVIEW_RECORDS[3], status: 'Submitted' },
-    { ...PROPOSAL_REVIEW_RECORDS[4], status: 'Department review', requestKind: 'fmb' },
-    { ...PROPOSAL_REVIEW_RECORDS[0], id: 906, proposalId: 'EVT-260142-T', status: 'Department review', requestKind: 'campusTour' },
-    { ...PROPOSAL_REVIEW_RECORDS[0], id: 907, proposalId: 'EVT-260142-W', status: 'Department review', requestKind: 'waterLogo' },
-    { ...PROPOSAL_REVIEW_RECORDS[0], id: 908, proposalId: 'EVT-260142-P', status: 'Department review', requestKind: 'photoVideo' },
-    { ...PROPOSAL_REVIEW_RECORDS[0], id: 909, proposalId: 'EVT-260142-AV', status: 'Department review', requestKind: 'soundLight' },
-    { ...PROPOSAL_REVIEW_RECORDS[0], id: 910, proposalId: 'EVT-260142-TR', status: 'Department review', requestKind: 'transportation' },
-  ]);
+  readonly items = signal<readonly InboxItem[]>([]);
+  readonly loading = signal(true);
+  readonly error = signal('');
+
+  constructor() {
+    this.service.list().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (items) => { this.items.set(items); this.loading.set(false); },
+      error: () => { this.error.set('Inbox items could not be loaded.'); this.loading.set(false); },
+    });
+  }
 
   readonly filteredItems = computed(() => {
     const query = this.searchDraft().trim().toLocaleLowerCase();
     const status = this.statusFilter();
-    const routedKinds = requestKindsForRole(this.role);
     const user = this.auth.user();
 
     return this.items().filter((item) => {
       // Permission gate: only show proposals where the current stage's action actually belongs
       // to this role right now (reviewer-stage ownership, or an unconfirmed department they
-      // manage — checked against the proposal's own departmentConfirmations, not just which
-      // request kinds the role happens to be tagged with, since a role like CFO is both a
-      // reviewer-chain gate and a department owner and must not have one capacity filtered by
-      // the other). This must run before any display filter — restricted items should never
-      // render, not render-then-block when opened.
-      if (!userOwnsCurrentProposalAction(user, item, item.requestKind)) return false;
-      // A department manager/staff role only ever owns their own request kind — a row explicitly
-      // tagged with a different kind (e.g. a synthetic per-department demo row) must not leak in
-      // even though the underlying proposal's workflow state passed the check above.
-      if (item.requestKind && routedKinds.length && !routedKinds.includes(item.requestKind)) return false;
+      // manage — checked against the proposal's own departmentConfirmations). This must run
+      // before any display filter — restricted items should never render, not render-then-block
+      // when opened. Real records carry no per-row requestKind tag, so
+      // `userOwnsCurrentProposalAction` is called without one; it derives department ownership
+      // entirely from the proposal's own `workflow.departmentConfirmations`.
+      if (!userOwnsCurrentProposalAction(user, item)) return false;
       const matchesQuery = query.length === 0 || `${item.proposalId} ${item.eventTitle} ${item.applicant}`.toLocaleLowerCase().includes(query);
       const matchesStatus = status === 'All' || item.status === status;
       return matchesQuery && matchesStatus;

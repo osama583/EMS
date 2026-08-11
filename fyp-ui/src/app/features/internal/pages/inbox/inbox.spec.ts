@@ -1,7 +1,11 @@
-import { Router } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { Router, provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
+import { environment } from '../../../../../environments/environment';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { UserRole } from '../../../../core/auth/auth.models';
+import { PROPOSAL_REVIEW_RECORDS } from '../../../../core/proposals/proposal-review.mock-data';
 import { InboxComponent } from './inbox';
 
 function loginAs(role: UserRole, email: string, roleLabel: string, department: string): void {
@@ -12,13 +16,27 @@ function loginAs(role: UserRole, email: string, roleLabel: string, department: s
 }
 
 describe('InboxComponent', () => {
+  let httpMock: HttpTestingController;
+
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [InboxComponent] }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [InboxComponent],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    }).compileComponents();
+    httpMock = TestBed.inject(HttpTestingController);
   });
+
+  afterEach(() => httpMock.verify());
+
+  function flushProposals(): void {
+    httpMock.expectOne(environment.proposalWorkflowApiUrl).flush(PROPOSAL_REVIEW_RECORDS);
+  }
 
   it('only shows proposals currently awaiting this reviewer\'s action', () => {
     loginAs(UserRole.HosHod, 'hoshod@demo.apu.edu.my', 'HOS / HOD', 'School Leadership');
     const fixture = TestBed.createComponent(InboxComponent);
+    fixture.detectChanges();
+    flushProposals();
     fixture.detectChanges();
 
     // Of the 8 seeded rows, only id 2 is at HosHodReview stage — CFO-stage, F&B-stage and
@@ -32,17 +50,21 @@ describe('InboxComponent', () => {
     loginAs(UserRole.LogisticsManager, 'logistics.manager@demo.apu.edu.my', 'Logistics Manager', 'Logistics and Facilities');
     const fixture = TestBed.createComponent(InboxComponent);
     fixture.detectChanges();
+    flushProposals();
+    fixture.detectChanges();
 
-    // Only rows tagged with the logistics request kind, at DepartmentReview stage, with logistics
-    // still unconfirmed should appear — reviewer-stage rows and other departments' rows must not.
+    // Only rows at DepartmentReview stage with an unconfirmed 'logistics' department task should
+    // appear — reviewer-stage rows and other departments' rows must not.
     const items = fixture.componentInstance.filteredItems();
-    expect(items.every((item) => item.requestKind === 'logistics')).toBe(true);
+    expect(items.every((item) => item.workflow.departmentConfirmations.some((entry) => entry.department === 'logistics' && !entry.confirmed))).toBe(true);
     expect(items.length).toBeGreaterThan(0);
   });
 
   it('shows nothing for a role with no reviewer or department ownership', () => {
     loginAs(UserRole.Applicant, 'applicant@demo.apu.edu.my', 'Applicant', 'School of Computing');
     const fixture = TestBed.createComponent(InboxComponent);
+    fixture.detectChanges();
+    flushProposals();
     fixture.detectChanges();
 
     expect(fixture.componentInstance.filteredItems()).toHaveLength(0);
@@ -54,6 +76,8 @@ describe('InboxComponent', () => {
     const fixture = TestBed.createComponent(InboxComponent);
     const router = TestBed.inject(Router);
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    fixture.detectChanges();
+    flushProposals();
     fixture.detectChanges();
 
     const firstViewButton = fixture.nativeElement.querySelector(
@@ -74,6 +98,8 @@ describe('InboxComponent', () => {
     const fixture = TestBed.createComponent(InboxComponent);
     const router = TestBed.inject(Router);
     const navigateSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    fixture.detectChanges();
+    flushProposals();
     fixture.detectChanges();
 
     const firstCard = fixture.nativeElement.querySelector('.shared-mobile-card') as HTMLElement;
