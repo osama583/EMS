@@ -1,10 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { UserRole } from '../../../../core/auth/auth.models';
 import { proposalForTitle } from '../../../../core/proposals/proposal-review.mock-data';
 import { ProposalReviewRecord } from '../../../../core/proposals/proposal-review.models';
-import { proposalSectionForUser } from '../../../../core/proposals/proposal-visibility';
+import { ProposalWorkflowService } from '../../../../core/proposals/proposal-workflow.service';
+import { proposalSectionForUser, userIsApplicantForProposal } from '../../../../core/proposals/proposal-visibility';
 import { ProposalStage } from '../../../../core/proposals/proposal-status.models';
 import { DepartmentRequestKind, requestKindsForRole } from '../../../../core/departments/department-workflow.config';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
@@ -45,6 +47,12 @@ interface RecordsPageDefinition {
   readonly records: readonly CollectionRecord[];
 }
 
+// Drafts/Pending(Ongoing)/History are now populated at runtime from real `ProposalReviewRecord`s
+// fetched via `ProposalWorkflowService.list()` (see `buildConvertedRecords()` /
+// `RecordsPageComponent`'s constructor) — their `records` arrays below are left empty and are
+// never read for these 3 kinds; only `title`/`description`/etc. display metadata is used from
+// this definition table. Notifications/request-ongoing/request-history remain intentionally
+// hardcoded (see class-level comment).
 const PAGE_DEFINITIONS: Readonly<Record<RecordsPageKind, RecordsPageDefinition>> = {
   drafts: {
     title: 'Drafts',
@@ -58,13 +66,7 @@ const PAGE_DEFINITIONS: Readonly<Record<RecordsPageKind, RecordsPageDefinition>>
       { key: 'edit', label: 'Continue draft', icon: 'edit' },
       { key: 'delete', label: 'Delete draft', icon: 'delete' },
     ],
-    records: [
-      { id: 101, title: 'AI Innovation Showcase', summary: 'Technology exhibition and student demonstrations.', reference: 'DRF-260081', category: 'Academic & Career', owner: 'You', initials: 'YU', date: '31 Jul 2026, 2:14 PM', status: 'In progress' },
-      { id: 102, title: 'International Food Festival', summary: 'Cultural food booths and performances.', reference: 'DRF-260079', category: 'Culture & Community', owner: 'You', initials: 'YU', date: '30 Jul 2026, 5:42 PM', status: 'Details missing' },
-      { id: 103, title: 'Student Wellness Morning', summary: 'Wellness activities for students and staff.', reference: 'DRF-260074', category: 'Sports & Wellness', owner: 'You', initials: 'YU', date: '28 Jul 2026, 10:08 AM', status: 'In progress' },
-      { id: 104, title: 'Creative Media Masterclass', summary: 'Practical session with industry speakers.', reference: 'DRF-260068', category: 'Workshops & Training', owner: 'You', initials: 'YU', date: '25 Jul 2026, 4:31 PM', status: 'Details missing' },
-      { id: 105, title: 'APU Open Mic Evening', summary: 'Student music and spoken-word programme.', reference: 'DRF-260061', category: 'Entertainment & Social', owner: 'You', initials: 'YU', date: '22 Jul 2026, 7:05 PM', status: 'In progress' },
-    ],
+    records: [],
   },
   pending: {
     title: 'Ongoing',
@@ -75,13 +77,7 @@ const PAGE_DEFINITIONS: Readonly<Record<RecordsPageKind, RecordsPageDefinition>>
     statusLabel: 'All review stages',
     categoryLabel: 'All categories',
     actions: [{ key: 'view', label: 'View proposal', icon: 'visibility' }],
-    records: [
-      { id: 201, title: 'APU Cultural Night 2026', summary: 'Awaiting department service confirmations.', reference: 'EVT-260142', category: 'Culture & Community', owner: 'Department Review', initials: 'DR', date: '31 Jul 2026, 4:18 PM', status: 'Department review' },
-      { id: 202, title: 'Future Tech Showcase', summary: 'Under review by the Head of School.', reference: 'EVT-260137', category: 'Academic & Career', owner: 'HOS Review', initials: 'HR', date: '30 Jul 2026, 11:42 AM', status: 'HOS/HOD review' },
-      { id: 203, title: 'APU Sports Carnival', summary: 'Additional approval required for participant count.', reference: 'EVT-260129', category: 'Sports & Wellness', owner: 'FMB Review', initials: 'FR', date: '29 Jul 2026, 5:27 PM', status: 'Additional approval' },
-      { id: 204, title: 'Career Connections Forum', summary: 'Proposal submitted and queued for initial review.', reference: 'EVT-260121', category: 'Academic & Career', owner: 'School Administration', initials: 'SA', date: '28 Jul 2026, 10:20 AM', status: 'Submitted' },
-      { id: 205, title: 'Community Volunteer Day', summary: 'Transport service availability is under review.', reference: 'EVT-260114', category: 'Volunteering', owner: 'Department Review', initials: 'DR', date: '24 Jul 2026, 8:54 AM', status: 'Department review' },
-    ],
+    records: [],
   },
   history: {
     title: 'History',
@@ -92,13 +88,7 @@ const PAGE_DEFINITIONS: Readonly<Record<RecordsPageKind, RecordsPageDefinition>>
     statusLabel: 'All outcomes',
     categoryLabel: 'All categories',
     actions: [{ key: 'view', label: 'View proposal', icon: 'visibility' }],
-    records: [
-      { id: 301, title: 'Graduate Networking Evening', summary: 'Completed with all department services confirmed.', reference: 'EVT-260082', category: 'Academic & Career', owner: 'APU Events System', initials: 'AE', date: '23 Jul 2026, 6:02 PM', status: 'Approved' },
-      { id: 302, title: 'Clubs and Societies Fair', summary: 'Proposal approved and event delivered.', reference: 'EVT-260074', category: 'Clubs & Societies', owner: 'APU Events System', initials: 'AE', date: '18 Jul 2026, 3:44 PM', status: 'Approved' },
-      { id: 303, title: 'Wellness Weekend', summary: 'Approved after requested schedule revision.', reference: 'EVT-260066', category: 'Sports & Wellness', owner: 'Student Affairs', initials: 'ST', date: '12 Jul 2026, 12:11 PM', status: 'Approved' },
-      { id: 304, title: 'Campus Film Screening', summary: 'Proposal was not approved after final review.', reference: 'EVT-260051', category: 'Entertainment & Social', owner: 'School Administration', initials: 'SA', date: '5 Jul 2026, 9:30 AM', status: 'Rejected' },
-      { id: 305, title: 'Design Thinking Workshop', summary: 'Completed successfully with venue support.', reference: 'EVT-260043', category: 'Workshops & Training', owner: 'APU Events System', initials: 'AE', date: '28 Jun 2026, 4:15 PM', status: 'Approved' },
-    ],
+    records: [],
   },
   notifications: {
     title: 'Notifications',
@@ -158,6 +148,12 @@ const PAGE_DEFINITIONS: Readonly<Record<RecordsPageKind, RecordsPageDefinition>>
   },
 };
 
+// 'drafts'/'pending'/'history' are converted to real ProposalWorkflowService-backed data (see
+// constructor below). 'notifications'/'request-ongoing'/'request-history' are INTENTIONALLY LEFT
+// hardcoded against `PAGE_DEFINITIONS` — no `notification` table exists in the corrected schema
+// (ems_database_schema.sql), and "request tracking" as a concept separate from a proposal's own
+// department tasks has no backend model in this plan. Do not silently invent a backend for these;
+// see task-4.3-brief.md Step 2 for the full rationale.
 @Component({
   selector: 'app-records-page',
   imports: [InternalDataPageComponent],
@@ -185,6 +181,8 @@ export class RecordsPageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
+  private readonly service = inject(ProposalWorkflowService);
+  private readonly destroyRef = inject(DestroyRef);
   readonly role = this.auth.user()?.role ?? UserRole.Applicant;
   readonly kind = (this.route.snapshot.data['collectionPage'] ?? 'drafts') as RecordsPageKind;
   readonly definition = PAGE_DEFINITIONS[this.kind];
@@ -194,17 +192,68 @@ export class RecordsPageComponent {
   readonly category = signal('All');
   readonly page = signal(1);
   readonly pageSize = signal(10);
+  readonly loading = signal(this.isConverted());
+  readonly error = signal('');
+
+  // Real `ProposalReviewRecord`s backing 'drafts'/'pending'/'history' — keyed by id so
+  // `proposalDetails()`/`openReview()` can pass the FULL real record via router state (matching
+  // inbox.ts's `openProposal()`) instead of round-tripping through a mock-data lookup. Kept
+  // separate from `records` (which still drives the shared table/filter/pagination plumbing via
+  // its lightweight `CollectionRecord` projection) so the 3 unconverted kinds' existing
+  // `CollectionRecord`-only flow (via `proposalForTitle()`) is untouched.
+  private readonly proposalsById = new Map<number, ProposalReviewRecord>();
+
+  constructor() {
+    if (!this.isConverted()) return;
+    this.service.list().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (proposals) => {
+        const user = this.auth.user();
+        const relevant = proposals.filter((proposal) => this.matchesKind(user, proposal));
+        this.proposalsById.clear();
+        for (const proposal of relevant) this.proposalsById.set(proposal.id, proposal);
+        this.records.set(relevant.map((proposal) => this.toCollectionRecord(proposal)));
+        this.loading.set(false);
+      },
+      error: () => { this.error.set(`${this.definition.title} could not be loaded.`); this.loading.set(false); },
+    });
+  }
+
+  private isConverted(): boolean {
+    const kind = (this.route.snapshot.data['collectionPage'] ?? 'drafts') as RecordsPageKind;
+    return kind === 'drafts' || kind === 'pending' || kind === 'history';
+  }
+
+  private matchesKind(user: ReturnType<AuthService['user']>, proposal: ProposalReviewRecord): boolean {
+    if (this.kind === 'drafts') {
+      // A draft has no ProposalStage enum member of its own (see proposal-status.models.ts) —
+      // the server projects an unsubmitted request's DB `status = 'draft'` as the display string
+      // `status: 'Draft'` (proposal-projection.service.js's STAGE_LABELS), which is the field
+      // this filter checks; `workflow.stage` for the same row is the raw unmapped string
+      // `'draft'`, not a valid ProposalStage, so it is intentionally not used here.
+      return userIsApplicantForProposal(user, proposal) && proposal.status === 'Draft';
+    }
+    const section = proposalSectionForUser(user, proposal);
+    return section === (this.kind === 'pending' ? 'ongoing' : 'history');
+  }
+
+  private toCollectionRecord(proposal: ProposalReviewRecord): CollectionRecord {
+    return {
+      id: proposal.id,
+      title: proposal.eventTitle,
+      summary: proposal.shortIntroduction,
+      reference: proposal.proposalId,
+      category: proposal.category,
+      owner: proposal.applicant,
+      initials: proposal.applicantInitials,
+      date: proposal.schedule,
+      status: proposal.status,
+    };
+  }
 
   readonly filteredRecords = computed(() => {
     const query = this.search().trim().toLocaleLowerCase();
     const routedKinds = requestKindsForRole(this.role);
-    const user = this.auth.user();
     return this.records().filter((record) => {
-      if (this.kind === 'pending' || this.kind === 'history') {
-        const proposal = this.proposalDetails(record);
-        const section = proposalSectionForUser(user, proposal, record.requestKind);
-        if (section !== (this.kind === 'pending' ? 'ongoing' : 'history')) return false;
-      }
       if (this.isRequestTracking() && routedKinds.length && (!record.requestKind || !routedKinds.includes(record.requestKind))) return false;
       const matchesQuery = !query || `${record.title} ${record.summary} ${record.reference} ${record.owner} ${record.category} ${record.status}`.toLocaleLowerCase().includes(query);
       return matchesQuery && (this.status() === 'All' || record.status === this.status()) && (this.category() === 'All' || record.category === this.category());
@@ -282,6 +331,11 @@ export class RecordsPageComponent {
   }
   handleAction(event: InternalRowActionEvent): void {
     if (this.kind === 'notifications' && (event.action.key === 'open' || event.action.key === 'read')) this.markRead(Number(event.record.id));
+    // Client-side-only removal: there is no `DELETE /api/proposal-workflow/:id` route in Phase 3
+    // (confirmed against proposal-workflow.routes.js), and adding one is out of this task's scope
+    // (see task-4.3-brief.md Step 2). This only mutates local signal state — a page reload will
+    // bring the "deleted" draft right back since the server was never told to remove it. Known,
+    // intentional gap.
     if (this.kind === 'drafts' && event.action.key === 'delete') this.records.update((records) => records.filter((record) => record.id !== event.record.id));
     if (event.action.key === 'view') this.openReview(Number(event.record.id));
   }
@@ -299,6 +353,11 @@ export class RecordsPageComponent {
     });
   }
   private proposalDetails(record: CollectionRecord): ProposalReviewRecord {
+    // For the 3 backend-converted kinds, `record.id` keys directly into the real fetched
+    // ProposalReviewRecord — no mock-lookup/status-string translation needed, since the server
+    // already set `workflow.stage` correctly.
+    const real = this.proposalsById.get(record.id);
+    if (real) return real;
     const proposal = proposalForTitle(record.title, record.id);
     return {
       ...proposal,
