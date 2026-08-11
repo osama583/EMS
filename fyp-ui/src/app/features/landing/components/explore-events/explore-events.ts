@@ -13,7 +13,7 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
-import { PublishedEvent, RegistrationStatus } from '../../../../core/events/published-event.models';
+import { EventCategory, ProposalEventSchedule, PublishedEvent, RegistrationStatus } from '../../../../core/events/published-event.models';
 import { SystemConfigService } from '../../../../core/config/system-config.service';
 import { PublishedEventService } from '../../../../core/events/published-event.service';
 import { EventFavouriteService } from '../../../../core/events/event-favourite.service';
@@ -44,7 +44,7 @@ interface ExploreEventDate {
 }
 
 interface ExploreEvent {
-  readonly id: number;
+  readonly id: string;
   readonly title: string;
   readonly category: string;
   readonly visibility: string;
@@ -102,144 +102,13 @@ export class ExploreEventsComponent {
 
   @ViewChild('filterCloseButton') private filterCloseButton?: ElementRef<HTMLButtonElement>;
 
-  readonly events: readonly ExploreEvent[] = [
-    {
-      id: 1,
-      title: 'Startup Pitch Night',
-      category: 'Academic & Career',
-      visibility: 'Public — Everyone',
-      school: 'School of Technology',
-      audience: ['All APU Community', 'Undergraduate Students', 'Postgraduate Students'],
-      format: 'On Campus',
-      timePeriod: 'Evening',
-      registration: 'Registration Open',
-      cost: 'Free',
-      date: this.createEventDate(1),
-      daysFromNow: 1,
-      time: '6:30 PM – 9:00 PM',
-      venue: 'APU Atrium',
-      image: '/assets/events/startup-pitch-night.jpg',
-    },
-    {
-      id: 2,
-      title: 'Career Connect Fair',
-      category: 'Academic & Career',
-      visibility: 'Public — Everyone',
-      school: 'School of Business',
-      audience: ['All APU Community', 'Undergraduate Students', 'Postgraduate Students', 'Alumni'],
-      format: 'On Campus',
-      timePeriod: 'Morning',
-      registration: 'No Registration Required',
-      cost: 'Free',
-      date: this.createEventDate(3),
-      daysFromNow: 3,
-      time: '10:00 AM – 4:00 PM',
-      venue: 'Level 3 Expo Hall',
-      image: '/assets/events/career-connect-fair.jpg',
-    },
-    {
-      id: 3,
-      title: 'Community Green Day',
-      category: 'Volunteering',
-      visibility: 'Public — Everyone',
-      school: 'Student Affairs',
-      audience: ['All APU Community', 'New Students', 'International Students'],
-      format: 'Off Campus',
-      timePeriod: 'Morning',
-      registration: 'Registration Open',
-      cost: 'Free',
-      date: this.createEventDate(5),
-      daysFromNow: 5,
-      time: '8:00 AM – 12:00 PM',
-      venue: 'Bukit Jalil Community Park',
-      image: '/assets/events/community-green-day.jpg',
-    },
-    {
-      id: 4,
-      title: 'Future Forward: Tech Expo',
-      category: 'Workshops & Training',
-      visibility: 'Public — Everyone',
-      school: 'School of Technology',
-      audience: ['All APU Community', 'Undergraduate Students', 'Staff'],
-      format: 'Hybrid',
-      timePeriod: 'Afternoon',
-      registration: 'Registration Open',
-      cost: 'Free',
-      date: this.createEventDate(7),
-      daysFromNow: 7,
-      time: '10:00 AM – 5:00 PM',
-      venue: 'APU Atrium',
-      image: '/assets/events/tech-expo.jpg',
-    },
-    {
-      id: 5,
-      title: 'One World Cultural Night',
-      category: 'Culture & Community',
-      visibility: 'Public — Everyone',
-      school: 'Student Affairs',
-      audience: ['All APU Community', 'International Students', 'Alumni'],
-      format: 'On Campus',
-      timePeriod: 'Evening',
-      registration: 'Waitlist Available',
-      cost: 'Free',
-      date: this.createEventDate(9),
-      daysFromNow: 9,
-      time: '6:30 PM – 10:00 PM',
-      venue: 'APU Auditorium',
-      image: '/assets/events/cultural-night.jpg',
-    },
-    {
-      id: 6,
-      title: 'APU Esports Showdown',
-      category: 'Entertainment & Social',
-      visibility: 'Internal — APU Community',
-      school: 'School of Computing',
-      audience: ['All APU Community', 'Undergraduate Students'],
-      format: 'On Campus',
-      timePeriod: 'Afternoon',
-      registration: 'Registration Open',
-      cost: 'Free',
-      date: this.createEventDate(12),
-      daysFromNow: 12,
-      time: '12:00 PM – 8:00 PM',
-      venue: 'Level 4 Arena',
-      image: '/assets/events/esports-showdown.jpg',
-    },
-    {
-      id: 7,
-      title: 'Campus After Dark',
-      category: 'Entertainment & Social',
-      visibility: 'Internal — APU Community',
-      school: 'Student Affairs',
-      audience: ['Undergraduate Students', 'Postgraduate Students', 'New Students'],
-      format: 'On Campus',
-      timePeriod: 'Evening',
-      registration: 'No Registration Required',
-      cost: 'Paid',
-      date: this.createEventDate(16),
-      daysFromNow: 16,
-      time: '7:00 PM – 10:30 PM',
-      venue: 'Campus Plaza',
-      image: '/assets/events/campus-after-dark.jpg',
-    },
-    {
-      id: 8,
-      title: 'Wellness Run & Community Day',
-      category: 'Sports & Wellness',
-      visibility: 'Public — Everyone',
-      school: 'School of Psychology',
-      audience: ['All APU Community', 'Staff', 'Alumni'],
-      format: 'Off Campus',
-      timePeriod: 'Morning',
-      registration: 'Registration Open',
-      cost: 'Paid',
-      date: this.createEventDate(22),
-      daysFromNow: 22,
-      time: '7:00 AM – 11:00 AM',
-      venue: 'APU Main Entrance',
-      image: '/assets/events/wellness-run.jpg',
-    },
-  ];
+  // Populated from the SAME `getPublishedEvents()` fetch that fills `publishedEventsById` (see
+  // `loadPublishedEvents()`) — no second, redundant HTTP call. Each `PublishedEvent` is mapped to
+  // the local `ExploreEvent` shape the filter/search logic below expects; see the field-by-field
+  // mapping notes in `toExploreEvent()`.
+  readonly events = signal<readonly ExploreEvent[]>([]);
+  readonly loading = signal(true);
+  readonly loadError = signal('');
 
   readonly searchTerm = signal('');
   readonly selectedPublishedEvent = signal<PublishedEvent | null>(null);
@@ -256,13 +125,13 @@ export class ExploreEventsComponent {
   private readonly publishedEventsById = signal<ReadonlyMap<string, PublishedEvent>>(new Map());
   private readonly registrationStatusByEventId = signal<ReadonlyMap<string, RegistrationStatus | null>>(new Map());
 
-  registrationCount(id: number): number { return this.publishedEventsById().get(`evt-${id}`)?.confirmedRegistrationCount ?? 0; }
-  publishedEvent(id: number): PublishedEvent | undefined { return this.publishedEventsById().get(`evt-${id}`); }
-  openEvent(id: number): void { this.selectedPublishedEvent.set(this.publishedEventsById().get(`evt-${id}`) ?? null); }
+  registrationCount(id: string): number { return this.publishedEventsById().get(id)?.confirmedRegistrationCount ?? 0; }
+  publishedEvent(id: string): PublishedEvent | undefined { return this.publishedEventsById().get(id); }
+  openEvent(id: string): void { this.selectedPublishedEvent.set(this.publishedEventsById().get(id) ?? null); }
   closeEvent(): void { this.selectedPublishedEvent.set(null); }
 
   readonly schoolOptions = computed(() =>
-    [...new Set(this.events.map((event) => event.school))].sort((a, b) => a.localeCompare(b)),
+    [...new Set(this.events().map((event) => event.school))].sort((a, b) => a.localeCompare(b)),
   );
 
   readonly filterGroups = computed<readonly FilterGroup[]>(() => [
@@ -367,10 +236,95 @@ export class ExploreEventsComponent {
     this.publishedEventService.getPublishedEvents().subscribe({
       next: (events) => {
         this.publishedEventsById.set(new Map(events.map((event) => [event.id, event])));
+        this.events.set(events.map((event) => this.toExploreEvent(event)));
+        this.loading.set(false);
         this.loadRegistrationStatuses(events);
       },
-      error: () => this.publishedEventsById.set(new Map()),
+      error: () => {
+        this.publishedEventsById.set(new Map());
+        this.loadError.set('Events could not be loaded.');
+        this.loading.set(false);
+      },
     });
+  }
+
+  // Maps the real `PublishedEvent` server shape onto the local `ExploreEvent` shape this
+  // component's filter/search/date logic was already written against, per task-4.3-brief.md
+  // Step 3's field-by-field guidance:
+  private toExploreEvent(event: PublishedEvent): ExploreEvent {
+    const schedule = event.schedule[0];
+    return {
+      id: event.id,
+      title: event.eventTitle,
+      category: this.firstCategory(event.categories),
+      visibility: this.visibilityLabel(event.eventVisibility),
+      school: event.schoolDepartment,
+      audience: event.audience,
+      format: event.eventFormat,
+      timePeriod: this.timePeriodFor(schedule),
+      registration: this.registrationLabel(event),
+      cost: event.isFree ? 'Free' : 'Paid',
+      date: this.eventDateFor(schedule),
+      daysFromNow: this.daysFromNowFor(schedule),
+      time: this.timeRangeFor(schedule),
+      venue: schedule?.location || 'To be confirmed',
+      image: event.eventImage.url,
+    };
+  }
+
+  private firstCategory(categories: readonly EventCategory[]): string {
+    return categories[0] ?? '';
+  }
+
+  // Filter UI's 'visibility' option strings ('Public — Everyone' / 'Internal — APU Community')
+  // predate the real `EventVisibility` union ('Public'/'Private'/'Club Only') — map the two real
+  // non-Public values onto the existing 'Internal' display bucket rather than widening the filter
+  // UI, since only Public/Private/Club Only proposals ever reach a published event in this plan's
+  // seed data and the filter option set itself is out of this task's "no template changes" scope.
+  private visibilityLabel(visibility: PublishedEvent['eventVisibility']): string {
+    return visibility === 'Public' ? 'Public — Everyone' : 'Internal — APU Community';
+  }
+
+  private registrationLabel(event: PublishedEvent): string {
+    if (event.registrationMode !== 'Automatic' && event.registrationMode !== 'Approval Required') return 'No Registration Required';
+    return 'Registration Open';
+  }
+
+  private timePeriodFor(schedule: ProposalEventSchedule | undefined): string {
+    const hour = Number(schedule?.start?.split(':')[0] ?? NaN);
+    if (Number.isNaN(hour)) return 'Morning';
+    if (hour < 12) return 'Morning';
+    if (hour < 17) return 'Afternoon';
+    return 'Evening';
+  }
+
+  private timeRangeFor(schedule: ProposalEventSchedule | undefined): string {
+    if (!schedule) return 'To be confirmed';
+    return `${this.formatTime(schedule.start)} – ${this.formatTime(schedule.end)}`;
+  }
+
+  private formatTime(value: string): string {
+    const [hours = '0', minutes = '00'] = value.split(':');
+    const hour = Number(hours);
+    const suffix = hour >= 12 ? 'PM' : 'AM';
+    return `${hour % 12 || 12}:${minutes} ${suffix}`;
+  }
+
+  private eventDateFor(schedule: ProposalEventSchedule | undefined): ExploreEventDate {
+    if (!schedule?.date) return { iso: new Date().toISOString(), display: 'To be confirmed' };
+    const date = new Date(`${schedule.date}T12:00:00`);
+    return {
+      iso: date.toISOString(),
+      display: new Intl.DateTimeFormat('en-MY', { weekday: 'short', day: 'numeric', month: 'short' }).format(date),
+    };
+  }
+
+  private daysFromNowFor(schedule: ProposalEventSchedule | undefined): number {
+    if (!schedule?.date) return 0;
+    const eventDate = new Date(`${schedule.date}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.round((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   }
 
   private loadRegistrationStatuses(events: readonly PublishedEvent[]): void {
@@ -519,7 +473,7 @@ export class ExploreEventsComponent {
   ): readonly ExploreEvent[] {
     const query = this.searchTerm().trim().toLocaleLowerCase();
 
-    return this.events.filter((event) => {
+    return this.events().filter((event) => {
       const searchable = [
         event.title,
         event.category,
@@ -614,18 +568,4 @@ export class ExploreEventsComponent {
     };
   }
 
-  private createEventDate(daysFromNow: number): ExploreEventDate {
-    const date = new Date();
-    date.setHours(12, 0, 0, 0);
-    date.setDate(date.getDate() + daysFromNow);
-
-    return {
-      iso: date.toISOString(),
-      display: new Intl.DateTimeFormat('en-MY', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-      }).format(date),
-    };
-  }
 }

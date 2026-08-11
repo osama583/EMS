@@ -8,24 +8,39 @@ import { ExploreEventsComponent } from './explore-events';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { UserRole } from '../../../../core/auth/auth.models';
 
-const MOCK_PUBLISHED_EVENTS: readonly PublishedEvent[] = Array.from({ length: 8 }, (_, index) => ({
+// Mirrors the variety of the old hardcoded 8-event fixture (titles/categories/schools/cost) so
+// this spec's pre-existing assertions (search matches, school filter options, a single
+// Sports & Wellness + Paid combination, 6/2-per-page pagination) still hold once the card grid is
+// driven by a real HTTP-fetched `PublishedEvent[]` instead of a literal array.
+const MOCK_EVENT_FIXTURES: readonly { title: string; category: PublishedEvent['categories'][number]; school: string; isFree: boolean }[] = [
+  { title: 'Startup Pitch Night', category: 'Academic & Career', school: 'School of Technology', isFree: true },
+  { title: 'Career Connect Fair', category: 'Academic & Career', school: 'School of Business', isFree: true },
+  { title: 'Community Green Day', category: 'Volunteering', school: 'Student Affairs', isFree: true },
+  { title: 'Future Forward: Tech Expo', category: 'Workshops & Training', school: 'School of Technology', isFree: true },
+  { title: 'One World Cultural Night', category: 'Culture & Community', school: 'Student Affairs', isFree: true },
+  { title: 'APU Esports Showdown', category: 'Entertainment & Social', school: 'School of Computing', isFree: true },
+  { title: 'Campus After Dark', category: 'Entertainment & Social', school: 'Student Affairs', isFree: false },
+  { title: 'Wellness Run & Community Day', category: 'Sports & Wellness', school: 'School of Psychology', isFree: false },
+];
+
+const MOCK_PUBLISHED_EVENTS: readonly PublishedEvent[] = MOCK_EVENT_FIXTURES.map((fixture, index) => ({
   id: `evt-${index + 1}`,
-  eventTitle: `Mock Event ${index + 1}`,
+  eventTitle: fixture.title,
   shortIntroduction: 'Mock introduction.',
   goals: 'Mock goals.',
   expectedBenefits: 'Mock benefits.',
-  categories: ['Academic & Career'],
+  categories: [fixture.category],
   eventVisibility: 'Public',
   eventFormat: 'On Campus',
   eventImage: { url: '/assets/events/mock.jpg', fileName: 'mock.jpg', mimeType: 'image/jpeg', sizeBytes: 0, status: 'uploaded' },
-  schoolDepartment: 'Student Affairs',
+  schoolDepartment: fixture.school,
   audience: ['APU Community'],
   schedule: [{ date: '2026-12-01', start: '10:00', end: '12:00', location: 'APU Atrium' }],
   totalExpectedPax: 100,
   registrationMode: 'Automatic',
   confirmedRegistrationCount: 10,
   pendingRegistrationCount: 0,
-  isFree: true,
+  isFree: fixture.isFree,
 }));
 
 describe('ExploreEventsComponent', () => {
