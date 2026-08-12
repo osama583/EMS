@@ -10,6 +10,7 @@ import { proposalSectionForUser, userIsApplicantForProposal, userOwnsCurrentProp
 import { ProposalWorkflowService } from '../../../../core/proposals/proposal-workflow.service';
 import { ProposalDepartmentViewComponent } from '../../../../shared/components/proposal-department-view/proposal-department-view';
 import { ProposalReviewerViewComponent } from '../../../../shared/components/proposal-reviewer-view/proposal-reviewer-view';
+import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
 
 type ViewKind = 'applicant' | 'reviewer' | 'department' | null;
 
@@ -20,7 +21,7 @@ type ViewKind = 'applicant' | 'reviewer' | 'department' | null;
 // workflow service, which only resolves proposals that are actually tracked there.
 @Component({
   selector: 'app-proposal-review-page',
-  imports: [ProposalReviewerViewComponent, ProposalDepartmentViewComponent],
+  imports: [ProposalReviewerViewComponent, ProposalDepartmentViewComponent, LoadingStateComponent],
   templateUrl: './proposal-review-page.html',
   styleUrl: './proposal-review-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -78,10 +79,13 @@ export class ProposalReviewPageComponent {
     }
   }
 
-  handleActionComplete(id: number): void {
-    this.workflow.getById(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((updated) => {
-      if (updated) this.proposal.set(updated);
-    });
+  // Every action a reviewer/department/applicant can take here (approve, reject, resubmit-to-
+  // applicant, confirm-department, resubmit-department, F&B selection approve/resubmit, cancel)
+  // emits actionComplete — once any of them completes, leave this proposal's detail view and
+  // land on Ongoing rather than staying in place, so the actor doesn't have to navigate back
+  // manually to see it move out of their Inbox.
+  handleActionComplete(_id: number): void {
+    void this.router.navigateByUrl('/app/proposals/pending');
   }
 
   goBack(): void {

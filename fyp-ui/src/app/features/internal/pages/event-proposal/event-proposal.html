@@ -70,11 +70,15 @@
         <header><span class="material-symbols-rounded">checklist</span><div><h2 id="requirements-step-title">Required for Event</h2></div></header>
         <section id="requirements-selection" class="proposal-card proposal-card--requirements shared-validation-container" [class.is-invalid]="!!error('requirements')" [attr.aria-invalid]="error('requirements') ? 'true' : null" (focusout)="leaveRequirements($event)">
           <div class="proposal-card__title"><h3>Select event requirements</h3><p>Only selected services will appear in Request Details.</p></div>
-          <div class="requirement-grid">
-            @for (requirement of requirements; track requirement.key) {
-              <label [class.requirement-option--selected]="selectedRequirements().includes(requirement.key)"><input type="checkbox" [checked]="selectedRequirements().includes(requirement.key)" (change)="toggleRequirement(requirement.key, $any($event.target).checked)" /><span class="material-symbols-rounded">{{ selectedRequirements().includes(requirement.key) ? 'check_circle' : 'circle' }}</span><strong>{{ requirement.label }}</strong></label>
-            }
-          </div>
+          @if (requestCatalogLoading()) {
+            <app-loading-state variant="bars" label="Loading requirements…" [count]="4" />
+          } @else {
+            <div class="requirement-grid">
+              @for (requirement of requirements; track requirement.key) {
+                <label [class.requirement-option--selected]="selectedRequirements().includes(requirement.key)"><input type="checkbox" [checked]="selectedRequirements().includes(requirement.key)" (change)="toggleRequirement(requirement.key, $any($event.target).checked)" /><span class="material-symbols-rounded">{{ selectedRequirements().includes(requirement.key) ? 'check_circle' : 'circle' }}</span><strong>{{ requirement.label }}</strong></label>
+              }
+            </div>
+          }
           @if (error('requirements')) { <app-validation-message controlId="requirements-selection" [message]="error('requirements')" /> }
         </section>
       </section>
@@ -207,9 +211,9 @@
       </div>
       <span class="proposal-actions__step" aria-live="polite">Step {{ currentStep() + 1 }} of {{ steps.length }}</span>
       <div class="proposal-actions__right">
-        <button type="button" class="table-control proposal-actions__button proposal-actions__button--draft" (click)="saveDraft()">
+        <button type="button" class="table-control proposal-actions__button proposal-actions__button--draft" [disabled]="savingDraft()" (click)="saveDraft()">
           <span class="material-symbols-rounded" aria-hidden="true">download</span>
-          Save as Draft
+          {{ savingDraft() ? 'Saving…' : 'Save as Draft' }}
         </button>
         @if (currentStep() < steps.length - 1) {
           <button type="button" class="table-control table-control--primary proposal-actions__button" (click)="next()">

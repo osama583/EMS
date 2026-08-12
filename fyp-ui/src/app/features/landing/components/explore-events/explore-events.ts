@@ -24,6 +24,7 @@ import { EventDetailsModalComponent } from '../../../../shared/components/event-
 import { InternalPaginationComponent } from '../../../../shared/components/internal-data-page/internal-data-page-parts';
 import { ExpandableSearchComponent } from '../../../../shared/components/expandable-search/expandable-search';
 import { FilterButtonComponent } from '../../../../shared/components/filter-button/filter-button';
+import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
 
 type FilterKey =
   | 'visibility'
@@ -83,6 +84,7 @@ const INITIAL_VISIBLE_EVENTS = 6;
     InternalPaginationComponent,
     ExpandableSearchComponent,
     FilterButtonComponent,
+    LoadingStateComponent,
   ],
   templateUrl: './explore-events.html',
   styleUrl: './explore-events.scss',

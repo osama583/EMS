@@ -2,187 +2,224 @@
   id="happening-soon"
   class="happening"
   aria-labelledby="happening-title"
-  aria-roledescription="carousel"
+  [attr.aria-roledescription]="events().length > 0 ? 'carousel' : null"
   (mouseenter)="pauseCarousel()"
   (mouseleave)="resumeCarousel()"
   (focusin)="pauseCarousel()"
   (focusout)="resumeCarousel()"
 >
-  <div
-    class="happening__background"
-    [class.happening__background--leaving]="
-      transitionPhase() === 'leaving' || transitionPhase() === 'image-in'
-    "
-    [style.background-image]="'url(' + activeEvent().image + ')'"
-    aria-hidden="true"
-  ></div>
-  <div class="happening__shade" aria-hidden="true"></div>
-
-  <div class="happening__progress" aria-hidden="true">
-    @if (!isTransitioning()) {
-      @if (progressCycle() % 2 === 0) {
-        <span [class.happening__progress-fill--paused]="isProgressPaused()"></span>
-      } @else {
-        <span [class.happening__progress-fill--paused]="isProgressPaused()"></span>
-      }
-    }
-  </div>
-
-  <div class="happening__layout">
-    <div class="event-story">
+  @if (loading()) {
+    <div class="happening__shade happening__shade--static" aria-hidden="true"></div>
+    <div class="happening__layout happening__layout--status">
       <p class="event-story__eyebrow section-title">
         <span>Happening soon</span>
         <span>Next 10 days</span>
       </p>
-
-      <div
-        class="event-story__changing"
-        [class.event-story__changing--hidden]="
-          transitionPhase() === 'leaving' || transitionPhase() === 'image-in'
-        "
-        [class.event-story__changing--entering]="transitionPhase() === 'details-in'"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        <div class="event-story__meta">
-          <time [attr.datetime]="activeEvent().date.iso">{{ activeEvent().date.long }}</time>
-          <span aria-hidden="true"></span>
-          <span>{{ activeEvent().category }}</span>
-        </div>
-
-        <h2 id="happening-title">{{ activeEvent().title }}</h2>
-        <p class="event-story__description">{{ activeEvent().description }}</p>
-        <p class="event-story__registrations">{{ registrationCount(activeEvent().title) }} registered</p>
-
-        <dl class="event-story__details">
-          <div>
-            <dt>Time</dt>
-            <dd>{{ activeEvent().time }}</dd>
-          </div>
-          <div>
-            <dt>Venue</dt>
-            <dd>{{ activeEvent().venue }}</dd>
-          </div>
-        </dl>
-
-        <app-cta-link label="Explore Event" arrow="↗" [compact]="true" (activated)="openEvent()" />
+      <app-loading-state variant="bars" label="Loading events…" [count]="4" />
+    </div>
+  } @else if (loadError()) {
+    <div class="happening__shade happening__shade--static" aria-hidden="true"></div>
+    <div class="happening__layout happening__layout--status">
+      <p class="event-story__eyebrow section-title">
+        <span>Happening soon</span>
+        <span>Next 10 days</span>
+      </p>
+      <div class="happening-empty" role="status">
+        <span class="happening-empty__icon material-symbols-rounded" aria-hidden="true">error</span>
+        <h2 id="happening-title">Events could not be loaded</h2>
+        <p>{{ loadError() }}</p>
       </div>
     </div>
+  } @else if (events().length === 0) {
+    <div class="happening__shade happening__shade--static" aria-hidden="true"></div>
+    <div class="happening__layout happening__layout--status">
+      <p class="event-story__eyebrow section-title">
+        <span>Happening soon</span>
+        <span>Next 10 days</span>
+      </p>
+      <div class="happening-empty" role="status">
+        <span class="happening-empty__icon material-symbols-rounded" aria-hidden="true">event_upcoming</span>
+        <h2 id="happening-title">Nothing happening just yet</h2>
+        <p>Check back soon — new events are added to the calendar all the time.</p>
+      </div>
+    </div>
+  } @else {
+    <div
+      class="happening__background"
+      [class.happening__background--leaving]="
+        transitionPhase() === 'leaving' || transitionPhase() === 'image-in'
+      "
+      [style.background-image]="'url(' + activeEvent().image + ')'"
+      aria-hidden="true"
+    ></div>
+    <div class="happening__shade" aria-hidden="true"></div>
 
-    <div class="event-deck">
-      <div
-        class="event-deck__cards"
-        [class.event-deck__cards--advancing]="isQueueAdvancing()"
-        [class.event-deck__cards--backward]="queueDirection() === 'backward'"
-        aria-label="Choose an upcoming event"
-        (pointerdown)="onCardsPointerDown($event)"
-        (pointermove)="onCardsPointerMove($event)"
-        (pointerup)="onCardsPointerUp($event)"
-        (pointercancel)="onCardsPointerUp($event)"
-      >
-        @for (card of eventCards(); track card.index) {
-          <button
-            #eventCard
-            type="button"
-            class="event-card"
-            [class.event-card--expanding]="expandingIndex() === card.index"
-            [class.event-card--expanded]="expandingIndex() === card.index && isExpanded()"
-            [class.event-card--background]="backgroundIndex() === card.index"
-            [class.event-card--shifting]="shiftingIndexes().includes(card.index)"
-            [class.event-card--returning]="returningIndex() === card.index"
-            [style.--expand-left.px]="
-              expandingIndex() === card.index
-                ? expandingCard()?.left
-                : backgroundIndex() === card.index
-                  ? backgroundCard()?.left
-                  : null
-            "
-            [style.--expand-top.px]="
-              expandingIndex() === card.index
-                ? expandingCard()?.top
-                : backgroundIndex() === card.index
-                  ? backgroundCard()?.top
-                  : null
-            "
-            [style.--expand-width.px]="
-              expandingIndex() === card.index
-                ? expandingCard()?.width
-                : backgroundIndex() === card.index
-                  ? backgroundCard()?.width
-                  : null
-            "
-            [style.--expand-height.px]="
-              expandingIndex() === card.index
-                ? expandingCard()?.height
-                : backgroundIndex() === card.index
-                  ? backgroundCard()?.height
-                  : null
-            "
-            [style.--expand-target-left.px]="
-              expandingIndex() === card.index
-                ? expandingCard()?.targetLeft
-                : backgroundIndex() === card.index
-                  ? backgroundCard()?.targetLeft
-                  : null
-            "
-            [style.--expand-target-top.px]="
-              expandingIndex() === card.index
-                ? expandingCard()?.targetTop
-                : backgroundIndex() === card.index
-                  ? backgroundCard()?.targetTop
-                  : null
-            "
-            [style.--expand-target-width.px]="
-              expandingIndex() === card.index
-                ? expandingCard()?.targetWidth
-                : backgroundIndex() === card.index
-                  ? backgroundCard()?.targetWidth
-                  : null
-            "
-            [style.--expand-target-height.px]="
-              expandingIndex() === card.index
-                ? expandingCard()?.targetHeight
-                : backgroundIndex() === card.index
-                  ? backgroundCard()?.targetHeight
-                  : null
-            "
-            [attr.data-event-index]="card.index"
-            [attr.aria-label]="'Show ' + card.event.title"
-            [attr.aria-hidden]="backgroundIndex() === card.index ? 'true' : null"
-            [attr.tabindex]="backgroundIndex() === card.index ? -1 : null"
-            (click)="onCardClick(card.index, eventCard, $event)"
-          >
-            <img [src]="card.event.image" [alt]="card.event.title" loading="lazy" />
-            <span class="event-card__shade" aria-hidden="true"></span>
-            <span class="event-card__content">
-              <span class="event-card__meta">
-                <time [attr.datetime]="card.event.date.iso">{{ card.event.date.short }}</time>
-                <span>{{ card.event.category }}</span>
-              </span>
-              <strong>{{ card.event.title }}</strong>
-              <span class="event-card__venue">{{ card.event.venue }}</span>
-            </span>
-            <span class="event-card__action" aria-hidden="true">↗</span>
-          </button>
+    <div class="happening__progress" aria-hidden="true">
+      @if (!isTransitioning()) {
+        @if (progressCycle() % 2 === 0) {
+          <span [class.happening__progress-fill--paused]="isProgressPaused()"></span>
+        } @else {
+          <span [class.happening__progress-fill--paused]="isProgressPaused()"></span>
         }
+      }
+    </div>
+
+    <div class="happening__layout">
+      <div class="event-story">
+        <p class="event-story__eyebrow section-title">
+          <span>Happening soon</span>
+          <span>Next 10 days</span>
+        </p>
+
+        <div
+          class="event-story__changing"
+          [class.event-story__changing--hidden]="
+            transitionPhase() === 'leaving' || transitionPhase() === 'image-in'
+          "
+          [class.event-story__changing--entering]="transitionPhase() === 'details-in'"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <div class="event-story__meta">
+            <time [attr.datetime]="activeEvent().date.iso">{{ activeEvent().date.long }}</time>
+            <span aria-hidden="true"></span>
+            <span>{{ activeEvent().category }}</span>
+          </div>
+
+          <h2 id="happening-title">{{ activeEvent().title }}</h2>
+          <p class="event-story__description">{{ activeEvent().description }}</p>
+          <p class="event-story__registrations">{{ registrationCount(activeEvent().id) }} registered</p>
+
+          <dl class="event-story__details">
+            <div>
+              <dt>Time</dt>
+              <dd>{{ activeEvent().time }}</dd>
+            </div>
+            <div>
+              <dt>Venue</dt>
+              <dd>{{ activeEvent().venue }}</dd>
+            </div>
+          </dl>
+
+          <app-cta-link label="Explore Event" arrow="↗" [compact]="true" (activated)="openEvent()" />
+        </div>
       </div>
 
-      <div class="event-deck__footer">
-        <div class="event-deck__controls">
-          <button type="button" (click)="previous()" aria-label="Previous event">←</button>
-          <button type="button" (click)="next()" aria-label="Next event">→</button>
+      <div class="event-deck">
+        <div
+          class="event-deck__cards"
+          [class.event-deck__cards--advancing]="isQueueAdvancing()"
+          [class.event-deck__cards--backward]="queueDirection() === 'backward'"
+          aria-label="Choose an upcoming event"
+          (pointerdown)="onCardsPointerDown($event)"
+          (pointermove)="onCardsPointerMove($event)"
+          (pointerup)="onCardsPointerUp($event)"
+          (pointercancel)="onCardsPointerUp($event)"
+        >
+          @for (card of eventCards(); track card.index) {
+            <button
+              #eventCard
+              type="button"
+              class="event-card"
+              [class.event-card--expanding]="expandingIndex() === card.index"
+              [class.event-card--expanded]="expandingIndex() === card.index && isExpanded()"
+              [class.event-card--background]="backgroundIndex() === card.index"
+              [class.event-card--shifting]="shiftingIndexes().includes(card.index)"
+              [class.event-card--returning]="returningIndex() === card.index"
+              [style.--expand-left.px]="
+                expandingIndex() === card.index
+                  ? expandingCard()?.left
+                  : backgroundIndex() === card.index
+                    ? backgroundCard()?.left
+                    : null
+              "
+              [style.--expand-top.px]="
+                expandingIndex() === card.index
+                  ? expandingCard()?.top
+                  : backgroundIndex() === card.index
+                    ? backgroundCard()?.top
+                    : null
+              "
+              [style.--expand-width.px]="
+                expandingIndex() === card.index
+                  ? expandingCard()?.width
+                  : backgroundIndex() === card.index
+                    ? backgroundCard()?.width
+                    : null
+              "
+              [style.--expand-height.px]="
+                expandingIndex() === card.index
+                  ? expandingCard()?.height
+                  : backgroundIndex() === card.index
+                    ? backgroundCard()?.height
+                    : null
+              "
+              [style.--expand-target-left.px]="
+                expandingIndex() === card.index
+                  ? expandingCard()?.targetLeft
+                  : backgroundIndex() === card.index
+                    ? backgroundCard()?.targetLeft
+                    : null
+              "
+              [style.--expand-target-top.px]="
+                expandingIndex() === card.index
+                  ? expandingCard()?.targetTop
+                  : backgroundIndex() === card.index
+                    ? backgroundCard()?.targetTop
+                    : null
+              "
+              [style.--expand-target-width.px]="
+                expandingIndex() === card.index
+                  ? expandingCard()?.targetWidth
+                  : backgroundIndex() === card.index
+                    ? backgroundCard()?.targetWidth
+                    : null
+              "
+              [style.--expand-target-height.px]="
+                expandingIndex() === card.index
+                  ? expandingCard()?.targetHeight
+                  : backgroundIndex() === card.index
+                    ? backgroundCard()?.targetHeight
+                    : null
+              "
+              [attr.data-event-index]="card.index"
+              [attr.aria-label]="'Show ' + card.event.title"
+              [attr.aria-hidden]="backgroundIndex() === card.index ? 'true' : null"
+              [attr.tabindex]="backgroundIndex() === card.index ? -1 : null"
+              (click)="onCardClick(card.index, eventCard, $event)"
+            >
+              <img [src]="card.event.image" [alt]="card.event.title" loading="lazy" />
+              <span class="event-card__shade" aria-hidden="true"></span>
+              <span class="event-card__content">
+                <span class="event-card__meta">
+                  <time [attr.datetime]="card.event.date.iso">{{ card.event.date.short }}</time>
+                  <span>{{ card.event.category }}</span>
+                </span>
+                <strong>{{ card.event.title }}</strong>
+                <span class="event-card__venue">{{ card.event.venue }}</span>
+              </span>
+              <span class="event-card__action" aria-hidden="true">↗</span>
+            </button>
+          }
         </div>
 
-        <div class="event-deck__position" aria-label="Carousel position">
-          <span>{{ counterLabel() }}</span>
-          <span class="event-deck__rail" aria-hidden="true">
-            <span [style.width]="progressWidth()"></span>
-          </span>
-          <span>{{ events.length.toString().padStart(2, '0') }}</span>
+        <div class="event-deck__footer">
+          <div class="event-deck__controls">
+            <button type="button" (click)="previous()" aria-label="Previous event">←</button>
+            <button type="button" (click)="next()" aria-label="Next event">→</button>
+          </div>
+
+          <div class="event-deck__position" aria-label="Carousel position">
+            <span>{{ counterLabel() }}</span>
+            <span class="event-deck__rail" aria-hidden="true">
+              <span [style.width]="progressWidth()"></span>
+            </span>
+            <span>{{ events().length.toString().padStart(2, '0') }}</span>
+          </div>
         </div>
       </div>
     </div>
-  </div>
+  }
 </section>
 
 <app-event-details-modal [open]="!!selectedPublishedEvent()" [event]="selectedPublishedEvent()" (close)="closeEvent()" />

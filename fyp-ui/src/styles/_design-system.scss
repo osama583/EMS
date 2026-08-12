@@ -97,6 +97,22 @@
   --form-error-ring: 0 0 0 0.22rem rgb(201 54 79 / 13%);
   --form-success: #16845b;
   --form-surface: rgb(255 255 255 / 88%);
+
+  // Shared loading-state tokens/animation — the single source every skeleton/spinner in the
+  // app should use (see shared/components/loading-state) instead of each page hand-rolling its
+  // own shimmer gradient or spin keyframes.
+  --shimmer-base: var(--apu-surface-muted);
+  --shimmer-highlight: rgb(15 35 60 / 6%);
+  --shimmer-duration: 1.25s;
+  --spin-duration: 900ms;
+}
+
+@keyframes shared-shimmer {
+  to { background-position: -220% 0; }
+}
+
+@keyframes shared-spin {
+  to { transform: rotate(360deg); }
 }
 
 html {

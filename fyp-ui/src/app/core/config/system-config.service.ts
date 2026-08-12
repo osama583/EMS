@@ -23,6 +23,10 @@ export class SystemConfigService {
   readonly paxReviewerThreshold = computed(() => this.state().paxReviewerThreshold);
   readonly cancellationDaysLimit = computed(() => this.state().cancellationDaysLimit);
   readonly eventCategories = computed(() => this.state().eventCategories);
+  // True until the real GET resolves — components reading paxReviewerThreshold/etc. at
+  // construction time (a plain signal snapshot, not a live subscription) should show a loading
+  // state rather than briefly rendering DEFAULT_CONFIG as if it were the real saved config.
+  readonly loading = signal(true);
 
   constructor() {
     this.refresh();
@@ -34,8 +38,8 @@ export class SystemConfigService {
 
   refresh(): void {
     this.http.get<SystemConfig>(this.baseUrl).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (config) => this.state.set(config),
-      error: () => this.state.set(DEFAULT_CONFIG),
+      next: (config) => { this.state.set(config); this.loading.set(false); },
+      error: () => { this.state.set(DEFAULT_CONFIG); this.loading.set(false); },
     });
   }
 }

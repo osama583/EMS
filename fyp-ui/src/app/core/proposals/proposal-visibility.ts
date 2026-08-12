@@ -5,7 +5,7 @@ import { ProposalStage, isReviewerStage } from './proposal-status.models';
 
 export type ProposalVisibilitySection = 'inbox' | 'ongoing' | 'history';
 
-const APPLICANT_ROLES: readonly UserRole[] = [UserRole.Applicant, UserRole.ClubPresident, UserRole.ExternalUser, UserRole.Student, UserRole.Staff];
+const APPLICANT_ROLES: readonly UserRole[] = [UserRole.Applicant, UserRole.ClubPresident, UserRole.ExternalUser, UserRole.Student, UserRole.Lecturer, UserRole.Staff];
 
 // The server owns workflow transitions; this is purely a display-layer mapping from "which stage
 // is active" to "which reviewer role's inbox it belongs in" — used only to decide what Angular
@@ -41,14 +41,20 @@ export function userOwnsCurrentProposalAction(user: AuthUser | null, proposal: P
   }
   const routedKinds = requestKindsForRole(user.role);
   if (requestKind && routedKinds.length && !routedKinds.includes(requestKind)) return false;
-  return roleOwnsWorkflowAction(user.role, proposal.workflow);
+  return roleOwnsWorkflowAction(user, proposal);
 }
 
-// Whether `role` currently owns an action on a proposal in `state` — the single source of truth
-// for "is this actually this user's job right now", used to keep restricted proposals out of a
-// role's Inbox in the first place rather than showing them and then blocking the action. This is
-// a read-only display filter over server-reported state, not a transition decision.
-function roleOwnsWorkflowAction(role: UserRole, state: ProposalReviewRecord['workflow']): boolean {
+// Whether `user` currently owns an action on `proposal` — the single source of truth for "is this
+// actually this user's job right now", used to keep restricted proposals out of a role's Inbox in
+// the first place rather than showing them and then blocking the action. This is a read-only
+// display filter over server-reported state, not a transition decision (the backend's
+// isHosHodOfUnit in workflow.service.js is the real authority — this mirrors it for display).
+function roleOwnsWorkflowAction(user: AuthUser, proposal: ProposalReviewRecord): boolean {
+  const state = proposal.workflow;
+  const role = user.role;
+  if (state.stage === ProposalStage.HosHodReview) {
+    return role === UserRole.HosHod && user.department === proposal.applicantDepartment;
+  }
   if (isReviewerStage(state.stage)) return reviewerRoleForStage(state.stage) === role;
   if (state.stage === ProposalStage.DepartmentReview) {
     const ownedDepartments = departmentsForRole(role);
@@ -69,7 +75,7 @@ function userIsRelatedToProposal(user: AuthUser, proposal: ProposalReviewRecord,
   const role = user.role;
   const routedKinds = requestKindsForRole(role);
   if (requestKind && routedKinds.length && !routedKinds.includes(requestKind)) return false;
-  if (reviewerHasRelation(role, proposal)) return true;
+  if (reviewerHasRelation(user, proposal)) return true;
   const ownedDepartments = departmentsForRole(role);
   return ownedDepartments.length > 0 && proposal.workflow.departmentConfirmations.some((entry) => ownedDepartments.includes(entry.department as DepartmentRequestKind));
 }
@@ -79,9 +85,13 @@ function userIsRelatedToProposal(user: AuthUser, proposal: ProposalReviewRecord,
 // applies at all (the server alone decides that, e.g. via the pax threshold for F&B/CFO).
 const REVIEWER_STAGE_ORDER: readonly ProposalStage[] = [ProposalStage.HosHodReview, ProposalStage.FmbReview, ProposalStage.CfoReview, ProposalStage.DepartmentReview];
 
-function reviewerHasRelation(role: UserRole, proposal: ProposalReviewRecord): boolean {
+function reviewerHasRelation(user: AuthUser, proposal: ProposalReviewRecord): boolean {
+  const role = user.role;
   const roleStage = REVIEWER_STAGE_ORDER.find((stage) => reviewerRoleForStage(stage) === role);
   if (!roleStage) return false;
+  // HOS/HOD is shared across every school/department unit — restrict relation to the reviewer's
+  // own unit so a School of Computing HOS doesn't see School of Business proposals in Ongoing.
+  if (role === UserRole.HosHod && user.department !== proposal.applicantDepartment) return false;
   if (proposal.workflow.rejectedBy === role) return true;
   const currentIndex = REVIEWER_STAGE_ORDER.indexOf(proposal.workflow.stage);
   const roleIndex = REVIEWER_STAGE_ORDER.indexOf(roleStage);

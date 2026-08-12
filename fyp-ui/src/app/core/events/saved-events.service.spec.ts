@@ -64,7 +64,7 @@ describe('event engagement mock services', () => {
     const auth = TestBed.inject(AuthService);
     const registration = TestBed.inject(ExternalRegistrationService);
     const challenge = await firstValueFrom(registration.registerExternalUser({
-      email: 'guest@example.com', firstName: 'Guest', age: 21, gender: 'Prefer not to say', password: 'Password1',
+      email: 'guest@example.com', firstName: 'Guest', lastName: 'User', age: 21, gender: 'Prefer not to say', password: 'Password1',
     }));
 
     expect(auth.authenticated()).toBe(false);

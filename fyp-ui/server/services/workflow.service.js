@@ -1,10 +1,7 @@
-// db/nextId are bound via init(), not required directly from '../db' at top-level:
-// db.js requires seed-requests.js, which requires this module — a circular require
-// where require('../db') at load time would return the partially-initialized module
-// (module.exports not yet assigned), leaving `db`/`nextId` undefined. db.js calls
-// init(db, nextId) with its own live references before any seed module runs, and
-// every other consumer of this module (e.g. the Express routes layer) does the same
-// once at startup, right after require('../db').
+// db/nextId are bound via init(), not required directly from '../db' at top-level: db.js's own
+// module-load order calls init(db, nextId) with its live references before any route or seed
+// logic runs, and every other consumer of this module (e.g. the Express routes layer) does the
+// same once at startup, right after require('../db').
 let db;
 let nextId;
 function init(dbRef, nextIdRef) {
@@ -226,6 +223,206 @@ function applicantResubmit(requestId, updates) {
   request.updated_at = new Date().toISOString();
   recordHistory(request.request_id, null, null, 'applicant-resubmit', request.applicant_user_id, 'applicant', null, previousStatus, resumeStatus);
   return request;
+}
+
+// Deletes every child-table row for a request (all tables keyed by request_id, minus the
+// request row itself) — used before re-writing a draft's child rows on every save-as-draft
+// call, since drafts are edited repeatedly and each save should fully replace prior content
+// rather than append duplicates.
+const REQUEST_CHILD_TABLES = [
+  'request_categories', 'application_requirements', 'event_schedule', 'co_owners', 'organizers',
+  'important_people', 'general_guest', 'brief_agenda', 'request_discussion_topics',
+  'request_logistics', 'request_transportation', 'request_photography_videography',
+  'request_sound_light', 'request_fmb', 'request_campus_tour', 'request_mineral_water_logo',
+  'request_mineral_water_normal', 'request_funding_purchase',
+];
+function clearRequestChildRows(requestId) {
+  for (const table of REQUEST_CHILD_TABLES) {
+    db[table] = db[table].filter((row) => row.request_id !== requestId);
+  }
+}
+
+// Builds every request_* child table row from the event-proposal form's submission payload
+// (Angular's EventProposalComponent, via proposal-workflow.routes.js's POST / and PUT /:id)
+// onto an already-created `request` row. Shared by createProposal() (submits immediately) and
+// saveDraft() (stays in status='draft').
+function buildRequestChildRows(request, payload) {
+  for (const categoryName of payload.eventCategories || []) {
+    const category = db.event_category.find((c) => c.name === categoryName);
+    if (category) db.request_categories.push({ request_id: request.request_id, category_id: category.event_category_id });
+  }
+
+  for (const requirementKey of payload.selectedRequirements || []) {
+    const requirement = db.event_requirements.find((r) => r.requirement_name === requirementKey);
+    if (requirement) db.application_requirements.push({ request_id: request.request_id, requirement_id: requirement.requirement_id });
+  }
+
+  for (const row of payload.scheduleRows || []) {
+    db.event_schedule.push({ event_schedule_id: nextId('event_schedule'), request_id: request.request_id, date: row.date, start_time: row.start, end_time: row.end, location: row.location });
+  }
+
+  for (const row of payload.coOwners || []) {
+    const [firstName, ...rest] = String(row.name || '').split(' ');
+    db.co_owners.push({ co_owner_id: nextId('co_owners'), request_id: request.request_id, staff_id: null, staff_first_name: firstName || '', staff_last_name: rest.join(' '), staff_email: row.email || '', staff_role: row.role || null });
+  }
+  for (const row of payload.organizers || []) {
+    const [firstName, ...rest] = String(row.name || '').split(' ');
+    db.organizers.push({ organizer_id: nextId('organizers'), request_id: request.request_id, staff_id: null, staff_first_name: firstName || '', staff_last_name: rest.join(' '), staff_email: row.email || '', staff_role: row.role || null, note: row.notes || null });
+  }
+  for (const row of payload.importantPeople || []) {
+    db.important_people.push({ important_person_id: nextId('important_people'), request_id: request.request_id, name: row.name, type: row.type, organization: row.organization || null, designation: row.designation || null });
+  }
+  for (const row of payload.guests || []) {
+    db.general_guest.push({ general_guest_id: nextId('general_guest'), request_id: request.request_id, guest_type: row.guestType, count: Number(row.count) || 0, notes: row.notes || null });
+  }
+  for (const row of payload.agenda || []) {
+    db.brief_agenda.push({ brief_agenda_id: nextId('brief_agenda'), request_id: request.request_id, time: row.time, activity: row.activity, location: row.location, pic: row.pic, notes: row.notes || null });
+  }
+  for (const row of payload.discussions || []) {
+    db.request_discussion_topics.push({ request_discussion_topic_id: nextId('request_discussion_topics'), request_id: request.request_id, discussion_topic: row.topic });
+  }
+
+  const requestRows = payload.requestRows || {};
+  for (const row of requestRows.logistics || []) {
+    db.request_logistics.push({ request_logistics_id: nextId('request_logistics'), request_id: request.request_id, option_id: row.item || null, item: row.item, quantity: Number(row.quantity) || 0, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
+  }
+  for (const row of requestRows.transportation || []) {
+    db.request_transportation.push({ request_transportation_id: nextId('request_transportation'), request_id: request.request_id, option_id: row.type || null, type: row.type, requested_pax: Number(row.requestedPax) || 0, pickup: row.pickup, dropoff: row.dropoff, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
+  }
+  for (const row of requestRows.photoVideo || []) {
+    db.request_photography_videography.push({ request_photography_videography_id: nextId('request_photography_videography'), request_id: request.request_id, option_id: row.service || null, service: row.service, personnel_quantity: Number(row.personnelQuantity) || 0, date: row.date, start_time: row.start, end_time: row.end, location: row.location, coverage: row.coverage, notes: row.notes || null });
+  }
+  for (const row of requestRows.soundLight || []) {
+    db.request_sound_light.push({ request_sound_light_id: nextId('request_sound_light'), request_id: request.request_id, option_id: row.item || null, item: row.item, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
+  }
+  for (const row of requestRows.fmb || []) {
+    db.request_fmb.push({ request_fmb_id: nextId('request_fmb'), request_id: request.request_id, option_id: row.foodType || null, food_type: row.foodType, pax: Number(row.quantity) || 0, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
+  }
+  for (const row of requestRows.campusTour || []) {
+    db.request_campus_tour.push({ request_campus_tour_id: nextId('request_campus_tour'), request_id: request.request_id, date: row.date, start_time: row.start, end_time: row.end, location: row.location, pax: Number(row.pax) || 0, start_point_option_id: row.startPoint || null, start_point: row.startPoint, notes: row.notes || null });
+  }
+  for (const row of requestRows.waterLogo || []) {
+    db.request_mineral_water_logo.push({ request_mineral_water_logo_id: nextId('request_mineral_water_logo'), request_id: request.request_id, option_id: row.quantity || null, quantity: Number(row.quantity) || 0, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
+  }
+  for (const row of requestRows.waterNormal || []) {
+    db.request_mineral_water_normal.push({ request_mineral_water_normal_id: nextId('request_mineral_water_normal'), request_id: request.request_id, option_id: row.quantity || null, quantity: Number(row.quantity) || 0, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
+  }
+  for (const row of requestRows.fundingPurchase || []) {
+    db.request_funding_purchase.push({ request_funding_purchase_id: nextId('request_funding_purchase'), request_id: request.request_id, main_option_id: row.mainItem || null, main_item: row.mainItem, sub_option_id: row.subItem || null, sub_item: row.subItem, quantity: Number(row.quantity) || 0, unit_price_rm: Number(row.unit) || 0, notes: row.notes || null });
+  }
+}
+
+function applyRequestScalarFields(request, payload, applicant) {
+  request.applicant_name = `${applicant.first_name} ${applicant.last_name}`;
+  request.applicant_email = applicant.email;
+  request.applicant_department_or_school = payload.applicantDepartment || '';
+  request.event_title = payload.eventTitle || '';
+  request.short_introduction = payload.shortIntroduction || '';
+  request.goals_objectives = payload.goals || '';
+  request.expected_benefits = payload.benefits || '';
+  request.event_visibility = payload.eventVisibility || 'Private';
+  request.event_format = payload.eventFormat || 'On Campus';
+  request.registration_approval = payload.registrationMode || 'Automatic';
+  request.promotion_publicity_method = payload.publicity || null;
+  request.event_image = payload.eventImage || null;
+  request.total_pax = Number(payload.totalPax) || 0;
+  request.max_pax = payload.maxPax != null ? Number(payload.maxPax) : null;
+  request.updated_at = new Date().toISOString();
+}
+
+// Builds a full `request` row plus every request_* child table row from the event-proposal
+// form's submission payload (Angular's EventProposalComponent.submit(), via
+// proposal-workflow.routes.js's POST /), then immediately runs it through submitProposal() so
+// it enters the workflow at the correct stage. If draftRequestId is given (the applicant opened
+// a saved draft and is now submitting it for real), that existing draft row is converted in
+// place instead of creating a second, duplicate request row.
+function createProposal(payload, draftRequestId) {
+  const applicant = db.users.find((u) => u.email === payload.applicantEmail);
+  if (!applicant) throw new WorkflowError('Applicant not found for the given applicantEmail.', 400);
+
+  let request = draftRequestId ? db.request.find((r) => r.request_id === Number(draftRequestId)) : null;
+  if (request && request.status !== 'draft') throw new WorkflowError('This proposal is no longer a draft and cannot be submitted as one.', 400);
+
+  if (request) {
+    clearRequestChildRows(request.request_id);
+  } else {
+    request = {
+      request_id: nextId('request'),
+      request_code: `EVT-${Date.now()}`,
+      applicant_user_id: applicant.user_id,
+      applicant_name: '', applicant_email: '', applicant_department_or_school: '',
+      event_title: '', short_introduction: '', goals_objectives: '', expected_benefits: '',
+      event_visibility: '', event_format: '', registration_approval: '',
+      promotion_publicity_method: null, event_image: null, total_pax: 0, max_pax: null,
+      status: 'draft',
+      submitted_at: null,
+      cancelled_at: null,
+      cancelled_by_user_id: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      resume_stage: null,
+      reviewer_comment: null,
+    };
+    db.request.push(request);
+  }
+
+  applyRequestScalarFields(request, payload, applicant);
+  buildRequestChildRows(request, payload);
+
+  recordHistory(request.request_id, null, null, 'create', applicant.user_id, applicant.role, null, null, 'draft');
+  return submitProposal(request.request_id);
+}
+
+// Creates (draftRequestId omitted) or updates (draftRequestId given) a `request` row that stays
+// in status='draft' — never runs submitProposal(), so it does not enter the review workflow.
+// Every "Save as Draft" click from the same form session should reuse the same request row
+// rather than accumulating duplicates, so the caller (proposal-workflow.routes.js) passes back
+// the id it got from the first save.
+function saveDraft(payload, draftRequestId) {
+  const applicant = db.users.find((u) => u.email === payload.applicantEmail);
+  if (!applicant) throw new WorkflowError('Applicant not found for the given applicantEmail.', 400);
+
+  let request = draftRequestId ? db.request.find((r) => r.request_id === Number(draftRequestId)) : null;
+  if (request && request.status !== 'draft') throw new WorkflowError('This proposal is no longer a draft and cannot be saved as one.', 400);
+
+  if (request) {
+    clearRequestChildRows(request.request_id);
+  } else {
+    request = {
+      request_id: nextId('request'),
+      request_code: `EVT-${Date.now()}`,
+      applicant_user_id: applicant.user_id,
+      applicant_name: '', applicant_email: '', applicant_department_or_school: '',
+      event_title: '', short_introduction: '', goals_objectives: '', expected_benefits: '',
+      event_visibility: '', event_format: '', registration_approval: '',
+      promotion_publicity_method: null, event_image: null, total_pax: 0, max_pax: null,
+      status: 'draft',
+      submitted_at: null,
+      cancelled_at: null,
+      cancelled_by_user_id: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      resume_stage: null,
+      reviewer_comment: null,
+    };
+    db.request.push(request);
+  }
+
+  applyRequestScalarFields(request, payload, applicant);
+  buildRequestChildRows(request, payload);
+  recordHistory(request.request_id, null, null, draftRequestId ? 'draft-update' : 'draft-create', applicant.user_id, applicant.role, null, 'draft', 'draft');
+  return request;
+}
+
+// Permanently removes a draft (status='draft' only — never a submitted proposal, which must go
+// through cancelProposal() instead to preserve its workflow_history trail) and all its child
+// rows. Used by the Drafts list's delete action.
+function deleteDraft(requestId) {
+  const request = findRequest(requestId);
+  if (request.status !== 'draft') throw new WorkflowError('Only drafts can be deleted.', 400);
+  clearRequestChildRows(request.request_id);
+  db.request = db.request.filter((r) => r.request_id !== request.request_id);
+  db.workflow_history = db.workflow_history.filter((h) => h.request_id !== request.request_id);
 }
 
 function cancelProposal(requestId, actorUserId) {
@@ -519,6 +716,9 @@ module.exports = {
   isHosHodOfUnit,
   authorizeAction,
   submitProposal,
+  createProposal,
+  saveDraft,
+  deleteDraft,
   approveReviewerStage,
   rejectReviewerStage,
   resubmitReviewerStage,

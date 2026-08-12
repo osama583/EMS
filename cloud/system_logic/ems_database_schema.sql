@@ -111,6 +111,18 @@ CREATE TABLE student (
     school      VARCHAR(150)
 );
 
+-- 1:1 extension of users for role='external-user' self-registered guest accounts (mirrors the
+-- staff/student extension pattern above). Holds demographic data collected at registration that
+-- no current feature reads yet, but is kept separate from `users` so future guest-demographics
+-- reporting/dashboards can query it without adding write-only columns to the shared users table.
+CREATE TABLE external_user_profile (
+    external_user_profile_id  BIGSERIAL PRIMARY KEY,
+    user_id                       BIGINT NOT NULL UNIQUE REFERENCES users(user_id),
+    age                               INTEGER,
+    gender                                VARCHAR(30),
+    registered_at                            TIMESTAMP NOT NULL DEFAULT now()
+);
+
 CREATE TABLE unit (
     code          VARCHAR(20) PRIMARY KEY,
     description   VARCHAR(200) NOT NULL,

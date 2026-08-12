@@ -9,10 +9,11 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { PublishedEvent } from '../../../../core/events/published-event.models';
+import { PublishedEvent, ProposalEventSchedule } from '../../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../../core/events/published-event.service';
 import { EventDetailsModalComponent } from '../../../../shared/components/event-details-modal/event-details-modal';
 import { CtaLinkComponent } from '../../../../shared/components/cta-link/cta-link';
+import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
 
 interface EventDate {
   readonly iso: string;
@@ -21,6 +22,7 @@ interface EventDate {
 }
 
 export interface UpcomingEvent {
+  readonly id: string;
   readonly title: string;
   readonly category: string;
   readonly venue: string;
@@ -30,6 +32,9 @@ export interface UpcomingEvent {
   readonly date: EventDate;
   readonly daysFromNow: number;
 }
+
+const HAPPENING_SOON_WINDOW_DAYS = 10;
+const MAX_HAPPENING_SOON_EVENTS = 5;
 
 interface EventCard {
   readonly event: UpcomingEvent;
@@ -59,7 +64,7 @@ type QueueDirection = 'forward' | 'backward' | 'direct';
 
 @Component({
   selector: 'app-happening-soon',
-  imports: [EventDetailsModalComponent, CtaLinkComponent],
+  imports: [EventDetailsModalComponent, CtaLinkComponent, LoadingStateComponent],
   templateUrl: './happening-soon.html',
   styleUrl: './happening-soon.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -83,71 +88,17 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
   private dragState: { pointerId: number; startX: number; scrollLeft: number } | null = null;
   private didDrag = false;
 
-  readonly events: readonly UpcomingEvent[] = [
-    {
-      title: 'Future Forward: Tech Expo',
-      category: 'Innovation',
-      venue: 'APU Atrium',
-      time: '10:00 AM – 5:00 PM',
-      description:
-        'Meet the student innovators building what comes next, from intelligent robots to immersive technology.',
-      image: '/assets/events/tech-expo.jpg',
-      date: this.createEventDate(1),
-      daysFromNow: 1,
-    },
-    {
-      title: 'One World Cultural Night',
-      category: 'Culture',
-      venue: 'APU Auditorium',
-      time: '6:30 PM – 10:00 PM',
-      description:
-        'A vibrant evening of performances, flavours and traditions shared by APU communities from around the world.',
-      image: '/assets/events/cultural-night.jpg',
-      date: this.createEventDate(3),
-      daysFromNow: 3,
-    },
-    {
-      title: 'APU Esports Showdown',
-      category: 'Esports',
-      venue: 'Level 4 Arena',
-      time: '12:00 PM – 8:00 PM',
-      description:
-        'Watch campus teams go head-to-head in an electric tournament built for players, fans and first-timers.',
-      image: '/assets/events/esports-showdown.jpg',
-      date: this.createEventDate(5),
-      daysFromNow: 5,
-    },
-    {
-      title: 'Campus After Dark',
-      category: 'Music',
-      venue: 'Campus Plaza',
-      time: '7:00 PM – 10:30 PM',
-      description:
-        'Live student bands, open-air energy and a campus night made for discovering your new favourite sound.',
-      image: '/assets/events/campus-after-dark.jpg',
-      date: this.createEventDate(7),
-      daysFromNow: 7,
-    },
-    {
-      title: 'Wellness Run & Community Day',
-      category: 'Community',
-      venue: 'APU Main Entrance',
-      time: '7:00 AM – 11:00 AM',
-      description:
-        'Start the morning moving with friends, then stay for games, wellness activities and community connections.',
-      image: '/assets/events/wellness-run.jpg',
-      date: this.createEventDate(9),
-      daysFromNow: 9,
-    },
-  ];
+  readonly events = signal<readonly UpcomingEvent[]>([]);
+  readonly loading = signal(true);
+  readonly loadError = signal('');
 
   readonly activeIndex = signal(0);
-  readonly activeEvent = computed(() => this.events[this.activeIndex()]);
+  readonly activeEvent = computed(() => this.events()[this.activeIndex()]);
   readonly counterLabel = computed(() => (this.activeIndex() + 1).toString().padStart(2, '0'));
   readonly progressWidth = computed(
-    () => `${((this.activeIndex() + 1) / this.events.length) * 100}%`,
+    () => `${((this.activeIndex() + 1) / Math.max(1, this.events().length)) * 100}%`,
   );
-  readonly queueIndexes = signal<readonly number[]>([1, 2, 3, 4]);
+  readonly queueIndexes = signal<readonly number[]>([]);
   readonly backgroundIndex = signal<number | null>(null);
   readonly backgroundCard = signal<ExpandingCard | null>(null);
   readonly outgoingIndex = signal<number | null>(null);
@@ -155,14 +106,14 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
   readonly returningIndex = signal<number | null>(null);
   readonly queueDirection = signal<QueueDirection>('direct');
   readonly queueCards = computed<readonly EventCard[]>(() =>
-    this.queueIndexes().map((index) => ({ event: this.events[index], index })),
+    this.queueIndexes().map((index) => ({ event: this.events()[index], index })),
   );
   readonly eventCards = computed<readonly EventCard[]>(() => {
     const backgroundIndex = this.backgroundIndex();
 
     if (backgroundIndex !== null) {
       return [
-        { event: this.events[backgroundIndex], index: backgroundIndex },
+        { event: this.events()[backgroundIndex], index: backgroundIndex },
         ...this.queueCards(),
       ];
     }
@@ -170,7 +121,7 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
     const outgoingIndex = this.outgoingIndex();
     return outgoingIndex === null
       ? this.queueCards()
-      : [...this.queueCards(), { event: this.events[outgoingIndex], index: outgoingIndex }];
+      : [...this.queueCards(), { event: this.events()[outgoingIndex], index: outgoingIndex }];
   });
   readonly transitionPhase = signal<TransitionPhase>('idle');
   readonly isTransitioning = signal(false);
@@ -182,27 +133,104 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
   readonly progressCycle = signal(0);
   readonly isProgressPaused = signal(true);
   readonly selectedPublishedEvent = signal<PublishedEvent | null>(null);
-  private readonly publishedEventsByTitle = signal<ReadonlyMap<string, PublishedEvent>>(new Map());
+  private readonly publishedEventsById = signal<ReadonlyMap<string, PublishedEvent>>(new Map());
 
-  registrationCount(title: string): number { return this.publishedEventsByTitle().get(title)?.confirmedRegistrationCount ?? 0; }
-  openEvent(): void { this.selectedPublishedEvent.set(this.publishedEventsByTitle().get(this.activeEvent().title) ?? null); }
+  registrationCount(id: string): number { return this.publishedEventsById().get(id)?.confirmedRegistrationCount ?? 0; }
+  openEvent(): void { this.selectedPublishedEvent.set(this.publishedEventsById().get(this.activeEvent().id) ?? null); }
   closeEvent(): void { this.selectedPublishedEvent.set(null); }
 
   constructor() {
+    this.loadPublishedEvents();
+  }
+
+  private loadPublishedEvents(): void {
     this.publishedEventService.getPublishedEvents().subscribe({
-      next: (events) => this.publishedEventsByTitle.set(new Map(events.map((event) => [event.eventTitle, event]))),
-      error: () => this.publishedEventsByTitle.set(new Map()),
+      next: (events) => {
+        this.publishedEventsById.set(new Map(events.map((event) => [event.id, event])));
+        const upcoming = this.selectHappeningSoon(events);
+        this.events.set(upcoming);
+        this.queueIndexes.set(upcoming.slice(1).map((_, index) => index + 1));
+        this.activeIndex.set(0);
+        this.loading.set(false);
+        this.preloadEventImages();
+        this.startCarouselIfInView();
+      },
+      error: () => {
+        this.publishedEventsById.set(new Map());
+        this.loadError.set('Events could not be loaded.');
+        this.loading.set(false);
+      },
     });
   }
 
+  // Cards for "Happening soon" are the soonest published events within the next
+  // HAPPENING_SOON_WINDOW_DAYS (matches the "Next 10 days" label shown in the UI); falls back to
+  // the soonest upcoming events overall when nothing falls inside that window so the section
+  // never renders with fewer than the available upcoming events.
+  private selectHappeningSoon(events: readonly PublishedEvent[]): readonly UpcomingEvent[] {
+    const upcoming = events
+      .map((event) => this.toUpcomingEvent(event))
+      .filter((event) => event.daysFromNow >= 0)
+      .sort((a, b) => a.daysFromNow - b.daysFromNow);
+
+    const withinWindow = upcoming.filter((event) => event.daysFromNow <= HAPPENING_SOON_WINDOW_DAYS);
+    const selected = withinWindow.length > 0 ? withinWindow : upcoming;
+    return selected.slice(0, MAX_HAPPENING_SOON_EVENTS);
+  }
+
+  private toUpcomingEvent(event: PublishedEvent): UpcomingEvent {
+    const schedule = event.schedule[0];
+    return {
+      id: event.id,
+      title: event.eventTitle,
+      category: event.categories[0] ?? '',
+      venue: schedule?.location || 'To be confirmed',
+      time: schedule ? `${this.formatTime(schedule.start)} – ${this.formatTime(schedule.end)}` : 'To be confirmed',
+      description: event.shortIntroduction,
+      image: event.eventImage.url,
+      date: this.eventDateFor(schedule),
+      daysFromNow: this.daysFromNowFor(schedule),
+    };
+  }
+
+  private formatTime(value: string): string {
+    const [hours = '0', minutes = '00'] = value.split(':');
+    const hour = Number(hours);
+    const suffix = hour >= 12 ? 'PM' : 'AM';
+    return `${hour % 12 || 12}:${minutes} ${suffix}`;
+  }
+
+  private eventDateFor(schedule: ProposalEventSchedule | undefined): EventDate {
+    if (!schedule?.date) {
+      const fallback = new Date();
+      return { iso: fallback.toISOString(), short: 'TBC', long: 'Date to be confirmed' };
+    }
+    const date = new Date(`${schedule.date}T12:00:00`);
+    return {
+      iso: date.toISOString(),
+      short: new Intl.DateTimeFormat('en-MY', { day: '2-digit', month: 'short' }).format(date),
+      long: new Intl.DateTimeFormat('en-MY', { weekday: 'long', day: 'numeric', month: 'long' }).format(date),
+    };
+  }
+
+  private daysFromNowFor(schedule: ProposalEventSchedule | undefined): number {
+    if (!schedule?.date) return Number.POSITIVE_INFINITY;
+    const eventDate = new Date(`${schedule.date}T00:00:00`);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.round((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
   ngAfterViewInit(): void {
+    this.startCarouselIfInView();
+  }
+
+  private startCarouselIfInView(): void {
     const section = this.host.nativeElement.querySelector<HTMLElement>('.happening');
 
-    if (!section) {
+    if (!section || this.events().length === 0 || this.observer) {
       return;
     }
-
-    this.preloadEventImages();
 
     if (typeof IntersectionObserver === 'undefined') {
       this.isInView = true;
@@ -315,7 +343,7 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
     if (
       targetIndex === this.activeIndex() ||
       targetIndex < 0 ||
-      targetIndex >= this.events.length ||
+      targetIndex >= this.events().length ||
       this.isTransitioning()
     ) {
       return;
@@ -402,7 +430,7 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
         : [];
 
     const cardGeometry: ExpandingCard = {
-      image: this.events[targetIndex].image,
+      image: this.events()[targetIndex].image,
       left: cardRect.left - layoutRect.left,
       top: cardRect.top - layoutRect.top,
       width: cardRect.width,
@@ -607,7 +635,7 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
   }
 
   private preloadEventImages(): void {
-    this.events.forEach((event) => {
+    this.events().forEach((event) => {
       const image = new Image();
       image.src = event.image;
       this.preloadedImages.push(image);
@@ -615,22 +643,4 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  private createEventDate(daysFromNow: number): EventDate {
-    const date = new Date();
-    date.setHours(12, 0, 0, 0);
-    date.setDate(date.getDate() + daysFromNow);
-
-    return {
-      iso: date.toISOString(),
-      short: new Intl.DateTimeFormat('en-MY', {
-        day: '2-digit',
-        month: 'short',
-      }).format(date),
-      long: new Intl.DateTimeFormat('en-MY', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-      }).format(date),
-    };
-  }
 }

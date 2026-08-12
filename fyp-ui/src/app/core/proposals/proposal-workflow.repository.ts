@@ -9,6 +9,9 @@ import { ProposalReviewRecord } from './proposal-review.models';
 export interface ProposalWorkflowRepository {
   list(): Observable<readonly ProposalReviewRecord[]>;
   getById(id: number): Observable<ProposalReviewRecord | undefined>;
+  create(payload: Record<string, unknown>): Observable<ProposalReviewRecord>;
+  saveDraft(payload: Record<string, unknown>): Observable<ProposalReviewRecord>;
+  deleteDraft(id: number): Observable<void>;
   approveAsReviewer(id: number, reviewerRole: UserRole): Observable<ProposalReviewRecord>;
   rejectAsReviewer(id: number, reviewerRole: UserRole, reason: string): Observable<ProposalReviewRecord>;
   resubmitAsReviewer(id: number, reviewerRole: UserRole, comment: string): Observable<ProposalReviewRecord>;
@@ -26,6 +29,9 @@ export class ApiProposalWorkflowRepository implements ProposalWorkflowRepository
   private readonly baseUrl = environment.proposalWorkflowApiUrl;
   list(): Observable<readonly ProposalReviewRecord[]> { return this.http.get<readonly ProposalReviewRecord[]>(this.baseUrl); }
   getById(id: number): Observable<ProposalReviewRecord | undefined> { return this.http.get<ProposalReviewRecord>(`${this.baseUrl}/${id}`); }
+  create(payload: Record<string, unknown>): Observable<ProposalReviewRecord> { return this.http.post<ProposalReviewRecord>(this.baseUrl, payload); }
+  saveDraft(payload: Record<string, unknown>): Observable<ProposalReviewRecord> { return this.http.post<ProposalReviewRecord>(`${this.baseUrl}/draft`, payload); }
+  deleteDraft(id: number): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/${id}`); }
   approveAsReviewer(id: number, reviewerRole: UserRole): Observable<ProposalReviewRecord> { return this.http.post<ProposalReviewRecord>(`${this.baseUrl}/${id}/approve`, { reviewerRole }); }
   rejectAsReviewer(id: number, reviewerRole: UserRole, reason: string): Observable<ProposalReviewRecord> { return this.http.post<ProposalReviewRecord>(`${this.baseUrl}/${id}/reject`, { reviewerRole, reason }); }
   resubmitAsReviewer(id: number, reviewerRole: UserRole, comment: string): Observable<ProposalReviewRecord> { return this.http.post<ProposalReviewRecord>(`${this.baseUrl}/${id}/resubmit`, { reviewerRole, comment }); }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import { SystemConfigService } from '../../../../core/config/system-config.service';
@@ -8,10 +8,11 @@ import { FormModalComponent } from '../../../../shared/components/form-modal/for
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
 import { InternalDataPageConfig, InternalDataRecord, InternalRowActionEvent } from '../../../../shared/components/internal-data-page/internal-data-page.models';
+import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
 
 @Component({
   selector: 'app-system-config',
-  imports: [FormFieldComponent, FeedbackBannerComponent, FormModalComponent, ConfirmDialogComponent, InternalDataPageComponent],
+  imports: [FormFieldComponent, FeedbackBannerComponent, FormModalComponent, ConfirmDialogComponent, InternalDataPageComponent, LoadingStateComponent],
   templateUrl: './system-config.html',
   styleUrl: './system-config.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -19,12 +20,26 @@ import { InternalDataPageConfig, InternalDataRecord, InternalRowActionEvent } fr
 export class SystemConfigComponent {
   private readonly configService = inject(SystemConfigService);
   private readonly destroyRef = inject(DestroyRef);
+  readonly configLoading = this.configService.loading;
   readonly paxThreshold = signal(this.configService.paxReviewerThreshold());
   readonly cancellationDays = signal(this.configService.cancellationDaysLimit());
   readonly policiesSaved = signal(false);
   readonly saving = signal(false);
 
   readonly categories = signal<readonly string[]>([...this.configService.eventCategories()]);
+
+  constructor() {
+    // configService.paxReviewerThreshold()/etc. are read once above as plain signal snapshots
+    // (not computed()), so if the real GET resolves after this component has already
+    // constructed with DEFAULT_CONFIG, that later value would otherwise never reach these local
+    // editable copies. Re-sync once, the moment loading flips to false.
+    effect(() => {
+      if (this.configService.loading()) return;
+      this.paxThreshold.set(this.configService.paxReviewerThreshold());
+      this.cancellationDays.set(this.configService.cancellationDaysLimit());
+      this.categories.set([...this.configService.eventCategories()]);
+    });
+  }
   readonly search = signal('');
   readonly page = signal(1);
   readonly pageSize = signal(10);

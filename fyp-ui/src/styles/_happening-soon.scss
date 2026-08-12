@@ -39,6 +39,62 @@ app-happening-soon {
   background: var(--apu-dark-section-shade);
 }
 
+.happening__shade--static {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(120% 120% at 15% 10%, rgb(42 131 255 / 16%), transparent 55%),
+    var(--apu-navy-950);
+}
+
+.happening__layout--status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: max(48rem, 100svh);
+  padding: clamp(5.8rem, 10vh, 8.5rem) var(--layout-gutter) var(--section-block);
+}
+
+.happening-empty {
+  display: grid;
+  max-width: 32rem;
+  gap: 0.9rem;
+  justify-items: flex-start;
+  text-align: left;
+}
+
+.happening-empty__icon {
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 6%);
+  color: var(--apu-yellow-500);
+  font-size: 1.75rem;
+}
+
+.happening-empty h2 {
+  margin: 0;
+  font-family: var(--apu-font-family);
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-weight: var(--weight-heading);
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+
+.happening-empty p {
+  margin: 0;
+  max-width: 30rem;
+  color: rgb(255 255 255 / 68%);
+  font-size: var(--type-body);
+  line-height: 1.6;
+}
+
 .happening__progress {
   position: absolute;
   z-index: 12;

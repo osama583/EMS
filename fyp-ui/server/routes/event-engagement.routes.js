@@ -5,15 +5,19 @@ const { isPublishedEvent, projectPublishedEvent } = require('../services/publish
 const router = express.Router();
 
 // notification-preferences has NO backing table in ems_database_schema.sql (system.md §8
-// flags notifications as a future addition, not built) — stored in-memory, local to this
-// router, keyed by email. NOT a db.js table since it's outside the schema entirely.
-const notificationPreferences = new Map();
+// flags notifications as a future addition, not built) — stored in db.notification_preference,
+// a mock-layer-only table (one row per user email), so it persists to db.json like every other
+// table instead of being lost on server restart.
 const DEFAULT_PREFERENCES = {
   registrationClosingReminder: true,
   eventStartingReminder: true,
   registrationClosingStatus: 'pending-api',
   eventStartingStatus: 'pending-api',
 };
+
+function findPreferenceRow(email) {
+  return db.notification_preference.find((p) => p.email === email);
+}
 
 router.get('/saved', async (req, res, next) => {
   try {
@@ -59,15 +63,26 @@ router.delete('/saved/:eventId', async (req, res, next) => {
 router.get('/notification-preferences', async (req, res, next) => {
   try {
     const { email } = req.query;
-    res.json(notificationPreferences.get(email) || DEFAULT_PREFERENCES);
+    const row = findPreferenceRow(email);
+    res.json(row ? { registrationClosingReminder: row.registration_closing_reminder, eventStartingReminder: row.event_starting_reminder, registrationClosingStatus: row.registration_closing_status, eventStartingStatus: row.event_starting_status } : DEFAULT_PREFERENCES);
   } catch (err) { next(err); }
 });
 
 router.put('/notification-preferences', async (req, res, next) => {
   try {
     const { email, ...preferences } = req.body;
-    const merged = { ...DEFAULT_PREFERENCES, ...notificationPreferences.get(email), ...preferences };
-    notificationPreferences.set(email, merged);
+    const existing = findPreferenceRow(email);
+    const current = existing ? { registrationClosingReminder: existing.registration_closing_reminder, eventStartingReminder: existing.event_starting_reminder, registrationClosingStatus: existing.registration_closing_status, eventStartingStatus: existing.event_starting_status } : DEFAULT_PREFERENCES;
+    const merged = { ...current, ...preferences };
+    const row = {
+      email,
+      registration_closing_reminder: merged.registrationClosingReminder,
+      event_starting_reminder: merged.eventStartingReminder,
+      registration_closing_status: merged.registrationClosingStatus,
+      event_starting_status: merged.eventStartingStatus,
+    };
+    if (existing) Object.assign(existing, row);
+    else db.notification_preference.push(row);
     res.json(merged);
   } catch (err) { next(err); }
 });

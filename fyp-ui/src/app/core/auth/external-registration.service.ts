@@ -1,6 +1,8 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { Observable, delay, of } from 'rxjs';
-import { AuthUser, UserRole } from './auth.models';
+import { Observable, catchError, delay, map, of } from 'rxjs';
+import { environment } from '../../../environments/environment';
+import { AuthUser } from './auth.models';
 import { AuthService } from './auth.service';
 import {
   ExternalRegistrationApi,
@@ -15,8 +17,14 @@ interface PendingChallenge { readonly request: ExternalUserRegistrationRequest; 
 @Injectable({ providedIn: 'root' })
 export class ExternalRegistrationService implements ExternalRegistrationApi {
   private readonly auth = inject(AuthService);
+  private readonly http = inject(HttpClient);
   private readonly challenges = new Map<string, PendingChallenge>();
 
+  // OTP delivery is still a dev-only mock (no email/SMS provider wired up) — this only stages
+  // the submitted form data locally and hands back a fixed code to display on-screen. The real
+  // account is NOT created here; it's created by verifyOtp() below, once the (mock) code is
+  // confirmed, via a real backend call — so a challenge that's never verified never becomes an
+  // account.
   registerExternalUser(request: ExternalUserRegistrationRequest): Observable<ExternalUserRegistrationResponse> {
     const challengeId = `external-${Date.now()}`;
     const otp = '246810';
@@ -33,19 +41,20 @@ export class ExternalRegistrationService implements ExternalRegistrationApi {
     const challenge = this.challenges.get(request.challengeId);
     if (!challenge) return of<VerifyExternalOtpResponse>({ status: 'expired', message: 'This verification request has expired.' }).pipe(delay(180));
     if (!/^\d{6}$/.test(request.otp.trim())) return of<VerifyExternalOtpResponse>({ status: 'invalid', message: 'The verification code is incorrect.' }).pipe(delay(180));
+    if (request.otp.trim() !== challenge.otp) return of<VerifyExternalOtpResponse>({ status: 'invalid', message: 'The verification code is incorrect.' }).pipe(delay(180));
 
-    const user: AuthUser = {
-      email: challenge.request.email,
-      displayName: challenge.request.firstName,
-      username: challenge.request.email.split('@', 1)[0],
-      role: UserRole.ExternalUser,
-      accountType: 'external',
-      roleLabel: 'Registered External User',
-      department: 'External Community',
-    };
-    this.challenges.delete(request.challengeId);
-    this.auth.establishSession(user);
-    return of<VerifyExternalOtpResponse>({ status: 'verified', user, message: 'Your account has been verified.' }).pipe(delay(220));
+    const { email, firstName, lastName, age, gender, password } = challenge.request;
+    return this.http.post<AuthUser>(`${environment.authApiUrl}/register`, { email, firstName, lastName, age, gender, password }).pipe(
+      map((user) => {
+        this.challenges.delete(request.challengeId);
+        this.auth.establishSession(user);
+        return { status: 'verified' as const, user, message: 'Your account has been verified.' };
+      }),
+      catchError((err) => of<VerifyExternalOtpResponse>({
+        status: 'invalid',
+        message: err?.error?.message || 'Registration could not be completed. Please try again.',
+      })),
+    );
   }
 
   private maskEmail(email: string): string {

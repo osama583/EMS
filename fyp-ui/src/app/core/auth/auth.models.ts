@@ -3,6 +3,7 @@ export enum UserRole {
   Applicant = 'applicant',
   ClubPresident = 'club-president',
   Student = 'student',
+  Lecturer = 'lecturer',
   Staff = 'staff',
   HosHod = 'hos-hod',
   Cfo = 'cfo',

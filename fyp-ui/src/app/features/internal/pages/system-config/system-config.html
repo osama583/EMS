@@ -14,31 +14,35 @@
     <h3>Approval Workflows & Policies</h3>
     <p class="system-config__desc">Configure threshold values and cancellation policies for event applications.</p>
 
-    <div class="system-config__card">
-      <app-form-field
-        controlId="config-pax-threshold"
-        label="High Pax Threshold (Number of attendees)"
-        type="number"
-        min="1"
-        [value]="paxThreshold()"
-        (valueChange)="setPaxThreshold($event)"
-      />
-      <p class="system-config__note">
-        Events with a total expected pax <strong>greater than</strong> this threshold will require additional review by the F&B Reviewer and CFO before Department Review.
-      </p>
+    @if (configLoading()) {
+      <app-loading-state variant="bars" label="Loading configuration…" [count]="2" />
+    } @else {
+      <div class="system-config__card">
+        <app-form-field
+          controlId="config-pax-threshold"
+          label="High Pax Threshold (Number of attendees)"
+          type="number"
+          min="1"
+          [value]="paxThreshold()"
+          (valueChange)="setPaxThreshold($event)"
+        />
+        <p class="system-config__note">
+          Events with a total expected pax <strong>greater than</strong> this threshold will require additional review by the F&B Reviewer and CFO before Department Review.
+        </p>
 
-      <app-form-field
-        controlId="config-cancellation-days"
-        label="Application Cancellation Deadline (Days before event date)"
-        type="number"
-        min="0"
-        [value]="cancellationDays()"
-        (valueChange)="setCancellationDays($event)"
-      />
-      <p class="system-config__note">
-        Submitters and designated co-owners are allowed to cancel an application up to <strong>{{ cancellationDays() }} days before</strong> the scheduled event date. After this deadline, the application remains read-only.
-      </p>
-    </div>
+        <app-form-field
+          controlId="config-cancellation-days"
+          label="Application Cancellation Deadline (Days before event date)"
+          type="number"
+          min="0"
+          [value]="cancellationDays()"
+          (valueChange)="setCancellationDays($event)"
+        />
+        <p class="system-config__note">
+          Submitters and designated co-owners are allowed to cancel an application up to <strong>{{ cancellationDays() }} days before</strong> the scheduled event date. After this deadline, the application remains read-only.
+        </p>
+      </div>
+    }
   </section>
 
   <section class="system-config__section">
@@ -49,7 +53,7 @@
     <app-feedback-banner [message]="errorMessage()" tone="error" />
 
     <app-internal-data-page
-      [config]="config()" [records]="records()" [filters]="[]" [searchValue]="search()" [loading]="false"
+      [config]="config()" [records]="records()" [filters]="[]" [searchValue]="search()" [loading]="configLoading()"
       [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
       (searchChange)="setSearch($event)" (reset)="resetSearch()"
       (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"

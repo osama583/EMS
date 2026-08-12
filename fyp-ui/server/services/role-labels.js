@@ -1,8 +1,7 @@
 // Shared role-label/department lookup, transcribed from fyp-ui/src/app/core/auth/mock-users.ts's
-// `roleDetails` object (as corrected by Task 2.1). Keyed by the same hyphenated role string
-// values used in db.users.role (server/db/seed-users.js). Consumed by both auth.routes.js
-// (login response) and admin.routes.js (user directory projection) so the map lives in exactly
-// one place instead of being duplicated verbatim in two route files.
+// `roleDetails` object. Keyed by the same hyphenated role string values used in db.users.role.
+// Consumed by both auth.routes.js (login response) and admin.routes.js (user directory
+// projection) so the map lives in exactly one place instead of being duplicated verbatim.
 const ROLE_LABELS = {
   'external-user': { label: 'Registered External User', department: 'External Community' },
   applicant: { label: 'Applicant', department: 'APU Community' },
@@ -24,10 +23,10 @@ const ROLE_LABELS = {
   'transport-manager': { label: 'Transport Manager', department: 'Transport Services' },
   'transport-staff': { label: 'Transport Driver / Staff', department: 'Transport Services' },
   'system-admin': { label: 'System Admin', department: 'System Administration' },
-  // Plain seeded student/staff accounts from server/db/seed-users.js, used as proposal
-  // applicants (Angular's UserRole enum now includes Student/Staff, mapped to the same
-  // proposal-owner navigation as Applicant/ClubPresident — Task 4.2 fix).
+  // Plain seeded student/staff accounts, used as proposal applicants (mapped to the same
+  // proposal-owner navigation as Applicant/ClubPresident).
   student: { label: 'Student', department: 'APU Community' },
+  lecturer: { label: 'Lecturer', department: 'Academic Staff' },
   staff: { label: 'Staff', department: 'General Staff' },
 };
 

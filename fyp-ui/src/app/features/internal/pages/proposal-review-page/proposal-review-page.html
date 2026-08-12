@@ -18,10 +18,7 @@
   </div>
 
   @if (loading()) {
-    <div class="proposal-review-page__state" role="status">
-      <span class="material-symbols-rounded" aria-hidden="true">progress_activity</span>
-      <p>Loading proposal…</p>
-    </div>
+    <app-loading-state variant="spinner" label="Loading proposal…" />
   } @else if (!proposal()) {
     <div class="proposal-review-page__state" role="status">
       <span class="material-symbols-rounded" aria-hidden="true">search_off</span>

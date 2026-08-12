@@ -64,6 +64,7 @@ export const ROLE_NAVIGATION: Readonly<Record<UserRole, RoleNavigation>> = {
   [UserRole.Applicant]: proposalRole('My Proposals', true),
   [UserRole.ClubPresident]: proposalRole('My Proposals', true),
   [UserRole.Student]: proposalRole('My Proposals', true),
+  [UserRole.Lecturer]: proposalRole('My Proposals', true),
   [UserRole.Staff]: proposalRole('My Proposals', true),
   [UserRole.HosHod]: proposalRole('Event Proposals'),
   [UserRole.Cfo]: (() => { const navigation = proposalRole('Event Proposals'); return { ...navigation, sections: [...navigation.sections, dropdownSettings(UserRole.Cfo)] }; })(),

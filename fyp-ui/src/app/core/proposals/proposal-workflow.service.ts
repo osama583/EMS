@@ -11,6 +11,9 @@ export class ProposalWorkflowService {
 
   list(): Observable<readonly ProposalReviewRecord[]> { return this.repository.list(); }
   getById(id: number): Observable<ProposalReviewRecord | undefined> { return this.repository.getById(id); }
+  create(payload: Record<string, unknown>): Observable<ProposalReviewRecord> { return this.repository.create(payload); }
+  saveDraft(payload: Record<string, unknown>): Observable<ProposalReviewRecord> { return this.repository.saveDraft(payload); }
+  deleteDraft(id: number): Observable<void> { return this.repository.deleteDraft(id); }
 
   approveAsReviewer(id: number, reviewerRole: UserRole): Observable<ProposalReviewRecord> {
     return this.repository.approveAsReviewer(id, reviewerRole);

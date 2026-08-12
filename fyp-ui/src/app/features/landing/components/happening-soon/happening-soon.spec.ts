@@ -1,8 +1,50 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { environment } from '../../../../../environments/environment';
+import { PublishedEvent } from '../../../../core/events/published-event.models';
 import { HappeningSoonComponent } from './happening-soon';
+
+const inDays = (days: number): string => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+};
+
+// Mirrors the old hardcoded 5-event fixture (titles/images/day offsets 1/3/5/7/9, all inside the
+// "Next 10 days" window) so this spec's pre-existing carousel-behaviour assertions still hold once
+// the deck is driven by a real HTTP-fetched `PublishedEvent[]` instead of a literal array.
+const MOCK_EVENT_FIXTURES: readonly { title: string; days: number; image: string }[] = [
+  { title: 'Future Forward: Tech Expo', days: 1, image: '/assets/events/tech-expo.jpg' },
+  { title: 'One World Cultural Night', days: 3, image: '/assets/events/cultural-night.jpg' },
+  { title: 'APU Esports Showdown', days: 5, image: '/assets/events/esports-showdown.jpg' },
+  { title: 'Campus After Dark', days: 7, image: '/assets/events/campus-after-dark.jpg' },
+  { title: 'Wellness Run & Community Day', days: 9, image: '/assets/events/wellness-run.jpg' },
+];
+
+const MOCK_PUBLISHED_EVENTS: readonly PublishedEvent[] = MOCK_EVENT_FIXTURES.map((fixture, index) => ({
+  id: `evt-${index + 1}`,
+  eventTitle: fixture.title,
+  shortIntroduction: 'Mock introduction.',
+  goals: 'Mock goals.',
+  expectedBenefits: 'Mock benefits.',
+  categories: ['Entertainment & Social'],
+  eventVisibility: 'Public',
+  eventFormat: 'On Campus',
+  eventImage: { url: fixture.image, fileName: fixture.image.split('/').at(-1) ?? 'mock.jpg', mimeType: 'image/jpeg', sizeBytes: 0, status: 'uploaded' },
+  schoolDepartment: 'Student Affairs',
+  audience: ['APU Community'],
+  schedule: [{ date: inDays(fixture.days), start: '10:00', end: '12:00', location: 'APU Atrium' }],
+  totalExpectedPax: 100,
+  registrationMode: 'Automatic',
+  confirmedRegistrationCount: 10,
+  pendingRegistrationCount: 0,
+  isFree: true,
+}));
 
 describe('HappeningSoonComponent', () => {
   let fixture: ComponentFixture<HappeningSoonComponent>;
+  let httpMock: HttpTestingController;
 
   beforeEach(async () => {
     Object.defineProperty(window, 'matchMedia', {
@@ -20,14 +62,19 @@ describe('HappeningSoonComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [HappeningSoonComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
 
     vi.useFakeTimers();
     fixture = TestBed.createComponent(HappeningSoonComponent);
+    httpMock = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+    httpMock.expectOne(environment.eventsApiUrl).flush(MOCK_PUBLISHED_EVENTS);
     fixture.detectChanges();
   });
 
   afterEach(() => {
+    httpMock.verify();
     fixture.destroy();
     TestBed.resetTestingModule();
     vi.useRealTimers();
@@ -39,9 +86,9 @@ describe('HappeningSoonComponent', () => {
     const section = fixture.nativeElement.querySelector('#happening-soon') as HTMLElement;
     const eventCards = fixture.nativeElement.querySelectorAll('.event-card');
 
-    expect(component.events).toHaveLength(5);
+    expect(component.events()).toHaveLength(5);
     expect(
-      component.events.every((event) => event.daysFromNow >= 1 && event.daysFromNow <= 10),
+      component.events().every((event) => event.daysFromNow >= 1 && event.daysFromNow <= 10),
     ).toBe(true);
     expect(section).not.toBeNull();
     expect(eventCards).toHaveLength(4);
@@ -193,5 +240,29 @@ describe('HappeningSoonComponent', () => {
     expect(component.isTransitioning()).toBe(false);
     expect(component.progressCycle()).toBe(previousCycle + 2);
     expect(component.isProgressPaused()).toBe(false);
+  });
+
+  it('shows an empty state when there are no upcoming events', async () => {
+    httpMock.verify();
+    fixture.destroy();
+    TestBed.resetTestingModule();
+
+    await TestBed.configureTestingModule({
+      imports: [HappeningSoonComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    }).compileComponents();
+
+    const emptyFixture = TestBed.createComponent(HappeningSoonComponent);
+    const emptyHttpMock = TestBed.inject(HttpTestingController);
+    emptyFixture.detectChanges();
+    emptyHttpMock.expectOne(environment.eventsApiUrl).flush([]);
+    emptyFixture.detectChanges();
+
+    const element = emptyFixture.nativeElement as HTMLElement;
+    expect(element.querySelector('.happening-empty')).not.toBeNull();
+    expect(element.textContent).toContain('Nothing happening just yet');
+
+    emptyHttpMock.verify();
+    emptyFixture.destroy();
   });
 });

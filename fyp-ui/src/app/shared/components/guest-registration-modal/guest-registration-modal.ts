@@ -41,6 +41,7 @@ import { roleCanUseSavedEvents } from '../../../core/auth/role-navigation';
           <div class="guest-registration-form__grid">
             <app-form-field controlId="external-email" label="Email" type="email" autocomplete="email" [required]="true" [value]="email()" (valueChange)="email.set($event)" />
             <app-form-field controlId="external-first-name" label="First name" autocomplete="given-name" [required]="true" [value]="firstName()" (valueChange)="firstName.set($event)" />
+            <app-form-field controlId="external-last-name" label="Last name" autocomplete="family-name" [required]="true" [value]="lastName()" (valueChange)="lastName.set($event)" />
             <app-form-field controlId="external-age" label="Age" type="number" min="13" [required]="true" [value]="age()" [error]="ageError()" (valueChange)="age.set($event)" />
             <app-form-field controlId="external-gender" label="Gender" [required]="true" [value]="gender()" [options]="genderOptions" (valueChange)="gender.set($event)" />
             <app-form-field class="guest-registration-form__wide" controlId="external-password" label="Password" type="password" autocomplete="new-password" [required]="true" [value]="password()" [error]="passwordError()" hint="Use at least 8 characters." (valueChange)="password.set($event)" />
@@ -78,6 +79,7 @@ export class GuestRegistrationModalComponent {
   readonly stage = signal<'login' | 'details' | 'otp'>('login');
   readonly email = signal('');
   readonly firstName = signal('');
+  readonly lastName = signal('');
   readonly age = signal('');
   readonly gender = signal('');
   readonly password = signal('');
@@ -102,7 +104,7 @@ export class GuestRegistrationModalComponent {
     : this.password() && this.password().length < 8 ? 'Password must contain at least 8 characters.' : '');
   readonly otpError = computed(() => this.otp() && !/^\d{6}$/.test(this.otp()) ? 'Verification code must contain 6 digits.' : '');
   readonly formValid = computed(() => this.stage() === 'details'
-    ? /^\S+@\S+\.\S+$/.test(this.email().trim()) && !!this.firstName().trim() && Number(this.age()) >= 13 && !!this.gender() && this.password().length >= 8
+    ? /^\S+@\S+\.\S+$/.test(this.email().trim()) && !!this.firstName().trim() && !!this.lastName().trim() && Number(this.age()) >= 13 && !!this.gender() && this.password().length >= 8
     : /^\d{6}$/.test(this.otp()));
 
   constructor() {
@@ -129,7 +131,7 @@ export class GuestRegistrationModalComponent {
   private startVerification(): void {
     this.loading.set(true);
     this.registration.registerExternalUser({
-      email: this.email(), firstName: this.firstName(), age: Number(this.age()), gender: this.gender(), password: this.password(),
+      email: this.email(), firstName: this.firstName(), lastName: this.lastName(), age: Number(this.age()), gender: this.gender(), password: this.password(),
     }).subscribe({
       next: (response) => {
         this.loading.set(false);
@@ -175,7 +177,7 @@ export class GuestRegistrationModalComponent {
   }
 
   private reset(): void {
-    this.stage.set('login'); this.email.set(''); this.firstName.set(''); this.age.set(''); this.gender.set('');
+    this.stage.set('login'); this.email.set(''); this.firstName.set(''); this.lastName.set(''); this.age.set(''); this.gender.set('');
     this.password.set(''); this.otp.set(''); this.challengeId.set(''); this.maskedEmail.set(''); this.developmentOtp.set('');
     this.serviceError.set(''); this.loading.set(false);
     this.emailError.set(''); this.loginPasswordError.set('');

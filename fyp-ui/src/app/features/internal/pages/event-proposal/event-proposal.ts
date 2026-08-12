@@ -1,7 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, OnDestroy, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription, finalize } from 'rxjs';
 import { FormFieldComponent } from '../../../../shared/components/form-controls/form-field';
 import { SearchableDropdownComponent } from '../../../../shared/components/searchable-dropdown/searchable-dropdown';
@@ -14,6 +14,7 @@ import { ValidationMessageComponent } from '../../../../shared/components/valida
 import { EditableRow, EditableTableColumn, SelectOption, StaffOption, FormControlType } from '../../../../shared/components/form-controls/form-controls.models';
 import { RequestOption, RequestOptionKind } from '../../../../core/request-options/request-option.models';
 import { RequestOptionService } from '../../../../core/request-options/request-option.service';
+import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { UserRole } from '../../../../core/auth/auth.models';
 import { EVENT_CATEGORY_OPTIONS, EventImageAsset, EventVisibility, RegistrationMode } from '../../../../core/events/published-event.models';
@@ -36,7 +37,7 @@ const options = (...labels: string[]): readonly SelectOption[] => labels.map(opt
 
 @Component({
   selector: 'app-event-proposal',
-  imports: [FormFieldComponent, SearchableDropdownComponent, ProposalTableComponent, ValidationMessageComponent, StepIndicatorComponent, FormModalComponent, EventImageUploadComponent, FeedbackBannerComponent],
+  imports: [FormFieldComponent, SearchableDropdownComponent, ProposalTableComponent, ValidationMessageComponent, StepIndicatorComponent, FormModalComponent, EventImageUploadComponent, FeedbackBannerComponent, LoadingStateComponent],
   templateUrl: './event-proposal.html',
   styleUrl: './event-proposal.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -45,12 +46,13 @@ export class EventProposalComponent implements OnDestroy {
   private readonly document = inject(DOCUMENT);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly workflow = inject(ProposalWorkflowService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly optionService = inject(RequestOptionService);
   private readonly applicant = this.auth.user();
   private readonly requestOptionCatalog = signal<readonly RequestOption[]>([]);
-  private readonly requestCatalogLoading = signal(true);
+  readonly requestCatalogLoading = signal(true);
   private readonly requestOptionSubscription: Subscription = this.optionService.watchActiveCatalog().subscribe({ next: (options) => { this.requestOptionCatalog.set(options); this.requestCatalogLoading.set(false); }, error: () => this.requestCatalogLoading.set(false) });
   private validationGuidanceTimer: ReturnType<typeof setTimeout> | undefined;
   private requestOptionsTimer: ReturnType<typeof setTimeout> | undefined;
@@ -58,6 +60,8 @@ export class EventProposalComponent implements OnDestroy {
   readonly currentStep = signal(0);
   readonly status = signal<'Draft' | 'Draft saved' | 'Submitted'>('Draft');
   readonly resubmitProposalId = signal<number | null>(null);
+  readonly draftRequestId = signal<number | null>(null);
+  readonly savingDraft = signal(false);
   readonly reviewerComment = signal('');
   readonly resubmitting = signal(false);
   readonly errors = signal<Readonly<Record<string, string>>>({});
@@ -136,9 +140,15 @@ export class EventProposalComponent implements OnDestroy {
   constructor() {
     const proposalId = Number(this.route.snapshot.queryParamMap.get('proposalId'));
     if (Number.isFinite(proposalId) && proposalId > 0) {
-      this.resubmitProposalId.set(proposalId);
       this.workflow.getById(proposalId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((record) => {
-        if (record) this.prefillFromRecord(record);
+        if (!record) return;
+        // A record still in status 'Draft' was opened from the Drafts list to keep editing — it
+        // continues saving as a draft (and eventually submits fresh) rather than going through
+        // resubmitFromApplicant(), which only exists for proposals a reviewer sent back
+        // (status='resubmission_required') and would reject a plain draft's status server-side.
+        if (record.status === 'Draft') this.draftRequestId.set(proposalId);
+        else this.resubmitProposalId.set(proposalId);
+        this.prefillFromRecord(record);
       });
     }
   }
@@ -582,7 +592,14 @@ export class EventProposalComponent implements OnDestroy {
       view.setTimeout(() => target.classList.remove('proposal-field-target'), 1800);
     }));
   }
-  saveDraft(): void { this.status.set('Draft saved'); this.showToast('Draft saved in this browser session.'); }
+  saveDraft(): void {
+    this.savingDraft.set(true);
+    const payload = { ...this.buildSubmissionPayload(), draftRequestId: this.draftRequestId() ?? undefined };
+    this.workflow.saveDraft(payload).pipe(finalize(() => this.savingDraft.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (record) => { this.draftRequestId.set(record.id); this.status.set('Draft saved'); this.showToast('Draft saved.'); },
+      error: () => this.showToast('The draft could not be saved. Please try again.'),
+    });
+  }
   openPreview(): void { this.previewOpen.set(true); }
   closePreview(): void { this.previewOpen.set(false); }
   closeValidationModal(): void {
@@ -596,6 +613,33 @@ export class EventProposalComponent implements OnDestroy {
     this.closeValidationModal();
     queueMicrotask(() => this.focusFirstInvalid());
   }
+  private buildSubmissionPayload(): Record<string, unknown> {
+    return {
+      applicantEmail: this.email(),
+      applicantDepartment: this.department(),
+      eventTitle: this.eventTitle(),
+      shortIntroduction: this.shortIntro(),
+      goals: this.goals(),
+      benefits: this.benefits(),
+      totalPax: this.totalPax(),
+      eventVisibility: this.eventVisibility(),
+      eventFormat: this.eventFormat(),
+      registrationMode: this.registrationMode(),
+      publicity: this.publicity(),
+      eventImage: this.eventImage(),
+      eventCategories: this.eventCategories(),
+      selectedRequirements: this.selectedRequirements(),
+      scheduleRows: this.schedule(),
+      coOwners: this.coOwners(),
+      organizers: this.organizers(),
+      importantPeople: this.importantPeople(),
+      guests: this.guests(),
+      agenda: this.agenda(),
+      discussions: this.discussions(),
+      requestRows: this.requestRows(),
+    };
+  }
+
   submit(): void {
     this.submitAttempted.set(true);
     const stepValidity = this.steps.map((_, index) => this.validateStep(index, false));
@@ -618,12 +662,25 @@ export class EventProposalComponent implements OnDestroy {
         benefits: this.benefits(),
         totalPax: this.totalPax(),
       }).pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-        next: () => { this.status.set('Submitted'); this.previewOpen.set(false); this.reviewerComment.set(''); this.showToast('Proposal resubmitted — it resumes at the stage that sent it back.'); },
+        next: () => {
+          this.status.set('Submitted'); this.previewOpen.set(false); this.reviewerComment.set('');
+          this.showToast('Proposal resubmitted — it resumes at the stage that sent it back.');
+          void this.router.navigateByUrl('/app/proposals/pending');
+        },
         error: () => this.showToast('The proposal could not be resubmitted. Please try again.'),
       });
       return;
     }
-    this.status.set('Submitted'); this.previewOpen.set(false); this.showToast('Proposal submitted successfully.');
+    this.resubmitting.set(true);
+    const payload = { ...this.buildSubmissionPayload(), draftRequestId: this.draftRequestId() ?? undefined };
+    this.workflow.create(payload).pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.status.set('Submitted'); this.previewOpen.set(false);
+        this.showToast('Proposal submitted successfully.');
+        void this.router.navigateByUrl('/app/proposals/pending');
+      },
+      error: () => this.showToast('The proposal could not be submitted. Please try again.'),
+    });
   }
 
   private validateStep(step: number, focus = true): boolean {

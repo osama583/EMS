@@ -1,15 +1,40 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnDestroy, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { GuestRegistrationFlowService } from '../../../core/auth/external-registration.service';
 import { AuthService } from '../../../core/auth/auth.service';
-import { AuthUser } from '../../../core/auth/auth.models';
+import { AuthUser, UserRole } from '../../../core/auth/auth.models';
 import { SavedEventsService } from '../../../core/events/saved-events.service';
 import type { MockAuthRecord } from '../../../core/auth/mock-users';
 import { roleCanUseSavedEvents } from '../../../core/auth/role-navigation';
 import { FormFieldComponent } from '../../../shared/components/form-controls/form-field';
 import { GuestRegistrationModalComponent } from '../../../shared/components/guest-registration-modal/guest-registration-modal';
 import { environment } from '../../../../environments/environment';
+
+interface DemoUserGroup { readonly label: string; readonly users: readonly MockAuthRecord[]; }
+
+// Fixed display order (per request): students, then school/lecturer staff, then department
+// staff, then HOS/HOD unit heads, then department/service managers, then their frontline staff.
+// Roles not explicitly bucketed (Applicant, ClubPresident, ExternalUser, SystemAdmin) fall into
+// "Other" at the end rather than being silently dropped.
+const DEMO_GROUP_ORDER: readonly { label: string; roles: readonly UserRole[] }[] = [
+  { label: 'Students', roles: [UserRole.Student] },
+  { label: 'School Staff / Lecturers', roles: [UserRole.Lecturer] },
+  { label: 'Department Staff', roles: [UserRole.Staff] },
+  { label: 'HOS / HOD', roles: [UserRole.HosHod] },
+  {
+    label: 'Department Managers', roles: [
+      UserRole.Cfo, UserRole.Fmb, UserRole.CafeteriaManager, UserRole.LogisticsManager,
+      UserRole.StudentServicesManager, UserRole.AvManager, UserRole.PhotographyManager, UserRole.TransportManager,
+    ],
+  },
+  {
+    label: 'Service Unit Staff', roles: [
+      UserRole.CafeteriaStaff, UserRole.CafeteriaAdmin, UserRole.LogisticsStaff,
+      UserRole.StudentServicesMember, UserRole.AvTechnician, UserRole.PhotographyStaff, UserRole.TransportStaff,
+    ],
+  },
+];
 
 @Component({
   selector: 'app-login',
@@ -45,7 +70,31 @@ export class LoginComponent implements OnDestroy {
   readonly selectedDemoEmail = signal<string | null>(null);
   readonly demoAuthEnabled = environment.enableMockAuth;
   readonly demoUsers = environment.mockUsers;
+  readonly demoSearch = signal('');
   readonly year = new Date().getFullYear();
+
+  readonly demoGroups = computed<readonly DemoUserGroup[]>(() => {
+    const query = this.demoSearch().trim().toLowerCase();
+    const matches = (user: MockAuthRecord): boolean => !query
+      || user.displayName.toLowerCase().includes(query)
+      || user.email.toLowerCase().includes(query)
+      || user.roleLabel.toLowerCase().includes(query)
+      || user.department.toLowerCase().includes(query);
+
+    const filtered = this.demoUsers.filter(matches);
+    const bucketed = new Set<string>();
+    const groups: DemoUserGroup[] = [];
+    for (const { label, roles } of DEMO_GROUP_ORDER) {
+      const users = filtered.filter((user) => roles.includes(user.role));
+      users.forEach((user) => bucketed.add(user.email));
+      if (users.length) groups.push({ label, users });
+    }
+    const other = filtered.filter((user) => !bucketed.has(user.email));
+    if (other.length) groups.push({ label: 'Other', users: other });
+    return groups;
+  });
+
+  setDemoSearch(value: string): void { this.demoSearch.set(value); }
 
   constructor() {
     const prefersReducedMotion = this.document.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;

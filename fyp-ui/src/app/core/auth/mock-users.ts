@@ -7,6 +7,7 @@ const roleDetails: Readonly<Record<UserRole, { label: string; department: string
   [UserRole.Applicant]: { label: 'Applicant', department: 'APU Community' },
   [UserRole.ClubPresident]: { label: 'Club President', department: 'Student Clubs and Societies' },
   [UserRole.Student]: { label: 'Student', department: 'APU Community' },
+  [UserRole.Lecturer]: { label: 'Lecturer', department: 'Academic Staff' },
   [UserRole.Staff]: { label: 'Staff', department: 'General Staff' },
   [UserRole.HosHod]: { label: 'HOS / HOD', department: 'School Leadership' },
   [UserRole.Cfo]: { label: 'CFO', department: 'Finance Office' },
@@ -27,25 +28,24 @@ const roleDetails: Readonly<Record<UserRole, { label: string; department: string
   [UserRole.SystemAdmin]: { label: 'System Admin', department: 'System Administration' },
 };
 
-const account = (email: string, displayName: string, role: UserRole, cafeteriaId?: number): MockAuthRecord => ({
+const account = (email: string, displayName: string, role: UserRole, options?: { department?: string; cafeteriaId?: number }): MockAuthRecord => ({
   email,
   displayName,
   username: email.split('@', 1)[0],
   role,
   accountType: 'internal',
   roleLabel: roleDetails[role].label,
-  department: roleDetails[role].department,
+  department: options?.department ?? roleDetails[role].department,
   password: 'Demo@123',
-  ...(cafeteriaId !== undefined ? { cafeteriaId } : {}),
+  ...(options?.cafeteriaId !== undefined ? { cafeteriaId: options.cafeteriaId } : {}),
 });
 
 export const MOCK_AUTH_USERS: readonly MockAuthRecord[] = [
   account('applicant@demo.apu.edu.my', 'Applicant Demo', UserRole.Applicant),
   account('club.president@demo.apu.edu.my', 'Club President Demo', UserRole.ClubPresident),
-  account('hoshod@demo.apu.edu.my', 'HOS / HOD Demo', UserRole.HosHod),
   account('cfo@demo.apu.edu.my', 'CFO Demo', UserRole.Cfo),
   account('fmb@demo.apu.edu.my', 'F&B Demo', UserRole.Fmb),
-  account('cafeteria.manager@demo.apu.edu.my', 'Cafeteria Manager', UserRole.CafeteriaManager, 1),
+  account('cafeteria.manager@demo.apu.edu.my', 'Cafeteria Manager', UserRole.CafeteriaManager, { cafeteriaId: 1 }),
   account('cafeteria.staff@demo.apu.edu.my', 'Cafeteria Staff', UserRole.CafeteriaStaff),
   account('cafeteria.admin@demo.apu.edu.my', 'Cafeteria Admin', UserRole.CafeteriaAdmin),
   account('logistics.manager@demo.apu.edu.my', 'Logistics Manager', UserRole.LogisticsManager),
@@ -67,4 +67,24 @@ export const MOCK_AUTH_USERS: readonly MockAuthRecord[] = [
   account('transport.staff@demo.apu.edu.my', 'Captain Bob (Transport Driver)', UserRole.TransportStaff),
   account('transport.staff2@demo.apu.edu.my', 'Harish Kumar (Fleet Coordinator)', UserRole.TransportStaff),
   account('system.admin@demo.apu.edu.my', 'System Admin', UserRole.SystemAdmin),
+
+  // Academic hierarchy demo: 2 schools, each with its own HOS reviewing only its own
+  // students'/lecturers' proposals (unit-scoped — see workflow.service.js's isHosHodOfUnit).
+  account('hos.computing@demo.apu.edu.my', 'Dr. Wei Chen (HOS, School of Computing)', UserRole.HosHod, { department: 'School of Computing' }),
+  account('student.computing@demo.apu.edu.my', 'Aina Rahman (Computing Student)', UserRole.Student, { department: 'School of Computing' }),
+  account('student.computing2@demo.apu.edu.my', 'Mei Ling Tan (Computing Student)', UserRole.Student, { department: 'School of Computing' }),
+  account('lecturer.computing@demo.apu.edu.my', 'Dr. Kumar Selvam (Computing Lecturer)', UserRole.Lecturer, { department: 'School of Computing' }),
+
+  account('hos.business@demo.apu.edu.my', 'Dr. Farah Aziz (HOS, School of Business)', UserRole.HosHod, { department: 'School of Business' }),
+  account('student.business@demo.apu.edu.my', 'Daniel Wong (Business Student)', UserRole.Student, { department: 'School of Business' }),
+  account('lecturer.business@demo.apu.edu.my', 'Dr. Siti Nurhaliza (Business Lecturer)', UserRole.Lecturer, { department: 'School of Business' }),
+
+  // Non-academic hierarchy demo: 2 departments, each with its own HOD reviewing only its own
+  // staff's proposals (same unit-scoped mechanism as the schools above).
+  account('hod.marketing@demo.apu.edu.my', 'Encik Razif Hassan (HOD, Marketing)', UserRole.HosHod, { department: 'Marketing' }),
+  account('staff.marketing@demo.apu.edu.my', 'Nurul Huda (Marketing Staff)', UserRole.Staff, { department: 'Marketing' }),
+  account('staff.marketing2@demo.apu.edu.my', 'Jordan Lee (Marketing Staff)', UserRole.Staff, { department: 'Marketing' }),
+
+  account('hod.finance@demo.apu.edu.my', 'Puan Aishah Karim (HOD, Finance)', UserRole.HosHod, { department: 'Finance' }),
+  account('staff.finance@demo.apu.edu.my', 'Farah Izzati (Finance Staff)', UserRole.Staff, { department: 'Finance' }),
 ];

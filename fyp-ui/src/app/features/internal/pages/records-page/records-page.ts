@@ -327,23 +327,29 @@ export class RecordsPageComponent {
   updatePageSize(value: number): void { this.pageSize.set(value); this.page.set(1); }
   openRecord(record: InternalDataRecord): void {
     if (this.kind === 'notifications') { this.markRead(Number(record.id)); return; }
+    if (this.kind === 'drafts') { this.openDraft(Number(record.id)); return; }
     this.openReview(Number(record.id));
   }
   handleAction(event: InternalRowActionEvent): void {
     if (this.kind === 'notifications' && (event.action.key === 'open' || event.action.key === 'read')) this.markRead(Number(event.record.id));
-    // Client-side-only removal: there is no `DELETE /api/proposal-workflow/:id` route in Phase 3
-    // (confirmed against proposal-workflow.routes.js), and adding one is out of this task's scope
-    // (see task-4.3-brief.md Step 2). This only mutates local signal state — a page reload will
-    // bring the "deleted" draft right back since the server was never told to remove it. Known,
-    // intentional gap.
-    if (this.kind === 'drafts' && event.action.key === 'delete') this.records.update((records) => records.filter((record) => record.id !== event.record.id));
-    if (event.action.key === 'view') this.openReview(Number(event.record.id));
+    if (this.kind === 'drafts' && event.action.key === 'delete') this.deleteDraft(Number(event.record.id));
+    if (event.action.key === 'view') { if (this.kind === 'drafts') this.openDraft(Number(event.record.id)); else this.openReview(Number(event.record.id)); }
+  }
+
+  private deleteDraft(id: number): void {
+    this.service.deleteDraft(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => this.records.update((records) => records.filter((record) => record.id !== id)),
+      error: () => { this.error.set('The draft could not be deleted.'); },
+    });
   }
 
   private markRead(id: number): void {
     this.records.update((records) => records.map((record) => record.id === id ? { ...record, unread: false, status: 'Read' } : record));
   }
   private isRequestTracking(): boolean { return this.kind === 'request-ongoing' || this.kind === 'request-history'; }
+  private openDraft(id: number): void {
+    void this.router.navigate(['/app/forms/event-proposal'], { queryParams: { proposalId: id } });
+  }
   private openReview(id: number): void {
     const record = this.records().find((item) => item.id === id);
     if (!record) return;

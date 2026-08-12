@@ -29,6 +29,9 @@ yarn-error.log
 !.vscode/mcp.json
 .history/*
 
+# Mock backend persisted data (regenerated from seed on first run)
+/server/data
+
 # Miscellaneous
 /.angular/cache
 .sass-cache/

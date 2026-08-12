@@ -28,6 +28,37 @@ router.get('/', async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Creates a brand-new proposal from the event-proposal form's full submission payload and
+// immediately routes it into the workflow (see workflow.service.js's createProposal, which
+// calls submitProposal() internally) — the applicant never sees a bare 'draft' state.
+router.post('/', async (req, res, next) => {
+  try {
+    const { draftRequestId, ...payload } = req.body;
+    const request = workflow.createProposal(payload, draftRequestId);
+    res.status(201).json(projectProposal(request));
+  } catch (err) { next(err); }
+});
+
+// "Save as Draft" — persists the form's current in-progress state without entering the review
+// workflow. req.body.draftRequestId (optional, set by the Angular form after its first save)
+// targets an existing draft row for update-in-place instead of creating a new row on every
+// click within the same editing session.
+router.post('/draft', async (req, res, next) => {
+  try {
+    const { draftRequestId, ...payload } = req.body;
+    const request = workflow.saveDraft(payload, draftRequestId);
+    res.status(200).json(projectProposal(request));
+  } catch (err) { next(err); }
+});
+
+// Deletes a draft (status='draft' only) — used by the Drafts list's delete action.
+router.delete('/:id', async (req, res, next) => {
+  try {
+    workflow.deleteDraft(req.params.id);
+    res.status(204).end();
+  } catch (err) { next(err); }
+});
+
 router.get('/:id', async (req, res, next) => {
   try {
     const request = db.request.find((r) => r.request_id === Number(req.params.id));
@@ -86,8 +117,8 @@ router.post('/:id/resubmit-department', async (req, res, next) => {
     // For the mock server, look up ANY user with a role matching this department's manager role as
     // a stand-in actor (acceptable simplification — a real backend would authenticate the request
     // and use the actual session user). This map uses the ACTUAL seeded role
-    // strings from server/db/seed-users.js (which use hyphens, e.g. 'logistics-manager',
-    // 'transport-manager', 'photography-manager', 'av-manager', 'student-services-manager',
+    // strings (hyphenated, e.g. 'logistics-manager', 'transport-manager', 'photography-manager',
+    // 'av-manager', 'student-services-manager',
     // 'cafeteria-manager') rather than workflow.service.js's internal `roleForRequirement` map
     // (createDepartmentTasks, ~line 257), whose underscored role strings ('logistics_manager',
     // 'transportation_manager', 'photo_video_manager', 'sound_light_manager',

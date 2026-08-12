@@ -1,5 +1,5 @@
 const express = require('express');
-const { db } = require('../db');
+const { db, nextId } = require('../db');
 const { ROLE_LABELS } = require('../services/role-labels');
 
 const router = express.Router();
@@ -8,8 +8,8 @@ const router = express.Router();
 // this manager is scoped to review (see AuthUser.cafeteriaId in auth.models.ts, documented as
 // "Set only for UserRole.CafeteriaManager"). Cafeteria-staff are intentionally excluded even
 // though they also have cafeteria_assignment rows, matching that contract. A manager can be
-// assigned to multiple cafeterias (see seed-cafeteria.js); pick the lowest cafeteria_id
-// deterministically rather than depending on array insertion order.
+// assigned to multiple cafeterias; pick the lowest cafeteria_id deterministically rather than
+// depending on array insertion order.
 function cafeteriaIdFor(user) {
   if (user.role !== 'cafeteria-manager') return undefined;
   const assignments = db.cafeteria_assignment.filter(
@@ -44,6 +44,58 @@ router.post('/login', async (req, res, next) => {
       roleLabel: labels.label,
       department: departmentFor(user),
       ...(cafeteriaId !== undefined ? { cafeteriaId } : {}),
+    });
+  } catch (err) { next(err); }
+});
+
+// Self-registration for guest ("Register as a guest") accounts, called AFTER the client-side
+// mock OTP challenge in ExternalRegistrationService.verifyOtp() succeeds (see
+// external-registration.service.ts) — OTP delivery itself stays a dev-only mock (no real email/
+// SMS provider wired up yet), but the account this creates is real: a `users` row with
+// role='external-user', persisted via server/data/db.json like every other account, so the
+// guest can log back in afterward through the normal POST /login above.
+router.post('/register', async (req, res, next) => {
+  try {
+    const { email, firstName, lastName, age, gender, password } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!normalizedEmail || !firstName || !password) {
+      return res.status(400).json({ message: 'Email, first name, and password are required.' });
+    }
+    if (db.users.some((u) => u.email === normalizedEmail)) {
+      return res.status(409).json({ message: 'An account with this email already exists.' });
+    }
+
+    const user = {
+      user_id: nextId('users'),
+      first_name: firstName,
+      last_name: lastName || '',
+      email: normalizedEmail,
+      phone_number: null,
+      role: 'external-user',
+      is_active: true,
+      password,
+    };
+    db.users.push(user);
+
+    if (age !== undefined || gender !== undefined) {
+      db.external_user_profile.push({
+        external_user_profile_id: nextId('external_user_profile'),
+        user_id: user.user_id,
+        age: age !== undefined && age !== null && age !== '' ? Number(age) : null,
+        gender: gender || null,
+        registered_at: new Date().toISOString(),
+      });
+    }
+
+    const labels = ROLE_LABELS[user.role] || { label: user.role, department: 'External Community' };
+    res.status(201).json({
+      email: user.email,
+      displayName: `${user.first_name} ${user.last_name}`.trim(),
+      username: user.email.split('@')[0],
+      role: user.role,
+      accountType: 'external',
+      roleLabel: labels.label,
+      department: labels.department,
     });
   } catch (err) { next(err); }
 });
