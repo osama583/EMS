@@ -7,8 +7,14 @@ nothing about permissions itself.
 
 ## Status
 
-Foundation complete and tested. Endpoint build-out in progress — see
-[docs/README.md](docs/README.md) for what exists today.
+Backend complete: 93 routes, the full workflow state machine, auth and RBAC,
+seed data, and generated OpenAPI docs. 58 tests pass against the live database.
+
+Remaining: rewiring the Angular frontend onto this API, after which
+`fyp-ui/server` (the Node mock) is deleted.
+
+Documentation lives in [docs/](docs/README.md) — start with
+[api-design.md](docs/api-design.md) and [workflow.md](docs/workflow.md).
 
 ## Setup
 
@@ -90,8 +96,25 @@ tests/
 ## Testing
 
 ```bash
-.venv/Scripts/python -m pytest tests/ -q
+.venv/Scripts/python -m pytest tests/ -q      # 58 tests, ~3 min
 ```
 
-`tests/test_auth_wiring.py` needs no database and covers the security envelope
-(token type confusion, error shape, security headers).
+| File | Needs a database | Covers |
+|---|---|---|
+| `test_auth_wiring.py` | no | Token type confusion, error envelope, security headers |
+| `test_workflow_e2e.py` | yes | Every branch of the state machine, in rolled-back transactions |
+| `test_api_e2e.py` | yes | HTTP status codes, auth, and list scoping |
+
+The workflow tests drive real SQL against the seeded database inside a
+transaction that is always rolled back, so they exercise real constraints
+without leaving anything behind.
+
+## API documentation
+
+```bash
+.venv/Scripts/python -m docs.generate_openapi   # regenerate after route changes
+cd docs && python -m http.server 8080           # then open index.html
+```
+
+`docs/openapi.json` is generated from the live URL map and each view's
+docstring, so the spec cannot drift from the code.
