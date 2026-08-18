@@ -22,7 +22,7 @@ from flask import Blueprint, jsonify, request
 
 from ..config import config
 from ..db import fetch_one, query_one, transaction
-from ..errors import BadRequest, Conflict, Unauthorized
+from ..errors import BadRequest, Conflict, NotFound, Unauthorized
 from ..extensions import limiter
 from ..logging_setup import audit
 from ..security import (
@@ -208,3 +208,65 @@ def register():
 
     audit("auth.guest.registered", actor_user_id=user["user_id"])
     return jsonify({"user": project_auth_user(user), **_tokens_for(user["user_id"])}), 201
+
+
+# ---------------------------------------------------------------------------
+# TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
+#
+# Lists every active user plus the one shared plaintext demo password (every
+# seeded account uses the same password - see seed/run.py). Powers the login
+# page's searchable account picker. Inert unless DEMO_MODE=true; a deployment
+# that never sets it serves a 404 here regardless of anything else.
+# ---------------------------------------------------------------------------
+_DEV_USERS_SQL = """
+    SELECT u.user_id AS id, u.full_name, u.email,
+           COALESCE(s.department_or_school, st.school) AS department
+      FROM users u
+ LEFT JOIN staff s ON s.user_id = u.user_id
+ LEFT JOIN student st ON st.user_id = u.user_id
+     WHERE u.is_active AND u.archived_at IS NULL
+  ORDER BY u.full_name
+"""
+
+_DEV_USER_ROLE_SQL = """
+    SELECT r.role_name, u.description AS unit_description
+      FROM user_unit_roles uur
+      JOIN role r ON r.role_code = uur.role_code
+ LEFT JOIN unit u ON u.code = uur.unit_code
+     WHERE uur.user_id = %s AND r.archived_at IS NULL
+  ORDER BY uur.user_unit_role_id
+     LIMIT 1
+"""
+
+
+def _dev_user_rows() -> list[dict[str, object]]:
+    from ..db import query as _query
+
+    rows = _query(_DEV_USERS_SQL)
+    out = []
+    for row in rows:
+        role = _query(_DEV_USER_ROLE_SQL, (row["id"],))
+        role_label = "Unassigned"
+        if role:
+            role_label = (
+                f"{role[0]['role_name']} — {role[0]['unit_description']}"
+                if role[0]["unit_description"]
+                else role[0]["role_name"]
+            )
+        out.append(
+            {
+                "id": str(row["id"]),
+                "displayName": row["full_name"],
+                "email": row["email"],
+                "roleLabel": role_label,
+                "department": row["department"] or "APU Community",
+            }
+        )
+    return out
+
+
+@bp.get("/dev-users")
+def dev_users():
+    if not config.demo_mode:
+        raise NotFound("Not found.")
+    return jsonify([{**row, "password": config.demo_password} for row in _dev_user_rows()])
