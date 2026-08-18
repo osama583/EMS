@@ -26,15 +26,19 @@ import {
         <h1>{{ config().title }}</h1>
         <p>{{ config().description }}</p>
       </div>
-      <span class="shared-page-header__actions">
+      <div class="shared-page-header__actions">
         @if (config().countLabel) { <span class="shared-page-header__count">{{ config().countLabel }}</span> }
+        <!-- Card/Table toggle and any page-specific header buttons sit HERE, on the same row as the
+             title + description (title left, controls right) rather than in their own strip below
+             the header or inside the search/filter card. -->
+        <ng-content select="[headerTrailing]"></ng-content>
         @if (config().primaryActionLabel) {
           <button type="button" class="table-control table-control--primary" (click)="primaryAction.emit()">
             <span class="material-symbols-rounded" aria-hidden="true">{{ config().primaryActionIcon ?? 'add' }}</span>
             {{ config().primaryActionLabel }}
           </button>
         }
-      </span>
+      </div>
     </div>
   `,
   host: { class: 'shared-page-header' },

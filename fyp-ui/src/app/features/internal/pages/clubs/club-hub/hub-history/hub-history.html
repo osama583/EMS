@@ -1,11 +1,9 @@
 <section class="club-request-history">
   <app-feedback-banner [message]="errorMessage()" tone="error" />
 
-  <app-internal-page-header [config]="headerConfig()" />
-
-  <div class="club-request-history__view-row">
-    <app-view-toggle [mode]="viewMode()" (modeChange)="setViewMode($event)" />
-  </div>
+  <app-internal-page-header [config]="headerConfig()">
+    <app-view-toggle headerTrailing [mode]="viewMode()" (modeChange)="setViewMode($event)" />
+  </app-internal-page-header>
 
   <section class="internal-table-workspace__controls club-request-history__controls">
     <div workspaceControls class="shared-page-controls">

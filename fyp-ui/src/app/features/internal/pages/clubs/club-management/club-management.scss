@@ -4,14 +4,6 @@
 
 .club-management__controls { margin-top: var(--space-4); margin-bottom: var(--space-5); }
 
-.club-management__view-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-}
-
 
 .club-management__add-mobile { display: none; }
 
@@ -19,7 +11,6 @@
 .club-management__categories-btn { display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap; }
 
 @media (max-width: 47.99rem) {
-  .club-management__view-row { flex-direction: column; align-items: stretch; }
   .club-management__header-actions { flex-direction: column; align-items: stretch; width: 100%; }
   .club-management__add-desktop { display: none !important; }
   .club-management__add-mobile {

@@ -1,3 +1,24 @@
+> **SUPERSEDED — historical record, do not implement from this file (marked 2026-08-18).**
+>
+> This is the implementation prompt for the 2026-08-13 Unit + Level migration. That migration ran
+> (see `server/scripts/migrate-unit-level-roles.js`), and was then itself replaced by the
+> 2026-08-17 Role<->Unit refactor. Two things this document specifies are **no longer true of the
+> application**:
+>
+> 1. **`users.function_level` does not exist.** The manager/staff/student "level" is not a column
+>    at all. A user's roles live in `user_unit_roles (user_id, unit_code, role_code)`, and whether
+>    a role is unit-linked or flat is derived from the `role_unit` junction table — zero rows means
+>    a flat role, one or more means unit-linked. There is no `unit.unit_kind` column either.
+> 2. **`cafeteria_assignment` does not exist.** This file says the cafeteria domain "already uses
+>    the correct scoped pattern via `cafeteria_assignment` — leave it untouched". That table has
+>    since been dropped: a Cafeteria is a `unit` row (code prefixed `cafeteria__`) and its
+>    Manager/Staff are ordinary `user_unit_roles` rows, exactly like every other unit.
+>
+> For the current model read `ems_database_schema.sql` in this folder (SECTION 1 for RBAC,
+> SECTION 2 for cafeterias) and `docs/superpowers/specs/2026-08-13-rbac-role-unit-redesign-design.md`.
+
+---
+
 # Implementation Prompt: Unit + Level RBAC Migration
 
 Paste this prompt to Claude Code (or follow it directly) to execute the full migration described below, end to end.

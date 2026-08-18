@@ -1,0 +1,97 @@
+# APU EMS — Flask API
+
+REST API for the APU Event Management System. Owns the proposal workflow state
+machine, authentication, and role/unit authorisation. The Angular app in
+`../fyp-ui` is a pure client: it renders what this API returns and decides
+nothing about permissions itself.
+
+## Status
+
+Foundation complete and tested. Endpoint build-out in progress — see
+[docs/README.md](docs/README.md) for what exists today.
+
+## Setup
+
+```bash
+cd backend
+python -m venv .venv
+.venv/Scripts/pip install -r requirements.txt   # POSIX: .venv/bin/pip
+
+cp .env.example .env
+# Fill in SECRET_KEY, SUPABASE_SERVICE_KEY and DATABASE_URL. See below.
+```
+
+### Filling `.env`
+
+| Variable | Where it comes from |
+|---|---|
+| `SECRET_KEY` | `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
+| `SUPABASE_SERVICE_KEY` | Supabase → Project Settings → API → `service_role` key |
+| `DATABASE_URL` | Supabase → Project Settings → Database → Connection string → URI (**session pooler**, port 5432) |
+
+`.env` is git-ignored. Nothing in this repo reads a credential from anywhere else.
+
+### Database
+
+```bash
+.venv/Scripts/python -m migrations.run --status   # what would run
+.venv/Scripts/python -m migrations.run            # apply
+.venv/Scripts/python -m seed.run                  # realistic sample data
+```
+
+`migrations/001_initial_schema.sql` is `ems_database_schema.sql` verbatim — the
+source of truth, copied unmodified so drift between the two is visible in a
+diff. `002` adds the secondary indexes the API's hot paths need.
+
+Migrations are tracked in `schema_migrations` by filename and checksum, so
+re-running is a no-op and an edited-after-apply file is reported rather than
+silently skipped.
+
+### Run
+
+```bash
+.venv/Scripts/python wsgi.py                      # dev, port 5000
+.venv/Scripts/gunicorn -w 4 -b 0.0.0.0:5000 wsgi:app   # production
+```
+
+Health check: `GET /health` → `{"status":"ok","database":true}`.
+
+## Layout
+
+```
+app/
+  config.py         env-driven config, validated at boot
+  db.py             psycopg2 pool, query helpers, transaction()
+  errors.py         ApiError hierarchy + the one JSON error envelope
+  logging_setup.py  structured logging, request correlation, audit()
+  extensions.py     rate limiter (keyed per user, falling back to IP)
+  security/         bcrypt, JWT, Principal, RBAC decorators
+  services/         business logic — the workflow state machine lives here
+  api/              one blueprint per resource family
+migrations/         versioned SQL + runner
+seed/               sample data
+docs/               OpenAPI spec and written guides
+tests/
+```
+
+## Conventions
+
+- **All routes are under `/api/v1`.** Versioned from day one so the frontend can
+  be migrated without a flag day.
+- **Authorisation is server-side, always.** Coarse role gates are decorators
+  (`@require_roles`); rules that depend on a row's state live in
+  `services/authorization.py` and run after the row is loaded. The client's
+  claim about who it is, is never trusted — the actor comes from the JWT.
+- **Errors share one envelope**: `{"error": {"code", "message", "request_id"}}`.
+  `message` is user-safe; internal detail is logged, not returned.
+- **Every write runs in a transaction.** A workflow transition either fully
+  applies — row, tasks, and history — or not at all.
+
+## Testing
+
+```bash
+.venv/Scripts/python -m pytest tests/ -q
+```
+
+`tests/test_auth_wiring.py` needs no database and covers the security envelope
+(token type confusion, error shape, security headers).

@@ -1,7 +1,6 @@
 :host { display: block; min-width: 0; }
 .club-page { width: min(100%, 82rem); min-width: 0; margin: 0 auto; }
 
-.club-page__view-row { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-4); }
 
 .club-page__controls { margin-top: var(--space-4); margin-bottom: var(--space-5); }
 
@@ -85,5 +84,4 @@
 .club-page__status .material-symbols-rounded { font-size: 1.1rem; }
 
 @media (max-width: 47.99rem) {
-  .club-page__view-row { flex-direction: column; align-items: stretch; }
 }

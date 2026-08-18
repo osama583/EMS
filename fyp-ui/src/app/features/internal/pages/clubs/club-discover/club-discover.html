@@ -1,11 +1,9 @@
 <section class="club-page">
   <app-feedback-banner [message]="errorMessage()" tone="error" />
 
-  <app-internal-page-header [config]="cardHeaderConfig()" />
-
-  <div class="club-page__view-row">
-    <app-view-toggle [mode]="viewMode()" (modeChange)="setViewMode($event)" />
-  </div>
+  <app-internal-page-header [config]="cardHeaderConfig()">
+    <app-view-toggle headerTrailing [mode]="viewMode()" (modeChange)="setViewMode($event)" />
+  </app-internal-page-header>
 
   <section class="internal-table-workspace__controls club-page__controls">
     <div workspaceControls class="shared-page-controls">

@@ -1,20 +1,27 @@
 <section class="option-management">
   <app-feedback-banner [message]="errorMessage()" tone="error" />
 
-  @if (showCardToggle()) {
-    <app-internal-page-header [config]="cardHeaderConfig()" (primaryAction)="openAdd()" />
+  <nav class="shared-tabs" aria-label="Sections">
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="!showDeleted()" (click)="setDeletedTab(false)">
+      <span class="material-symbols-rounded" aria-hidden="true">list_alt</span>
+      {{ config().header.title }}
+    </button>
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="showDeleted()" (click)="setDeletedTab(true)">
+      <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+      Deleted
+    </button>
+  </nav>
 
-    <div class="option-management__view-row">
-      <app-view-toggle [mode]="viewMode()" (modeChange)="setViewMode($event)" />
-      <button type="button" class="table-control" (click)="toggleDeletedView()">
-        <span class="material-symbols-rounded" aria-hidden="true">{{ showDeleted() ? 'list_alt' : 'delete' }}</span>
-        {{ showDeleted() ? 'Back to options' : 'Deleted' }}
-      </button>
-      <button type="button" class="table-control table-control--primary option-management__add-desktop" (click)="openAdd()">
-        <span class="material-symbols-rounded" aria-hidden="true">add</span>
-        {{ config().header.primaryActionLabel }}
-      </button>
-    </div>
+  @if (showCardToggle()) {
+    <app-internal-page-header [config]="cardHeaderConfig()" (primaryAction)="openAdd()">
+      <div headerTrailing class="option-management__header-actions">
+        <app-view-toggle [mode]="viewMode()" (modeChange)="setViewMode($event)" />
+        <button type="button" class="table-control table-control--primary option-management__add-desktop" (click)="openAdd()">
+          <span class="material-symbols-rounded" aria-hidden="true">add</span>
+          {{ config().header.primaryActionLabel }}
+        </button>
+      </div>
+    </app-internal-page-header>
 
     @if (!showDeleted()) {
       <section class="internal-table-workspace__controls option-management__controls">
@@ -38,13 +45,6 @@
         </div>
       </section>
     }
-  } @else {
-    <div class="option-management__view-row">
-      <button type="button" class="table-control" (click)="toggleDeletedView()">
-        <span class="material-symbols-rounded" aria-hidden="true">{{ showDeleted() ? 'list_alt' : 'delete' }}</span>
-        {{ showDeleted() ? 'Back to options' : 'Deleted' }}
-      </button>
-    </div>
   }
 
   @if (showDeleted()) {

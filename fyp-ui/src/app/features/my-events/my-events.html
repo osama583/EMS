@@ -2,11 +2,6 @@
 
 <main class="my-events-page" [class.my-events-page--internal]="!publicLayout">
   <div class="my-events-page__inner">
-    <header class="my-events-page__header">
-      <h1>My Events</h1>
-      <span>Everything you have saved, registered for, or attended in one place.</span>
-    </header>
-
     <nav class="shared-tabs" aria-label="My Events sections">
       @for (tab of tabs; track tab.key) {
         <a
@@ -14,10 +9,16 @@
           [routerLink]="[basePath, tab.path]"
           routerLinkActive="shared-tabs__tab--active"
         >
+          <span class="material-symbols-rounded" aria-hidden="true">{{ tab.icon }}</span>
           {{ tab.label }}
         </a>
       }
     </nav>
+
+    <header class="my-events-page__header">
+      <h1>My Events</h1>
+      <span>Everything you have saved, registered for, or attended in one place.</span>
+    </header>
 
     <router-outlet />
   </div>

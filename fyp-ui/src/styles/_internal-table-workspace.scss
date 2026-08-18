@@ -259,14 +259,34 @@
 }
 
 .internal-table-workspace[data-view='card'] > [workspaceMobile] {
+  display: block;
+}
+
+/*
+ * The cards are children of <app-internal-mobile-record-list> (.shared-mobile-list), NOT of the
+ * [workspaceMobile] wrapper — the wrapper only ever holds that one element plus the empty state.
+ * Putting the grid on the wrapper therefore laid out a single item and every card stacked in one
+ * column. The grid belongs on the list itself so cards flow left-to-right and wrap to the next
+ * row once they run out of horizontal space.
+ */
+.internal-table-workspace[data-view='card'] > [workspaceMobile] > .shared-mobile-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
   gap: var(--space-4);
   align-items: start;
 }
 
-.internal-table-workspace[data-view='card'] > [workspaceMobile] > * {
+.internal-table-workspace[data-view='card'] > [workspaceMobile] > .shared-mobile-list > * {
   min-width: 0;
+}
+
+/*
+ * The status pill collided with the absolutely-positioned actions button (the round more_horiz
+ * control at the card's top-right corner). Cards in the desktop card view drop it; the narrow
+ * -viewport card list keeps it, since there is no table to fall back to on a phone.
+ */
+.internal-table-workspace[data-view='card'] .shared-mobile-card__status {
+  display: none;
 }
 
 .internal-table-workspace__table-scroll {

@@ -16,8 +16,8 @@ export class MyEventsComponent {
   readonly basePath = this.publicLayout ? '/my-events' : '/app/events/my-events';
 
   readonly tabs = [
-    { key: 'saved', label: 'Saved Events', path: 'saved' },
-    { key: 'registered', label: 'Registered Events', path: 'registered' },
-    { key: 'history', label: 'History', path: 'history' },
+    { key: 'saved', label: 'Saved Events', path: 'saved', icon: 'bookmark' },
+    { key: 'registered', label: 'Registered Events', path: 'registered', icon: 'how_to_reg' },
+    { key: 'history', label: 'History', path: 'history', icon: 'history' },
   ] as const;
 }

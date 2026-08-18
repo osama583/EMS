@@ -29,8 +29,10 @@
 
 .shared-page-header__actions {
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-2);
 }
 
@@ -647,6 +649,9 @@
 @media (max-width: 48rem) {
   .shared-page-header__title-row { align-items: flex-start; flex-wrap: wrap; }
   .shared-page-header__actions { width: 100%; justify-content: space-between; }
+  /* app-view-toggle goes full-width below 48rem (see view-toggle.scss); let it take its own line
+     inside the header actions instead of squeezing the count and primary action off the row. */
+  .shared-page-header__actions > app-view-toggle { flex: 1 1 100%; }
   .shared-page-header__count { padding: 0.42rem 0.7rem; font-size: 0.7rem; }
   .shared-page-controls__right { width: 100%; }
   .shared-filter-controls { min-width: 0; flex: 1 1 auto; }

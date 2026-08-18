@@ -1,11 +1,9 @@
 <section class="club-management">
   <app-feedback-banner [message]="errorMessage()" tone="error" />
 
-  <app-internal-page-header [config]="cardHeaderConfig()" (primaryAction)="openAdd()" />
-
-  <div class="club-management__view-row">
-    <app-view-toggle [mode]="viewMode()" (modeChange)="setViewMode($event)" />
-    <div class="club-management__header-actions">
+  <app-internal-page-header [config]="cardHeaderConfig()" (primaryAction)="openAdd()">
+    <div headerTrailing class="club-management__header-actions">
+      <app-view-toggle [mode]="viewMode()" (modeChange)="setViewMode($event)" />
       <button type="button" class="table-control club-management__categories-btn" (click)="openCategoryManager()">
         <span class="material-symbols-rounded" aria-hidden="true">sell</span>
         Manage categories
@@ -15,7 +13,7 @@
         Add club
       </button>
     </div>
-  </div>
+  </app-internal-page-header>
 
   <section class="internal-table-workspace__controls club-management__controls">
     <div workspaceControls class="shared-page-controls">

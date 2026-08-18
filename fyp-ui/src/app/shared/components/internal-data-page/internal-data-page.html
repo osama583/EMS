@@ -14,7 +14,11 @@
   (pageSizeChange)="pageSizeChange.emit($event)"
 >
   @if (!hideHeader()) {
-    <app-internal-page-header workspaceHeader [config]="config().header" (primaryAction)="primaryAction.emit()" />
+    <app-internal-page-header workspaceHeader [config]="config().header" (primaryAction)="primaryAction.emit()">
+      @if (showViewToggle()) {
+        <app-view-toggle headerTrailing [mode]="viewMode()" [ariaLabel]="'Choose ' + config().ariaLabel + ' view'" (modeChange)="setViewMode($event)" />
+      }
+    </app-internal-page-header>
   }
 
   @if (!hideControls()) {
@@ -31,9 +35,6 @@
           (filterChange)="filterChange.emit($event)"
         />
         <app-internal-reset-button (reset)="reset.emit()" />
-        @if (showViewToggle()) {
-          <app-view-toggle [mode]="viewMode()" [ariaLabel]="'Choose ' + config().ariaLabel + ' view'" (modeChange)="setViewMode($event)" />
-        }
       </div>
     </div>
   }

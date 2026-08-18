@@ -1,7 +1,6 @@
 :host { display: block; min-width: 0; }
 .club-request-history { width: min(100%, 82rem); min-width: 0; margin: 0 auto; }
 
-.club-request-history__view-row { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-4); }
 .club-request-history__controls { margin-top: var(--space-4); margin-bottom: var(--space-5); }
 
 // Same card grid look as My Clubs / Pending Requests (.club-page__grid/__card/__image/__body).
@@ -92,5 +91,4 @@
 .club-request-history__details dd { margin: 0; color: var(--apu-navy-900); line-height: 1.55; }
 
 @media (max-width: 47.99rem) {
-  .club-request-history__view-row { flex-direction: column; align-items: stretch; }
 }

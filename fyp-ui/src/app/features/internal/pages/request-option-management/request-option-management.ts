@@ -263,10 +263,14 @@ export class RequestOptionManagementComponent {
   // ---------------------------------------------------------------------------
   // Deleted view
   // ---------------------------------------------------------------------------
-  toggleDeletedView(): void {
-    this.showDeleted.update((value) => !value);
+  // Options | Deleted is a PAGE-level section switch, so it renders as the shared tab strip above
+  // the page title (same treatment as Users/Assignments/Deleted on the Admin Directory) rather
+  // than as a button in the header row. Tabs set the section directly instead of flipping it.
+  setDeletedTab(deleted: boolean): void {
+    if (this.showDeleted() === deleted) return;
+    this.showDeleted.set(deleted);
     this.clearNotices();
-    if (this.showDeleted()) this.loadDeleted();
+    if (deleted) this.loadDeleted();
   }
   private loadDeleted(): void {
     this.deletedLoading.set(true);
