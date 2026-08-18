@@ -416,6 +416,8 @@ def _report(accounts, counts, password: str) -> None:
     print("Every seeded account shares this password. It is printed once, here -")
     print("only the bcrypt hash is stored, so it cannot be recovered later.")
     print("Re-run with --reset --password <value> to set a different one.\n")
+    print("To enable the login page's demo-user picker (testing only):")
+    print(f"  Set DEMO_PASSWORD={password} and DEMO_MODE=true in backend/.env\n")
 
     width = max(len(email) for email, _, _ in accounts)
     for email, display_name, roles in accounts:
