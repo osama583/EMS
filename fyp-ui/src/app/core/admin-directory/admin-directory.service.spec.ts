@@ -37,8 +37,8 @@ describe('AdminDirectoryService', () => {
 
     const usersPromise = firstValueFrom(service.users$);
     const unitsPromise = firstValueFrom(service.units$);
-    httpMock.expectOne(`${environment.adminDirectoryApiUrl}/users`).flush(SEED_USERS);
-    httpMock.expectOne(`${environment.adminDirectoryApiUrl}/units`).flush(SEED_UNITS);
+    httpMock.expectOne(`${`${environment.apiBaseUrl}/admin`}/users`).flush(SEED_USERS);
+    httpMock.expectOne(`${`${environment.apiBaseUrl}/admin`}/units`).flush(SEED_UNITS);
     const [users, units] = await Promise.all([usersPromise, unitsPromise]);
 
     expect(users.length).toBeGreaterThan(0);
@@ -60,11 +60,11 @@ describe('AdminDirectoryService', () => {
       id: 'unit-student-experience', name: 'Student Experience', code: 'SE',
       description: 'Student experience operations.', active: true, roleCodes: [],
     };
-    httpMock.expectOne(`${environment.adminDirectoryApiUrl}/units`).flush(createdRecord);
+    httpMock.expectOne(`${`${environment.apiBaseUrl}/admin`}/units`).flush(createdRecord);
     const created = await createdPromise;
 
     const unitsPromise = firstValueFrom(service.units$);
-    httpMock.expectOne(`${environment.adminDirectoryApiUrl}/units`).flush([...SEED_UNITS, createdRecord]);
+    httpMock.expectOne(`${`${environment.apiBaseUrl}/admin`}/units`).flush([...SEED_UNITS, createdRecord]);
     const units = await unitsPromise;
 
     expect(created.name).toBe('Student Experience');

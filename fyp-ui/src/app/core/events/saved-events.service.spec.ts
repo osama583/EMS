@@ -22,7 +22,13 @@ const APPLICANT_USER: AuthUser = testUser(
 
 function loginViaMock(auth: AuthService, httpMock: HttpTestingController): void {
   auth.login('applicant@demo.apu.edu.my', 'Demo@123').subscribe();
-  httpMock.expectOne(`${environment.authApiUrl}/login`).flush(APPLICANT_USER);
+  httpMock.expectOne(`${environment.apiBaseUrl}/auth/login`).flush(sessionEnvelope(APPLICANT_USER));
+}
+
+
+/** Login, refresh and register all return the user wrapped with a token pair. */
+function sessionEnvelope(user: unknown) {
+  return { user, accessToken: 'test-access-token', refreshToken: 'test-refresh-token', expiresIn: 3600 };
 }
 
 describe('event engagement mock services', () => {
@@ -45,17 +51,17 @@ describe('event engagement mock services', () => {
     loginViaMock(auth, httpMock);
 
     const savePromise = firstValueFrom(saved.saveEvent(auth.user()!.email, 'evt-1'));
-    httpMock.expectOne(`${environment.eventEngagementApiUrl}/saved`).flush({ eventId: 'evt-1', saved: true });
+    httpMock.expectOne(`${`${environment.apiBaseUrl}/events/me`}/saved`).flush({ eventId: 'evt-1', saved: true });
     await savePromise;
     expect(saved.isSaved('evt-1')).toBe(true);
 
     const savedEventsPromise = firstValueFrom(saved.getSavedEvents(auth.user()!.email));
-    httpMock.expectOne((req) => req.method === 'GET' && req.url === `${environment.eventEngagementApiUrl}/saved`)
+    httpMock.expectOne((req) => req.method === 'GET' && req.url === `${`${environment.apiBaseUrl}/events/me`}/saved`)
       .flush({ items: [{ id: 'evt-1' }, { id: 'evt-2' }], total: 2 });
     expect((await savedEventsPromise).items[0]?.id).toBe('evt-1');
 
     const removePromise = firstValueFrom(saved.removeSavedEvent(auth.user()!.email, 'evt-1'));
-    httpMock.expectOne((req) => req.method === 'DELETE' && req.url === `${environment.eventEngagementApiUrl}/saved/evt-1`)
+    httpMock.expectOne((req) => req.method === 'DELETE' && req.url === `${`${environment.apiBaseUrl}/events/me`}/saved/evt-1`)
       .flush({ eventId: 'evt-1', saved: false });
     await removePromise;
     expect(saved.isSaved('evt-1')).toBe(false);
@@ -74,9 +80,9 @@ describe('event engagement mock services', () => {
     const httpMock = TestBed.inject(HttpTestingController);
     const resultPromise = firstValueFrom(registration.verifyOtp({ challengeId: challenge.challengeId, otp: challenge.developmentOtp! }));
     await new Promise((resolve) => setTimeout(resolve, 0));
-    httpMock.expectOne(`${environment.authApiUrl}/register`).flush(testUser([testRole('external-user')], {
+    httpMock.expectOne(`${environment.apiBaseUrl}/auth/register`).flush(sessionEnvelope(testUser([testRole('external-user')], {
       email: 'guest@example.com', displayName: 'Guest User', username: 'guest', accountType: 'external',
-    }));
+    })));
     const result = await resultPromise;
     expect(result.status).toBe('verified');
     expect(auth.user()?.roles.some((role) => role.roleCode === 'external-user')).toBe(true);
@@ -89,7 +95,7 @@ describe('event engagement mock services', () => {
     const httpMock = TestBed.inject(HttpTestingController);
     let success = false;
     auth.login('applicant@demo.apu.edu.my', 'Demo@123').subscribe((result) => { success = result.success; });
-    httpMock.expectOne(`${environment.authApiUrl}/login`).flush(APPLICANT_USER);
+    httpMock.expectOne(`${environment.apiBaseUrl}/auth/login`).flush(sessionEnvelope(APPLICANT_USER));
     expect(success).toBe(true);
 
     TestBed.inject(HttpTestingController).verify();

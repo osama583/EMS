@@ -7,7 +7,7 @@ import { StaffTask, StaffTaskAssignmentDraft, StaffTaskRepository, StaffTaskRout
 @Injectable({ providedIn: 'root' })
 export class ApiStaffTaskRepository implements StaffTaskRepository {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = environment.staffTasksApiUrl;
+  private readonly baseUrl = `${environment.apiBaseUrl}/tasks`;
   list(role: StaffTaskRoutingKey, assignedToEmail: string): Observable<readonly StaffTask[]> { return this.http.get<readonly StaffTask[]>(this.baseUrl, { params: { role, assignedToEmail } }); }
   assign(draft: StaffTaskAssignmentDraft): Observable<StaffTask> { return this.http.post<StaffTask>(`${this.baseUrl}/assignments`, draft); }
   updateStatus(id: string, status: StaffTaskStatus, staffEmail: string): Observable<StaffTask> { return this.http.patch<StaffTask>(`${this.baseUrl}/${encodeURIComponent(id)}/status`, { status, staffEmail }); }

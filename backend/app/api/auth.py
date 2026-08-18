@@ -16,12 +16,13 @@ code. See docs/security.md.
 from __future__ import annotations
 
 import logging
+import uuid
 
 from flask import Blueprint, jsonify, request
 
 from ..config import config
-from ..db import query_one, transaction
-from ..errors import BadRequest, Unauthorized
+from ..db import fetch_one, query_one, transaction
+from ..errors import BadRequest, Conflict, Unauthorized
 from ..extensions import limiter
 from ..logging_setup import audit
 from ..security import (
@@ -145,3 +146,65 @@ def me():
     if not user:
         raise Unauthorized("Your account no longer exists.")
     return jsonify(project_auth_user(user))
+
+
+@bp.post("/register")
+@limiter.limit(config.ratelimit_auth)
+def register():
+    """Self-registration for an EXTERNAL guest account.
+
+    Guests may browse, save and register for public events. They can never
+    submit a proposal or reach any internal page - that is enforced by the
+    'external-user' role, which @require_internal rejects, not by anything the
+    client sends.
+
+    Returns the same envelope as login, so the caller is signed in immediately.
+    """
+    body = _json_body()
+    email = str(body.get("email", "")).strip().lower()
+    password = str(body.get("password", ""))
+    first_name = str(body.get("firstName", "")).strip()
+    last_name = str(body.get("lastName", "")).strip()
+
+    if not email or not password or not first_name:
+        raise BadRequest("Email, password and first name are required.")
+    if len(password) < 8:
+        raise BadRequest("Choose a password of at least 8 characters.")
+    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise BadRequest(f"Password must be at most {MAX_PASSWORD_BYTES} bytes.")
+
+    full_name = (first_name + " " + last_name).strip()
+    with transaction() as cur:
+        existing = fetch_one(
+            cur, "SELECT user_id FROM users WHERE lower(email) = %s", (email,)
+        )
+        if existing:
+            # Deliberately vague: a precise message would confirm which
+            # addresses already hold an account.
+            raise Conflict("That email address cannot be registered.")
+
+        username = email.split("@")[0][:80]
+        # Usernames are unique; a guest whose local part collides with an
+        # existing account gets a suffixed one rather than a failed signup.
+        if fetch_one(cur, "SELECT 1 FROM users WHERE lower(username) = lower(%s)", (username,)):
+            username = (username[:70] + "-" + uuid.uuid4().hex[:8])
+
+        cur.execute(
+            """INSERT INTO users (full_name, username, email, password, is_active)
+               VALUES (%s, %s, %s, %s, TRUE) RETURNING user_id, full_name, username, email""",
+            (full_name, username, email, hash_password(password)),
+        )
+        user = dict(cur.fetchone())
+        cur.execute(
+            "INSERT INTO user_unit_roles (user_id, unit_code, role_code) VALUES (%s, NULL, %s)",
+            (user["user_id"], "external-user"),
+        )
+        age = body.get("age")
+        cur.execute(
+            """INSERT INTO external_user_profile (user_id, age, gender)
+               VALUES (%s, %s, %s)""",
+            (user["user_id"], int(age) if str(age or "").isdigit() else None, body.get("gender")),
+        )
+
+    audit("auth.guest.registered", actor_user_id=user["user_id"])
+    return jsonify({"user": project_auth_user(user), **_tokens_for(user["user_id"])}), 201

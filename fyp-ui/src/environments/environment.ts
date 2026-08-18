@@ -1,17 +1,6 @@
+// Local development. `ng serve` proxies /api to the Flask backend on port 5000
+// (see proxy.conf.json), so a relative base URL avoids CORS entirely in dev.
 export const environment = {
   production: false,
-  enableMockAuth: true,
-  authApiUrl: '/api/auth',
-  requestOptionsApiUrl: '/api/request-options',
-  adminDirectoryApiUrl: '/api/admin',
-  staffTasksApiUrl: '/api/staff-tasks',
-  eventsApiUrl: '/api/events',
-  eventEngagementApiUrl: '/api/event-engagement',
-  proposalWorkflowApiUrl: '/api/proposal-workflow',
-  configApiUrl: '/api/config',
-  eventCatalogApiUrl: '/api/event-catalog',
-  cafeteriasApiUrl: '/api/cafeterias',
-  imageUploadApiUrl: '/api/uploads',
-  clubsApiUrl: '/api',
-  useMockImageUpload: true,
+  apiBaseUrl: '/api/v1',
 } as const;

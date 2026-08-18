@@ -22,14 +22,14 @@ const CATALOG_SEED: readonly RequestOption[] = [
 function createComponent(): ComponentFixture<EventProposalComponent> {
   const fixture = TestBed.createComponent(EventProposalComponent);
   const httpMock = TestBed.inject(HttpTestingController);
-  httpMock.expectOne((request) => request.url === environment.requestOptionsApiUrl).flush(CATALOG_SEED);
-  httpMock.match((request) => request.url === environment.configApiUrl).forEach((request) => request.flush({
+  httpMock.expectOne((request) => request.url === `${environment.apiBaseUrl}/options`).flush(CATALOG_SEED);
+  httpMock.match((request) => request.url === `${environment.apiBaseUrl}/catalog/config`).forEach((request) => request.flush({
     paxReviewerThreshold: 50,
     cancellationDaysLimit: 3,
     maxEventCategories: 2,
   }));
-  httpMock.match((request) => request.url.startsWith(environment.eventCatalogApiUrl)).forEach((request) => request.flush([]));
-  httpMock.match((request) => request.url === `${environment.adminDirectoryApiUrl}/users`).forEach((request) => request.flush([]));
+  httpMock.match((request) => request.url.startsWith(`${environment.apiBaseUrl}/catalog`)).forEach((request) => request.flush([]));
+  httpMock.match((request) => request.url === `${`${environment.apiBaseUrl}/admin`}/users`).forEach((request) => request.flush([]));
   return fixture;
 }
 

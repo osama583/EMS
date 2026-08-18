@@ -8,7 +8,7 @@ import { EventRegistrationApi, RegisteredEventsResponse } from './event-engageme
 @Injectable({ providedIn: 'root' })
 export class PublishedEventService implements EventRegistrationApi {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = environment.eventsApiUrl;
+  private readonly baseUrl = `${environment.apiBaseUrl}/events`;
 
   getPublishedEvents(): Observable<readonly PublishedEvent[]> { return this.http.get<readonly PublishedEvent[]>(this.baseUrl); }
   getEventDetails(id: string): Observable<PublishedEvent | undefined> { return this.http.get<PublishedEvent>(`${this.baseUrl}/${encodeURIComponent(id)}`); }

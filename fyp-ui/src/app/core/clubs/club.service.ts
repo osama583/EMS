@@ -8,7 +8,7 @@ import { ClubCategoryRecord, ClubDraft, ClubJoinRequestRecord, ClubMemberRecord,
 @Injectable({ providedIn: 'root' })
 export class ClubService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = environment.clubsApiUrl;
+  private readonly baseUrl = `${environment.apiBaseUrl}`;
 
   getClubs(options?: { activeOnly?: boolean; viewerUserId?: string }): Observable<readonly ClubRecord[]> {
     const params: Record<string, string> = {};

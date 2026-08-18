@@ -13,6 +13,6 @@ export class LogisticsAvailabilityService {
   check(optionId: string, date: string, start: string, end: string, quantity?: number): Observable<LogisticsAvailability> {
     let params = new HttpParams().set('date', date).set('start', start).set('end', end);
     if (quantity !== undefined) params = params.set('quantity', String(quantity));
-    return this.http.get<LogisticsAvailability>(`${environment.requestOptionsApiUrl}/logistics/${encodeURIComponent(optionId)}/availability`, { params });
+    return this.http.get<LogisticsAvailability>(`${`${environment.apiBaseUrl}/options`}/logistics/${encodeURIComponent(optionId)}/availability`, { params });
   }
 }

@@ -1,22 +1,6 @@
+// Production. Set to the deployed API's absolute origin; it must appear in the
+// backend's CORS_ORIGINS allow-list.
 export const environment = {
   production: true,
-  enableMockAuth: false,
-  authApiUrl: '/api/auth',
-  useMockRequestOptions: false,
-  requestOptionsApiUrl: '/api/request-options',
-  useMockAdminDirectory: false,
-  adminDirectoryApiUrl: '/api/admin',
-  useMockStaffTasks: false,
-  staffTasksApiUrl: '/api/staff-tasks',
-  eventsApiUrl: '/api/events',
-  useMockEventEngagement: false,
-  eventEngagementApiUrl: '/api/event-engagement',
-  useMockProposalWorkflow: false,
-  proposalWorkflowApiUrl: '/api/proposal-workflow',
-  configApiUrl: '/api/config',
-  eventCatalogApiUrl: '/api/event-catalog',
-  cafeteriasApiUrl: '/api/cafeterias',
-  useMockImageUpload: false,
-  imageUploadApiUrl: '/api/uploads',
-  clubsApiUrl: '/api',
+  apiBaseUrl: '/api/v1',
 } as const;

@@ -8,7 +8,7 @@ import { Archived, AdminDirectoryRepository, AdminNavPageDraft, AdminNavPageGran
 @Injectable({ providedIn: 'root' })
 export class ApiAdminDirectoryRepository implements AdminDirectoryRepository {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = environment.adminDirectoryApiUrl;
+  private readonly baseUrl = `${environment.apiBaseUrl}/admin`;
   getUsers(): Observable<readonly AdminUserRecord[]> { return this.http.get<readonly AdminUserRecord[]>(`${this.baseUrl}/users`); }
   getUnits(): Observable<readonly AdminUnitRecord[]> { return this.http.get<readonly AdminUnitRecord[]>(`${this.baseUrl}/units`); }
   createUser(draft: AdminUserDraft): Observable<AdminUserRecord> { return this.http.post<AdminUserRecord>(`${this.baseUrl}/users`, draft); }

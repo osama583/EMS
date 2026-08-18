@@ -3,7 +3,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../../core/auth/auth.service';
-import { proposalForTitle } from '../../../../core/proposals/proposal-review.mock-data';
 import { ProposalReviewRecord } from '../../../../core/proposals/proposal-review.models';
 import { ProposalWorkflowService } from '../../../../core/proposals/proposal-workflow.service';
 import { userIsApplicantForProposal } from '../../../../core/proposals/proposal-visibility';
@@ -246,6 +245,11 @@ export class RecordsPageComponent {
   readonly sharedRecords = computed<readonly InternalDataRecord[]>(() => this.visibleRecords().map((record): InternalDataRecord => {
     if (this.kind === 'notifications') return { id: record.id, emphasized: record.unread, cells: { title: { primary: record.title, secondary: record.summary }, reference: { primary: record.reference, secondary: record.category }, owner: { primary: record.owner, avatar: record.initials }, date: { primary: record.date }, status: { primary: record.status, badge: true, tone: this.statusTone(record.status) } }, mobile: { eyebrow: record.category, status: record.status, title: record.title, identity: record.owner, initials: record.initials, unread: record.unread, details: [{ icon: 'description', text: record.reference }, { icon: 'schedule', text: record.date }] } };
     const proposal = this.proposalDetails(record);
+    // Falls back to the row's own display fields rather than inventing a
+    // proposal: a row with no backing record still renders truthfully.
+    if (!proposal) {
+      return { id: record.id, cells: { proposalId: { primary: record.reference }, title: { primary: record.title }, applicant: { primary: record.owner }, schedule: { primary: record.date }, introduction: { primary: record.summary }, pax: { primary: '—' }, status: { primary: record.status, badge: true, tone: this.statusTone(record.status) } }, mobile: { eyebrow: record.reference, status: record.status, title: record.title, identity: record.owner, initials: record.initials, details: [{ icon: 'schedule', text: record.date }] } };
+    }
     return { id: record.id, cells: { proposalId: { primary: proposal.proposalId }, title: { primary: proposal.eventTitle }, applicant: { primary: proposal.applicant }, schedule: { primary: proposal.schedule }, introduction: { primary: proposal.shortIntroduction }, pax: { primary: String(proposal.totalPax) }, status: { primary: record.status, badge: true, tone: this.statusTone(record.status) } }, mobile: { eyebrow: proposal.proposalId, status: record.status, title: proposal.eventTitle, identity: proposal.applicant, initials: proposal.applicantInitials, details: [{ icon: 'schedule', text: proposal.schedule }, { icon: 'groups', text: `${proposal.totalPax} expected pax` }, { icon: 'notes', text: proposal.shortIntroduction }] } };
   }));
 
@@ -276,7 +280,7 @@ export class RecordsPageComponent {
     const target = this.deleteTarget();
     if (!target) return;
     this.deleting.set(true);
-    this.service.deleteDraft(target.id, this.auth.user()?.email ?? '').pipe(
+    this.service.deleteDraft(target.id).pipe(
       finalize(() => this.deleting.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
@@ -298,32 +302,17 @@ export class RecordsPageComponent {
   private openDraft(id: number): void {
     void this.router.navigate(['/app/forms/event-proposal'], { queryParams: { proposalId: id } });
   }
-  private proposalDetails(record: CollectionRecord): ProposalReviewRecord {
-    // For 'drafts', record.id keys directly into the real fetched ProposalReviewRecord — no
-    // mock-lookup/status-string translation needed.
-    const real = this.proposalsById.get(record.id);
-    if (real) return real;
-    const proposal = proposalForTitle(record.title, record.id);
-    return {
-      ...proposal,
-      id: record.id,
-      proposalId: record.reference,
-      eventTitle: record.title,
-      shortIntroduction: record.summary || proposal.shortIntroduction,
-      status: record.status,
-      category: record.category,
-      workflow: { ...proposal.workflow, stage: this.stageForStatus(record.status, proposal.workflow.stage) },
-    };
-  }
-  private stageForStatus(status: string, fallback: ProposalStage): ProposalStage {
-    if (status === 'Approved' || status === 'Completed') return ProposalStage.Approved;
-    if (status === 'Rejected' || status === 'Cancelled') return ProposalStage.Rejected;
-    if (status === 'Revision required' || status === 'Details missing' || status === 'Required action') return ProposalStage.ResubmissionRequired;
-    if (status === 'Department review' || status === 'In progress' || status === 'Assigned' || status === 'Scheduled' || status === 'Awaiting assignment') return ProposalStage.DepartmentReview;
-    if (status === 'Additional approval' || status === 'CFO review') return ProposalStage.CfoReview;
-    if (status === 'F&B review') return ProposalStage.FmbReview;
-    if (status === 'Submitted' || status === 'HOS/HOD review') return ProposalStage.HosHodReview;
-    return fallback;
+  /**
+   * The real record this row came from, or null.
+   *
+   * Every row is now backed by a proposal fetched from the API, so a miss means
+   * something is genuinely wrong. This used to synthesise a plausible-looking
+   * proposal from the row's display text, which put fabricated data in front of
+   * a reviewer; callers navigate by id instead and let the detail page load the
+   * real thing.
+   */
+  private proposalDetails(record: CollectionRecord): ProposalReviewRecord | null {
+    return this.proposalsById.get(record.id) ?? null;
   }
   private uniqueValues(key: 'status' | 'category'): string[] { return [...new Set(this.records().map((record) => record[key]))]; }
   private statusTone(status: string): InternalCellTone {

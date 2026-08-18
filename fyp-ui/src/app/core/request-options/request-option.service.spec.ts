@@ -73,7 +73,7 @@ describe('RequestOptionService', () => {
     const httpMock = TestBed.inject(HttpTestingController);
 
     const optionsPromise = firstValueFrom(service.watchActive('transportation'));
-    httpMock.expectOne((request) => request.url === environment.requestOptionsApiUrl)
+    httpMock.expectOne((request) => request.url === `${environment.apiBaseUrl}/options`)
       .flush(SEED_OPTIONS.filter((option) => option.kind === 'transportation'));
     const options = await optionsPromise;
     const selectOptions = service.toSelectOptions(options);
@@ -119,9 +119,9 @@ describe('RequestOptionService', () => {
 
     const servingUnitsPromise = firstValueFrom(service.watchActive('servingUnit'));
     const dietaryInformationPromise = firstValueFrom(service.watchActive('dietaryInformation'));
-    httpMock.expectOne((request) => request.url === environment.requestOptionsApiUrl && request.params.get('kinds') === 'servingUnit')
+    httpMock.expectOne((request) => request.url === `${environment.apiBaseUrl}/options` && request.params.get('kinds') === 'servingUnit')
       .flush(SEED_OPTIONS.filter((option) => option.kind === 'servingUnit'));
-    httpMock.expectOne((request) => request.url === environment.requestOptionsApiUrl && request.params.get('kinds') === 'dietaryInformation')
+    httpMock.expectOne((request) => request.url === `${environment.apiBaseUrl}/options` && request.params.get('kinds') === 'dietaryInformation')
       .flush(SEED_OPTIONS.filter((option) => option.kind === 'dietaryInformation'));
     const [servingUnits, dietaryInformation] = await Promise.all([servingUnitsPromise, dietaryInformationPromise]);
 
@@ -134,16 +134,16 @@ describe('RequestOptionService', () => {
     const httpMock = TestBed.inject(HttpTestingController);
 
     const beforePromise = firstValueFrom(service.watchAll(['fmb']));
-    httpMock.expectOne((request) => request.url === environment.requestOptionsApiUrl).flush(SEED_OPTIONS);
+    httpMock.expectOne((request) => request.url === `${environment.apiBaseUrl}/options`).flush(SEED_OPTIONS);
     const before = await beforePromise;
     expect(before.some((option) => option.id === 'food-other')).toBe(true);
 
     const deletePromise = firstValueFrom(service.delete('food-other'));
-    httpMock.expectOne(`${environment.requestOptionsApiUrl}/food-other`).flush(null);
+    httpMock.expectOne(`${`${environment.apiBaseUrl}/options`}/food-other`).flush(null);
     await deletePromise;
 
     const afterPromise = firstValueFrom(service.watchAll(['fmb']));
-    httpMock.expectOne((request) => request.url === environment.requestOptionsApiUrl)
+    httpMock.expectOne((request) => request.url === `${environment.apiBaseUrl}/options`)
       .flush(SEED_OPTIONS.filter((option) => option.id !== 'food-other'));
     const after = await afterPromise;
     expect(after.some((option) => option.id === 'food-other')).toBe(false);

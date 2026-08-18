@@ -6,7 +6,7 @@ import { environment } from '../../../../../environments/environment';
 import { PublishedEvent } from '../../../../core/events/published-event.models';
 import { ExploreEventsComponent } from './explore-events';
 import { AuthService } from '../../../../core/auth/auth.service';
-import { testRole, testUser } from '../../../../core/auth/auth.test-fixtures';
+import { testRole, testTokens, testUser } from '../../../../core/auth/auth.test-fixtures';
 
 // Mirrors the variety of the old hardcoded 8-event fixture (titles/categories/schools/cost) so
 // this spec's pre-existing assertions (search matches, school filter options, a single
@@ -64,8 +64,8 @@ describe('ExploreEventsComponent', () => {
     component = fixture.componentInstance;
     httpMock = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
-    httpMock.expectOne(environment.eventsApiUrl).flush(MOCK_PUBLISHED_EVENTS);
-    httpMock.match((request) => request.url.startsWith(environment.eventCatalogApiUrl)).forEach((request) => request.flush([]));
+    httpMock.expectOne(`${environment.apiBaseUrl}/events`).flush(MOCK_PUBLISHED_EVENTS);
+    httpMock.match((request) => request.url.startsWith(`${environment.apiBaseUrl}/catalog`)).forEach((request) => request.flush([]));
     fixture.detectChanges();
   });
 
@@ -99,14 +99,14 @@ describe('ExploreEventsComponent', () => {
     TestBed.inject(AuthService).establishSession(testUser(
       [testRole('student', 'school_of_computing', 'School of Computing')],
       { email: 'applicant@demo.apu.edu.my', displayName: 'Demo Applicant', username: 'applicant' },
-    ));
+    ), testTokens());
     const saveButton = fixture.nativeElement.querySelector('.save-event') as HTMLButtonElement;
 
     expect(saveButton.getAttribute('aria-pressed')).toBe('false');
     saveButton.click();
     fixture.detectChanges();
 
-    httpMock.expectOne((req) => req.method === 'POST' && req.url === `${environment.eventEngagementApiUrl}/saved`)
+    httpMock.expectOne((req) => req.method === 'POST' && req.url === `${`${environment.apiBaseUrl}/events/me`}/saved`)
       .flush({ eventId: 'evt-1', saved: true });
     fixture.detectChanges();
 
@@ -116,7 +116,7 @@ describe('ExploreEventsComponent', () => {
     saveButton.click();
     fixture.detectChanges();
 
-    httpMock.expectOne((req) => req.method === 'DELETE' && req.url.startsWith(`${environment.eventEngagementApiUrl}/saved/`))
+    httpMock.expectOne((req) => req.method === 'DELETE' && req.url.startsWith(`${`${environment.apiBaseUrl}/events/me`}/saved/`))
       .flush({ eventId: 'evt-1', saved: false });
     fixture.detectChanges();
 
@@ -207,8 +207,8 @@ describe('ExploreEventsComponent visibility filtering', () => {
     fixture = TestBed.createComponent(ExploreEventsComponent);
     httpMock = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
-    httpMock.expectOne(environment.eventsApiUrl).flush(MIXED_VISIBILITY_EVENTS);
-    httpMock.match((request) => request.url.startsWith(environment.eventCatalogApiUrl)).forEach((request) => request.flush([]));
+    httpMock.expectOne(`${environment.apiBaseUrl}/events`).flush(MIXED_VISIBILITY_EVENTS);
+    httpMock.match((request) => request.url.startsWith(`${environment.apiBaseUrl}/catalog`)).forEach((request) => request.flush([]));
     fixture.detectChanges();
 
     const titles = fixture.componentInstance.events().map((event) => event.title);
@@ -223,12 +223,12 @@ describe('ExploreEventsComponent visibility filtering', () => {
     TestBed.inject(AuthService).establishSession(testUser(
       [testRole('student', 'school_of_computing', 'School of Computing')],
       { email: 'applicant@demo.apu.edu.my', displayName: 'Demo Applicant', username: 'applicant' },
-    ));
+    ), testTokens());
     fixture = TestBed.createComponent(ExploreEventsComponent);
     httpMock = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
-    httpMock.expectOne(environment.eventsApiUrl).flush(MIXED_VISIBILITY_EVENTS);
-    httpMock.match((request) => request.url.startsWith(environment.eventCatalogApiUrl)).forEach((request) => request.flush([]));
+    httpMock.expectOne(`${environment.apiBaseUrl}/events`).flush(MIXED_VISIBILITY_EVENTS);
+    httpMock.match((request) => request.url.startsWith(`${environment.apiBaseUrl}/catalog`)).forEach((request) => request.flush([]));
     fixture.detectChanges();
 
     const titles = fixture.componentInstance.events().map((event) => event.title);
@@ -236,9 +236,9 @@ describe('ExploreEventsComponent visibility filtering', () => {
 
     // Signed-in-only side effects that confirm all three (not just the Public one) were treated
     // as visible: per-event "my registration" lookups plus the saved-events fetch.
-    httpMock.expectOne((req) => req.url === `${environment.eventsApiUrl}/evt-public/registrations/mine`).flush(null);
-    httpMock.expectOne((req) => req.url === `${environment.eventsApiUrl}/evt-private/registrations/mine`).flush(null);
-    httpMock.expectOne((req) => req.url === `${environment.eventsApiUrl}/evt-club/registrations/mine`).flush(null);
-    httpMock.expectOne((req) => req.url.startsWith(`${environment.eventEngagementApiUrl}/saved`)).flush({ items: [] });
+    httpMock.expectOne((req) => req.url === `${`${environment.apiBaseUrl}/events`}/evt-public/registrations/mine`).flush(null);
+    httpMock.expectOne((req) => req.url === `${`${environment.apiBaseUrl}/events`}/evt-private/registrations/mine`).flush(null);
+    httpMock.expectOne((req) => req.url === `${`${environment.apiBaseUrl}/events`}/evt-club/registrations/mine`).flush(null);
+    httpMock.expectOne((req) => req.url.startsWith(`${`${environment.apiBaseUrl}/events/me`}/saved`)).flush({ items: [] });
   });
 });

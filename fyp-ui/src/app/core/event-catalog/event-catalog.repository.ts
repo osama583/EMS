@@ -13,7 +13,7 @@ export type EventCatalogResource = 'categories' | 'formats';
 @Injectable({ providedIn: 'root' })
 export class EventCatalogRepositoryImpl {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = environment.eventCatalogApiUrl;
+  private readonly baseUrl = `${environment.apiBaseUrl}/catalog`;
 
   private urlFor(resource: EventCatalogResource, path = ''): string {
     return `${this.baseUrl}/${resource}${path}`;

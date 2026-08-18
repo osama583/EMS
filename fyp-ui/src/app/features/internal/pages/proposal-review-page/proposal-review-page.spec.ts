@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { AuthService } from '../../../../core/auth/auth.service';
-import { testNavPage, testRole, testUser } from '../../../../core/auth/auth.test-fixtures';
+import { testNavPage, testRole, testTokens, testUser } from '../../../../core/auth/auth.test-fixtures';
 import { environment } from '../../../../../environments/environment';
 import { PROPOSAL_REVIEW_RECORDS } from '../../../../core/proposals/proposal-review.mock-data';
 import { ProposalStage } from '../../../../core/proposals/proposal-status.models';
@@ -45,16 +45,16 @@ describe('ProposalReviewPageComponent', () => {
     await configureWithRoute(String(pendingProposal.id));
     TestBed.inject(AuthService).establishSession(testUser([testRole('head-of-school', 'school_of_computing', 'School of Computing')], {
       email: 'hoshod@demo.apu.edu.my', displayName: 'HOS / HOD Demo', username: 'hoshod',
-    }));
+    }), testTokens());
 
     const fixture = TestBed.createComponent(ProposalReviewPageComponent);
     const httpMock = TestBed.inject(HttpTestingController);
     // No router state is passed in this test, so the component constructor always issues its
     // own getById fetch (mirrors production: only a state-carrying navigation skips it).
-    httpMock.expectOne(`${environment.proposalWorkflowApiUrl}/${pendingProposal.id}`).flush(pendingProposal);
+    httpMock.expectOne(`${environment.apiBaseUrl}/proposals/${pendingProposal.id}`).flush(pendingProposal);
     fixture.componentInstance.proposal.set(pendingProposal);
     fixture.detectChanges();
-    httpMock.expectOne(environment.configApiUrl).flush({
+    httpMock.expectOne(`${environment.apiBaseUrl}/catalog/config`).flush({
       paxReviewerThreshold: 50,
       cancellationDaysLimit: 3,
       eventCategories: [],
@@ -83,7 +83,7 @@ describe('ProposalReviewPageComponent', () => {
     // Approving no longer re-fetches the proposal by id — handleActionComplete navigates the
     // user away to Ongoing once the approve call resolves (see proposal-review-page.ts), rather
     // than staying on this page and refreshing its data.
-    httpMock.expectOne(`${environment.proposalWorkflowApiUrl}/${pendingProposal.id}/approve`).flush(approvedProposal);
+    httpMock.expectOne(`${environment.apiBaseUrl}/proposals/${pendingProposal.id}/decision`).flush(approvedProposal);
 
     await new Promise((resolve) => setTimeout(resolve, 250));
     fixture.detectChanges();
@@ -95,13 +95,13 @@ describe('ProposalReviewPageComponent', () => {
     await configureWithRoute('999999');
     TestBed.inject(AuthService).establishSession(testUser([testRole('head-of-school', 'school_of_computing', 'School of Computing')], {
       email: 'hoshod@demo.apu.edu.my', displayName: 'HOS / HOD Demo', username: 'hoshod',
-    }));
+    }), testTokens());
 
     const fixture = TestBed.createComponent(ProposalReviewPageComponent);
     fixture.detectChanges();
 
     const httpMock = TestBed.inject(HttpTestingController);
-    httpMock.expectOne(`${environment.proposalWorkflowApiUrl}/999999`).flush(null);
+    httpMock.expectOne(`${environment.apiBaseUrl}/proposals/999999`).flush(null);
 
     await new Promise((resolve) => setTimeout(resolve, 250));
     fixture.detectChanges();

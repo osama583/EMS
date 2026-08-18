@@ -22,46 +22,6 @@
         <app-form-field controlId="login-password" name="password" label="Password" type="password" placeholder="Enter your password" autocomplete="current-password" [required]="true" [showRequiredIndicator]="false" [validateOnBlur]="false" [value]="password()" [error]="passwordError()" (valueChange)="setPassword($event)" />
       </div>
 
-      @if (demoAuthEnabled) {
-        <section class="login-demo-users" aria-labelledby="demo-users-heading">
-          <div class="login-demo-users__heading">
-            <span id="demo-users-heading">Development demo users</span>
-            <small>Click an account to fill the form</small>
-          </div>
-          <label class="login-demo-users__search">
-            <span class="material-symbols-rounded" aria-hidden="true">search</span>
-            <input type="search" placeholder="Search by name, role, or department" [value]="demoSearch()" (input)="setDemoSearch($any($event.target).value)" aria-label="Search demo users" />
-          </label>
-          <div class="login-demo-users__list" role="listbox" aria-label="Development demo users">
-            @for (group of demoGroups(); track group.label) {
-              <div class="login-demo-users__group">
-                <span class="login-demo-users__group-label">{{ group.label }}</span>
-                @for (user of group.users; track user.email) {
-                  <button
-                    type="button"
-                    class="login-demo-user"
-                    [class.login-demo-user--selected]="selectedDemoEmail() === user.email"
-                    [attr.aria-selected]="selectedDemoEmail() === user.email"
-                    role="option"
-                    (click)="selectDemoUser(user)"
-                  >
-                    <span class="login-demo-user__identity">
-                      <strong>{{ user.displayName }}</strong>
-                      <span class="login-demo-user__badges">
-                        <span class="login-demo-user__badge">{{ user.roleLabel }}</span>
-                        <span class="login-demo-user__badge login-demo-user__badge--muted">{{ user.department }}</span>
-                      </span>
-                    </span>
-                    <span class="material-symbols-rounded login-demo-user__check" aria-hidden="true">check_circle</span>
-                  </button>
-                }
-              </div>
-            } @empty {
-              <p class="login-demo-users__empty">No demo users match your search.</p>
-            }
-          </div>
-        </section>
-      }
 
       @if (loginError()) {
         <div class="login-form__error" role="alert"><span class="material-symbols-rounded" aria-hidden="true">warning</span><span>{{ loginError() }}</span></div>

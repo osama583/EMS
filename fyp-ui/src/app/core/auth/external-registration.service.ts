@@ -4,6 +4,7 @@ import { Observable, catchError, delay, map, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthUser } from './auth.models';
 import { AuthService } from './auth.service';
+
 import {
   ExternalRegistrationApi,
   ExternalUserRegistrationRequest,
@@ -11,6 +12,14 @@ import {
   VerifyExternalOtpRequest,
   VerifyExternalOtpResponse,
 } from '../events/event-engagement.models';
+
+/** Registration returns the same envelope as login, so the guest is signed in at once. */
+interface RegistrationResponse {
+  readonly user: AuthUser;
+  readonly accessToken: string;
+  readonly refreshToken: string;
+  readonly expiresIn: number;
+}
 
 interface PendingChallenge { readonly request: ExternalUserRegistrationRequest; readonly otp: string; }
 
@@ -44,15 +53,19 @@ export class ExternalRegistrationService implements ExternalRegistrationApi {
     if (request.otp.trim() !== challenge.otp) return of<VerifyExternalOtpResponse>({ status: 'invalid', message: 'The verification code is incorrect.' }).pipe(delay(180));
 
     const { email, firstName, lastName, age, gender, password } = challenge.request;
-    return this.http.post<AuthUser>(`${environment.authApiUrl}/register`, { email, firstName, lastName, age, gender, password }).pipe(
-      map((user) => {
+    return this.http.post<RegistrationResponse>(`${environment.apiBaseUrl}/auth/register`, { email, firstName, lastName, age, gender, password }).pipe(
+      map((response) => {
         this.challenges.delete(request.challengeId);
-        this.auth.establishSession(user);
-        return { status: 'verified' as const, user, message: 'Your account has been verified.' };
+        this.auth.establishSession(response.user, {
+          accessToken: response.accessToken,
+          refreshToken: response.refreshToken,
+          expiresAt: Date.now() + response.expiresIn * 1000,
+        });
+        return { status: 'verified' as const, user: response.user, message: 'Your account has been verified.' };
       }),
       catchError((err) => of<VerifyExternalOtpResponse>({
         status: 'invalid',
-        message: err?.error?.message || 'Registration could not be completed. Please try again.',
+        message: err?.error?.error?.message || 'Registration could not be completed. Please try again.',
       })),
     );
   }

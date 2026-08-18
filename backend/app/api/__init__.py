@@ -9,6 +9,7 @@ from .events import bp as events_bp
 from .options import bp as options_bp
 from .proposals import bp as proposals_bp
 from .tasks import bp as tasks_bp, orders_bp as cafeteria_orders_bp
+from .uploads import bp as uploads_bp
 
 BLUEPRINTS = (
     auth_bp,
@@ -20,4 +21,5 @@ BLUEPRINTS = (
     admin_bp,
     events_bp,
     clubs_bp,
+    uploads_bp,
 )

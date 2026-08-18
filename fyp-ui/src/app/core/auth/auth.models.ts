@@ -72,14 +72,6 @@ export interface AuthUser {
   readonly presidentOfClubIds?: readonly string[];
 }
 
-// GET /api/auth/demo-users' response shape — an AuthUser plus the seed account's plaintext
-// password, so the login screen's "Development demo users" picker can autofill both fields. Only
-// ever fetched when environment.enableMockAuth is true (dev/local); never requested in a
-// production build. See AuthService.getDemoUsers().
-export interface DemoAuthUser extends AuthUser {
-  readonly password: string;
-}
-
 export interface AuthNavigationSection {
   readonly key: string;
   readonly label: string;

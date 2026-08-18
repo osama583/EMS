@@ -15,7 +15,7 @@ const DEFAULT_CONFIG: SystemConfig = {
 export class SystemConfigService {
   private readonly http = inject(HttpClient);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly baseUrl = environment.configApiUrl;
+  private readonly baseUrl = `${environment.apiBaseUrl}/catalog/config`;
 
   private readonly state = signal<SystemConfig>(DEFAULT_CONFIG);
   readonly config = computed(() => this.state());

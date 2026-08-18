@@ -35,21 +35,82 @@ bp = Blueprint("events", __name__, url_prefix="/events")
 # detail view can never disagree about what is visible.
 _PUBLISHED = "r.status = 'completed_approved' AND r.event_visibility IN ('Public', 'Club Only')"
 
+# Column list matches the frontend's PublishedEvent model field for field, so
+# no client-side remapping is needed. Registration counts are computed here
+# rather than shipping the registration rows for the browser to count.
 _EVENT_SELECT = f"""
-    SELECT r.request_id AS id, r.request_code AS "eventCode", r.event_title AS title,
-           r.short_introduction AS summary, r.event_image AS "imageUrl",
-           r.event_visibility AS visibility, r.event_format_snapshot AS format,
-           r.registration_approval AS "registrationMode", r.max_pax AS "maxPax",
-           r.cost_amount AS cost, r.applicant_name AS organiser,
-           r.applicant_department_or_school AS "organiserUnit",
+    SELECT r.request_id::text AS id,
+           r.event_title AS "eventTitle",
+           r.short_introduction AS "shortIntroduction",
+           r.goals_objectives AS goals,
+           r.expected_benefits AS "expectedBenefits",
+           r.event_visibility AS "eventVisibility",
+           r.promotion_publicity_method AS "promotionMethod",
+           r.event_format_snapshot AS "eventFormat",
+           r.event_image AS "eventImageUrl",
+           r.applicant_department_or_school AS "schoolDepartment",
+           r.applicant_name AS organiser,
+           r.total_pax AS "totalExpectedPax",
+           r.max_pax AS "maxPax",
+           r.registration_approval AS "registrationMode",
+           r.cost_amount AS cost,
+           r.bank_account_name AS "bankAccountName",
+           r.bank_account_number AS "bankAccountNumber",
            (SELECT count(*) FROM event_registration er
              WHERE er.request_id = r.request_id AND er.status = 'registered')
-             AS "confirmedRegistrations",
+             AS "confirmedRegistrationCount",
+           (SELECT count(*) FROM event_registration er
+             WHERE er.request_id = r.request_id AND er.status = 'pending_approval')
+             AS "pendingRegistrationCount",
            (SELECT min(s."date") FROM event_schedule s WHERE s.request_id = r.request_id)
              AS "firstDate"
       FROM request r
      WHERE {_PUBLISHED}
 """
+
+
+def _decorate(cur, event: dict) -> dict:
+    """Add the child collections and derived flags the model declares."""
+    event_id = int(event["id"])
+    event["schedule"] = [
+        {
+            "date": str(row["date"]),
+            "start": str(row["start_time"])[:5],
+            "end": str(row["end_time"])[:5],
+            "location": row["location"],
+        }
+        for row in fetch_all(
+            cur,
+            'SELECT "date", start_time, end_time, location FROM event_schedule '
+            "WHERE request_id = %s ORDER BY event_schedule_id",
+            (event_id,),
+        )
+    ]
+    event["categories"] = [
+        row["category_name"]
+        for row in fetch_all(
+            cur, "SELECT category_name FROM request_categories WHERE request_id = %s", (event_id,)
+        )
+    ]
+    # The model expects an image ASSET, not a bare URL.
+    url = event.pop("eventImageUrl", None)
+    event["eventImage"] = (
+        {"url": url, "fileName": "", "mimeType": "", "sizeBytes": 0, "status": "uploaded"}
+        if url
+        else None
+    )
+    cost = event.get("cost")
+    event["cost"] = float(cost) if cost is not None else None
+    event["isFree"] = not event["cost"]
+    # Audience is not modelled in the schema; the guest breakdown is the nearest
+    # equivalent the proposal form collects.
+    event["audience"] = [
+        row["guest_type"]
+        for row in fetch_all(
+            cur, "SELECT DISTINCT guest_type FROM general_guest WHERE request_id = %s", (event_id,)
+        )
+    ]
+    return event
 
 
 def _load_published(cur, event_id: int) -> dict:
@@ -63,27 +124,16 @@ def _load_published(cur, event_id: int) -> dict:
 @limiter.limit("120 per minute")
 def list_events():
     """Public. No token required - this is the discovery page."""
-    rows = query(_EVENT_SELECT + ' ORDER BY "firstDate" NULLS LAST, r.request_id DESC')
-    return jsonify(rows)
+    with transaction() as cur:
+        rows = fetch_all(cur, _EVENT_SELECT + ' ORDER BY "firstDate" NULLS LAST, r.request_id DESC')
+        return jsonify([_decorate(cur, row) for row in rows])
 
 
 @bp.get("/<int:event_id>")
 @limiter.limit("120 per minute")
 def get_event(event_id: int):
     with transaction() as cur:
-        event = _load_published(cur, event_id)
-        event["schedule"] = fetch_all(
-            cur,
-            'SELECT "date", start_time AS "startTime", end_time AS "endTime", location '
-            "FROM event_schedule WHERE request_id = %s ORDER BY event_schedule_id",
-            (event_id,),
-        )
-        event["categories"] = [
-            r["category_name"]
-            for r in fetch_all(
-                cur, "SELECT category_name FROM request_categories WHERE request_id = %s", (event_id,)
-            )
-        ]
+        event = _decorate(cur, _load_published(cur, event_id))
     return jsonify(event)
 
 
@@ -110,7 +160,7 @@ def register(event_id: int):
         if existing:
             raise Conflict("You are already registered for this event.")
 
-        if event["maxPax"] is not None and event["confirmedRegistrations"] >= event["maxPax"]:
+        if event["maxPax"] is not None and event["confirmedRegistrationCount"] >= event["maxPax"]:
             raise WorkflowError("This event is full.", code="event_full")
 
         # Manual approval puts the registration in the organiser's queue.

@@ -783,7 +783,7 @@ export class ProposalDepartmentViewComponent {
     if (!proposal || !department) return;
     this.confirming.set(true);
     const confirmedByEmail = this.auth.user()?.email ?? '';
-    this.workflow.confirmDepartment(proposal.id, department, confirmedByEmail).pipe(finalize(() => this.confirming.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.workflow.confirmDepartment(proposal.id, department).pipe(finalize(() => this.confirming.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.toast.success('Fulfilment confirmed', 'Assign a team member to complete the work.'); this.actionComplete.emit(proposal.id); },
       error: (err) => this.toast.error('Could not confirm fulfilment', apiErrorMessage(err, 'Please try again.')),
     });
@@ -808,7 +808,7 @@ export class ProposalDepartmentViewComponent {
     const department = this.departments()[0];
     if (!proposal || !department) return;
     this.resubmitting.set(true);
-    this.workflow.resubmitAsDepartment(proposal.id, department, comment, this.auth.user()?.email ?? '').pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.workflow.sendBackAsDepartment(proposal.id, department, comment).pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.toast.info('Sent back to the applicant', 'Other departments continue unaffected.'); this.comment.set(''); this.actionComplete.emit(proposal.id); },
       error: (err) => this.toast.error('Could not send this back', apiErrorMessage(err, 'Please try again.')),
     });
@@ -828,7 +828,7 @@ export class ProposalDepartmentViewComponent {
     const proposal = this.proposal();
     if (!proposal) return;
     this.selectionActionPending.set(selection.id);
-    this.workflow.approveFmbSelection(proposal.id, selection.id, this.auth.user()!.email).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.workflow.approveFmbSelection(proposal.id, selection.id).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.toast.success('Order approved', 'It is now in your Cafeteria Staff shared inbox.'); this.actionComplete.emit(proposal.id); },
       error: (err) => this.toast.error('Could not approve this order', apiErrorMessage(err, 'Please try again.')),
     });
@@ -863,7 +863,7 @@ export class ProposalDepartmentViewComponent {
     const proposal = this.proposal();
     if (!proposal) return;
     this.selectionActionPending.set(selection.id);
-    this.workflow.resubmitFmbSelection(proposal.id, selection.id, this.auth.user()!.email, comment).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.workflow.sendBackFmbSelection(proposal.id, selection.id, comment).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.toast.info('Sent back to F&B', 'Only this order is affected — the rest continue as normal.'); this.selectionComment.set(''); this.actionComplete.emit(proposal.id); },
       error: (err) => this.toast.error('Could not send this order back', apiErrorMessage(err, 'Please try again.')),
     });
@@ -925,7 +925,7 @@ export class ProposalDepartmentViewComponent {
       menuItemLabel: menuItem.label,
       quantity: Number(this.createOrderQuantity()),
       notes: this.createOrderNotes().trim() || undefined,
-    }, this.auth.user()!.email).pipe(finalize(() => this.creatingOrder.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+    }).pipe(finalize(() => this.creatingOrder.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.createOrderTarget.set(null); this.toast.success('Order created', 'It is now awaiting that cafeteria manager\u2019s approval.'); this.actionComplete.emit(proposal.id); },
       error: (err) => { this.createOrderError.set(apiErrorMessage(err, 'Could not create this order. Please try again.')); this.toast.error('Could not create this order', apiErrorMessage(err, 'Please try again.')); },
     });
@@ -998,7 +998,7 @@ export class ProposalDepartmentViewComponent {
       menuItemLabel: menuItem.label,
       quantity: Number(this.createOrderQuantity()),
       notes: this.createOrderNotes().trim(),
-    }, this.auth.user()!.email).pipe(finalize(() => this.creatingOrder.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+    }).pipe(finalize(() => this.creatingOrder.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.editOrderTarget.set(null); this.toast.success('Order re-sent', 'It is back with the cafeteria manager for approval.'); this.actionComplete.emit(proposal.id); },
       error: (err) => { this.createOrderError.set(apiErrorMessage(err, 'Could not save this order.')); this.toast.error('Could not re-send this order', apiErrorMessage(err, 'Please try again.')); },
     });
@@ -1013,7 +1013,7 @@ export class ProposalDepartmentViewComponent {
     const selection = this.cancelOrderTarget();
     if (!proposal || !selection) return;
     this.creatingOrder.set(true);
-    this.workflow.editFmbSelection(proposal.id, selection.id, { cancel: true }, this.auth.user()!.email)
+    this.workflow.editFmbSelection(proposal.id, selection.id, { cancel: true })
       .pipe(finalize(() => this.creatingOrder.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
         next: () => { this.cancelOrderTarget.set(null); this.toast.warning('Order cancelled', 'Create a new order if this part of the request still needs covering.'); this.actionComplete.emit(proposal.id); },
         error: (err) => { this.cancelOrderTarget.set(null); this.toast.error('Could not cancel this order', apiErrorMessage(err, 'Please try again.')); },

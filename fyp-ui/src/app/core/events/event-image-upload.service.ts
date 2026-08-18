@@ -50,7 +50,7 @@ export class ApiEventImageUploadService implements EventImageUploadApi {
 
   upload(request: EventImageUploadRequest): Observable<EventImageUploadResponse> {
     return readAsDataUrl(request.file).pipe(
-      switchMap((dataUrl) => this.http.post<{ storageKey: string; url: string }>(environment.imageUploadApiUrl, {
+      switchMap((dataUrl) => this.http.post<{ storageKey: string; url: string }>(`${environment.apiBaseUrl}/uploads`, {
         fileName: request.file.name,
         mimeType: request.file.type,
         sizeBytes: request.file.size,
@@ -72,5 +72,7 @@ export class ApiEventImageUploadService implements EventImageUploadApi {
 
 export const EVENT_IMAGE_UPLOAD_API = new InjectionToken<EventImageUploadApi>('EVENT_IMAGE_UPLOAD_API', {
   providedIn: 'root',
-  factory: () => environment.useMockImageUpload ? inject(MockEventImageUploadService) : inject(ApiEventImageUploadService),
+  // Always the real API now: uploads must return a URL, because
+  // request.event_image is VARCHAR(255) and cannot hold a data URL.
+  factory: () => inject(ApiEventImageUploadService),
 });

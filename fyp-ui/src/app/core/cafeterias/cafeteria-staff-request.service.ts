@@ -7,7 +7,7 @@ import { CafeteriaStaffRequest, CafeteriaStaffRequestDraft } from './cafeteria-s
 @Injectable({ providedIn: 'root' })
 export class CafeteriaStaffRequestService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = `${environment.cafeteriasApiUrl}/staff-requests`;
+  private readonly baseUrl = `${`${environment.apiBaseUrl}/catalog/cafeterias`}/staff-requests`;
   private readonly refreshRequests = new BehaviorSubject<void>(undefined);
 
   submit(draft: CafeteriaStaffRequestDraft): Observable<CafeteriaStaffRequest> {

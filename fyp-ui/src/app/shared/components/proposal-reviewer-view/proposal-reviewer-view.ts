@@ -267,7 +267,7 @@ export class ProposalReviewerViewComponent {
     const user = this.currentUser();
     if (!proposal || !user) return;
     this.cancelling.set(true);
-    this.workflow.cancelProposal(proposal.id, user.email).pipe(
+    this.workflow.cancelProposal(proposal.id).pipe(
       finalize(() => this.cancelling.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
@@ -296,7 +296,7 @@ export class ProposalReviewerViewComponent {
     const proposal = this.proposal();
     if (!proposal) return;
     this.approving.set(true);
-    this.workflow.approveAsReviewer(proposal.id, this.auth.user()?.email ?? '').pipe(
+    this.workflow.approveAsReviewer(proposal.id).pipe(
       finalize(() => this.approving.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
@@ -344,7 +344,7 @@ export class ProposalReviewerViewComponent {
     const proposal = this.proposal();
     if (!proposal) return;
     this.rejecting.set(true);
-    this.workflow.rejectAsReviewer(proposal.id, this.auth.user()?.email ?? '', reason).pipe(
+    this.workflow.rejectAsReviewer(proposal.id, reason).pipe(
       finalize(() => this.rejecting.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
@@ -357,7 +357,7 @@ export class ProposalReviewerViewComponent {
     const proposal = this.proposal();
     if (!proposal) return;
     this.resubmitting.set(true);
-    this.workflow.resubmitAsReviewer(proposal.id, this.auth.user()?.email ?? '', comment).pipe(
+    this.workflow.sendBackAsReviewer(proposal.id, comment).pipe(
       finalize(() => this.resubmitting.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({

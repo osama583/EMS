@@ -8,7 +8,7 @@ import { Archived } from '../admin-directory/admin-directory.models';
 @Injectable({ providedIn: 'root' })
 export class CafeteriaService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = environment.cafeteriasApiUrl;
+  private readonly baseUrl = `${environment.apiBaseUrl}/catalog/cafeterias`;
   private readonly refreshRequests = new BehaviorSubject<void>(undefined);
 
   // Every non-admin cafeteria picker (F&B's read-only Cafeteria Menus viewer) still just calls

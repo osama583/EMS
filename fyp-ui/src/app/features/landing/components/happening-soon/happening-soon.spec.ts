@@ -5,10 +5,15 @@ import { environment } from '../../../../../environments/environment';
 import { PublishedEvent } from '../../../../core/events/published-event.models';
 import { HappeningSoonComponent } from './happening-soon';
 
+// Formats in LOCAL time. toISOString() would render UTC, which is a different
+// calendar day whenever local time is behind UTC midnight (any run before 08:00
+// in UTC+8), shifting every offset by one and failing the window assertions.
 const inDays = (days: number): string => {
   const date = new Date();
   date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
 };
 
 // Mirrors the old hardcoded 5-event fixture (titles/images/day offsets 1/3/5/7/9, all inside the
@@ -73,7 +78,7 @@ describe('HappeningSoonComponent', () => {
     fixture = TestBed.createComponent(HappeningSoonComponent);
     httpMock = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
-    httpMock.expectOne(environment.eventsApiUrl).flush(MOCK_PUBLISHED_EVENTS);
+    httpMock.expectOne(`${environment.apiBaseUrl}/events`).flush(MOCK_PUBLISHED_EVENTS);
     fixture.detectChanges();
   });
 
@@ -259,7 +264,7 @@ describe('HappeningSoonComponent', () => {
     const emptyFixture = TestBed.createComponent(HappeningSoonComponent);
     const emptyHttpMock = TestBed.inject(HttpTestingController);
     emptyFixture.detectChanges();
-    emptyHttpMock.expectOne(environment.eventsApiUrl).flush([]);
+    emptyHttpMock.expectOne(`${environment.apiBaseUrl}/events`).flush([]);
     emptyFixture.detectChanges();
 
     const element = emptyFixture.nativeElement as HTMLElement;

@@ -17,7 +17,7 @@ export class SavedEventsService implements SavedEventsApi {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly baseUrl = environment.eventEngagementApiUrl;
+  private readonly baseUrl = `${environment.apiBaseUrl}/events/me`;
 
   private readonly savedIdsState = signal<ReadonlySet<string>>(new Set());
   readonly savedEventIds = computed(() => this.savedIdsState());

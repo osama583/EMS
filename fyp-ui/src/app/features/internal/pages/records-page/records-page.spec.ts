@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { environment } from '../../../../../environments/environment';
 import { AuthService } from '../../../../core/auth/auth.service';
-import { testNavPage, testRole, testUser } from '../../../../core/auth/auth.test-fixtures';
+import { testNavPage, testRole, testTokens, testUser } from '../../../../core/auth/auth.test-fixtures';
 import { PROPOSAL_REVIEW_RECORDS } from '../../../../core/proposals/proposal-review.mock-data';
 import { ProposalReviewRecord } from '../../../../core/proposals/proposal-review.models';
 import { RecordsPageComponent } from './records-page';
@@ -20,7 +20,7 @@ function loginAsDraftOwner(): void {
   TestBed.inject(AuthService).establishSession(testUser([testRole('staff', 'student_affairs', 'Student Affairs')], {
     email: DRAFT_APPLICANT_EMAIL, displayName: 'Jordan Lee', username: 'jordan.lee',
     nav: [testNavPage('drafts', 'Drafts')],
-  }));
+  }), testTokens());
 }
 
 describe('RecordsPageComponent', () => {
@@ -40,7 +40,7 @@ describe('RecordsPageComponent', () => {
     loginAsDraftOwner();
     const fixture = TestBed.createComponent(RecordsPageComponent);
     fixture.detectChanges();
-    httpMock.expectOne(environment.proposalWorkflowApiUrl).flush(DRAFT_PROPOSALS);
+    httpMock.expectOne((req) => req.url === `${environment.apiBaseUrl}/proposals`).flush({ items: DRAFT_PROPOSALS, page: 1, pageSize: 200, total: DRAFT_PROPOSALS.length, totalPages: 1 });
     fixture.detectChanges();
 
     const element = fixture.nativeElement as HTMLElement;
@@ -54,7 +54,7 @@ describe('RecordsPageComponent', () => {
     loginAsDraftOwner();
     const fixture = TestBed.createComponent(RecordsPageComponent);
     fixture.detectChanges();
-    httpMock.expectOne(environment.proposalWorkflowApiUrl).flush(DRAFT_PROPOSALS);
+    httpMock.expectOne((req) => req.url === `${environment.apiBaseUrl}/proposals`).flush({ items: DRAFT_PROPOSALS, page: 1, pageSize: 200, total: DRAFT_PROPOSALS.length, totalPages: 1 });
     fixture.detectChanges();
 
     const input = fixture.nativeElement.querySelector('input[type="search"]') as HTMLInputElement;
@@ -69,10 +69,10 @@ describe('RecordsPageComponent', () => {
   it('excludes drafts that belong to a different applicant', () => {
     TestBed.inject(AuthService).establishSession(testUser([testRole('staff', 'student_affairs', 'Student Affairs')], {
       email: 'someone.else@student.apu.edu.my', displayName: 'Someone Else', username: 'someone.else',
-    }));
+    }), testTokens());
     const fixture = TestBed.createComponent(RecordsPageComponent);
     fixture.detectChanges();
-    httpMock.expectOne(environment.proposalWorkflowApiUrl).flush(DRAFT_PROPOSALS);
+    httpMock.expectOne((req) => req.url === `${environment.apiBaseUrl}/proposals`).flush({ items: DRAFT_PROPOSALS, page: 1, pageSize: 200, total: DRAFT_PROPOSALS.length, totalPages: 1 });
     fixture.detectChanges();
 
     expect(fixture.componentInstance.filteredRecords()).toHaveLength(0);

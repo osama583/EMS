@@ -319,3 +319,55 @@ def restore_option(kind: str, option_id: int):
         audit("options.restored", kind=kind, option_id=option_id,
               actor_user_id=current_principal().user_id)
     return jsonify({**row, "id": row[catalogue.pk], "kind": kind})
+
+
+@bp.get("/logistics/<int:option_id>/availability")
+@require_auth
+def logistics_availability(option_id: int):
+    """How many of this item remain free for a date/time window.
+
+    Computed server-side by subtracting quantities already committed to
+    overlapping bookings on live proposals. Cancelled and rejected proposals do
+    not hold stock.
+    """
+    from flask import request as flask_request
+
+    date = flask_request.args.get("date")
+    start = flask_request.args.get("start")
+    end = flask_request.args.get("end")
+    if not (date and start and end):
+        raise BadRequest("date, start and end query parameters are required.")
+
+    with transaction() as cur:
+        option = fetch_one(
+            cur,
+            "SELECT logistics_option_id, label, available_quantity, quantity_unit "
+            "FROM logistics_options WHERE logistics_option_id = %s AND archived_at IS NULL",
+            (option_id,),
+        )
+        if option is None:
+            raise NotFound("Logistics item not found.")
+
+        committed = fetch_one(
+            cur,
+            '''SELECT COALESCE(sum(rl.quantity), 0) AS total
+                 FROM request_logistics rl
+                 JOIN request r ON r.request_id = rl.request_id
+                WHERE rl.option_id = %s
+                  AND rl."date" = %s
+                  AND r.status NOT IN ('draft', 'cancelled', 'completed_rejected')
+                  AND rl.start_time < %s AND rl.end_time > %s''',
+            (option_id, date, end, start),
+        )["total"]
+
+    total = option["available_quantity"] or 0
+    return jsonify(
+        {
+            "optionId": option["logistics_option_id"],
+            "label": option["label"],
+            "unit": option["quantity_unit"],
+            "totalQuantity": total,
+            "committedQuantity": int(committed),
+            "availableQuantity": max(0, total - int(committed)),
+        }
+    )

@@ -106,7 +106,7 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const { AuthService } = await import('./core/auth/auth.service');
-    const { testUser, testRole, testNavPage } = await import('./core/auth/auth.test-fixtures');
+    const { testUser, testRole, testNavPage, testTokens } = await import('./core/auth/auth.test-fixtures');
     // The sidebar is rendered straight from the server-supplied nav tree, so the session needs a
     // real nav node for the route under test to be reachable.
     TestBed.inject(AuthService).establishSession(testUser(
@@ -117,7 +117,7 @@ describe('App', () => {
         username: 'applicant',
         nav: [testNavPage('how-it-works', 'How It Works')],
       },
-    ));
+    ), testTokens());
     await TestBed.inject(Router).navigateByUrl('/app/how-it-works');
     await fixture.whenStable();
     fixture.detectChanges();

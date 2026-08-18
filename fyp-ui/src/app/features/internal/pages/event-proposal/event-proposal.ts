@@ -869,7 +869,7 @@ export class EventProposalComponent implements OnDestroy {
     const proposalId = this.resubmitProposalId();
     if (proposalId === null) return;
     this.savingDraft.set(true);
-    this.workflow.saveEdits(proposalId, this.buildSubmissionPayload(), this.applicant?.email ?? '').pipe(finalize(() => this.savingDraft.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.workflow.saveEdits(proposalId, this.buildSubmissionPayload()).pipe(finalize(() => this.savingDraft.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => this.showToast('Changes saved', 'This proposal stays in your Inbox until you resubmit it.'),
       error: (err) => this.showError('Your changes could not be saved', err, 'Please try again.'),
     });
@@ -943,7 +943,7 @@ export class EventProposalComponent implements OnDestroy {
     const proposalId = this.resubmitProposalId();
     if (proposalId !== null) {
       this.resubmitting.set(true);
-      this.workflow.resubmitFromApplicant(proposalId, this.buildSubmissionPayload(), this.applicant?.email ?? '').pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      this.workflow.resubmitFromApplicant(proposalId, this.buildSubmissionPayload()).pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
         next: () => {
           this.status.set('Submitted'); this.previewOpen.set(false); this.reviewerComments.set([]);
           this.showToast('Proposal resubmitted', 'It resumes at whichever stage sent it back to you.');

@@ -73,7 +73,7 @@ describe('EventCalendarComponent', () => {
     component = fixture.componentInstance;
     httpMock = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
-    httpMock.expectOne(environment.eventsApiUrl).flush(MOCK_PUBLISHED_EVENTS);
+    httpMock.expectOne(`${environment.apiBaseUrl}/events`).flush(MOCK_PUBLISHED_EVENTS);
     fixture.detectChanges();
   });
 

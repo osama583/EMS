@@ -9,7 +9,7 @@ import { RequestOptionDto, mapRequestOptionResponse, mapRequestOptionWrite } fro
 @Injectable({ providedIn: 'root' })
 export class ApiRequestOptionRepository implements RequestOptionRepository {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = environment.requestOptionsApiUrl;
+  private readonly baseUrl = `${environment.apiBaseUrl}/options`;
 
   getOptions(query: RequestOptionQuery): Observable<readonly RequestOption[]> {
     let params = new HttpParams();

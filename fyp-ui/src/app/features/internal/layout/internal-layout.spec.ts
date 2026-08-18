@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
-import { testNavPage, testRole, testUser } from '../../../core/auth/auth.test-fixtures';
+import { testNavPage, testRole, testTokens, testUser } from '../../../core/auth/auth.test-fixtures';
 import { InternalLayoutComponent } from './internal-layout';
 
 describe('InternalLayoutComponent', () => {
@@ -46,7 +46,7 @@ describe('InternalLayoutComponent', () => {
           children: [testNavPage('events/explore-events', 'Explore Events')],
         },
       ],
-    }));
+    }), testTokens());
 
     fixture = TestBed.createComponent(InternalLayoutComponent);
     component = fixture.componentInstance;
@@ -201,7 +201,7 @@ describe('InternalLayoutComponent', () => {
       displayName: 'Cafeteria Staff',
       username: 'cafeteria.staff',
       nav: [testNavPage('tasks', 'My Tasks')],
-    }));
+    }), testTokens());
 
     fixture.detectChanges();
 

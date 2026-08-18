@@ -39,7 +39,7 @@ export class ApiPaymentProofUploadService implements PaymentProofUploadApi {
 
   upload(request: PaymentProofUploadRequest): Observable<PaymentProofUploadResponse> {
     return readAsDataUrl(request.file).pipe(
-      switchMap((dataUrl) => this.http.post<{ storageKey: string; url: string }>(environment.imageUploadApiUrl, {
+      switchMap((dataUrl) => this.http.post<{ storageKey: string; url: string }>(`${environment.apiBaseUrl}/uploads`, {
         fileName: request.file.name,
         mimeType: request.file.type,
         sizeBytes: request.file.size,
@@ -52,5 +52,7 @@ export class ApiPaymentProofUploadService implements PaymentProofUploadApi {
 
 export const PAYMENT_PROOF_UPLOAD_API = new InjectionToken<PaymentProofUploadApi>('PAYMENT_PROOF_UPLOAD_API', {
   providedIn: 'root',
-  factory: () => environment.useMockImageUpload ? inject(MockPaymentProofUploadService) : inject(ApiPaymentProofUploadService),
+  // Always the real API now: uploads must return a URL, because
+  // request.event_image is VARCHAR(255) and cannot hold a data URL.
+  factory: () => inject(ApiPaymentProofUploadService),
 });

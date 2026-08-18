@@ -1,4 +1,5 @@
 import { AuthNavNode, AuthUser, AuthUserRole } from './auth.models';
+import { AuthTokens } from './token-store';
 
 // Shared AuthUser builder for specs. Before this existed every spec hand-wrote its own literal
 // against the PRE-RBAC-redesign shape (`role`, `functionLevel`, `unitId`, `unitKind`, the deleted
@@ -78,3 +79,17 @@ export const TEST_SYSTEM_ADMIN = testUser([testRole('system-admin')], {
 export const TEST_EXTERNAL_USER = testUser([testRole('external-user')], {
   email: 'guest@example.com', displayName: 'Guest User', username: 'guest',
 });
+
+
+/**
+ * A token set for specs. `authenticated` requires a session, so a spec that
+ * only sets a user would render as logged out. Expiry is far enough ahead that
+ * no test triggers a refresh.
+ */
+export function testTokens(): AuthTokens {
+  return {
+    accessToken: 'test-access-token',
+    refreshToken: 'test-refresh-token',
+    expiresAt: Date.now() + 60 * 60 * 1000,
+  };
+}
