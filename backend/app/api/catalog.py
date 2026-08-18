@@ -28,18 +28,74 @@ bp = Blueprint("catalog", __name__, url_prefix="/catalog")
 RETENTION_DAYS = 7
 
 
+# The config table is keyed by SCREAMING_SNAKE code; the client speaks its own
+# camelCase field names. Mapping here keeps database naming out of the API
+# contract, and means the client cannot silently read a key that does not exist.
+CONFIG_FIELDS: dict[str, str] = {
+    "paxReviewerThreshold": "HIGH_PAX_THRESHOLD",
+    "cancellationDaysLimit": "CANCELLATION_DEADLINE_DAYS",
+    "maxEventCategories": "MAX_EVENT_CATEGORIES",
+}
+
+
+def _config_payload(rows) -> dict[str, int]:
+    by_code = {r["code"]: r["number"] for r in rows}
+    return {
+        field: int(by_code[code]) for field, code in CONFIG_FIELDS.items() if code in by_code
+    }
+
+
 @bp.get("/config")
 @require_auth
 def get_config():
-    """Workflow tunables as {code: number}. The client reads these rather than
-    duplicating thresholds it would then get wrong when an admin changes one."""
-    rows = query("SELECT code, number FROM config ORDER BY code")
-    return jsonify({r["code"]: float(r["number"]) for r in rows})
+    """Workflow tunables. The client reads these rather than duplicating
+    thresholds it would then get wrong when an admin changes one."""
+    return jsonify(_config_payload(query("SELECT code, number FROM config")))
+
+
+@bp.put("/config")
+@require_admin
+def replace_config():
+    """Save the whole settings form in one go.
+
+    PUT of the entire object rather than a call per value: the form is saved as
+    a unit, and applying it field by field would leave a half-applied policy
+    visible to anyone reading config in between.
+    """
+    payload = body()
+    updates = {
+        CONFIG_FIELDS[field]: payload[field] for field in CONFIG_FIELDS if field in payload
+    }
+    if not updates:
+        raise BadRequest(
+            "Provide at least one of: " + ", ".join(sorted(CONFIG_FIELDS)) + "."
+        )
+
+    for field, value in ((f, payload[f]) for f in CONFIG_FIELDS if f in payload):
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
+            raise BadRequest(f"{field} must be a non-negative number.")
+
+    with transaction() as cur:
+        for code, value in updates.items():
+            cur.execute(
+                "UPDATE config SET number = %s WHERE code = %s RETURNING code", (value, code)
+            )
+            if cur.fetchone() is None:
+                raise NotFound("No configuration value named " + code + ".")
+        rows = fetch_all(cur, "SELECT code, number FROM config")
+        audit(
+            "catalog.config.updated",
+            codes=sorted(updates),
+            actor_user_id=current_principal().user_id,
+        )
+    return jsonify(_config_payload(rows))
 
 
 @bp.put("/config/<code>")
 @require_admin
 def set_config(code: str):
+    """Single-value update, by raw config code. Kept for callers that predate
+    the whole-object PUT above."""
     payload = body()
     (number,) = required(payload, "number")
     with transaction() as cur:

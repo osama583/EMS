@@ -163,26 +163,69 @@ def _writable_values(payload: dict, catalogue: Catalogue, allowed: set[str]) -> 
     return values
 
 
+def _requested_kinds() -> list[str]:
+    """The catalogues this request is about.
+
+    ?kinds= takes a comma-separated list: the manager pages and the proposal
+    form both show several catalogues at once, and one request per catalogue
+    would be a round trip each over a remote database. ?kind= stays supported
+    for single-catalogue callers, and omitting both means every catalogue -
+    which is what the manager page's unfiltered view asks for.
+
+    Every name is validated against CATALOGUES before it reaches a query, so
+    the table and column names interpolated below are only ever our own.
+    """
+    raw = request.args.get("kinds") or request.args.get("kind") or ""
+    kinds = [k.strip() for k in raw.split(",") if k.strip()]
+    if not kinds:
+        return list(CATALOGUES)
+    for kind in kinds:
+        _catalogue(kind)
+    # De-duplicated, preserving the order asked for.
+    return list(dict.fromkeys(kinds))
+
+
 @bp.get("")
 @require_auth
 def list_options():
-    kind = request.args.get("kind")
-    if not kind:
-        raise BadRequest("A ?kind= parameter is required. See /catalog/requirements for the keys.")
-    catalogue = _catalogue(kind)
+    """Rows from one or more catalogues, filtered in the database.
 
-    sql = f"SELECT * FROM {catalogue.table} WHERE archived_at IS NULL"
-    params: list = []
-    if flag("activeOnly"):
-        sql += " AND active"
-    # A cafeteria manager's menu view is scoped to their own cafeteria.
-    unit_code = request.args.get("unitCode")
-    if kind == "fmb" and unit_code:
-        sql += " AND unit_code = %s"
-        params.append(unit_code)
+    Each catalogue is its own table with its own columns, so this issues one
+    narrow SELECT per requested kind rather than a UNION: a UNION would have to
+    flatten every branch onto one column list, discarding exactly the
+    kind-specific fields (available_quantity, passenger_capacity, ...) the
+    manager pages and the proposal form render.
 
-    rows = query(sql + f" ORDER BY {catalogue.pk}", params)
-    return jsonify([{**r, "id": r[catalogue.pk], "kind": kind} for r in rows])
+    Every filter - active, search, cafeteria scope - is applied in SQL, so no
+    row crosses the wire only to be discarded here.
+    """
+    kinds = _requested_kinds()
+    active_only = flag("active") or flag("activeOnly")
+    search = (request.args.get("search") or "").strip()
+    cafeteria_code = request.args.get("cafeteriaCode") or request.args.get("unitCode")
+
+    out: list[dict] = []
+    for kind in kinds:
+        catalogue = CATALOGUES[kind]
+        clauses = ["archived_at IS NULL"]
+        params: list = []
+        if active_only:
+            clauses.append("active")
+        if search:
+            clauses.append("(label ILIKE %s OR COALESCE(description, '') ILIKE %s)")
+            params += [f"%{search}%", f"%{search}%"]
+        # Only the cafeteria menu is scoped by unit; the filter would match no
+        # column on any other catalogue, so it is skipped rather than applied.
+        if cafeteria_code and "unit_code" in catalogue.extra_columns:
+            clauses.append("unit_code = %s")
+            params.append(cafeteria_code)
+
+        rows = query(
+            f"SELECT * FROM {catalogue.table} WHERE " + " AND ".join(clauses) + " ORDER BY label",
+            params,
+        )
+        out += [{**r, "id": r[catalogue.pk], "kind": kind} for r in rows]
+    return jsonify(out)
 
 
 @bp.get("/deleted")
