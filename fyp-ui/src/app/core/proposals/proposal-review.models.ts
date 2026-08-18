@@ -53,6 +53,11 @@ export interface ProposalReviewRecord {
   readonly status: string;
   readonly category: string;
   readonly requests: readonly ProposalDepartmentRequest[];
+  // Structured (non-flattened) per-requirement rows — mirrors what event-proposal.ts's own
+  // requestRows form state holds (date/start/end/withLogo/etc. as individual fields, plus each
+  // option-picker field encoded as `${kind}:${option_id}`). `requests` above is a display-only
+  // projection with pre-joined strings and is NOT sufficient to repopulate the editable form.
+  readonly requestRows?: Partial<Record<ProposalDepartmentKey, readonly EditableRow[]>>;
 
   // Full submission fields — everything the applicant filled out on the event-proposal form,
   // carried through so the Full Reviewer view (View 1) can render it read-only in its entirety.

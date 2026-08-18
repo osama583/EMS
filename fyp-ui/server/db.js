@@ -286,7 +286,7 @@ function seedCategoriesAndRequirements() {
   const categoryNames = ['Academic & Career', 'Workshops & Training', 'Sports & Wellness', 'Culture & Community', 'Clubs & Societies', 'Entertainment & Social', 'Volunteering'];
   for (const name of categoryNames) db.event_category.push({ event_category_id: nextId('event_category'), name, code: deriveUnitCode(name), active: true, archived_at: null });
 
-  const requirementNames = ['logistics', 'transportation', 'photoVideo', 'soundLight', 'fmb', 'campusTour', 'fundingPurchase'];
+  const requirementNames = ['logistics', 'transportation', 'photoVideo', 'soundLight', 'fmb', 'campusTour', 'waterNormal', 'fundingPurchase'];
   for (const name of requirementNames) db.event_requirements.push({ requirement_id: nextId('event_requirements'), requirement_name: name });
 
   // Previously hardcoded in the Angular proposal form's Event Format dropdown — now an
@@ -398,9 +398,9 @@ function seedDropdownOptions() {
   // kind. logo_branding_requirement carries over as optional guidance shown when relevant.
   const bottleCounts = [24, 48, 96, 120];
   for (const count of bottleCounts) {
-    db.water_normal_options.push({ water_normal_option_id: nextId('water_normal_options'), requirement_id: requirementId('fmb'), label: `${count} bottles`, description: null, active: true, number_of_bottles: count, available_stock: 500, ordering_delivery_instructions: null, logo_branding_requirement: 'APU logo artwork is required if requesting bottles with a logo.' });
+    db.water_normal_options.push({ water_normal_option_id: nextId('water_normal_options'), requirement_id: requirementId('waterNormal'), label: `${count} bottles`, description: null, active: true, number_of_bottles: count, available_stock: 500, ordering_delivery_instructions: null, logo_branding_requirement: 'APU logo artwork is required if requesting bottles with a logo.' });
   }
-  db.water_normal_options.push({ water_normal_option_id: nextId('water_normal_options'), requirement_id: requirementId('fmb'), label: 'Custom quantity', description: null, active: true, number_of_bottles: 0, available_stock: 500, ordering_delivery_instructions: null, logo_branding_requirement: 'APU logo artwork is required if requesting bottles with a logo.' });
+  db.water_normal_options.push({ water_normal_option_id: nextId('water_normal_options'), requirement_id: requirementId('waterNormal'), label: 'Custom quantity', description: null, active: true, number_of_bottles: 0, available_stock: 500, ordering_delivery_instructions: null, logo_branding_requirement: 'APU logo artwork is required if requesting bottles with a logo.' });
 
   const fundingMainIdMap = {};
   for (const [oldId, label, financeCode] of [['fund-main-printing', 'Printing and materials', 'PRINT'], ['fund-main-venue', 'Venue setup', 'VENUE'], ['fund-main-honorarium', 'Honorarium', 'HON'], ['fund-main-external', 'External service', 'EXT'], ['fund-main-supplies', 'Event supplies', 'SUP']]) {
@@ -982,6 +982,28 @@ function backfillMissingCatalogDefaults() {
   }
 }
 
+// seedCategoriesAndRequirements()'s requirementNames list was missing 'waterNormal' until this
+// fix — any db.json persisted before this point has no event_requirements row for it, which
+// meant Mineral Water could never be recorded in application_requirements (it silently vanished
+// from "selected requirements" on every save/resubmit even though request_mineral_water rows
+// themselves are written unconditionally from requestRows). Idempotent: a no-op once the row
+// exists, matching backfillEventCatalog()'s pattern above.
+function backfillWaterNormalRequirement() {
+  let changed = false;
+  let waterNormal = db.event_requirements.find((r) => r.requirement_name === 'waterNormal');
+  if (!waterNormal) {
+    waterNormal = { requirement_id: nextId('event_requirements'), requirement_name: 'waterNormal' };
+    db.event_requirements.push(waterNormal);
+    changed = true;
+  }
+  // The seed used to point every water_normal_options row at requirementId('fmb') by mistake
+  // (copy-paste from the block above it) — repoint any row still carrying that wrong id.
+  for (const row of db.water_normal_options) {
+    if (row.requirement_id !== waterNormal.requirement_id) { row.requirement_id = waterNormal.requirement_id; changed = true; }
+  }
+  if (changed) saveDb();
+}
+
 if (fs.existsSync(DB_FILE)) {
   loadFromDisk();
 } else {
@@ -994,6 +1016,7 @@ backfillSplitSystemConfigNavPages();
 backfillResolveNavIcons();
 backfillEventCatalog();
 backfillMissingCatalogDefaults();
+backfillWaterNormalRequirement();
 
 require('./services/admin-deletion.registry').init(db);
 

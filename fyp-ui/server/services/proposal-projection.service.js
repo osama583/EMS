@@ -62,6 +62,27 @@ function departmentRequestsFor(requestId) {
   return rows;
 }
 
+// Structured (non-flattened) per-requirement editable rows — the shape the event-proposal
+// form's own request-editor tables read/write (see event-proposal.ts's buildRequirementDefinitions
+// column keys: date/start/end/quantity/item/etc., plus each option-picker field encoded as
+// `${kind}:${option_id}` exactly like resolveOptionSnapshot() in workflow.service.js expects).
+// This is what prefillFromRecord() must use to repopulate the form on resubmit/draft-reopen —
+// departmentRequestsFor()'s rows above are a display-only projection (pre-joined strings like
+// "2026-01-01 · 09:00-10:00") with no way back into individual date/start/end/withLogo fields,
+// which used to be fed into the editor directly and silently dropped every such field on save.
+function requestRowsFor(requestId) {
+  const rows = { logistics: [], transportation: [], photoVideo: [], soundLight: [], fmb: [], campusTour: [], waterNormal: [], fundingPurchase: [] };
+  for (const l of db.request_logistics.filter((r) => r.request_id === requestId)) rows.logistics.push({ id: l.request_logistics_id, item: l.option_id != null ? `logistics:${l.option_id}` : l.item, quantity: l.quantity, date: l.date, start: l.start_time, end: l.end_time, location: l.location, notes: l.notes || '' });
+  for (const t of db.request_transportation.filter((r) => r.request_id === requestId)) rows.transportation.push({ id: t.request_transportation_id, type: t.option_id != null ? `transportation:${t.option_id}` : t.type, requestedPax: t.requested_pax, date: t.date, start: t.moving_time, pickup: t.pickup, dropoff: t.dropoff, notes: t.notes || '' });
+  for (const p of db.request_photography_videography.filter((r) => r.request_id === requestId)) rows.photoVideo.push({ id: p.request_photography_videography_id, service: p.option_id != null ? `photoVideo:${p.option_id}` : p.service, date: p.date, start: p.start_time, end: p.end_time, location: p.location, notes: p.notes || '' });
+  for (const s of db.request_sound_light.filter((r) => r.request_id === requestId)) rows.soundLight.push({ id: s.request_sound_light_id, item: s.option_id != null ? `soundLight:${s.option_id}` : s.item, date: s.date, start: s.start_time, end: s.end_time, location: s.location, notes: s.notes || '' });
+  for (const f of db.request_fmb.filter((r) => r.request_id === requestId)) rows.fmb.push({ id: f.request_fmb_id, foodType: f.option_id != null ? `fmb:${f.option_id}` : f.food_type, quantity: f.pax, date: f.date, start: f.serve_time, location: f.location, notes: f.notes || '' });
+  for (const c of db.request_campus_tour.filter((r) => r.request_id === requestId)) rows.campusTour.push({ id: c.request_campus_tour_id, startPoint: c.start_point_option_id != null ? `campusTourStart:${c.start_point_option_id}` : c.start_point, tourType: c.tour_type_option_id != null ? `campusTourType:${c.tour_type_option_id}` : c.tour_type, date: c.date, pax: c.pax, notes: c.notes || '' });
+  for (const w of db.request_mineral_water.filter((r) => r.request_id === requestId)) rows.waterNormal.push({ id: w.request_mineral_water_id, quantity: w.option_id != null ? `waterNormal:${w.option_id}` : String(w.quantity), withLogo: w.with_logo ? 'Yes' : 'No', date: w.date, start: w.start_time, end: w.end_time, location: w.location, notes: w.notes || '' });
+  for (const f of db.request_funding_purchase.filter((r) => r.request_id === requestId)) rows.fundingPurchase.push({ id: f.request_funding_purchase_id, mainItem: f.main_option_id != null ? `fundingMain:${f.main_option_id}` : f.main_item, subItem: f.sub_option_id != null ? `fundingSub:${f.sub_option_id}` : f.sub_item, quantity: f.quantity, unit: f.unit_price_rm, notes: f.notes || '' });
+  return rows;
+}
+
 function fmbSelectionsFor(requestId) {
   const fmbRows = db.request_fmb.filter((f) => f.request_id === requestId);
   const selections = [];
@@ -127,6 +148,7 @@ function projectProposal(request) {
     status: STAGE_LABELS[request.status] || request.status,
     category: categories[0] || '',
     requests: departmentRequestsFor(request.request_id),
+    requestRows: requestRowsFor(request.request_id),
     applicantEmail: request.applicant_email,
     applicantDepartment: request.applicant_department_or_school,
     coOwners: editableRowsFromCoOwners(request.request_id),

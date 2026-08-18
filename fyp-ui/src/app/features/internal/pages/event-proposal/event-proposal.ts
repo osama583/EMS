@@ -257,10 +257,16 @@ export class EventProposalComponent implements OnDestroy {
     this.agenda.set(record.agenda);
     this.discussions.set(record.discussions);
     this.selectedRequirements.set(record.selectedRequirements);
+    // Use the server's structured per-requirement rows (date/start/end/withLogo/etc. as real
+    // fields) rather than reconstructing them from the flattened, display-only `record.requests`
+    // strings — that used to silently drop fields the editor needs (e.g. Mineral Water's
+    // withLogo, and every requirement's date/start/end), which then saved back as
+    // undefined/false and blanked the Request Details schedule after resubmission.
+    const structuredRows = record.requestRows ?? {};
     this.requestRows.set({
       logistics: [], transportation: [], photoVideo: [], soundLight: [], fmb: [], campusTour: [], waterNormal: [], fundingPurchase: [],
       ...Object.fromEntries(
-        record.selectedRequirements.map((key) => [key, record.requests.filter((request) => request.department === key).map((request) => ({ ...request }))]),
+        record.selectedRequirements.map((key) => [key, (structuredRows[key] ?? []).map((row) => ({ ...row }))]),
       ),
     });
   }
