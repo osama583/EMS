@@ -51,6 +51,13 @@ class Config:
     log_level: str = os.getenv("LOG_LEVEL", "INFO").upper()
     log_format: str = os.getenv("LOG_FORMAT", "console").lower()
 
+    # --- Demo login picker (TESTING ONLY - delete before production) -----
+    # Gates GET /auth/dev-users. Off by default; a deployed environment that
+    # never sets DEMO_MODE serves nothing from that route regardless of what
+    # else is misconfigured.
+    demo_mode: bool = os.getenv("DEMO_MODE", "").strip().lower() == "true"
+    demo_password: str = os.getenv("DEMO_PASSWORD", "")
+
     @property
     def is_development(self) -> bool:
         return self.env == "development"
