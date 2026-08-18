@@ -228,14 +228,17 @@ _DEV_USERS_SQL = """
   ORDER BY u.full_name
 """
 
-_DEV_USER_ROLE_SQL = """
-    SELECT r.role_name, u.description AS unit_description
+# One row per user (their first role by assignment order), fetched for every
+# seeded user in a single round trip instead of one query per user - the
+# per-user loop this replaced took ~9s over a remote DB for ~40 users.
+_DEV_USER_ROLES_SQL = """
+    SELECT DISTINCT ON (uur.user_id)
+           uur.user_id, r.role_name, u.description AS unit_description
       FROM user_unit_roles uur
       JOIN role r ON r.role_code = uur.role_code
  LEFT JOIN unit u ON u.code = uur.unit_code
-     WHERE uur.user_id = %s AND r.archived_at IS NULL
-  ORDER BY uur.user_unit_role_id
-     LIMIT 1
+     WHERE r.archived_at IS NULL
+  ORDER BY uur.user_id, uur.user_unit_role_id
 """
 
 
@@ -243,15 +246,17 @@ def _dev_user_rows() -> list[dict[str, object]]:
     from ..db import query as _query
 
     rows = _query(_DEV_USERS_SQL)
+    roles_by_user = {row["user_id"]: row for row in _query(_DEV_USER_ROLES_SQL)}
+
     out = []
     for row in rows:
-        role = _query(_DEV_USER_ROLE_SQL, (row["id"],))
+        role = roles_by_user.get(row["id"])
         role_label = "Unassigned"
         if role:
             role_label = (
-                f"{role[0]['role_name']} — {role[0]['unit_description']}"
-                if role[0]["unit_description"]
-                else role[0]["role_name"]
+                f"{role['role_name']} — {role['unit_description']}"
+                if role["unit_description"]
+                else role["role_name"]
             )
         out.append(
             {

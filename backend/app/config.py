@@ -27,6 +27,11 @@ def _csv(name: str, default: str) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
+def _bool(name: str) -> bool:
+    """Only the literal "true" enables a flag; unset or anything else is off."""
+    return os.getenv(name, "").strip().lower() == "true"
+
+
 @dataclass(frozen=True)
 class Config:
     env: str = os.getenv("FLASK_ENV", "production")
@@ -55,7 +60,7 @@ class Config:
     # Gates GET /auth/dev-users. Off by default; a deployed environment that
     # never sets DEMO_MODE serves nothing from that route regardless of what
     # else is misconfigured.
-    demo_mode: bool = os.getenv("DEMO_MODE", "").strip().lower() == "true"
+    demo_mode: bool = _bool("DEMO_MODE")
     demo_password: str = os.getenv("DEMO_PASSWORD", "")
 
     @property

@@ -10,6 +10,7 @@ import pytest
 
 from app import create_app
 from app.api import auth as auth_module
+from app.config import _bool
 
 
 @pytest.fixture()
@@ -19,11 +20,25 @@ def client():
     return app.test_client()
 
 
-def test_dev_users_config_defaults_to_disabled():
-    from app.config import config
+def test_demo_mode_is_off_when_the_variable_is_unset(monkeypatch):
+    """The shipped default. Asserted against the parser rather than the
+    imported singleton, whose field defaults were evaluated once at import -
+    a developer with the picker enabled in their own .env would otherwise fail
+    an assertion about the default, which says nothing about the code."""
+    monkeypatch.delenv("DEMO_MODE", raising=False)
+    assert _bool("DEMO_MODE") is False
 
-    assert config.demo_mode is False
-    assert config.demo_password == ""
+
+@pytest.mark.parametrize("raw", ["", "false", "False", "0", "no", "yes", "1", "TRUE-ish"])
+def test_demo_mode_needs_the_literal_string_true(raw, monkeypatch):
+    monkeypatch.setenv("DEMO_MODE", raw)
+    assert _bool("DEMO_MODE") is False
+
+
+@pytest.mark.parametrize("raw", ["true", "TRUE", " True "])
+def test_demo_mode_accepts_true_case_insensitively(raw, monkeypatch):
+    monkeypatch.setenv("DEMO_MODE", raw)
+    assert _bool("DEMO_MODE") is True
 
 
 def test_dev_users_route_404s_when_demo_mode_is_off(client, monkeypatch):
