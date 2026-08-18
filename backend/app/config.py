@@ -51,7 +51,7 @@ class Config:
     log_level: str = os.getenv("LOG_LEVEL", "INFO").upper()
     log_format: str = os.getenv("LOG_FORMAT", "console").lower()
 
-    # --- Demo login picker (TESTING ONLY - delete before production) -----
+    # --- Demo login picker (TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)) ---
     # Gates GET /auth/dev-users. Off by default; a deployed environment that
     # never sets DEMO_MODE serves nothing from that route regardless of what
     # else is misconfigured.
