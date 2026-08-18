@@ -36,6 +36,7 @@ const MOCK_PUBLISHED_EVENTS: readonly PublishedEvent[] = MOCK_EVENT_FIXTURES.map
   audience: ['APU Community'],
   schedule: [{ date: inDays(fixture.days), start: '10:00', end: '12:00', location: 'APU Atrium' }],
   totalExpectedPax: 100,
+  maxPax: null,
   registrationMode: 'Automatic',
   confirmedRegistrationCount: 10,
   pendingRegistrationCount: 0,

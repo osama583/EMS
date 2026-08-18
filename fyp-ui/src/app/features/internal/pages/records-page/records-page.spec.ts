@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { environment } from '../../../../../environments/environment';
 import { AuthService } from '../../../../core/auth/auth.service';
-import { UserRole } from '../../../../core/auth/auth.models';
+import { testNavPage, testRole, testUser } from '../../../../core/auth/auth.test-fixtures';
 import { PROPOSAL_REVIEW_RECORDS } from '../../../../core/proposals/proposal-review.mock-data';
 import { ProposalReviewRecord } from '../../../../core/proposals/proposal-review.models';
 import { RecordsPageComponent } from './records-page';
@@ -17,11 +17,10 @@ const DRAFT_PROPOSALS: readonly ProposalReviewRecord[] = [
 ];
 
 function loginAsDraftOwner(): void {
-  TestBed.inject(AuthService).establishSession({
+  TestBed.inject(AuthService).establishSession(testUser([testRole('staff', 'student_affairs', 'Student Affairs')], {
     email: DRAFT_APPLICANT_EMAIL, displayName: 'Jordan Lee', username: 'jordan.lee',
-    role: 'staff' as UserRole, accountType: 'internal', roleLabel: 'Student Affairs Staff', department: 'Student Affairs',
-    functionLevel: 'staff', unitId: 'student_affairs', unitKind: 'service_department',
-  });
+    nav: [testNavPage('drafts', 'Drafts')],
+  }));
 }
 
 describe('RecordsPageComponent', () => {
@@ -68,11 +67,9 @@ describe('RecordsPageComponent', () => {
   });
 
   it('excludes drafts that belong to a different applicant', () => {
-    TestBed.inject(AuthService).establishSession({
+    TestBed.inject(AuthService).establishSession(testUser([testRole('staff', 'student_affairs', 'Student Affairs')], {
       email: 'someone.else@student.apu.edu.my', displayName: 'Someone Else', username: 'someone.else',
-      role: 'staff' as UserRole, accountType: 'internal', roleLabel: 'Student Affairs Staff', department: 'Student Affairs',
-      functionLevel: 'staff', unitId: 'student_affairs', unitKind: 'service_department',
-    });
+    }));
     const fixture = TestBed.createComponent(RecordsPageComponent);
     fixture.detectChanges();
     httpMock.expectOne(environment.proposalWorkflowApiUrl).flush(DRAFT_PROPOSALS);

@@ -1,19 +1,18 @@
 <section class="admin-directory">
-  <app-feedback-banner [message]="successMessage()" tone="success" />
   <app-feedback-banner [message]="errorMessage()" tone="error" />
 
-  <nav class="admin-directory__tabs" aria-label="Sections">
-    <button type="button" class="admin-directory__tab" [class.admin-directory__tab--active]="tab() === 'active'" (click)="setTab('active')">
+  <nav class="shared-tabs" aria-label="Sections">
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="tab() === 'active'" (click)="setTab('active')">
       <span class="material-symbols-rounded" aria-hidden="true">list_alt</span>
       {{ entity === 'users' ? 'Users' : 'Units' }}
     </button>
     @if (entity === 'users') {
-      <button type="button" class="admin-directory__tab" [class.admin-directory__tab--active]="tab() === 'assignments'" (click)="setTab('assignments')">
+      <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="tab() === 'assignments'" (click)="setTab('assignments')">
         <span class="material-symbols-rounded" aria-hidden="true">assignment</span>
         Assignments
       </button>
     }
-    <button type="button" class="admin-directory__tab" [class.admin-directory__tab--active]="tab() === 'deleted'" (click)="setTab('deleted')">
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="tab() === 'deleted'" (click)="setTab('deleted')">
       <span class="material-symbols-rounded" aria-hidden="true">delete</span>
       Deleted
     </button>
@@ -118,7 +117,7 @@
             <span role="cell">
               <button
                 type="button" class="assignment-draft-table__remove" aria-label="Remove assignment"
-                [disabled]="removingExistingAssignmentId() === row.assignmentId" (click)="removeExistingAssignment(row.assignmentId)"
+                [disabled]="removingExistingAssignmentId() === row.assignmentId" (click)="openRemoveAssignment(row)"
               >
                 <span class="material-symbols-rounded" aria-hidden="true">delete</span>
               </button>
@@ -158,3 +157,23 @@
     </div>
   </app-form-modal>
 }
+
+<app-confirm-dialog
+  [open]="restoreTarget() !== null"
+  title="Restore item"
+  [message]="restoreMessage()"
+  confirmLabel="Restore"
+  [danger]="false"
+  (confirm)="confirmRestore()"
+  (cancel)="cancelRestore()"
+/>
+
+<app-confirm-dialog
+  [open]="removeAssignmentTarget() !== null"
+  title="Remove role assignment"
+  [message]="removeAssignmentMessage()"
+  confirmLabel="Remove"
+  [loading]="!!removingExistingAssignmentId()"
+  (confirm)="confirmRemoveAssignment()"
+  (cancel)="cancelRemoveAssignment()"
+/>

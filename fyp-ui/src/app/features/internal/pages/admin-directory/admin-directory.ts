@@ -17,12 +17,14 @@ import { FeedbackBannerComponent } from '../../../../shared/components/feedback-
 import { FormFieldComponent } from '../../../../shared/components/form-controls/form-field';
 import { SelectOption } from '../../../../shared/components/form-controls/form-controls.models';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
+import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog';
 import { DeleteConfirmDialogComponent } from '../../../../shared/components/delete-confirm-dialog/delete-confirm-dialog';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
 import { InternalCellClickEvent, InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent } from '../../../../shared/components/internal-data-page/internal-data-page.models';
 import { StatusToggleComponent } from '../../../../shared/components/status-toggle/status-toggle';
 import { SearchableDropdownComponent } from '../../../../shared/components/searchable-dropdown/searchable-dropdown';
 import { PopoverComponent } from '../../../../shared/components/popover/popover';
+import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 
 type AdminEntity = 'users' | 'units';
 type AdminTab = 'active' | 'assignments' | 'deleted';
@@ -63,14 +65,22 @@ interface AssignmentDraftRow {
 
 // RBAC redesign: the Users form only edits identity fields (Full Name/Username/Email/Active) per
 // the design spec — role/unit assignment is managed on the Assignments tab instead, not this form.
+// The deleted-items table names its first column differently per page (identity / name / label),
+// so the confirmation reads whichever cell actually carries the record's display name.
+function restoreLabelFor(record: InternalDataRecord): string {
+  const named = Object.values(record.cells).find((cell) => !!cell?.primary);
+  return named?.primary ? String(named.primary) : String(record.id);
+}
+
 @Component({
   selector: 'app-admin-directory',
-  imports: [InternalDataPageComponent, FormModalComponent, FormFieldComponent, StatusToggleComponent, FeedbackBannerComponent, DeleteConfirmDialogComponent, SearchableDropdownComponent, PopoverComponent],
+  imports: [InternalDataPageComponent, FormModalComponent, FormFieldComponent, StatusToggleComponent, FeedbackBannerComponent, ConfirmDialogComponent, DeleteConfirmDialogComponent, SearchableDropdownComponent, PopoverComponent],
   templateUrl: './admin-directory.html',
   styleUrl: './admin-directory.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AdminDirectoryComponent {
+  private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly service = inject(AdminDirectoryService);
   private readonly destroyRef = inject(DestroyRef);
@@ -92,7 +102,6 @@ export class AdminDirectoryComponent {
   readonly modalOpen = signal(false);
   readonly editingId = signal<string | null>(null);
   readonly draft = signal<Record<string, string | boolean | readonly string[]>>({});
-  readonly successMessage = signal('');
   readonly errorMessage = signal('');
 
   // Delete-confirmation flow: the dependency preview is fetched as soon as the dialog opens (not
@@ -314,6 +323,22 @@ export class AdminDirectoryComponent {
 
   // Existing-row remove inside the modal, independent of the draft-row save flow below — removes
   // immediately (same DELETE the standalone table used before grouping), not deferred to submit.
+  // Removing an assignment revokes that user's access immediately — confirmed first, like every
+  // other action that changes what somebody can do.
+  readonly removeAssignmentTarget = signal<AssignmentRow | null>(null);
+  readonly removeAssignmentMessage = computed(() => {
+    const target = this.removeAssignmentTarget();
+    if (!target) return '';
+    const scope = target.unitDescription ? ` in ${target.unitDescription}` : '';
+    return `Remove the ${target.roleName} role${scope} from this user? They lose the access it grants straight away. This cannot be undone, but the role can be assigned again.`;
+  });
+  openRemoveAssignment(row: AssignmentRow): void { this.removeAssignmentTarget.set(row); }
+  cancelRemoveAssignment(): void { if (!this.removingExistingAssignmentId()) this.removeAssignmentTarget.set(null); }
+  confirmRemoveAssignment(): void {
+    const target = this.removeAssignmentTarget();
+    if (target) this.removeExistingAssignment(target.assignmentId);
+  }
+
   removeExistingAssignment(assignmentId: string): void {
     const userId = this.editingAssignmentUserId();
     if (!userId) return;
@@ -321,8 +346,12 @@ export class AdminDirectoryComponent {
     this.service.removeAssignment(userId, assignmentId)
       .pipe(finalize(() => this.removingExistingAssignmentId.set(null)), takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => this.existingAssignmentRows.update((rows) => rows.filter((row) => row.assignmentId !== assignmentId)),
-        error: (err) => this.errorMessage.set(err?.error?.message || 'The assignment could not be removed.'),
+        next: () => {
+          this.existingAssignmentRows.update((rows) => rows.filter((row) => row.assignmentId !== assignmentId));
+          this.removeAssignmentTarget.set(null);
+          this.toast.success('Assignment removed', 'The user no longer holds that role.');
+        },
+        error: (err) => { this.removeAssignmentTarget.set(null); this.toast.error('The assignment could not be removed', apiErrorMessage(err, 'Please try again.')); },
       });
   }
 
@@ -372,7 +401,7 @@ export class AdminDirectoryComponent {
     if (!this.assignmentFormValid()) return;
     const userId = this.addAssignmentUserId();
     const rows = this.assignmentDraftRows();
-    if (rows.length === 0) { this.assignmentModalOpen.set(false); this.successMessage.set('Assignments updated.'); return; }
+    if (rows.length === 0) { this.assignmentModalOpen.set(false); this.toast.success('Assignments updated'); return; }
     this.assigningRole.set(true);
     this.clearMessages();
     this.submitDraftRow(userId, rows, 0, 0);
@@ -382,7 +411,7 @@ export class AdminDirectoryComponent {
     if (index >= rows.length) {
       this.assigningRole.set(false);
       this.assignmentModalOpen.set(false);
-      this.successMessage.set(`${savedCount} assignment${savedCount === 1 ? '' : 's'} added.`);
+      this.toast.success(`${savedCount} assignment${savedCount === 1 ? '' : 's'} added.`);
       return;
     }
     const row = rows[index];
@@ -393,9 +422,7 @@ export class AdminDirectoryComponent {
         this.assigningRole.set(false);
         const roleLabel = row.roleOptions.find((r) => r.roleCode === row.roleCode)?.roleName || row.roleCode;
         const detail = err?.error?.message || 'could not be added';
-        this.errorMessage.set(
-          `${savedCount} assignment${savedCount === 1 ? '' : 's'} added before row ${index + 1} (${roleLabel}) failed: ${detail}`,
-        );
+        this.toast.error(`${savedCount} assignment${savedCount === 1 ? '' : 's'} added before row ${index + 1} (${roleLabel}) failed: ${detail}`,);
       },
     });
   }
@@ -484,7 +511,7 @@ export class AdminDirectoryComponent {
     this.changeStatus(record);
   }
   handleDeletedAction(event: InternalRowActionEvent): void {
-    if (event.action.key === 'restore') { this.restore(String(event.record.id)); return; }
+    if (event.action.key === 'restore') { this.restoreTarget.set({ id: String(event.record.id), label: restoreLabelFor(event.record) }); return; }
     if (event.action.key === 'purge') this.requestPurge(String(event.record.id));
   }
   // Users tab's relationship badge: a single relationship already shows in full, so only a
@@ -524,8 +551,8 @@ export class AdminDirectoryComponent {
       ? (id ? this.service.updateUser(id, this.userDraft()) : this.service.createUser(this.userDraft()))
       : (id ? this.service.updateUnit(id, this.unitDraft()) : this.service.createUnit(this.unitDraft()));
     request.pipe(finalize(() => this.saving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.modalOpen.set(false); this.successMessage.set(`${this.entity === 'users' ? 'User' : 'Unit'} ${id ? 'updated' : 'created'} successfully.`); },
-      error: () => this.errorMessage.set(`The ${this.entity === 'users' ? 'user' : 'unit'} could not be saved.`),
+      next: () => { this.modalOpen.set(false); this.toast.success(`${this.entity === 'users' ? 'User' : 'Unit'} ${id ? 'updated' : 'created'} successfully.`); },
+      error: () => this.toast.error(`The ${this.entity === 'users' ? 'user' : 'unit'} could not be saved.`),
     });
   }
 
@@ -546,7 +573,7 @@ export class AdminDirectoryComponent {
     const request = this.entity === 'users' ? this.service.checkUserDeletion(record.id) : this.service.checkUnitDeletion(record.id);
     request.pipe(finalize(() => this.checkingDeletion.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (preview) => this.deletePreview.set(preview),
-      error: () => this.errorMessage.set('Could not check whether this record can be deleted.'),
+      error: () => this.toast.error('Could not check whether this record can be deleted'),
     });
   }
   cancelDelete(): void { if (!this.deleting()) { this.deleteTarget.set(null); this.deletePreview.set(null); } }
@@ -559,21 +586,35 @@ export class AdminDirectoryComponent {
     request.pipe(finalize(() => this.deleting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.deleteTarget.set(null); this.deletePreview.set(null);
-        this.successMessage.set(`${this.entityKindLabel()} deleted. It can be restored from the Deleted tab within 7 days.`);
+        this.toast.success(`${this.entityKindLabel()} deleted. It can be restored from the Deleted tab within 7 days.`);
       },
-      error: (err) => this.errorMessage.set(err?.error?.message || `The ${this.entity === 'users' ? 'user' : 'unit'} could not be deleted.`),
+      error: (err) => this.toast.error(err?.error?.message || `The ${this.entity === 'users' ? 'user' : 'unit'} could not be deleted.`),
     });
   }
+  // Restoring brings an archived record back into circulation immediately, so it is
+  // confirmed first like every other state-changing action.
+  readonly restoreTarget = signal<{ id: string; label: string } | null>(null);
+  readonly restoreMessage = computed(() => {
+    const target = this.restoreTarget();
+    return target ? `Restore ${target.label}? It becomes active again straight away.` : '';
+  });
+  cancelRestore(): void { this.restoreTarget.set(null); }
+  confirmRestore(): void {
+    const target = this.restoreTarget();
+    this.restoreTarget.set(null);
+    if (target) this.restore(target.id);
+  }
+
   restore(id: string): void {
     this.clearMessages();
     this.restoringId.set(id);
     const request: Observable<AdminUserRecord | AdminUnitRecord> = this.entity === 'users' ? this.service.restoreUser(id) : this.service.restoreUnit(id);
     request.pipe(finalize(() => this.restoringId.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
-        this.successMessage.set(`${this.entityKindLabel()} restored.`);
+        this.toast.success(`${this.entityKindLabel()} restored.`);
         this.loadDeleted();
       },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The record could not be restored.'),
+      error: (err) => this.toast.error('The record could not be restored', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -593,10 +634,10 @@ export class AdminDirectoryComponent {
     request.pipe(finalize(() => this.purging.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.purgeTargetId.set(null);
-        this.successMessage.set(`${this.entityKindLabel()} permanently deleted.`);
+        this.toast.success(`${this.entityKindLabel()} permanently deleted.`);
         this.loadDeleted();
       },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The record could not be permanently deleted.'),
+      error: (err) => this.toast.error('The record could not be permanently deleted', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -612,15 +653,15 @@ export class AdminDirectoryComponent {
   // from `description` itself and rejects any client-supplied `code` — so `code` isn't even
   // included in the draft sent to the backend on create. (PUT doesn't touch code either.)
   private unitDraft(): AdminUnitDraft { return { description: this.value('name').trim() || this.value('description').trim(), active: Boolean(this.draft()['active']), roleCodes: this.roleCodes() }; }
-  private clearMessages(): void { this.successMessage.set(''); this.errorMessage.set(''); }
+  private clearMessages(): void { this.errorMessage.set(''); }
   private changeStatus(record: AdminUserRecord | AdminUnitRecord): void {
     this.clearMessages();
     const request: Observable<AdminUserRecord | AdminUnitRecord> = this.entity === 'users'
       ? this.service.setUserActive(record.id, !record.active)
       : this.service.setUnitActive(record.id, !record.active);
     request.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => this.successMessage.set(`${this.entity === 'users' ? 'User' : 'Unit'} is now ${record.active ? 'inactive' : 'active'}.`),
-      error: () => this.errorMessage.set('The active status could not be changed.'),
+      next: () => this.toast.success(`${this.entity === 'users' ? 'User' : 'Unit'} is now ${record.active ? 'inactive' : 'active'}.`),
+      error: () => this.toast.error('The active status could not be changed'),
     });
   }
   private pageSlice<T>(records: readonly T[]): readonly T[] { return records.slice((this.page() - 1) * this.pageSize(), this.page() * this.pageSize()); }

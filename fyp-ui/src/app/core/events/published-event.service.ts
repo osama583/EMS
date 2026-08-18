@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { EventRegistration, PublishedEvent, RegistrationResult } from './published-event.models';
+import { EventRegistration, PendingEventRegistration, PublishedEvent, RegistrationResult } from './published-event.models';
 import { EventRegistrationApi, RegisteredEventsResponse } from './event-engagement.models';
 
 @Injectable({ providedIn: 'root' })
@@ -13,21 +13,29 @@ export class PublishedEventService implements EventRegistrationApi {
   getPublishedEvents(): Observable<readonly PublishedEvent[]> { return this.http.get<readonly PublishedEvent[]>(this.baseUrl); }
   getEventDetails(id: string): Observable<PublishedEvent | undefined> { return this.http.get<PublishedEvent>(`${this.baseUrl}/${encodeURIComponent(id)}`); }
   getRegistrationCount(id: string): Observable<number> { return this.http.get<{ count: number }>(`${this.baseUrl}/${encodeURIComponent(id)}/registration-count`).pipe(map((response) => response.count)); }
+  // Every registration awaiting this user's approval, across all of their own events.
+  getMyPendingRegistrations(email: string): Observable<readonly PendingEventRegistration[]> {
+    return this.http.get<readonly PendingEventRegistration[]>(`${this.baseUrl}/registrations/pending`, { params: { email: email.trim().toLowerCase() } });
+  }
   getPendingRegistrations(id: string): Observable<readonly EventRegistration[]> { return this.http.get<readonly EventRegistration[]>(`${this.baseUrl}/${encodeURIComponent(id)}/registrations`, { params: { status: 'pending' } }); }
 
   getMyRegistration(eventId: string, email: string): Observable<EventRegistration | null> {
     return this.http.get<EventRegistration | null>(`${this.baseUrl}/${encodeURIComponent(eventId)}/registrations/mine`, { params: { email: email.trim().toLowerCase() } });
   }
 
-  registerForEvent(eventId: string, email: string, paymentProof?: { url: string; fileName: string }): Observable<RegistrationResult> {
+  // `reason` is required by the server when the event uses manual approval (max 100 characters).
+  registerForEvent(eventId: string, email: string, paymentProof?: { url: string; fileName: string }, reason?: string): Observable<RegistrationResult> {
     return this.http.post<RegistrationResult>(`${this.baseUrl}/${encodeURIComponent(eventId)}/register`, {
       email: email.trim().toLowerCase(),
       paymentProofUrl: paymentProof?.url,
       paymentProofFileName: paymentProof?.fileName,
+      reason,
     });
   }
-  approveRegistration(id: string): Observable<EventRegistration | undefined> { return this.http.post<EventRegistration>(`${this.baseUrl}/registrations/${encodeURIComponent(id)}/approve`, {}); }
-  rejectRegistration(id: string): Observable<EventRegistration | undefined> { return this.http.post<EventRegistration>(`${this.baseUrl}/registrations/${encodeURIComponent(id)}/reject`, {}); }
+  // actorEmail identifies the applicant/co-owner approving their own event's registrations —
+  // the server rejects anyone else (events.routes.js's assertEventOwner).
+  approveRegistration(id: string, actorEmail: string): Observable<EventRegistration | undefined> { return this.http.post<EventRegistration>(`${this.baseUrl}/registrations/${encodeURIComponent(id)}/approve`, { actorEmail }); }
+  rejectRegistration(id: string, actorEmail: string): Observable<EventRegistration | undefined> { return this.http.post<EventRegistration>(`${this.baseUrl}/registrations/${encodeURIComponent(id)}/reject`, { actorEmail }); }
 
   isEventEnded(item: PublishedEvent): boolean {
     const schedule = item.schedule[0];

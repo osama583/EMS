@@ -1,21 +1,11 @@
 <section class="option-management">
-  <app-feedback-banner [message]="successMessage()" tone="success" />
   <app-feedback-banner [message]="errorMessage()" tone="error" />
 
   @if (showCardToggle()) {
     <app-internal-page-header [config]="cardHeaderConfig()" (primaryAction)="openAdd()" />
 
     <div class="option-management__view-row">
-      <div class="option-management__view-toggle" role="group" aria-label="Choose view">
-        <button type="button" [class.active]="viewMode() === 'table'" (click)="setViewMode('table')">
-          <span class="material-symbols-rounded" aria-hidden="true">table_rows</span>
-          Table
-        </button>
-        <button type="button" [class.active]="viewMode() === 'card'" (click)="setViewMode('card')">
-          <span class="material-symbols-rounded" aria-hidden="true">grid_view</span>
-          Card View
-        </button>
-      </div>
+      <app-view-toggle [mode]="viewMode()" (modeChange)="setViewMode($event)" />
       <button type="button" class="table-control" (click)="toggleDeletedView()">
         <span class="material-symbols-rounded" aria-hidden="true">{{ showDeleted() ? 'list_alt' : 'delete' }}</span>
         {{ showDeleted() ? 'Back to options' : 'Deleted' }}
@@ -125,4 +115,14 @@
 <app-option-item-details-modal
   [open]="!!detailsTarget()" [item]="detailsTarget()"
   (close)="closeDetails()"
+/>
+
+<app-confirm-dialog
+  [open]="restoreTarget() !== null"
+  title="Restore item"
+  [message]="restoreMessage()"
+  confirmLabel="Restore"
+  [danger]="false"
+  (confirm)="confirmRestore()"
+  (cancel)="cancelRestore()"
 />

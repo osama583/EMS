@@ -15,16 +15,21 @@ const CATALOG_SEED: readonly RequestOption[] = [
   { id: 'fund-sub-speaker', kind: 'fundingSub', label: 'Guest speaker', parentId: 'fund-main-honorarium', active: true },
 ];
 
+// The form loads four catalogs on construction: request options, the two id-backed event
+// catalogs, the admin-settable config (MAX_EVENT_CATEGORIES), and the staff directory that backs
+// the Co-owner picker. Every one of them has to be answered or HttpTestingController.verify()
+// fails in afterEach.
 function createComponent(): ComponentFixture<EventProposalComponent> {
   const fixture = TestBed.createComponent(EventProposalComponent);
   const httpMock = TestBed.inject(HttpTestingController);
   httpMock.expectOne((request) => request.url === environment.requestOptionsApiUrl).flush(CATALOG_SEED);
-  httpMock.expectOne((request) => request.url === environment.configApiUrl).flush({
+  httpMock.match((request) => request.url === environment.configApiUrl).forEach((request) => request.flush({
     paxReviewerThreshold: 50,
     cancellationDaysLimit: 3,
-    eventCategories: [],
-    eventFormats: ['On Campus', 'Online', 'Hybrid', 'Off Campus'],
-  });
+    maxEventCategories: 2,
+  }));
+  httpMock.match((request) => request.url.startsWith(environment.eventCatalogApiUrl)).forEach((request) => request.flush([]));
+  httpMock.match((request) => request.url === `${environment.adminDirectoryApiUrl}/users`).forEach((request) => request.flush([]));
   return fixture;
 }
 
@@ -51,7 +56,7 @@ describe('EventProposalComponent', () => {
     const fixture = createComponent();
     fixture.detectChanges();
     expect(fixture.componentInstance.steps.map((step) => step.label)).toEqual([
-      'Applicant Info', 'General Event Info', 'Required for Event', 'Request Details', 'Detailed Event Info', 'Final Actions',
+      'Applicant Info', 'General Event Info', 'Required for Event', 'Request Details', 'Detailed Event Info', 'Final Review',
     ]);
     expect(fixture.nativeElement.querySelectorAll('app-step-indicator .step').length).toBe(6);
   });

@@ -47,6 +47,7 @@ const MOCK_PUBLISHED_EVENTS: readonly PublishedEvent[] = MOCK_EVENT_FIXTURES.map
   audience: ['APU Community'],
   schedule: [{ date: isoDate(fixture.daysFromNow), start: fixture.start, end: fixture.end, location: fixture.venue }],
   totalExpectedPax: 100,
+  maxPax: null,
   registrationMode: 'Automatic',
   confirmedRegistrationCount: 10,
   pendingRegistrationCount: 0,
@@ -167,7 +168,7 @@ describe('EventCalendarComponent', () => {
     component.openCalendarFilters();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.calendar-filter-dialog')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.shared-form-modal')).not.toBeNull();
     expect(document.body.classList.contains('calendar-filter-open')).toBe(true);
 
     component.toggleDraftCategory('Volunteering');
@@ -194,7 +195,7 @@ describe('EventCalendarComponent', () => {
     fixture.detectChanges();
 
     expect(component.selectedDay()?.events).toHaveLength(4);
-    expect(fixture.nativeElement.querySelector('#day-dialog-title')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.shared-form-modal .day-dialog__events')).not.toBeNull();
     expect(document.body.classList.contains('calendar-dialog-open')).toBe(true);
   });
 
@@ -204,7 +205,7 @@ describe('EventCalendarComponent', () => {
     component.openEvent(event);
     fixture.detectChanges();
 
-    const dialog = fixture.nativeElement.querySelector('.calendar-dialog') as HTMLElement;
+    const dialog = fixture.nativeElement.querySelector('.shared-form-modal') as HTMLElement;
     expect(dialog.textContent).toContain(event.title);
     expect(dialog.textContent).toContain(event.time);
     expect(dialog.textContent).toContain(event.venue);

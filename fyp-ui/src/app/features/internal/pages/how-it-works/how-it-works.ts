@@ -334,7 +334,8 @@ export class HowItWorksComponent implements AfterViewInit {
     // the exact same browser-computed arc length — they can't drift apart.
     view.requestAnimationFrame(() => {
       const pathEl = this.routePathRef?.nativeElement;
-      if (!pathEl) {
+      // Same guard as positionAtProgress(): SVG geometry APIs are not universally implemented.
+      if (!pathEl || typeof pathEl.getTotalLength !== 'function') {
         return;
       }
 
@@ -356,7 +357,10 @@ export class HowItWorksComponent implements AfterViewInit {
 
   private positionAtProgress(progress: number): ProcessPathPosition {
     const pathEl = this.routePathRef?.nativeElement;
-    if (!pathEl) {
+    // getTotalLength/getPointAtLength are SVG geometry APIs that some environments (notably
+    // jsdom, used by the test runner) do not implement. Guard rather than throw: the timeline
+    // still renders, just without the animated tracker.
+    if (!pathEl || typeof pathEl.getTotalLength !== 'function' || typeof pathEl.getPointAtLength !== 'function') {
       return { x: 0, y: 0, angle: 0 };
     }
 

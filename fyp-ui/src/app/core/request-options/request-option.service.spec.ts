@@ -3,39 +3,51 @@ import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AuthUser, UnitKind, UserRole } from '../auth/auth.models';
+import { AuthUser } from '../auth/auth.models';
+import { testNavPage, testRole, testUser } from '../auth/auth.test-fixtures';
 import { roleCanAccess } from '../auth/role-navigation';
 import { canManageRequestOptions, managerOptionKinds } from './request-option.permissions';
 import { RequestOption } from './request-option.models';
 import { RequestOptionService } from './request-option.service';
 
-// Unit + Level model fixtures — Logistics/A/V/Student Services managers are unit-scoped
-// (functionLevel='manager' on their own Service department unit) rather than their own UserRole.
-// F&B is unit-scoped too (unit code 'food_beverage_services').
-function unitManager(unitId: string, unitKind: UnitKind, department: string): AuthUser {
-  return {
-    email: `${unitId}.manager@demo.apu.edu.my`, displayName: `${department} Manager`, username: `${unitId}.manager`,
-    role: 'manager' as UserRole, accountType: 'internal', roleLabel: `${department} Manager`, department,
-    functionLevel: 'manager', unitId, unitKind,
-  };
+// Identity fixtures on the current RBAC model: a Service department's manager is whoever holds
+// head-of-department on that unit. Which option catalogs they may curate follows from the unit
+// alone (department-workflow.config.ts), never from a role name.
+const DROPDOWN_PAGES_BY_UNIT: Readonly<Record<string, readonly string[]>> = {
+  logistics_and_facilities: ['dropdown-options/logistics'],
+  a_v_services: ['dropdown-options/soundLight'],
+  student_services: ['dropdown-options/campusTourStart', 'dropdown-options/campusTourType'],
+  food_beverage_services: ['dropdown-options/dietaryInformation', 'dropdown-options/servingUnit', 'dropdown-options/waterNormal', 'cafeteria-menus'],
+};
+
+// A Service department's manager is whoever holds head-of-department on that unit. Which option
+// catalogs they may curate follows from the unit alone (department-workflow.config.ts); which
+// pages they can open follows from the server-supplied nav tree (nav-tree.service.js), which
+// grants one Dropdown Options page per kind rather than a single catch-all page.
+function unitManager(unitCode: string, department: string): AuthUser {
+  return testUser([testRole('head-of-department', unitCode, department)], {
+    email: `${unitCode}.manager@demo.apu.edu.my`,
+    displayName: `${department} Manager`,
+    username: `${unitCode}.manager`,
+    nav: (DROPDOWN_PAGES_BY_UNIT[unitCode] ?? []).map((pageCode) => testNavPage(pageCode)),
+  });
 }
-const logisticsManager = unitManager('logistics_and_facilities', 'service_department', 'Logistics and Facilities');
-const avManager = unitManager('a_v_services', 'service_department', 'A/V Services');
-const studentServicesManager = unitManager('student_services', 'service_department', 'Student Services');
-const fmbManager = unitManager('food_beverage_services', 'service_department', 'Food & Beverage Services');
-const studentUser: AuthUser = {
-  email: 'student@demo.apu.edu.my', displayName: 'Student', username: 'student', role: 'student' as UserRole,
-  accountType: 'internal', roleLabel: 'Student — School of Computing', department: 'School of Computing',
-  functionLevel: 'student', unitId: 'school_of_computing', unitKind: 'school',
-};
-const cafeteriaManagerUser: AuthUser = {
+const logisticsManager = unitManager('logistics_and_facilities', 'Logistics and Facilities');
+const avManager = unitManager('a_v_services', 'A/V Services');
+const studentServicesManager = unitManager('student_services', 'Student Services');
+const fmbManager = unitManager('food_beverage_services', 'Food & Beverage Services');
+const studentUser: AuthUser = testUser([testRole('student', 'school_of_computing', 'School of Computing')], {
+  email: 'student@demo.apu.edu.my', displayName: 'Student', username: 'student',
+});
+const cafeteriaManagerUser: AuthUser = testUser([testRole('cafeteria-manager', 'cafeteria__atrium_cafeteria', 'Atrium Cafeteria')], {
   email: 'cafeteria.manager@demo.apu.edu.my', displayName: 'Cafeteria Manager', username: 'cafeteria.manager',
-  role: UserRole.CafeteriaManager, accountType: 'internal', roleLabel: 'Cafeteria Manager', department: 'Cafeteria Services',
-};
-const cfoUser: AuthUser = {
-  email: 'cfo@demo.apu.edu.my', displayName: 'CFO', username: 'cfo',
-  role: UserRole.Cfo, accountType: 'internal', roleLabel: 'CFO', department: 'Finance Office',
-};
+  cafeteriaCode: 'cafeteria__atrium_cafeteria',
+  nav: [testNavPage('menu', 'My Menu')],
+});
+const cfoUser: AuthUser = testUser([testRole('cfo')], {
+  email: 'cfo@demo.apu.edu.my', displayName: 'CFO', username: 'cfo', department: 'Finance Office',
+  nav: [testNavPage('dropdown-options/fundingMain'), testNavPage('dropdown-options/fundingSub')],
+});
 
 const SEED_OPTIONS: readonly RequestOption[] = [
   { id: 'transport-grab-voucher', kind: 'transportation', label: 'Grab voucher', passengerCapacity: 4, availableVehicles: 20, description: 'Capacity is per vehicle.', active: true },
@@ -71,24 +83,19 @@ describe('RequestOptionService', () => {
   it('keeps manager permissions centralized by role and page', () => {
     expect(managerOptionKinds(logisticsManager)).toEqual(['logistics']);
     expect(managerOptionKinds(cfoUser)).toEqual(['fundingMain', 'fundingSub']);
-    // F&B reviews F&B/water requests but no longer owns the menu (fmb) or Serving Units
-    // catalogs — those moved to CafeteriaManager, scoped to their assigned cafeteria.
-    // waterLogo no longer exists as its own kind — Mineral Water is one merged catalog.
-    expect(managerOptionKinds(fmbManager)).toEqual(['dietaryInformation', 'waterNormal']);
-    expect(managerOptionKinds(cafeteriaManagerUser)).toEqual(['fmb', 'servingUnit']);
+    // F&B owns the whole food-catalog set (menu, dietary information, serving units, mineral
+    // water). A Cafeteria Manager owns only their own cafeteria's menu. waterLogo no longer
+    // exists as its own kind — Mineral Water is one merged catalog.
+    expect(managerOptionKinds(fmbManager)).toEqual(['fmb', 'dietaryInformation', 'servingUnit', 'waterNormal']);
+    expect(managerOptionKinds(cafeteriaManagerUser)).toEqual(['fmb']);
     expect(managerOptionKinds(studentServicesManager)).toEqual(['campusTourStart', 'campusTourType']);
     expect(canManageRequestOptions(cafeteriaManagerUser, true)).toBe(true);
     expect(canManageRequestOptions(cafeteriaManagerUser, false)).toBe(false);
-    expect(canManageRequestOptions(fmbManager, true)).toBe(false);
+    expect(canManageRequestOptions(fmbManager, true)).toBe(true);
     expect(canManageRequestOptions(fmbManager, false)).toBe(true);
     expect(canManageRequestOptions(studentUser, false)).toBe(false);
-    expect(roleCanAccess(logisticsManager, '/app/dropdown-options')).toBe(true);
-    expect(roleCanAccess(cafeteriaManagerUser, '/app/menu')).toBe(true);
-    expect(roleCanAccess(fmbManager, '/app/menu')).toBe(false);
-    expect(roleCanAccess(fmbManager, '/app/cafeteria-menus')).toBe(true);
-    expect(roleCanAccess(cafeteriaManagerUser, '/app/cafeteria-menus')).toBe(false);
-    expect(roleCanAccess(cfoUser, '/app/dropdown-options')).toBe(true);
-    expect(roleCanAccess(fmbManager, '/app/dropdown-options')).toBe(true);
+    // Page access is decided purely by the server-supplied nav tree: each department is granted
+    // the Dropdown Options page for the kinds it owns, and nothing else.
     expect(roleCanAccess(logisticsManager, '/app/dropdown-options/logistics')).toBe(true);
     expect(roleCanAccess(logisticsManager, '/app/dropdown-options/soundLight')).toBe(false);
     expect(roleCanAccess(logisticsManager, '/app/dropdown-options/campusTourStart')).toBe(false);
@@ -96,9 +103,14 @@ describe('RequestOptionService', () => {
     expect(roleCanAccess(avManager, '/app/dropdown-options/soundLight')).toBe(true);
     expect(roleCanAccess(studentServicesManager, '/app/dropdown-options/campusTourStart')).toBe(true);
     expect(roleCanAccess(fmbManager, '/app/dropdown-options/waterNormal')).toBe(true);
-    expect(roleCanAccess(cafeteriaManagerUser, '/app/dropdown-options/servingUnit')).toBe(true);
-    expect(roleCanAccess(fmbManager, '/app/dropdown-options/servingUnit')).toBe(false);
-    expect(roleCanAccess(fmbManager, '/app/dropdown-options/dietaryInformation')).toBe(true);
+    expect(roleCanAccess(fmbManager, '/app/dropdown-options/servingUnit')).toBe(true);
+    expect(roleCanAccess(cfoUser, '/app/dropdown-options/fundingMain')).toBe(true);
+    // My Menu is the Cafeteria Manager's own cafeteria; F&B gets the read-only cross-cafeteria
+    // overview instead.
+    expect(roleCanAccess(cafeteriaManagerUser, '/app/menu')).toBe(true);
+    expect(roleCanAccess(fmbManager, '/app/menu')).toBe(false);
+    expect(roleCanAccess(fmbManager, '/app/cafeteria-menus')).toBe(true);
+    expect(roleCanAccess(cafeteriaManagerUser, '/app/cafeteria-menus')).toBe(false);
   });
 
   it('provides API-compatible serving-unit and dietary-information IDs', async () => {

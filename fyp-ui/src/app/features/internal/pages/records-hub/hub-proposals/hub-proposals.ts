@@ -5,7 +5,7 @@ import { AuthService } from '../../../../../core/auth/auth.service';
 import { ProposalReviewRecord } from '../../../../../core/proposals/proposal-review.models';
 import { ProposalWorkflowService } from '../../../../../core/proposals/proposal-workflow.service';
 import { ProposalStage } from '../../../../../core/proposals/proposal-status.models';
-import { proposalSectionForUser, userIsApplicantForProposal } from '../../../../../core/proposals/proposal-visibility';
+import { departmentAwaitingApplicant, proposalNeedsApplicantAction, proposalSectionForUser, userIsApplicantForProposal } from '../../../../../core/proposals/proposal-visibility';
 import { InternalDataPageComponent } from '../../../../../shared/components/internal-data-page/internal-data-page';
 import {
   InternalCellTone,
@@ -70,7 +70,7 @@ export class HubProposalsComponent {
     const status = this.statusFilter();
     return this.bucketedItems().filter((item) => {
       const matchesQuery = query.length === 0 || `${item.proposalId} ${item.eventTitle} ${item.applicant}`.toLocaleLowerCase().includes(query);
-      const matchesStatus = status === 'All' || item.status === status;
+      const matchesStatus = status === 'All' || this.displayStatus(item) === status;
       return matchesQuery && matchesStatus;
     });
   });
@@ -108,28 +108,35 @@ export class HubProposalsComponent {
   }));
 
   readonly filterConfigs = computed<readonly InternalFilterConfig[]>(() => {
-    const statuses = [...new Set(this.bucketedItems().map((item) => item.status))];
+    const statuses = [...new Set(this.bucketedItems().map((item) => this.displayStatus(item)))];
     return [{ key: 'status', ariaLabel: 'Status', value: this.statusFilter(), options: [{ value: 'All', label: 'All statuses' }, ...statuses.map((value) => ({ value, label: value }))] }];
   });
 
+  // A department push-back leaves request.status at 'Department review' (parallel independence),
+  // so the applicant-facing label has to come from the per-task status, not the proposal status.
+  private displayStatus(item: ProposalReviewRecord): string {
+    if (departmentAwaitingApplicant(item) && userIsApplicantForProposal(this.auth.user(), item)) return 'Changes requested';
+    return item.status;
+  }
+
   readonly sharedRecords = computed<readonly InternalDataRecord[]>(() => this.visibleItems().map((item): InternalDataRecord => ({
     id: item.id,
-    emphasized: item.status === 'Revision required',
+    emphasized: this.displayStatus(item) === 'Revision required' || this.displayStatus(item) === 'Changes requested',
     cells: {
       proposalId: { primary: item.proposalId },
       eventTitle: { primary: item.eventTitle },
       applicant: { primary: item.applicant },
       schedule: { primary: item.schedule },
       pax: { primary: String(item.totalPax) },
-      status: { primary: item.status, badge: true, tone: this.statusTone(item.status) },
+      status: { primary: this.displayStatus(item), badge: true, tone: this.statusTone(this.displayStatus(item)) },
     },
     mobile: {
       eyebrow: item.proposalId,
-      status: item.status,
+      status: this.displayStatus(item),
       title: item.eventTitle,
       identity: item.applicant,
       initials: item.applicantInitials,
-      unread: item.status === 'Revision required',
+      unread: this.displayStatus(item) === 'Revision required' || this.displayStatus(item) === 'Changes requested',
       details: [
         { icon: 'schedule', text: item.schedule },
         { icon: 'groups', text: `${item.totalPax} expected pax` },
@@ -156,8 +163,10 @@ export class HubProposalsComponent {
     if (!item) return;
     // An applicant whose own proposal was sent back for changes edits it in the same form used to
     // create it, not the reviewer-facing /proposals/review page — mirrors records-page.ts's
-    // openDraft() for the 'drafts' bucket, just keyed off ResubmissionRequired instead of 'Draft'.
-    if (item.workflow.stage === ProposalStage.ResubmissionRequired && userIsApplicantForProposal(this.auth.user(), item)) {
+    // openDraft() for the 'drafts' bucket. This covers BOTH ways a proposal comes back: a
+    // reviewer stage sending the whole thing back (ResubmissionRequired) and a single department
+    // asking for changes while the rest of department review carries on.
+    if (proposalNeedsApplicantAction(item) && userIsApplicantForProposal(this.auth.user(), item)) {
       void this.router.navigate(['/app/forms/event-proposal'], { queryParams: { proposalId: id } });
       return;
     }
@@ -168,7 +177,7 @@ export class HubProposalsComponent {
   }
 
   private statusTone(status: string): InternalCellTone {
-    if (status === 'Revision required') return 'warning';
+    if (status === 'Revision required' || status === 'Changes requested') return 'warning';
     if (status === 'Rejected' || status === 'Cancelled') return 'danger';
     if (status === 'Approved') return 'success';
     return 'blue';

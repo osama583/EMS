@@ -1,17 +1,16 @@
 <section class="page-visibility">
-  <app-feedback-banner [message]="successMessage()" tone="success" />
   <app-feedback-banner [message]="errorMessage()" tone="error" />
 
-  <nav class="page-visibility__tabs" aria-label="Page Visibility sections">
-    <button type="button" class="page-visibility__tab" [class.page-visibility__tab--active]="activeTab() === 'pages'" (click)="setTab('pages')">
+  <nav class="shared-tabs" aria-label="Page Visibility sections">
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="activeTab() === 'pages'" (click)="setTab('pages')">
       <span class="material-symbols-rounded" aria-hidden="true">list_alt</span>
       Pages
     </button>
-    <button type="button" class="page-visibility__tab" [class.page-visibility__tab--active]="activeTab() === 'permissions'" (click)="setTab('permissions')">
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="activeTab() === 'permissions'" (click)="setTab('permissions')">
       <span class="material-symbols-rounded" aria-hidden="true">admin_panel_settings</span>
       Permissions
     </button>
-    <button type="button" class="page-visibility__tab" [class.page-visibility__tab--active]="activeTab() === 'deleted'" (click)="setTab('deleted')">
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="activeTab() === 'deleted'" (click)="setTab('deleted')">
       <span class="material-symbols-rounded" aria-hidden="true">delete</span>
       Deleted
     </button>
@@ -188,4 +187,14 @@
   [open]="!!purgeTargetCode()" [permanent]="true" entityKind="Page" [entityLabel]="purgeTargetLabel()"
   [preview]="{ canDelete: true, blockingReasons: [], entityLabel: purgeTargetLabel() }" [deleting]="purgingPage()"
   (confirm)="confirmPurgePage()" (cancel)="cancelPurgePage()"
+/>
+
+<app-confirm-dialog
+  [open]="restoreTarget() !== null"
+  title="Restore item"
+  [message]="restoreMessage()"
+  confirmLabel="Restore"
+  [danger]="false"
+  (confirm)="confirmRestore()"
+  (cancel)="cancelRestore()"
 />

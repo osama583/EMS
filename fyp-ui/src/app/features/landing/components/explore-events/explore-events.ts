@@ -3,9 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  ElementRef,
   HostListener,
-  ViewChild,
   computed,
   inject,
   input,
@@ -22,6 +20,7 @@ import { isSchoolStudentOrLecturer } from '../../../../core/auth/role-access';
 import { GuestRegistrationFlowService } from '../../../../core/auth/external-registration.service';
 import { EventCardComponent } from '../../../../shared/components/event-card/event-card';
 import { EventDetailsModalComponent } from '../../../../shared/components/event-details-modal/event-details-modal';
+import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
 import { InternalPaginationComponent } from '../../../../shared/components/internal-data-page/internal-data-page-parts';
 import { ExpandableSearchComponent } from '../../../../shared/components/expandable-search/expandable-search';
 import { FilterButtonComponent } from '../../../../shared/components/filter-button/filter-button';
@@ -78,7 +77,7 @@ const INITIAL_VISIBLE_EVENTS = 6;
 
 @Component({
   selector: 'app-explore-events',
-  imports: [
+  imports: [FormModalComponent, 
     EventDetailsModalComponent,
     EventCardComponent,
     InternalPaginationComponent,
@@ -103,8 +102,6 @@ export class ExploreEventsComponent {
   readonly favourites = inject(EventFavouriteService);
   readonly variant = input<'public' | 'internal'>('public');
   readonly registeringEventId = signal<string | null>(null);
-
-  @ViewChild('filterCloseButton') private filterCloseButton?: ElementRef<HTMLButtonElement>;
 
   // Populated from the SAME `getPublishedEvents()` fetch that fills `publishedEventsById` (see
   // `loadPublishedEvents()`) — no second, redundant HTTP call. Each `PublishedEvent` is mapped to
@@ -386,7 +383,6 @@ export class ExploreEventsComponent {
     this.draftCustomTo.set(this.appliedCustomTo());
     this.filterOpen.set(true);
     this.document.body.classList.add('filters-open');
-    queueMicrotask(() => this.filterCloseButton?.nativeElement.focus());
   }
 
   closeFilters(): void {
@@ -474,8 +470,16 @@ export class ExploreEventsComponent {
       return;
     }
     if (this.registeringEventId()) return;
+    const event = this.publishedEventsById().get(eventId);
+    // Manual-approval events need a reason for attending, and paid events need proof of payment.
+    // Neither can be collected from a one-click card button, so open the details modal (which
+    // owns both fields) instead of firing a registration the server would reject.
+    if (event && (event.registrationMode === 'Approval Required' || (event.cost != null && event.cost > 0))) {
+      this.openEvent(eventId);
+      return;
+    }
     this.registeringEventId.set(eventId);
-    const eventTitle = this.publishedEventsById().get(eventId)?.eventTitle ?? 'the event';
+    const eventTitle = event?.eventTitle ?? 'the event';
     this.publishedEventService.registerForEvent(eventId, user.email).subscribe({
       next: (result) => {
         this.registeringEventId.set(null);

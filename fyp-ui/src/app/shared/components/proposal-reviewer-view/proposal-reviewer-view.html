@@ -8,12 +8,6 @@
     <!-- LEFT — Proposal Details -->
     <div class="prv-main">
 
-      @if (actionMessage()) {
-        <div class="prv-status-banner" role="status" [attr.data-kind]="actionBannerKind()">
-          <span class="material-symbols-rounded" aria-hidden="true">{{ actionBannerIcon() }}</span>
-          {{ actionMessage() }}
-        </div>
-      }
 
       <!-- Section: Applicant -->
       <app-proposal-section icon="person" title="Applicant" description="Submitter details and co-owners.">

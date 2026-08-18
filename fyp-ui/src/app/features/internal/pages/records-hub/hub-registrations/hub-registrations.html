@@ -1,0 +1,29 @@
+@if (errorMessage()) { <app-feedback-banner tone="error" [message]="errorMessage()" /> }
+
+<app-internal-data-page
+  [config]="config()"
+  [records]="records()"
+  [filters]="filters()"
+  [searchValue]="search()"
+  [loading]="loading()"
+  [totalPages]="totalPages()"
+  [page]="currentPage()"
+  [pageSize]="pageSize()"
+  (searchChange)="setSearch($event)"
+  (filterChange)="setFilter($event)"
+  (reset)="reset()"
+  (pageChange)="setPage($event)"
+  (pageSizeChange)="setPageSize($event)"
+  (rowAction)="handleAction($event)"
+/>
+
+<app-confirm-dialog
+  [open]="pendingAction() !== null"
+  [title]="confirmTitle()"
+  [message]="confirmMessage()"
+  [confirmLabel]="pendingAction()?.action === 'reject' ? 'Reject' : 'Approve'"
+  [danger]="pendingAction()?.action === 'reject'"
+  [loading]="processing()"
+  (confirm)="confirmAction()"
+  (cancel)="cancelAction()"
+/>

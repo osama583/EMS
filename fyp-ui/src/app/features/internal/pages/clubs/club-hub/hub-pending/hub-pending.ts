@@ -8,12 +8,13 @@ import { InternalDataPageComponent } from '../../../../../../shared/components/i
 import { InternalFilterControlsComponent, InternalPageHeaderComponent, InternalResetButtonComponent, InternalSearchFieldComponent } from '../../../../../../shared/components/internal-data-page/internal-data-page-parts';
 import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalPageHeaderConfig } from '../../../../../../shared/components/internal-data-page/internal-data-page.models';
 import { FeedbackBannerComponent } from '../../../../../../shared/components/feedback-banner/feedback-banner';
+import { ViewToggleComponent } from '../../../../../../shared/components/view-toggle/view-toggle';
 
 type ViewMode = 'table' | 'card';
 
 @Component({
   selector: 'app-hub-pending',
-  imports: [
+  imports: [ViewToggleComponent, 
     InternalDataPageComponent, FeedbackBannerComponent, InternalPageHeaderComponent,
     InternalSearchFieldComponent, InternalFilterControlsComponent, InternalResetButtonComponent,
   ],

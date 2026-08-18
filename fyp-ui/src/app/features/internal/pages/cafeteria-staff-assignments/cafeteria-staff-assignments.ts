@@ -8,11 +8,13 @@ import { CafeteriaStaffRequest } from '../../../../core/cafeterias/cafeteria-sta
 import { CafeteriaStaffRequestService } from '../../../../core/cafeterias/cafeteria-staff-request.service';
 import { FeedbackBannerComponent } from '../../../../shared/components/feedback-banner/feedback-banner';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
+import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog';
 import { DeleteConfirmDialogComponent } from '../../../../shared/components/delete-confirm-dialog/delete-confirm-dialog';
 import { SearchableDropdownComponent } from '../../../../shared/components/searchable-dropdown/searchable-dropdown';
 import { SelectOption } from '../../../../shared/components/form-controls/form-controls.models';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
 import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent } from '../../../../shared/components/internal-data-page/internal-data-page.models';
+import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 
 const REQUEST_ACTION_LABELS: Record<CafeteriaStaffRequest['action'], string> = { add: 'Add staff', edit: 'Edit staff', remove: 'Remove staff' };
 
@@ -30,12 +32,13 @@ const ROLE_OPTIONS: readonly SelectOption[] = [
 // Users/Assignments screens are unaffected — a separate, general-purpose view over the same rows).
 @Component({
   selector: 'app-cafeteria-staff-assignments',
-  imports: [InternalDataPageComponent, FormModalComponent, FeedbackBannerComponent, DeleteConfirmDialogComponent, SearchableDropdownComponent],
+  imports: [InternalDataPageComponent, FormModalComponent, FeedbackBannerComponent, ConfirmDialogComponent, DeleteConfirmDialogComponent, SearchableDropdownComponent],
   templateUrl: './cafeteria-staff-assignments.html',
   styleUrl: './cafeteria-staff-assignments.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CafeteriaStaffAssignmentsComponent {
+  private readonly toast = inject(ToastService);
   private readonly service = inject(CafeteriaService);
   private readonly auth = inject(AuthService);
   private readonly staffRequests = inject(CafeteriaStaffRequestService);
@@ -45,6 +48,7 @@ export class CafeteriaStaffAssignmentsComponent {
   // approve/reject — a flat oversight role, so every cafeteria's requests show here, not just one.
   readonly pendingRequests = signal<readonly CafeteriaStaffRequest[]>([]);
   readonly requestActionPending = signal<string | null>(null);
+  readonly approveRequestTarget = signal<CafeteriaStaffRequest | null>(null);
   readonly rejectTarget = signal<CafeteriaStaffRequest | null>(null);
   readonly rejectComment = signal('');
   readonly rejecting = signal(false);
@@ -68,7 +72,6 @@ export class CafeteriaStaffAssignmentsComponent {
   readonly selectedUserLabel = signal('');
   readonly selectedCafeteriaCode = signal('');
   readonly selectedRoleCode = signal<CafeteriaStaffRoleCode | ''>('');
-  readonly successMessage = signal('');
   readonly errorMessage = signal('');
 
   readonly deleteTarget = signal<CafeteriaAssignment | null>(null);
@@ -139,12 +142,22 @@ export class CafeteriaStaffAssignmentsComponent {
     return action === 'remove' ? 'remove this staff member' : action === 'edit' ? 'edit this staff member' : 'add this staff member';
   }
 
+  // Approving a staff request grants (or revokes) that person's access to a cafeteria, so it is
+  // confirmed before it runs.
+  openApproveRequest(request: CafeteriaStaffRequest): void { this.approveRequestTarget.set(request); }
+  closeApproveRequest(): void { if (!this.requestActionPending()) this.approveRequestTarget.set(null); }
+  confirmApproveRequest(): void {
+    const request = this.approveRequestTarget();
+    this.approveRequestTarget.set(null);
+    if (request) this.approveRequest(request);
+  }
+
   approveRequest(request: CafeteriaStaffRequest): void {
     this.clearMessages();
     this.requestActionPending.set(request.id);
     this.staffRequests.approve(request.id, this.auth.user()!.id!).pipe(finalize(() => this.requestActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.successMessage.set(`${REQUEST_ACTION_LABELS[request.action]} request approved.`); this.service.refresh(); },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The request could not be approved. Please try again.'),
+      next: () => { this.toast.success(`${REQUEST_ACTION_LABELS[request.action]} request approved.`); this.service.refresh(); },
+      error: (err) => this.toast.error('The request could not be approved', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -159,8 +172,8 @@ export class CafeteriaStaffAssignmentsComponent {
     if (!target) return;
     this.rejecting.set(true);
     this.staffRequests.reject(target.id, this.auth.user()!.id!, this.rejectComment().trim()).pipe(finalize(() => this.rejecting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.rejectTarget.set(null); this.successMessage.set(`${REQUEST_ACTION_LABELS[target.action]} request rejected.`); },
-      error: (err) => { this.rejectTarget.set(null); this.errorMessage.set(err?.error?.message || 'The request could not be rejected. Please try again.'); },
+      next: () => { this.rejectTarget.set(null); this.toast.success(`${REQUEST_ACTION_LABELS[target.action]} request rejected.`); },
+      error: (err) => { this.rejectTarget.set(null); this.toast.error('The request could not be rejected', apiErrorMessage(err, 'Please try again.')); },
     });
   }
 
@@ -209,8 +222,8 @@ export class CafeteriaStaffAssignmentsComponent {
       ? this.service.updateAssignment(editingId, { cafeteriaCode: this.selectedCafeteriaCode(), roleCode: this.selectedRoleCode() as CafeteriaStaffRoleCode })
       : this.service.assign(this.selectedUserId(), this.selectedCafeteriaCode(), this.selectedRoleCode());
     request.pipe(finalize(() => this.saving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.modalOpen.set(false); this.successMessage.set(editingId ? 'Assignment updated.' : 'Assignment added.'); },
-      error: (err) => this.errorMessage.set(err?.error?.message || `The assignment could not be ${editingId ? 'updated' : 'added'}.`),
+      next: () => { this.modalOpen.set(false); this.toast.success(editingId ? 'Assignment updated.' : 'Assignment added.'); },
+      error: (err) => this.toast.error(err?.error?.message || `The assignment could not be ${editingId ? 'updated' : 'added'}.`),
     });
   }
 
@@ -234,8 +247,8 @@ export class CafeteriaStaffAssignmentsComponent {
     if (!target) return;
     this.deleting.set(true);
     this.service.removeAssignment(target.assignmentId).pipe(finalize(() => this.deleting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.deleteTarget.set(null); this.successMessage.set('Assignment removed.'); },
-      error: (err) => { this.deleteTarget.set(null); this.errorMessage.set(err?.error?.message || 'The assignment could not be removed.'); },
+      next: () => { this.deleteTarget.set(null); this.toast.success('Assignment removed'); },
+      error: (err) => { this.deleteTarget.set(null); this.toast.error('The assignment could not be removed', apiErrorMessage(err, 'Please try again.')); },
     });
   }
 
@@ -245,7 +258,7 @@ export class CafeteriaStaffAssignmentsComponent {
       error: () => this.errorMessage.set('Assignable users could not be loaded.'),
     });
   }
-  private clearMessages(): void { this.successMessage.set(''); this.errorMessage.set(''); }
+  private clearMessages(): void { this.errorMessage.set(''); }
   private pageSlice<T>(records: readonly T[]): readonly T[] { return records.slice((this.page() - 1) * this.pageSize(), this.page() * this.pageSize()); }
   private assignmentRecords(): readonly InternalDataRecord[] {
     return this.pageSlice(this.filteredAssignments()).map((a) => ({

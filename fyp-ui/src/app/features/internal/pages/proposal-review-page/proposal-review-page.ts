@@ -4,7 +4,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { AuthUser } from '../../../../core/auth/auth.models';
-import { workflowForManager } from '../../../../core/departments/department-workflow.config';
+import { requestKindsForManager } from '../../../../core/departments/department-workflow.config';
+import { hasRole } from '../../../../core/auth/role-access';
 import { ProposalReviewRecord } from '../../../../core/proposals/proposal-review.models';
 import { proposalSectionForUser, userIsApplicantForProposal, userOwnsCurrentProposalAction } from '../../../../core/proposals/proposal-visibility';
 import { ProposalWorkflowService } from '../../../../core/proposals/proposal-workflow.service';
@@ -66,10 +67,12 @@ export class ProposalReviewPageComponent {
     const proposal = this.proposal();
     if (!user || !proposal) return null;
     if (userIsApplicantForProposal(user, proposal)) return 'applicant';
-    // A department manager is a unit-scoped head-of-department/head-of-school, or the flat 'cfo'
-    // role — both are covered by passing the full AuthUser through, since workflowForManager's
-    // WorkflowIdentity union accepts either a role_code string or an AuthUser.
-    if (workflowForManager(user)) return 'department';
+    // A department manager is a unit-scoped head-of-department/head-of-school who actually owns
+    // at least one request kind. Owning only OPTION kinds is not enough: the CFO curates the
+    // Funding/Purchase catalogs but reviews proposals at the cfo_review stage as a reviewer, so
+    // it must fall through to the reviewer view. Cafeteria Managers act per cafeteria order and
+    // use the department view's per-selection mode.
+    if (requestKindsForManager(user).length > 0 || hasRole(user, 'cafeteria-manager')) return 'department';
     return 'reviewer';
   });
 

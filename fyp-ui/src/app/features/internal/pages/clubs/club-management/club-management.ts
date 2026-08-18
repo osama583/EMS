@@ -18,12 +18,13 @@ import { OptionCardViewModel } from '../../../../../shared/components/option-car
 import { ImageUploadFieldComponent } from '../../../../../shared/components/image-upload-field/image-upload-field';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { ClubCategoryManagerComponent } from '../../../../../shared/components/club-category-manager/club-category-manager';
+import { ViewToggleComponent } from '../../../../../shared/components/view-toggle/view-toggle';
 
 type ViewMode = 'table' | 'card';
 
 @Component({
   selector: 'app-club-management',
-  imports: [
+  imports: [ViewToggleComponent, 
     InternalDataPageComponent, FormModalComponent, FormFieldComponent, SearchableDropdownComponent, StatusToggleComponent,
     FeedbackBannerComponent, OptionCardGridComponent, InternalPageHeaderComponent,
     InternalSearchFieldComponent, InternalFilterControlsComponent, InternalResetButtonComponent, ImageUploadFieldComponent,

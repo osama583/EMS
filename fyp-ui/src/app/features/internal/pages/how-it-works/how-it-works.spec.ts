@@ -52,7 +52,8 @@ describe('HowItWorksComponent', () => {
     expect(element.querySelectorAll('.process-route__progress')).toHaveLength(1);
     expect(basePath?.getAttribute('d')).toBeTruthy();
     expect(progressPath?.getAttribute('d')).toBe(basePath?.getAttribute('d'));
-    expect(progressPath?.getAttribute('pathLength')).toBe('1');
+    expect(progressPath?.getAttribute('stroke-dasharray')).not.toBeNull();
+    expect(progressPath?.getAttribute('stroke-dashoffset')).not.toBeNull();
     expect(element.querySelector('.process-step__path')).toBeNull();
   });
 

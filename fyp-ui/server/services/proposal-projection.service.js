@@ -1,4 +1,5 @@
 const { db } = require('../db');
+const workflow = require('./workflow.service');
 
 const STAGE_LABELS = {
   submitted: 'Submitted', hos_hod_review: 'HOS/HOD review', fmb_review: 'F&B review', cfo_review: 'CFO review',
@@ -56,7 +57,7 @@ function departmentRequestsFor(requestId) {
   for (const s of db.request_sound_light.filter((r) => r.request_id === requestId)) rows.push({ id: s.request_sound_light_id, department: 'soundLight', item: s.item, quantity: '1', schedule: `${s.date} · ${s.start_time}-${s.end_time}`, location: s.location, notes: s.notes || '' });
   for (const f of db.request_fmb.filter((r) => r.request_id === requestId)) rows.push({ id: f.request_fmb_id, department: 'fmb', item: f.food_type, quantity: `${f.pax} pax`, schedule: `${f.date} · ${f.serve_time}`, location: f.location, notes: f.notes || '' });
   for (const c of db.request_campus_tour.filter((r) => r.request_id === requestId)) rows.push({ id: c.request_campus_tour_id, department: 'campusTour', item: `${c.start_point} · ${c.tour_type}`, quantity: `${c.pax} pax`, schedule: c.date, location: '', notes: c.notes || '' });
-  for (const w of db.request_mineral_water.filter((r) => r.request_id === requestId)) rows.push({ id: w.request_mineral_water_id, department: 'waterNormal', item: w.with_logo ? 'Mineral Water (with Logo)' : 'Mineral Water', quantity: `${w.quantity} bottles`, schedule: `${w.date} · ${w.start_time}-${w.end_time}`, location: w.location, notes: w.notes || '' });
+  for (const w of db.request_mineral_water.filter((r) => r.request_id === requestId)) rows.push({ id: w.request_mineral_water_id, department: 'waterNormal', item: w.with_logo ? 'Mineral Water (with Logo)' : 'Mineral Water', quantity: w.option_label ? `${w.option_label}` : `${w.quantity} bottles`, schedule: `${w.date} · ${w.start_time}-${w.end_time}`, location: w.location, notes: w.notes || '' });
   for (const f of db.request_funding_purchase.filter((r) => r.request_id === requestId)) rows.push({ id: f.request_funding_purchase_id, department: 'fundingPurchase', item: `${f.main_item} — ${f.sub_item}`, quantity: String(f.quantity), schedule: '', location: '', notes: f.notes || '' });
   return rows;
 }
@@ -72,14 +73,34 @@ function fmbSelectionsFor(requestId) {
         requestFmbId: fmbRow.request_fmb_id,
         cafeteriaCode: selection.unit_code,
         cafeteriaName: cafeteria ? cafeteria.description : 'Unknown cafeteria',
+        // Encoded the same way request-options.routes.js projects catalog ids, so the F&B edit
+        // form's menu-item picker can match it directly.
+        fmbOptionId: selection.fmb_option_id != null ? `fmb:${selection.fmb_option_id}` : '',
         menuItemLabel: selection.menu_item_label,
         quantity: selection.quantity,
         notes: selection.notes || '',
         status: selection.status,
+        // Why the owning Cafeteria Manager pushed this specific order back — shown to F&B on the
+        // edit form so they know what to change before re-sending it.
+        managerComment: selection.manager_comment || '',
       });
     }
   }
   return selections;
+}
+
+// Guest types that count as "external" for the reviewer's at-a-glance KPI — derived from the
+// applicant's own general_guest breakdown rather than an assumed percentage of total pax.
+const EXTERNAL_GUEST_TYPES = new Set(['External Guests', 'Parents-Guardians', 'Parents / Guardians', 'Industry Partners', 'Alumni', 'Others']);
+function externalPaxFor(requestId) {
+  return db.general_guest
+    .filter((g) => g.request_id === requestId && EXTERNAL_GUEST_TYPES.has(g.guest_type))
+    .reduce((sum, g) => sum + (Number(g.count) || 0), 0);
+}
+
+function canStillBeCancelled(request) {
+  if (['completed_approved', 'completed_rejected', 'cancelled', 'draft'].includes(request.status)) return false;
+  return workflow.isWithinCancellationWindow(request.request_id);
 }
 
 function selectedRequirementsFor(requestId) {
@@ -125,7 +146,12 @@ function projectProposal(request) {
     bankAccountNumber: request.bank_account_number || null,
     publicity: request.promotion_publicity_method || '',
     selectedRequirements: selectedRequirementsFor(request.request_id),
-    externalPax: Math.round(request.total_pax * 0.1),
+    externalPax: externalPaxFor(request.request_id),
+    maxPax: request.max_pax != null ? Number(request.max_pax) : null,
+    // Server-computed so the cancel button's enabled state comes from the same authority that
+    // enforces it (workflow.service.js's isWithinCancellationWindow), not a second date parser
+    // in the browser.
+    cancellationOpen: canStillBeCancelled(request),
     fmbSelections: fmbSelectionsFor(request.request_id),
     workflow: {
       stage: dbStatusToProposalStage(request.status),
@@ -133,7 +159,12 @@ function projectProposal(request) {
       reviewerComment: request.reviewer_comment || undefined,
       departmentConfirmations: db.request_task.filter((t) => t.request_id === request.request_id && t.stage_code === 'department_review').map((t) => ({
         department: db.event_requirements.find((r) => r.requirement_id === t.requirement_id).requirement_name,
-        confirmed: t.status === 'completed' || t.status === 'approved',
+        confirmed: t.status === 'completed' || t.status === 'approved' || t.status === 'preparing',
+        // Raw task status + the department's pushback comment, so the UI can tell "still waiting
+        // on this department" apart from "this department asked the applicant for changes"
+        // without re-deriving it from `confirmed` alone.
+        status: t.status,
+        comment: t.comment || undefined,
         confirmedAt: t.resolved_at || undefined,
         confirmedBy: t.resolved_by_user_id ? String(t.resolved_by_user_id) : undefined,
       })),

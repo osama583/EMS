@@ -11,6 +11,7 @@ import { SearchableDropdownComponent } from '../../../../shared/components/searc
 import { SelectOption } from '../../../../shared/components/form-controls/form-controls.models';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
 import { InternalDataPageConfig, InternalDataRecord, InternalRowActionEvent } from '../../../../shared/components/internal-data-page/internal-data-page.models';
+import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 
 // Cafeteria Manager's own staff-roster screen — scoped to their own cafeteria only (unlike
 // Cafeteria Admin's cross-cafeteria Staff Assignments page). Every add/edit/remove goes through
@@ -26,6 +27,7 @@ import { InternalDataPageConfig, InternalDataRecord, InternalRowActionEvent } fr
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CafeteriaMyStaffComponent {
+  private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
   private readonly cafeterias = inject(CafeteriaService);
   private readonly requests = inject(CafeteriaStaffRequestService);
@@ -45,7 +47,6 @@ export class CafeteriaMyStaffComponent {
   readonly editingAssignment = signal<CafeteriaAssignment | null>(null);
   readonly selectedUserId = signal('');
   readonly selectedUserLabel = signal('');
-  readonly successMessage = signal('');
   readonly errorMessage = signal('');
 
   readonly removeTarget = signal<CafeteriaAssignment | null>(null);
@@ -118,8 +119,8 @@ export class CafeteriaMyStaffComponent {
     this.submitting.set(true); this.clearMessages();
     this.requests.submit({ requestedByUserId: this.auth.user()!.id!, action: 'add', email: user.email, displayName: user.displayName, roleCode: 'cafeteria-staff' })
       .pipe(finalize(() => this.submitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-        next: () => { this.modalOpen.set(false); this.successMessage.set('Request sent to Cafeteria Admin for approval.'); },
-        error: (err) => this.errorMessage.set(err?.error?.message || 'The request could not be sent. Please try again.'),
+        next: () => { this.modalOpen.set(false); this.toast.success('Request sent to Cafeteria Admin for approval'); },
+        error: (err) => this.toast.error('The request could not be sent', apiErrorMessage(err, 'Please try again.')),
       });
   }
 
@@ -136,10 +137,10 @@ export class CafeteriaMyStaffComponent {
     this.removing.set(true); this.clearMessages();
     this.requests.submit({ requestedByUserId: this.auth.user()!.id!, action: 'remove', targetAssignmentId: target.assignmentId })
       .pipe(finalize(() => this.removing.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-        next: () => { this.removeTarget.set(null); this.successMessage.set('Removal request sent to Cafeteria Admin for approval.'); },
-        error: (err) => { this.removeTarget.set(null); this.errorMessage.set(err?.error?.message || 'The request could not be sent. Please try again.'); },
+        next: () => { this.removeTarget.set(null); this.toast.success('Removal request sent to Cafeteria Admin for approval'); },
+        error: (err) => { this.removeTarget.set(null); this.toast.error('The request could not be sent', apiErrorMessage(err, 'Please try again.')); },
       });
   }
 
-  private clearMessages(): void { this.successMessage.set(''); this.errorMessage.set(''); }
+  private clearMessages(): void { this.errorMessage.set(''); }
 }

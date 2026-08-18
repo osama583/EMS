@@ -14,13 +14,24 @@
           @if (request.reason) { <p class="hub-club-requests__comment">"{{ request.reason }}"</p> }
         </div>
         <div class="hub-club-requests__actions">
-          <button type="button" class="table-control table-control--primary" [disabled]="processingId() === request.id" (click)="approve(request)">Approve</button>
+          <button type="button" class="table-control table-control--primary" [disabled]="processingId() === request.id" (click)="openApprove(request)">Approve</button>
           <button type="button" class="table-control table-control--danger" [disabled]="processingId() === request.id" (click)="openReject(request)">Reject</button>
         </div>
       </li>
     }
   </ul>
 }
+
+<app-confirm-dialog
+  [open]="!!approveTarget()"
+  title="Approve join request"
+  [message]="approveTarget() ? ('Approve ' + approveTarget()!.requester.displayName + ' to join ' + approveTarget()!.clubName + '? They become a member immediately.') : ''"
+  confirmLabel="Approve"
+  [danger]="false"
+  [loading]="!!processingId()"
+  (confirm)="confirmApprove()"
+  (cancel)="closeApprove()"
+/>
 
 <app-proposal-comment-dialog
   [open]="!!rejectTarget()" title="Reject Join Request" label="Reason for rejection" confirmLabel="Reject" [danger]="true" [loading]="rejecting()"

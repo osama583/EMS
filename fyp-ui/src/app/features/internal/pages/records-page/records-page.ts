@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { finalize } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { proposalForTitle } from '../../../../core/proposals/proposal-review.mock-data';
@@ -7,7 +8,9 @@ import { ProposalReviewRecord } from '../../../../core/proposals/proposal-review
 import { ProposalWorkflowService } from '../../../../core/proposals/proposal-workflow.service';
 import { userIsApplicantForProposal } from '../../../../core/proposals/proposal-visibility';
 import { ProposalStage } from '../../../../core/proposals/proposal-status.models';
+import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
+import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 import {
   InternalCellTone,
   InternalDataPageConfig,
@@ -47,8 +50,12 @@ interface RecordsPageDefinition {
 // 'drafts' is populated at runtime from real ProposalReviewRecords (see buildConvertedRecords() /
 // this component's constructor) — its `records` array below is left empty and never read; only
 // the display metadata (title/description/etc.) is used from this definition table.
-// 'notifications' remains intentionally hardcoded — no `notification` table exists in the
-// corrected schema (ems_database_schema.sql). 2026-08-13 sidebar reorg: 'pending'/'history'/
+// FLAGGED GAP (system specification §8F — flag, do not implement): 'notifications' is the ONLY
+// list in the app still backed by hardcoded client-side rows. There is no `notification` table in
+// ems_database_schema.sql and the specification describes no notification concept, so building a
+// real feed would mean inventing a new concept (a table, delivery rules, read state, and a
+// producer for every workflow transition). The sample rows below are therefore illustrative
+// placeholders, not data — everything else on every other page comes from the API. 2026-08-13 sidebar reorg: 'pending'/'history'/
 // 'request-ongoing'/'request-history' kinds were removed from this component entirely — they now
 // live in records-hub's Ongoing/History pages (hub-proposals.ts / hub-requests.ts), which reuse
 // the same underlying data sources bucketed by proposalSectionForUser instead of a page-per-kind.
@@ -91,7 +98,7 @@ const PAGE_DEFINITIONS: Readonly<Record<RecordsPageKind, RecordsPageDefinition>>
 
 @Component({
   selector: 'app-records-page',
-  imports: [InternalDataPageComponent],
+  imports: [InternalDataPageComponent, ConfirmDialogComponent],
   template: `
     <app-internal-data-page
       [config]="pageConfig()"
@@ -109,6 +116,17 @@ const PAGE_DEFINITIONS: Readonly<Record<RecordsPageKind, RecordsPageDefinition>>
       (rowAction)="handleAction($event)"
       (recordOpen)="openRecord($event)"
     />
+
+    <!-- Deleting a draft is irreversible, so it is always confirmed first (spec §8B). -->
+    <app-confirm-dialog
+      [open]="deleteTarget() !== null"
+      title="Delete draft"
+      [message]="'Are you sure you want to delete the draft ' + (deleteTarget()?.title || 'this proposal') + '? This cannot be undone.'"
+      confirmLabel="Delete Draft"
+      [loading]="deleting()"
+      (confirm)="confirmDelete()"
+      (cancel)="deleteTarget.set(null)"
+    />
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -118,6 +136,9 @@ export class RecordsPageComponent {
   private readonly auth = inject(AuthService);
   private readonly service = inject(ProposalWorkflowService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
+  readonly deleteTarget = signal<CollectionRecord | null>(null);
+  readonly deleting = signal(false);
   readonly kind = (this.route.snapshot.data['collectionPage'] ?? 'drafts') as RecordsPageKind;
   readonly definition = PAGE_DEFINITIONS[this.kind];
   readonly records = signal<readonly CollectionRecord[]>(this.definition.records);
@@ -145,7 +166,7 @@ export class RecordsPageComponent {
         this.records.set(relevant.map((proposal) => this.toCollectionRecord(proposal)));
         this.loading.set(false);
       },
-      error: () => { this.error.set(`${this.definition.title} could not be loaded.`); this.loading.set(false); },
+      error: () => { this.error.set(`${this.definition.title} could not be loaded.`); this.toast.error(`${this.definition.title} could not be loaded`, 'Please refresh and try again.'); this.loading.set(false); },
     });
   }
 
@@ -242,14 +263,32 @@ export class RecordsPageComponent {
   }
   handleAction(event: InternalRowActionEvent): void {
     if (this.kind === 'notifications' && (event.action.key === 'open' || event.action.key === 'read')) this.markRead(Number(event.record.id));
-    if (this.kind === 'drafts' && event.action.key === 'delete') this.deleteDraft(Number(event.record.id));
+    if (this.kind === 'drafts' && event.action.key === 'delete') this.askDeleteDraft(Number(event.record.id));
     if (event.action.key === 'view' || event.action.key === 'edit') this.openDraft(Number(event.record.id));
   }
 
-  private deleteDraft(id: number): void {
-    this.service.deleteDraft(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => this.records.update((records) => records.filter((record) => record.id !== id)),
-      error: () => { this.error.set('The draft could not be deleted.'); },
+  private askDeleteDraft(id: number): void {
+    const record = this.records().find((entry) => entry.id === id);
+    if (record) this.deleteTarget.set(record);
+  }
+
+  confirmDelete(): void {
+    const target = this.deleteTarget();
+    if (!target) return;
+    this.deleting.set(true);
+    this.service.deleteDraft(target.id, this.auth.user()?.email ?? '').pipe(
+      finalize(() => this.deleting.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: () => {
+        this.records.update((records) => records.filter((record) => record.id !== target.id));
+        this.deleteTarget.set(null);
+        this.toast.success('Draft deleted', `${target.title} has been removed.`);
+      },
+      error: (err) => {
+        this.deleteTarget.set(null);
+        this.toast.error('Could not delete this draft', apiErrorMessage(err, 'Please try again.'));
+      },
     });
   }
 

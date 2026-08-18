@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { finalize, forkJoin } from 'rxjs';
+import { finalize } from 'rxjs';
 import { AdminDirectoryService } from '../../../core/admin-directory/admin-directory.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { AuthUser } from '../../../core/auth/auth.models';
@@ -20,6 +20,7 @@ import { ProposalKpiBarComponent } from '../proposal-kpi-bar/proposal-kpi-bar';
 import { ProposalSectionComponent } from '../proposal-section/proposal-section';
 import { ProposalTableColumn, ProposalTableComponent } from '../proposal-table/proposal-table';
 import { SearchableDropdownComponent } from '../searchable-dropdown/searchable-dropdown';
+import { ToastService, apiErrorMessage } from '../toast/toast.service';
 
 interface ReviewerComment {
   readonly stage: string;
@@ -48,13 +49,6 @@ interface ReviewerComment {
 
         <!-- LEFT — Proposal Details & Department Requests -->
         <div class="prv-main">
-
-          @if (actionMessage()) {
-            <div class="prv-status-banner" role="status" [attr.data-kind]="actionBannerKind()">
-              <span class="material-symbols-rounded" aria-hidden="true">{{ actionBannerIcon() }}</span>
-              {{ actionMessage() }}
-            </div>
-          }
 
           <!-- Section: Event Overview -->
           <app-proposal-section icon="description" title="Event Overview" description="General information, registration and publicity.">
@@ -141,6 +135,40 @@ interface ReviewerComment {
                cafeteria and menu item for each raw food/water request row, one order at a time,
                until the requested quantity is covered. Each order then goes to that cafeteria's
                own Cafeteria Manager for approval — F&B never approves its own order. -->
+          @if (isFmbCreateOrderView() && resubmittedSelections().length) {
+            <app-proposal-section icon="assignment_return" title="Orders Sent Back To You" description="A cafeteria manager asked for changes. Edit the dish, quantity or cafeteria — saving re-sends the order.">
+              <div class="prv-fmb-selections">
+                @for (selection of resubmittedSelections(); track selection.id) {
+                  <div class="prv-fmb-selection" [attr.data-status]="selection.status">
+                    <div class="prv-fmb-selection__body">
+                      <div class="prv-fmb-selection__row">
+                        <span class="prv-fmb-selection__label">Order</span>
+                        <strong>{{ selection.cafeteriaName }} · {{ selection.menuItemLabel }} × {{ selection.quantity }}</strong>
+                      </div>
+                      @if (selection.managerComment) {
+                        <div class="prv-fmb-selection__row">
+                          <span class="prv-fmb-selection__label">Manager's comment</span>
+                          <span>{{ selection.managerComment }}</span>
+                        </div>
+                      }
+                      <span class="prv-fmb-selection__status">{{ selectionStatusLabel(selection.status) }}</span>
+                    </div>
+                    <div class="prv-fmb-selection__actions">
+                      <button type="button" class="prv-btn prv-btn--approve" [disabled]="selectionActionPending() === selection.id" (click)="openEditOrderModal(selection)">
+                        <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">edit</span>
+                        <span class="prv-btn__label">Edit &amp; Re-send</span>
+                      </button>
+                      <button type="button" class="prv-btn prv-btn--resubmit" [disabled]="selectionActionPending() === selection.id" (click)="openCancelOrderModal(selection)">
+                        <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">cancel</span>
+                        <span class="prv-btn__label">Cancel Order</span>
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+            </app-proposal-section>
+          }
+
           @if (isFmbCreateOrderView()) {
             <app-proposal-section icon="restaurant" title="Cafeteria Orders" description="Pick a cafeteria and menu item to fulfill each request. Create as many orders per request as needed.">
               <div class="prv-fmb-selections">
@@ -266,21 +294,18 @@ interface ReviewerComment {
                   [required]="true"
                   [options]="staffOptions()"
                   [value]="assigneeEmail()"
-                  (valueChange)="assigneeEmail.set($any($event)); assignmentMessage.set('')"
+                  (valueChange)="assigneeEmail.set($any($event))"
                 />
                 <button
                   type="button"
                   class="prv-btn prv-btn--approve"
                   [disabled]="!assigneeEmail() || assigning() || !requestRows().length"
-                  (click)="assignRequests()"
+                  (click)="assignConfirm.set(true)"
                 >
                   <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">assignment_ind</span>
                   <span class="prv-btn__label">{{ assigning() ? 'Assigning...' : 'Assign Tasks' }}</span>
                 </button>
               </div>
-              @if (assignmentMessage()) {
-                <p class="proposal-department-view__assignment-message" role="status">{{ assignmentMessage() }}</p>
-              }
             </div>
           }
 
@@ -483,6 +508,104 @@ interface ReviewerComment {
         }
       </div>
     </app-form-modal>
+
+    <!-- Assign confirmation modal (every critical action is confirmed before it runs) -->
+    <app-form-modal
+      [open]="assignConfirm()"
+      title="Assign this work"
+      primaryLabel="Assign Tasks"
+      secondaryLabel="Cancel"
+      [loading]="assigning()"
+      (close)="assignConfirm.set(false)"
+      (cancel)="assignConfirm.set(false)"
+      (submit)="confirmAssign()"
+    >
+      <div class="prv-action-modal-body">
+        <p class="prv-action-modal__info">
+          <span class="material-symbols-rounded" aria-hidden="true">assignment_ind</span>
+          Assign all {{ requestRows().length }} of this department's requested item(s) to
+          <strong>{{ assigneeName() }}</strong>? They will see the work in their Inbox immediately.
+        </p>
+      </div>
+    </app-form-modal>
+
+    <!-- Edit Order modal (F&B answering a Cafeteria Manager's push-back) -->
+    <app-form-modal
+      [open]="editOrderTarget() !== null"
+      title="Edit and re-send this order"
+      primaryLabel="Save &amp; Re-send"
+      secondaryLabel="Cancel"
+      [loading]="creatingOrder()"
+      [disabled]="!createOrderValid()"
+      (close)="closeEditOrderModal()"
+      (cancel)="closeEditOrderModal()"
+      (submit)="confirmEditOrder()"
+    >
+      <div class="prv-action-modal-body">
+        @if (editOrderTarget(); as selection) {
+          @if (selection.managerComment) {
+            <p class="prv-action-modal__warn prv-action-modal__warn--amber">
+              <span class="material-symbols-rounded" aria-hidden="true">rate_review</span>
+              {{ selection.managerComment }}
+            </p>
+          }
+        }
+        <app-searchable-dropdown
+          controlId="edit-order-cafeteria"
+          label="Cafeteria"
+          placeholder="Select a cafeteria"
+          [required]="true"
+          [options]="cafeteriaSelectOptions()"
+          [value]="createOrderCafeteria()"
+          (valueChange)="selectCreateOrderCafeteria($any($event))"
+        />
+        <app-searchable-dropdown
+          controlId="edit-order-menu-item"
+          label="Menu item"
+          placeholder="Select a menu item"
+          [required]="true"
+          [disabled]="!createOrderCafeteria()"
+          [options]="menuItemSelectOptions()"
+          [value]="createOrderMenuItemId()"
+          (valueChange)="selectCreateOrderMenuItem($any($event))"
+        />
+        <div class="prv-comment-area">
+          <label class="prv-comment-area__label" for="edit-order-quantity">Quantity</label>
+          <input id="edit-order-quantity" class="prv-comment-area__input" type="number" min="1" [value]="createOrderQuantity()" (input)="setCreateOrderQuantity($any($event.target).value)" />
+        </div>
+        <div class="prv-comment-area">
+          <label class="prv-comment-area__label" for="edit-order-notes">Notes (optional)</label>
+          <textarea id="edit-order-notes" class="prv-comment-area__input" rows="3" [value]="createOrderNotes()" (input)="setCreateOrderNotes($any($event.target).value)"></textarea>
+        </div>
+        @if (createOrderError()) {
+          <p class="prv-comment-area__error" role="alert">
+            <span class="material-symbols-rounded" aria-hidden="true">error</span>
+            {{ createOrderError() }}
+          </p>
+        }
+      </div>
+    </app-form-modal>
+
+    <!-- Cancel Order confirmation (irreversible, so it is confirmed explicitly) -->
+    <app-form-modal
+      [open]="cancelOrderTarget() !== null"
+      title="Cancel this order"
+      primaryLabel="Cancel Order"
+      secondaryLabel="Keep Order"
+      [danger]="true"
+      [loading]="creatingOrder()"
+      (close)="cancelOrderTarget.set(null)"
+      (cancel)="cancelOrderTarget.set(null)"
+      (submit)="confirmCancelOrder()"
+    >
+      <div class="prv-action-modal-body">
+        <p class="prv-action-modal__warn prv-action-modal__warn--amber">
+          <span class="material-symbols-rounded" aria-hidden="true">warning</span>
+          Are you sure you want to cancel this order? This cannot be undone — you will need to
+          create a new order to cover this part of the request.
+        </p>
+      </div>
+    </app-form-modal>
   `,
   styleUrl: './proposal-department-view.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -495,6 +618,7 @@ export class ProposalDepartmentViewComponent {
   private readonly cafeterias = inject(CafeteriaService);
   private readonly options = inject(RequestOptionService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
 
   readonly proposal = input<ProposalReviewRecord | null>(null);
   // RBAC redesign: the department manager viewing this component is identified by their full
@@ -510,15 +634,14 @@ export class ProposalDepartmentViewComponent {
   readonly staffUsers = signal<readonly { email: string; displayName: string }[]>([]);
   readonly assigneeEmail = signal('');
   readonly assigning = signal(false);
-  readonly assignmentMessage = signal('');
+  readonly assignConfirm = signal(false);
   readonly staffOptions = computed(() => this.staffUsers().map((user) => ({ value: user.email, label: user.displayName, description: user.email })));
+  readonly assigneeName = computed(() => this.staffUsers().find((user) => user.email === this.assigneeEmail())?.displayName ?? this.assigneeEmail());
 
   readonly confirming = signal(false);
   readonly resubmitting = signal(false);
   readonly approveConfirm = signal(false);
   readonly resubmitConfirm = signal(false);
-  readonly actionMessage = signal('');
-  readonly actionBannerKind = signal<'success' | 'error' | 'info'>('info');
   readonly comment = signal('');
   readonly commentValidationError = signal(false);
 
@@ -552,8 +675,16 @@ export class ProposalDepartmentViewComponent {
     hasRole(this.role(), 'head-of-department', 'food_beverage_services') && this.departments().includes('fmb'),
   );
 
+  // Orders a Cafeteria Manager sent back — F&B's own action queue on this proposal.
+  readonly resubmittedSelections = computed<readonly FmbSelection[]>(() =>
+    (this.proposal()?.fmbSelections ?? []).filter((selection) => selection.status === 'resubmitted'),
+  );
+
   readonly cafeteriaOptions = signal<readonly Cafeteria[]>([]);
   readonly createOrderTarget = signal<EditableRow | null>(null);
+  // Same modal fields are reused for editing an order a Cafeteria Manager pushed back.
+  readonly editOrderTarget = signal<FmbSelection | null>(null);
+  readonly cancelOrderTarget = signal<FmbSelection | null>(null);
   readonly createOrderCafeteria = signal('');
   readonly createOrderMenuItems = signal<readonly FoodRequestOption[]>([]);
   readonly createOrderMenuItemId = signal('');
@@ -583,13 +714,6 @@ export class ProposalDepartmentViewComponent {
   });
 
   readonly commentRequired = computed(() => this.comment().trim().length === 0);
-
-  readonly actionBannerIcon = computed(() => {
-    const kind = this.actionBannerKind();
-    if (kind === 'success') return 'check_circle';
-    if (kind === 'error') return 'error';
-    return 'info';
-  });
 
   readonly reviewerComments = computed<readonly ReviewerComment[]>(() => {
     const proposal = this.proposal();
@@ -658,11 +782,10 @@ export class ProposalDepartmentViewComponent {
     const department = this.departments()[0];
     if (!proposal || !department) return;
     this.confirming.set(true);
-    this.actionMessage.set('');
     const confirmedByEmail = this.auth.user()?.email ?? '';
     this.workflow.confirmDepartment(proposal.id, department, confirmedByEmail).pipe(finalize(() => this.confirming.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.actionBannerKind.set('success'); this.actionMessage.set('Fulfilment confirmed.'); this.actionComplete.emit(proposal.id); },
-      error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not confirm fulfilment. Please try again.'); },
+      next: () => { this.toast.success('Fulfilment confirmed', 'Assign a team member to complete the work.'); this.actionComplete.emit(proposal.id); },
+      error: (err) => this.toast.error('Could not confirm fulfilment', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -685,9 +808,9 @@ export class ProposalDepartmentViewComponent {
     const department = this.departments()[0];
     if (!proposal || !department) return;
     this.resubmitting.set(true);
-    this.workflow.resubmitAsDepartment(proposal.id, department, comment).pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.actionBannerKind.set('info'); this.actionMessage.set('Sent back to the applicant with your comment.'); this.comment.set(''); this.actionComplete.emit(proposal.id); },
-      error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not resubmit. Please try again.'); },
+    this.workflow.resubmitAsDepartment(proposal.id, department, comment, this.auth.user()?.email ?? '').pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.toast.info('Sent back to the applicant', 'Other departments continue unaffected.'); this.comment.set(''); this.actionComplete.emit(proposal.id); },
+      error: (err) => this.toast.error('Could not send this back', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -705,10 +828,9 @@ export class ProposalDepartmentViewComponent {
     const proposal = this.proposal();
     if (!proposal) return;
     this.selectionActionPending.set(selection.id);
-    this.actionMessage.set('');
     this.workflow.approveFmbSelection(proposal.id, selection.id, this.auth.user()!.email).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.actionBannerKind.set('success'); this.actionMessage.set('Order approved and sent to Cafeteria Staff.'); this.actionComplete.emit(proposal.id); },
-      error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not approve this order. Please try again.'); },
+      next: () => { this.toast.success('Order approved', 'It is now in your Cafeteria Staff shared inbox.'); this.actionComplete.emit(proposal.id); },
+      error: (err) => this.toast.error('Could not approve this order', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -742,8 +864,8 @@ export class ProposalDepartmentViewComponent {
     if (!proposal) return;
     this.selectionActionPending.set(selection.id);
     this.workflow.resubmitFmbSelection(proposal.id, selection.id, this.auth.user()!.email, comment).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.actionBannerKind.set('info'); this.actionMessage.set('Sent back to F&B for this order only.'); this.selectionComment.set(''); this.actionComplete.emit(proposal.id); },
-      error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not resubmit this order. Please try again.'); },
+      next: () => { this.toast.info('Sent back to F&B', 'Only this order is affected — the rest continue as normal.'); this.selectionComment.set(''); this.actionComplete.emit(proposal.id); },
+      error: (err) => this.toast.error('Could not send this order back', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -804,27 +926,97 @@ export class ProposalDepartmentViewComponent {
       quantity: Number(this.createOrderQuantity()),
       notes: this.createOrderNotes().trim() || undefined,
     }, this.auth.user()!.email).pipe(finalize(() => this.creatingOrder.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.createOrderTarget.set(null); this.actionBannerKind.set('success'); this.actionMessage.set('Order created and sent to the cafeteria manager for approval.'); this.actionComplete.emit(proposal.id); },
-      error: (err) => this.createOrderError.set(err?.error?.message || 'Could not create this order. Please try again.'),
+      next: () => { this.createOrderTarget.set(null); this.toast.success('Order created', 'It is now awaiting that cafeteria manager\u2019s approval.'); this.actionComplete.emit(proposal.id); },
+      error: (err) => { this.createOrderError.set(apiErrorMessage(err, 'Could not create this order. Please try again.')); this.toast.error('Could not create this order', apiErrorMessage(err, 'Please try again.')); },
     });
+  }
+
+  confirmAssign(): void {
+    this.assignConfirm.set(false);
+    this.assignRequests();
   }
 
   assignRequests(): void {
     const proposal = this.proposal();
     const assignedToEmail = this.assigneeEmail();
     const unitCode = this.staffUnitCode();
+    const assignedByEmail = this.auth.user()?.email ?? '';
     const departments = this.departments();
     if (!proposal || !assignedToEmail || !unitCode) return;
     const requests = proposal.requests.filter((request) => departments.includes(request.department));
     if (!requests.length) return;
     this.assigning.set(true);
-    forkJoin(requests.map((request) => this.tasks.assign({
-      role: unitCode, assignedToEmail, eventCode: proposal.proposalId, eventTitle: proposal.eventTitle,
-      request: request.item, quantity: request.quantity, schedule: request.schedule, location: request.location,
-      detailLabel: 'Department notes', detail: request.notes,
-    }))).pipe(finalize(() => this.assigning.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => this.assignmentMessage.set(`Assigned to ${this.staffUsers().find((user) => user.email === assignedToEmail)?.displayName ?? assignedToEmail}.`),
-      error: () => this.assignmentMessage.set('The request could not be assigned. Please try again.'),
+    // One request_task covers the whole department, so a single assign call is enough — issuing
+    // one per requested row used to make the backend reject every call after the first as a
+    // duplicate assignment.
+    const first = requests[0];
+    this.tasks.assign({
+      role: unitCode, assignedToEmail, assignedByEmail, eventCode: proposal.proposalId, eventTitle: proposal.eventTitle,
+      request: first.item, quantity: first.quantity, schedule: first.schedule, location: first.location,
+      detailLabel: 'Department notes', detail: first.notes,
+    }).pipe(finalize(() => this.assigning.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.toast.success('Work assigned', `${this.assigneeName()} will see it in their Inbox.`);
+        this.assigneeEmail.set('');
+      },
+      error: (err) => this.toast.error('Could not assign this work', apiErrorMessage(err, 'Please try again.')),
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // F&B: edit or cancel an order a Cafeteria Manager pushed back. Saving IS the re-send.
+  // ---------------------------------------------------------------------------
+  openEditOrderModal(selection: FmbSelection): void {
+    this.editOrderTarget.set(selection);
+    this.createOrderQuantity.set(selection.quantity);
+    this.createOrderNotes.set(selection.notes ?? '');
+    this.createOrderError.set('');
+    this.createOrderMenuItemId.set('');
+    this.selectCreateOrderCafeteria(selection.cafeteriaCode);
+    // Preselect the current menu item once that cafeteria's menu has loaded.
+    this.options.watchByCafeteria(selection.cafeteriaCode).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      if (this.editOrderTarget()?.id === selection.id && !this.createOrderMenuItemId()) {
+        this.createOrderMenuItemId.set(selection.fmbOptionId);
+      }
+    });
+  }
+
+  closeEditOrderModal(): void {
+    if (!this.creatingOrder()) this.editOrderTarget.set(null);
+  }
+
+  confirmEditOrder(): void {
+    const proposal = this.proposal();
+    const selection = this.editOrderTarget();
+    const menuItem = this.createOrderMenuItems().find((item) => item.id === this.createOrderMenuItemId());
+    if (!proposal || !selection || !menuItem || !this.createOrderValid()) return;
+    this.creatingOrder.set(true);
+    this.createOrderError.set('');
+    this.workflow.editFmbSelection(proposal.id, selection.id, {
+      cafeteriaCode: this.createOrderCafeteria(),
+      fmbOptionId: menuItem.id,
+      menuItemLabel: menuItem.label,
+      quantity: Number(this.createOrderQuantity()),
+      notes: this.createOrderNotes().trim(),
+    }, this.auth.user()!.email).pipe(finalize(() => this.creatingOrder.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.editOrderTarget.set(null); this.toast.success('Order re-sent', 'It is back with the cafeteria manager for approval.'); this.actionComplete.emit(proposal.id); },
+      error: (err) => { this.createOrderError.set(apiErrorMessage(err, 'Could not save this order.')); this.toast.error('Could not re-send this order', apiErrorMessage(err, 'Please try again.')); },
+    });
+  }
+
+  openCancelOrderModal(selection: FmbSelection): void {
+    this.cancelOrderTarget.set(selection);
+  }
+
+  confirmCancelOrder(): void {
+    const proposal = this.proposal();
+    const selection = this.cancelOrderTarget();
+    if (!proposal || !selection) return;
+    this.creatingOrder.set(true);
+    this.workflow.editFmbSelection(proposal.id, selection.id, { cancel: true }, this.auth.user()!.email)
+      .pipe(finalize(() => this.creatingOrder.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: () => { this.cancelOrderTarget.set(null); this.toast.warning('Order cancelled', 'Create a new order if this part of the request still needs covering.'); this.actionComplete.emit(proposal.id); },
+        error: (err) => { this.cancelOrderTarget.set(null); this.toast.error('Could not cancel this order', apiErrorMessage(err, 'Please try again.')); },
+      });
   }
 }

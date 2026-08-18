@@ -119,6 +119,21 @@ import { ValidationMessageComponent } from '../validation-message/validation-mes
               (valueChange)="setEmail($event)"
             />
 
+            @if (needsReason()) {
+              <app-form-field
+                controlId="event-registration-reason"
+                label="Reason for attending"
+                type="textarea"
+                placeholder="Tell the organizer why you would like to attend"
+                hint="The organizer approves each registration for this event."
+                [required]="true"
+                [maxLength]="reasonMaxLength"
+                [value]="reason()"
+                [error]="reasonError()"
+                (valueChange)="setReason($event)"
+              />
+            }
+
             @if (message()) {
               <p
                 class="event-details__message"
@@ -189,6 +204,12 @@ export class EventDetailsModalComponent {
   readonly paymentProof = signal<{ url: string; fileName: string } | null>(null);
   readonly uploadingProof = signal(false);
   readonly paymentProofError = signal('');
+  // Events with registrationMode 'Approval Required' collect a short reason the organizer reads
+  // in their Inbox before approving (system specification §6).
+  readonly reasonMaxLength = 100;
+  readonly reason = signal('');
+  readonly reasonError = signal('');
+  readonly needsReason = computed(() => this.event()?.registrationMode === 'Approval Required');
   readonly maxProofFileSizeMb = 5;
   private readonly allowedProofTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'application/pdf']);
 
@@ -265,6 +286,11 @@ export class EventDetailsModalComponent {
     if (this.emailValid()) this.emailError.set('');
   }
 
+  setReason(value: string): void {
+    this.reason.set(value.slice(0, this.reasonMaxLength));
+    if (this.reason().trim()) this.reasonError.set('');
+  }
+
   register(): void {
     const item = this.event();
     if (!item) return;
@@ -274,13 +300,18 @@ export class EventDetailsModalComponent {
       return;
     }
 
+    if (this.needsReason() && !this.reason().trim()) {
+      this.reasonError.set('Tell the organizer why you would like to attend.');
+      return;
+    }
+
     if (this.isPaidEvent(item) && !this.paymentProof()) {
       this.paymentProofError.set('Upload your payment proof before registering.');
       return;
     }
 
     this.registering.set(true);
-    this.service.registerForEvent(item.id, this.email(), this.paymentProof() ?? undefined).subscribe({
+    this.service.registerForEvent(item.id, this.email(), this.paymentProof() ?? undefined, this.reason().trim() || undefined).subscribe({
       next: (result) => {
         this.registering.set(false);
         this.message.set(result.message);

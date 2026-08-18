@@ -8,6 +8,7 @@ import { SystemConfig, SystemConfigDraft } from './system-config.models';
 const DEFAULT_CONFIG: SystemConfig = {
   paxReviewerThreshold: 50,
   cancellationDaysLimit: 3,
+  maxEventCategories: 2,
 };
 
 @Injectable({ providedIn: 'root' })
@@ -20,6 +21,7 @@ export class SystemConfigService {
   readonly config = computed(() => this.state());
   readonly paxReviewerThreshold = computed(() => this.state().paxReviewerThreshold);
   readonly cancellationDaysLimit = computed(() => this.state().cancellationDaysLimit);
+  readonly maxEventCategories = computed(() => this.state().maxEventCategories);
   // True until the real GET resolves — components reading paxReviewerThreshold/etc. at
   // construction time (a plain signal snapshot, not a live subscription) should show a loading
   // state rather than briefly rendering DEFAULT_CONFIG as if it were the real saved config.

@@ -74,14 +74,40 @@ export function userIsApplicantForProposal(user: AuthUser | null, proposal: Prop
   });
 }
 
+// True when a DEPARTMENT (not a single-actor reviewer) has pushed one of its tasks back to the
+// applicant. The proposal itself stays in DepartmentReview — sibling departments keep working in
+// parallel — so this cannot be read off `workflow.stage`; it lives on the per-task status.
+export function departmentAwaitingApplicant(proposal: ProposalReviewRecord): boolean {
+  return proposal.workflow.departmentConfirmations.some((entry) => entry.status === 'resubmitted');
+}
+
+// Everything the applicant currently has to answer: a reviewer stage that sent the whole
+// proposal back, or one or more departments that asked for changes.
+export function proposalNeedsApplicantAction(proposal: ProposalReviewRecord): boolean {
+  return proposal.workflow.stage === ProposalStage.ResubmissionRequired || departmentAwaitingApplicant(proposal);
+}
+
 export function userOwnsCurrentProposalAction(user: AuthUser | null, proposal: ProposalReviewRecord, requestKind?: DepartmentRequestKind): boolean {
   if (!user) return false;
-  if (isApplicantLike(user)) {
-    return userIsApplicantForProposal(user, proposal) && proposal.workflow.stage === ProposalStage.ResubmissionRequired;
+  // The applicant (or a co-owner) always owns the action when something was sent back to them,
+  // whatever else their account happens to be — a head-of-department submitting their own
+  // proposal is an applicant for THAT proposal.
+  if (userIsApplicantForProposal(user, proposal)) {
+    if (proposalNeedsApplicantAction(proposal)) return true;
+    if (isApplicantLike(user)) return false;
   }
+  if (isApplicantLike(user) && !isReviewerOrDepartmentOwner(user)) return false;
   const routedKinds = requestKindsForRole(user);
   if (requestKind && routedKinds.length && !routedKinds.includes(requestKind)) return false;
   return roleOwnsWorkflowAction(user, proposal);
+}
+
+// A user can be applicant-like (staff/lecturer/student) AND still own a review queue — e.g. a
+// department's staff member. Only a purely applicant-like account short-circuits above.
+function isReviewerOrDepartmentOwner(user: AuthUser): boolean {
+  return reviewerStageForUser(user) !== null
+    || hasRole(user, 'cafeteria-manager')
+    || departmentsForRole(user).length > 0;
 }
 
 // Whether `user` currently owns an action on `proposal` — the single source of truth for "is this
@@ -95,6 +121,13 @@ function roleOwnsWorkflowAction(user: AuthUser, proposal: ProposalReviewRecord):
   // same "parallel independence" precedent as DepartmentReview's per-department confirmations
   // below, just one level more granular (per-selection, not per-department).
   if (hasRole(user, 'cafeteria-manager')) return myCafeteriaSelections(user, proposal).some((selection) => selection.status === 'pending');
+  // F&B: a Cafeteria Manager pushing one order back puts that order squarely on F&B's desk, even
+  // though the fmb department task itself is already 'approved'. Same per-selection granularity as
+  // the Cafeteria Manager branch above, mirrored on the other side of the hand-off.
+  if (hasRole(user, 'head-of-department', 'food_beverage_services')
+    && (proposal.fmbSelections ?? []).some((selection) => selection.status === 'resubmitted')) {
+    return true;
+  }
   const state = proposal.workflow;
   if (state.stage === ProposalStage.HosHodReview) {
     return headOfSchoolUnitCode(user) !== undefined && departmentFor(user) === proposal.applicantDepartment;
@@ -102,14 +135,20 @@ function roleOwnsWorkflowAction(user: AuthUser, proposal: ProposalReviewRecord):
   if (isReviewerStage(state.stage)) return userMatchesReviewerForStage(user, state.stage);
   if (state.stage === ProposalStage.DepartmentReview) {
     const ownedDepartments = departmentsForRole(user);
-    return state.departmentConfirmations.some((entry) => !entry.confirmed && ownedDepartments.includes(entry.department as DepartmentRequestKind));
+    // 'resubmitted' means this department is waiting on the APPLICANT, so it belongs in the
+    // department's Ongoing, not its Inbox. 'pending' is the only status they still owe action on.
+    return state.departmentConfirmations.some((entry) => (entry.status ?? (entry.confirmed ? 'approved' : 'pending')) === 'pending' && ownedDepartments.includes(entry.department as DepartmentRequestKind));
   }
   return false;
 }
 
+// History covers every terminal state — approved, rejected AND cancelled (system specification
+// §4, Visibility). A cancelled proposal used to fall through to Ongoing, where it sat forever.
+const TERMINAL_STAGES: readonly ProposalStage[] = [ProposalStage.Approved, ProposalStage.Rejected, ProposalStage.Cancelled];
+
 export function proposalSectionForUser(user: AuthUser | null, proposal: ProposalReviewRecord, requestKind?: DepartmentRequestKind): ProposalVisibilitySection | null {
   if (!user || !userIsRelatedToProposal(user, proposal, requestKind)) return null;
-  if (proposal.workflow.stage === ProposalStage.Approved || proposal.workflow.stage === ProposalStage.Rejected) return 'history';
+  if (TERMINAL_STAGES.includes(proposal.workflow.stage)) return 'history';
   if (userOwnsCurrentProposalAction(user, proposal, requestKind)) return 'inbox';
   return 'ongoing';
 }

@@ -249,6 +249,26 @@
   display: none;
 }
 
+/*
+ * Card view (the shared card/table toggle). Selecting "Card View" hides the table card and
+ * shows the same record list the narrow-viewport layout already renders, arranged as a
+ * responsive grid so it reads as a deliberate desktop layout rather than a stretched phone one.
+ */
+.internal-table-workspace[data-view='card'] .internal-table-workspace__table-card {
+  display: none;
+}
+
+.internal-table-workspace[data-view='card'] > [workspaceMobile] {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.internal-table-workspace[data-view='card'] > [workspaceMobile] > * {
+  min-width: 0;
+}
+
 .internal-table-workspace__table-scroll {
   width: 100%;
   overflow-x: auto;

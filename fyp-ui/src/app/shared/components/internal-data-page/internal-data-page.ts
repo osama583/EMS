@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { InternalTableWorkspaceComponent } from '../internal-table-workspace/internal-table-workspace';
 import {
   InternalCellClickEvent,
@@ -17,6 +17,7 @@ import {
   InternalResetButtonComponent,
   InternalSearchFieldComponent,
 } from './internal-data-page-parts';
+import { ListViewMode, ViewToggleComponent } from '../view-toggle/view-toggle';
 
 @Component({
   selector: 'app-internal-data-page',
@@ -29,6 +30,7 @@ import {
     InternalDataTableComponent,
     InternalPageStateComponent,
     InternalMobileRecordListComponent,
+    ViewToggleComponent,
   ],
   templateUrl: './internal-data-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -44,6 +46,9 @@ export class InternalDataPageComponent {
   readonly pageSize = input(10);
   readonly hideHeader = input(false);
   readonly hideControls = input(false);
+  // Card/table switch (system specification §8A). Every list page gets the same control; pages
+  // that genuinely have nothing card-shaped to show can opt out with [showViewToggle]="false".
+  readonly showViewToggle = input(true);
 
   readonly searchChange = output<string>();
   readonly filterChange = output<InternalFilterChange>();
@@ -54,6 +59,12 @@ export class InternalDataPageComponent {
   readonly recordOpen = output<InternalDataRecord>();
   readonly primaryAction = output<void>();
   readonly cellClick = output<InternalCellClickEvent>();
+
+  // Local to the component: which view the user picked. Table is the default on desktop, and
+  // narrow viewports always render cards regardless (handled in CSS), so this only decides the
+  // desktop presentation.
+  readonly viewMode = signal<ListViewMode>('table');
+  setViewMode(mode: ListViewMode): void { this.viewMode.set(mode); }
 
   readonly shouldShowClear = computed(() => {
     if (this.records().length > 0) return false;

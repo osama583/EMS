@@ -1,23 +1,29 @@
-@if (showTasksTab() || showRequestsTab() || showClubRequestsTab()) {
-  <nav class="records-hub-tabs" aria-label="{{ title }} sections">
-    <a class="records-hub-tabs__tab" routerLink="proposals" routerLinkActive="records-hub-tabs__tab--active">
+@if (showTasksTab() || showRequestsTab() || showClubRequestsTab() || showRegistrationsTab()) {
+  <nav class="shared-tabs" aria-label="{{ title }} sections">
+    <a class="shared-tabs__tab" routerLink="proposals" routerLinkActive="shared-tabs__tab--active">
       <span class="material-symbols-rounded" aria-hidden="true">description</span>
       Proposals
     </a>
     @if (showTasksTab()) {
-      <a class="records-hub-tabs__tab" routerLink="tasks" routerLinkActive="records-hub-tabs__tab--active">
+      <a class="shared-tabs__tab" routerLink="tasks" routerLinkActive="shared-tabs__tab--active">
         <span class="material-symbols-rounded" aria-hidden="true">task</span>
         Tasks
       </a>
     }
     @if (showRequestsTab()) {
-      <a class="records-hub-tabs__tab" routerLink="requests" routerLinkActive="records-hub-tabs__tab--active">
+      <a class="shared-tabs__tab" routerLink="requests" routerLinkActive="shared-tabs__tab--active">
         <span class="material-symbols-rounded" aria-hidden="true">assignment</span>
         Requests
       </a>
     }
+    @if (showRegistrationsTab()) {
+      <a class="shared-tabs__tab" routerLink="registrations" routerLinkActive="shared-tabs__tab--active">
+        <span class="material-symbols-rounded" aria-hidden="true">how_to_reg</span>
+        Registrations
+      </a>
+    }
     @if (showClubRequestsTab()) {
-      <a class="records-hub-tabs__tab" routerLink="club-requests" routerLinkActive="records-hub-tabs__tab--active">
+      <a class="shared-tabs__tab" routerLink="club-requests" routerLinkActive="shared-tabs__tab--active">
         <span class="material-symbols-rounded" aria-hidden="true">how_to_reg</span>
         Club Requests
       </a>

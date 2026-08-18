@@ -7,10 +7,12 @@ import { Archived } from '../../../../core/admin-directory/admin-directory.model
 import { FeedbackBannerComponent } from '../../../../shared/components/feedback-banner/feedback-banner';
 import { FormFieldComponent } from '../../../../shared/components/form-controls/form-field';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
+import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog';
 import { DeleteConfirmDialogComponent } from '../../../../shared/components/delete-confirm-dialog/delete-confirm-dialog';
 import { StatusToggleComponent } from '../../../../shared/components/status-toggle/status-toggle';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
 import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent } from '../../../../shared/components/internal-data-page/internal-data-page.models';
+import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 
 type CafeteriaManageTab = 'active' | 'deleted';
 
@@ -19,14 +21,22 @@ type CafeteriaManageTab = 'active' | 'deleted';
 // the exact same shape as the System Admin Units page, just scoped to CafeteriaService's
 // dedicated /api/cafeterias endpoints instead of every unit in the system. Deleted tab follows
 // the same 7-day soft-delete/restore/purge lifecycle as every other Admin Settings entity.
+// The deleted-items table names its first column differently per page (identity / name / label),
+// so the confirmation reads whichever cell actually carries the record's display name.
+function restoreLabelFor(record: InternalDataRecord): string {
+  const named = Object.values(record.cells).find((cell) => !!cell?.primary);
+  return named?.primary ? String(named.primary) : String(record.id);
+}
+
 @Component({
   selector: 'app-cafeteria-manage',
-  imports: [InternalDataPageComponent, FormModalComponent, FormFieldComponent, StatusToggleComponent, FeedbackBannerComponent, DeleteConfirmDialogComponent],
+  imports: [ConfirmDialogComponent, InternalDataPageComponent, FormModalComponent, FormFieldComponent, StatusToggleComponent, FeedbackBannerComponent, DeleteConfirmDialogComponent],
   templateUrl: './cafeteria-manage.html',
   styleUrl: './cafeteria-manage.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CafeteriaManageComponent {
+  private readonly toast = inject(ToastService);
   private readonly service = inject(CafeteriaService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -41,7 +51,6 @@ export class CafeteriaManageComponent {
   readonly modalOpen = signal(false);
   readonly editingCode = signal<string | null>(null);
   readonly draft = signal<{ name: string; active: boolean }>({ name: '', active: true });
-  readonly successMessage = signal('');
   readonly errorMessage = signal('');
 
   readonly deleteTarget = signal<Cafeteria | null>(null);
@@ -162,7 +171,7 @@ export class CafeteriaManageComponent {
     this.changeStatus(cafeteria);
   }
   handleDeletedAction(event: InternalRowActionEvent): void {
-    if (event.action.key === 'restore') { this.restore(String(event.record.id)); return; }
+    if (event.action.key === 'restore') { this.restoreTarget.set({ id: String(event.record.id), label: restoreLabelFor(event.record) }); return; }
     if (event.action.key === 'purge') this.requestPurge(String(event.record.id));
   }
   closeModal(): void { if (!this.saving()) this.modalOpen.set(false); }
@@ -177,8 +186,8 @@ export class CafeteriaManageComponent {
       ? this.service.update(code, this.draft())
       : this.service.create(this.draft());
     request.pipe(finalize(() => this.saving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.modalOpen.set(false); this.successMessage.set(`Cafeteria ${code ? 'updated' : 'created'} successfully.`); },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The cafeteria could not be saved.'),
+      next: () => { this.modalOpen.set(false); this.toast.success(`Cafeteria ${code ? 'updated' : 'created'} successfully.`); },
+      error: (err) => this.toast.error('The cafeteria could not be saved', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -198,18 +207,32 @@ export class CafeteriaManageComponent {
     this.service.delete(target.code).pipe(finalize(() => this.deleting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.deleteTarget.set(null);
-        this.successMessage.set('Cafeteria deleted. It can be restored from the Deleted tab within 7 days.');
+        this.toast.success('Cafeteria deleted', 'It can be restored from the Deleted tab within 7 days.');
       },
-      error: (err) => { this.deleteTarget.set(null); this.errorMessage.set(err?.error?.message || 'The cafeteria could not be deleted.'); },
+      error: (err) => { this.deleteTarget.set(null); this.toast.error('The cafeteria could not be deleted', apiErrorMessage(err, 'Please try again.')); },
     });
+  }
+
+  // Restoring brings an archived record back into circulation immediately, so it is
+  // confirmed first like every other state-changing action.
+  readonly restoreTarget = signal<{ id: string; label: string } | null>(null);
+  readonly restoreMessage = computed(() => {
+    const target = this.restoreTarget();
+    return target ? `Restore ${target.label}? It becomes active again straight away.` : '';
+  });
+  cancelRestore(): void { this.restoreTarget.set(null); }
+  confirmRestore(): void {
+    const target = this.restoreTarget();
+    this.restoreTarget.set(null);
+    if (target) this.restore(target.id);
   }
 
   restore(code: string): void {
     this.clearMessages();
     this.restoringCode.set(code);
     this.service.restore(code).pipe(finalize(() => this.restoringCode.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.successMessage.set('Cafeteria restored.'); this.loadDeleted(); },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The cafeteria could not be restored.'),
+      next: () => { this.toast.success('Cafeteria restored'); this.loadDeleted(); },
+      error: (err) => this.toast.error('The cafeteria could not be restored', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -228,18 +251,18 @@ export class CafeteriaManageComponent {
     if (!code) return;
     this.purging.set(true);
     this.service.purge(code).pipe(finalize(() => this.purging.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.purgeTargetCode.set(null); this.successMessage.set('Cafeteria permanently deleted.'); this.loadDeleted(); },
-      error: (err) => { this.purgeTargetCode.set(null); this.errorMessage.set(err?.error?.message || 'The cafeteria could not be permanently deleted.'); },
+      next: () => { this.purgeTargetCode.set(null); this.toast.success('Cafeteria permanently deleted'); this.loadDeleted(); },
+      error: (err) => { this.purgeTargetCode.set(null); this.toast.error('The cafeteria could not be permanently deleted', apiErrorMessage(err, 'Please try again.')); },
     });
   }
 
   private formatDate(iso: string): string { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
-  private clearMessages(): void { this.successMessage.set(''); this.errorMessage.set(''); }
+  private clearMessages(): void { this.errorMessage.set(''); }
   private changeStatus(cafeteria: Cafeteria): void {
     this.clearMessages();
     this.service.setActive(cafeteria.code, !cafeteria.active).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => this.successMessage.set(`Cafeteria is now ${cafeteria.active ? 'inactive' : 'active'}.`),
-      error: () => this.errorMessage.set('The active status could not be changed.'),
+      next: () => this.toast.success(`Cafeteria is now ${cafeteria.active ? 'inactive' : 'active'}.`),
+      error: () => this.toast.error('The active status could not be changed'),
     });
   }
   private pageSlice<T>(records: readonly T[]): readonly T[] { return records.slice((this.page() - 1) * this.pageSize(), this.page() * this.pageSize()); }

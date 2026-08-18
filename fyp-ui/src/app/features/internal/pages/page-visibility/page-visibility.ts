@@ -7,6 +7,7 @@ import { DeletionPreview } from '../../../../shared/models/deletion.models';
 import { FeedbackBannerComponent } from '../../../../shared/components/feedback-banner/feedback-banner';
 import { FormFieldComponent } from '../../../../shared/components/form-controls/form-field';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
+import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog';
 import { DeleteConfirmDialogComponent } from '../../../../shared/components/delete-confirm-dialog/delete-confirm-dialog';
 import { ImageUploadFieldComponent } from '../../../../shared/components/image-upload-field/image-upload-field';
 import { SearchableDropdownComponent } from '../../../../shared/components/searchable-dropdown/searchable-dropdown';
@@ -14,6 +15,7 @@ import { PopoverComponent } from '../../../../shared/components/popover/popover'
 import { SelectOption } from '../../../../shared/components/form-controls/form-controls.models';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
 import { InternalCellClickEvent, InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent } from '../../../../shared/components/internal-data-page/internal-data-page.models';
+import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 
 // Server-side derivation this mirrors exactly: services/unit-code.js's deriveUnitCode(), also
 // used server-side to auto-slug label -> page_code (admin.routes.js POST /nav-pages).
@@ -71,14 +73,22 @@ const GRANT_TYPE_OPTIONS: readonly { readonly value: NavGrantType; readonly labe
   { value: 'unit', label: 'Unit only', description: 'Anyone holding ANY role in this unit — e.g. "everyone in Finance".' },
 ];
 
+// The deleted-items table names its first column differently per page (identity / name / label),
+// so the confirmation reads whichever cell actually carries the record's display name.
+function restoreLabelFor(record: InternalDataRecord): string {
+  const named = Object.values(record.cells).find((cell) => !!cell?.primary);
+  return named?.primary ? String(named.primary) : String(record.id);
+}
+
 @Component({
   selector: 'app-page-visibility',
-  imports: [InternalDataPageComponent, FormModalComponent, FormFieldComponent, FeedbackBannerComponent, ImageUploadFieldComponent, SearchableDropdownComponent, PopoverComponent, DeleteConfirmDialogComponent],
+  imports: [ConfirmDialogComponent, InternalDataPageComponent, FormModalComponent, FormFieldComponent, FeedbackBannerComponent, ImageUploadFieldComponent, SearchableDropdownComponent, PopoverComponent, DeleteConfirmDialogComponent],
   templateUrl: './page-visibility.html',
   styleUrl: './page-visibility.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PageVisibilityComponent {
+  private readonly toast = inject(ToastService);
   private readonly service = inject(AdminDirectoryService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -90,7 +100,6 @@ export class PageVisibilityComponent {
   readonly units = signal<readonly AdminUnitRecord[]>([]);
   readonly loading = signal(true);
   readonly saving = signal(false);
-  readonly successMessage = signal('');
   readonly errorMessage = signal('');
   readonly iconError = signal('');
 
@@ -324,9 +333,9 @@ export class PageVisibilityComponent {
     request.pipe(finalize(() => this.saving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.modalOpen.set(false);
-        this.successMessage.set(`Page ${code ? 'updated' : 'created'} successfully.`);
+        this.toast.success(`Page ${code ? 'updated' : 'created'} successfully.`);
       },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The page could not be saved.'),
+      error: (err) => this.toast.error('The page could not be saved', apiErrorMessage(err, 'Please try again.')),
     });
   }
   requestDeletePage(page: AdminNavPageRecord): void {
@@ -336,7 +345,7 @@ export class PageVisibilityComponent {
     this.checkingDeletion.set(true);
     this.service.checkNavPageDeletion(page.pageCode).pipe(finalize(() => this.checkingDeletion.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (preview) => this.deletePreview.set(preview),
-      error: () => this.errorMessage.set('Could not check whether this page can be deleted.'),
+      error: () => this.toast.error('Could not check whether this page can be deleted'),
     });
   }
   cancelDeletePage(): void { if (!this.deletingPage()) { this.deleteTarget.set(null); this.deletePreview.set(null); } }
@@ -348,16 +357,16 @@ export class PageVisibilityComponent {
     this.service.deleteNavPage(target.pageCode).pipe(finalize(() => this.deletingPage.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.deleteTarget.set(null); this.deletePreview.set(null);
-        this.successMessage.set('Page deleted. It can be restored from the Deleted tab within 7 days.');
+        this.toast.success('Page deleted', 'It can be restored from the Deleted tab within 7 days.');
       },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The page could not be deleted.'),
+      error: (err) => this.toast.error('The page could not be deleted', apiErrorMessage(err, 'Please try again.')),
     });
   }
   toggleActive(page: AdminNavPageRecord): void {
     this.clearMessages();
     this.service.updateNavPage(page.pageCode, { active: !page.active }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => this.successMessage.set(`Page is now ${page.active ? 'inactive' : 'active'}.`),
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The active status could not be changed.'),
+      next: () => this.toast.success(`Page is now ${page.active ? 'inactive' : 'active'}.`),
+      error: (err) => this.toast.error('The active status could not be changed', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -400,15 +409,29 @@ export class PageVisibilityComponent {
     emptyTitle: 'No deleted pages', emptyDescription: 'Pages you delete will appear here for 7 days before being permanently removed.', pageSizeOptions: [5, 10, 25],
   }));
   handleDeletedAction(event: InternalRowActionEvent): void {
-    if (event.action.key === 'restore') { this.restorePage(String(event.record.id)); return; }
+    if (event.action.key === 'restore') { this.restoreTarget.set({ id: String(event.record.id), label: restoreLabelFor(event.record) }); return; }
     if (event.action.key === 'purge') this.requestPurgePage(String(event.record.id));
   }
+  // Restoring brings an archived record back into circulation immediately, so it is
+  // confirmed first like every other state-changing action.
+  readonly restoreTarget = signal<{ id: string; label: string } | null>(null);
+  readonly restoreMessage = computed(() => {
+    const target = this.restoreTarget();
+    return target ? `Restore ${target.label}? It becomes active again straight away.` : '';
+  });
+  cancelRestore(): void { this.restoreTarget.set(null); }
+  confirmRestore(): void {
+    const target = this.restoreTarget();
+    this.restoreTarget.set(null);
+    if (target) this.restorePage(target.id);
+  }
+
   restorePage(code: string): void {
     this.clearMessages();
     this.restoringCode.set(code);
     this.service.restoreNavPage(code).pipe(finalize(() => this.restoringCode.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.successMessage.set('Page restored.'); this.loadDeleted(); },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The page could not be restored.'),
+      next: () => { this.toast.success('Page restored'); this.loadDeleted(); },
+      error: (err) => this.toast.error('The page could not be restored', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -432,13 +455,13 @@ export class PageVisibilityComponent {
     if (!code) return;
     this.purgingPage.set(true);
     this.service.purgeNavPage(code).pipe(finalize(() => this.purgingPage.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.purgeTargetCode.set(null); this.successMessage.set('Page permanently deleted.'); this.loadDeleted(); },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The page could not be permanently deleted.'),
+      next: () => { this.purgeTargetCode.set(null); this.toast.success('Page permanently deleted'); this.loadDeleted(); },
+      error: (err) => this.toast.error('The page could not be permanently deleted', apiErrorMessage(err, 'Please try again.')),
     });
   }
   private formatDate(iso: string): string { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
 
-  private clearMessages(): void { this.successMessage.set(''); this.errorMessage.set(''); }
+  private clearMessages(): void { this.errorMessage.set(''); }
   private pageSlice<T>(records: readonly T[]): readonly T[] { return records.slice((this.page() - 1) * this.pageSize(), this.page() * this.pageSize()); }
   private pageRecords(): readonly InternalDataRecord[] {
     return this.pageSlice(this.filteredPages()).map(({ page, depth }) => {
@@ -578,16 +601,16 @@ export class PageVisibilityComponent {
     const grant = page?.grants.find((g) => g.grantId === grantId);
     if (!grant) return;
     this.service.setNavPageGrantActive(pageCode, grantId, !grant.active).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => this.successMessage.set(`Permission is now ${grant.active ? 'inactive' : 'active'}.`),
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The active status could not be changed.'),
+      next: () => this.toast.success(`Permission is now ${grant.active ? 'inactive' : 'active'}.`),
+      error: (err) => this.toast.error('The active status could not be changed', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
   private removeGrant(pageCode: string, grantId: number, onDone?: () => void): void {
     this.clearMessages();
     this.service.removeNavPageGrant(pageCode, grantId).pipe(finalize(() => onDone?.()), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.deleteGrantTarget.set(null); this.successMessage.set('Permission removed. It can be restored from the Deleted tab within 7 days.'); },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The permission could not be removed.'),
+      next: () => { this.deleteGrantTarget.set(null); this.toast.success('Permission removed', 'It can be restored from the Deleted tab within 7 days.'); },
+      error: (err) => this.toast.error('The permission could not be removed', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -785,7 +808,7 @@ export class PageVisibilityComponent {
       ? this.service.updateNavPageGrant(page.pageCode, editingId, grantDraft)
       : this.service.addNavPageGrant(page.pageCode, grantDraft);
     request.pipe(finalize(() => this.grantSaving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.grantModalOpen.set(false); this.successMessage.set(editingId ? 'Permission updated.' : 'Permission added.'); },
+      next: () => { this.grantModalOpen.set(false); this.toast.success(editingId ? 'Permission updated.' : 'Permission added.'); },
       error: (err) => this.grantError.set(err?.error?.message || 'The permission could not be saved.'),
     });
   }

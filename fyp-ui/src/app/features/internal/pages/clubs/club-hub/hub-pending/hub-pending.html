@@ -4,16 +4,7 @@
   <app-internal-page-header [config]="cardHeaderConfig()" />
 
   <div class="club-page__view-row">
-    <div class="club-page__view-toggle" role="group" aria-label="Choose view">
-      <button type="button" [class.active]="viewMode() === 'card'" (click)="setViewMode('card')">
-        <span class="material-symbols-rounded" aria-hidden="true">grid_view</span>
-        Card View
-      </button>
-      <button type="button" [class.active]="viewMode() === 'table'" (click)="setViewMode('table')">
-        <span class="material-symbols-rounded" aria-hidden="true">table_rows</span>
-        Table
-      </button>
-    </div>
+    <app-view-toggle [mode]="viewMode()" (modeChange)="setViewMode($event)" />
   </div>
 
   <section class="internal-table-workspace__controls club-page__controls">

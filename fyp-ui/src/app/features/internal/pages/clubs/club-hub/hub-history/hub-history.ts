@@ -8,6 +8,7 @@ import { InternalDataPageConfig, InternalDataRecord, InternalFilterConfig, Inter
 import { InternalDataPageComponent } from '../../../../../../shared/components/internal-data-page/internal-data-page';
 import { FeedbackBannerComponent } from '../../../../../../shared/components/feedback-banner/feedback-banner';
 import { FormModalComponent } from '../../../../../../shared/components/form-modal/form-modal';
+import { ViewToggleComponent } from '../../../../../../shared/components/view-toggle/view-toggle';
 
 type ViewMode = 'table' | 'card';
 
@@ -17,7 +18,7 @@ type ViewMode = 'table' | 'card';
 // President's reason, all sourced from GET /clubs/join-requests/mine (no new endpoint needed).
 @Component({
   selector: 'app-hub-history',
-  imports: [FeedbackBannerComponent, InternalPageHeaderComponent, InternalDataPageComponent, FormModalComponent, InternalSearchFieldComponent, InternalResetButtonComponent],
+  imports: [ViewToggleComponent, FeedbackBannerComponent, InternalPageHeaderComponent, InternalDataPageComponent, FormModalComponent, InternalSearchFieldComponent, InternalResetButtonComponent],
   templateUrl: './hub-history.html',
   styleUrl: './hub-history.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

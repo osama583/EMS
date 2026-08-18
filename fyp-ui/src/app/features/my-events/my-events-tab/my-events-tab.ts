@@ -99,8 +99,15 @@ export class MyEventsTabComponent {
   registerForEvent(eventId: string): void {
     const user = this.auth.user();
     if (!user || this.registeringEventId()) return;
+    const event = this.entries().find((entry) => entry.event.id === eventId)?.event;
+    // Same as Explore: a reason for attending / payment proof can only be collected in the
+    // details modal, so route there rather than sending an incomplete registration.
+    if (event && (event.registrationMode === 'Approval Required' || (event.cost != null && event.cost > 0))) {
+      this.selectedEvent.set(event);
+      return;
+    }
     this.registeringEventId.set(eventId);
-    const eventTitle = this.entries().find((entry) => entry.event.id === eventId)?.event.eventTitle ?? 'the event';
+    const eventTitle = event?.eventTitle ?? 'the event';
     this.eventService.registerForEvent(eventId, user.email).subscribe({
       next: (result) => {
         this.registeringEventId.set(null);

@@ -1,0 +1,73 @@
+/*
+ * The ONE tab strip. Every set of tabs in the app — routed (Inbox/Ongoing/History, Club Hub,
+ * My Events) and in-page (Users, Roles, Page Visibility, Cafeterias, Event Catalog) — renders
+ * with these classes, so tabs look and behave identically wherever they appear (system
+ * specification §8A). Before this, three different treatments coexisted: a pill group, an
+ * underline row, and a blue-filled pill.
+ *
+ * Markup:
+ *   <nav class="shared-tabs" aria-label="…">
+ *     <a|button class="shared-tabs__tab" [class.shared-tabs__tab--active]="…">…</a|button>
+ *   </nav>
+ *
+ * Routed tabs use routerLinkActive="shared-tabs__tab--active"; in-page tabs bind the class.
+ */
+.shared-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.3rem;
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-pill);
+  background: var(--apu-surface-muted);
+  max-width: 100%;
+}
+
+.shared-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.35rem;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--apu-text-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--motion-control) var(--ease-standard), color var(--motion-control) var(--ease-standard);
+}
+
+.shared-tabs__tab .material-symbols-rounded { font-size: 1.1rem; }
+.shared-tabs__tab:hover { color: var(--apu-blue-700); }
+.shared-tabs__tab:focus-visible { outline: 2px solid var(--apu-blue-600); outline-offset: 2px; }
+.shared-tabs__tab--active {
+  background: var(--apu-white);
+  color: var(--apu-blue-700);
+  box-shadow: var(--shadow-card);
+}
+
+/* A count/badge suffix, e.g. "Deleted 3". */
+.shared-tabs__count {
+  display: inline-grid;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--apu-surface-muted);
+  color: var(--apu-text-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.shared-tabs__tab--active .shared-tabs__count { background: var(--apu-blue-50, #eef4ff); color: var(--apu-blue-700); }
+
+@media (max-width: 34rem) {
+  .shared-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; width: 100%; }
+  .shared-tabs__tab { justify-content: center; }
+}

@@ -6,21 +6,19 @@ import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../auth/auth.service';
 import { ExternalRegistrationService, GuestRegistrationFlowService } from '../auth/external-registration.service';
-import { AuthUser, UserRole } from '../auth/auth.models';
+import { AuthUser } from '../auth/auth.models';
+import { testNavPage, testRole, testUser } from '../auth/auth.test-fixtures';
 import { SavedEventsService } from './saved-events.service';
 
-const APPLICANT_USER: AuthUser = {
-  email: 'applicant@demo.apu.edu.my',
-  displayName: 'Demo Applicant',
-  username: 'applicant',
-  role: 'student' as UserRole,
-  accountType: 'internal',
-  roleLabel: 'Student — School of Computing',
-  department: 'School of Computing',
-  functionLevel: 'student',
-  unitId: 'school_of_computing',
-  unitKind: 'school',
-};
+const APPLICANT_USER: AuthUser = testUser(
+  [testRole('student', 'school_of_computing', 'School of Computing')],
+  {
+    email: 'applicant@demo.apu.edu.my',
+    displayName: 'Demo Applicant',
+    username: 'applicant',
+    nav: [testNavPage('dashboard', 'Dashboard')],
+  },
+);
 
 function loginViaMock(auth: AuthService, httpMock: HttpTestingController): void {
   auth.login('applicant@demo.apu.edu.my', 'Demo@123').subscribe();
@@ -71,9 +69,17 @@ describe('event engagement mock services', () => {
     }));
 
     expect(auth.authenticated()).toBe(false);
-    const result = await firstValueFrom(registration.verifyOtp({ challengeId: challenge.challengeId, otp: challenge.developmentOtp! }));
+    // Verifying the (mock) OTP is what actually creates the account: it POSTs to the real
+    // /auth/register endpoint and establishes the returned session.
+    const httpMock = TestBed.inject(HttpTestingController);
+    const resultPromise = firstValueFrom(registration.verifyOtp({ challengeId: challenge.challengeId, otp: challenge.developmentOtp! }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    httpMock.expectOne(`${environment.authApiUrl}/register`).flush(testUser([testRole('external-user')], {
+      email: 'guest@example.com', displayName: 'Guest User', username: 'guest', accountType: 'external',
+    }));
+    const result = await resultPromise;
     expect(result.status).toBe('verified');
-    expect(auth.user()?.role).toBe(UserRole.ExternalUser);
+    expect(auth.user()?.roles.some((role) => role.roleCode === 'external-user')).toBe(true);
     expect(auth.user()?.accountType).toBe('external');
     expect(localStorage.getItem('apu-ems-auth-user')).toContain('guest@example.com');
   });
@@ -93,7 +99,7 @@ describe('event engagement mock services', () => {
 
     expect(restored.authenticated()).toBe(true);
     expect(restored.isInternalUser()).toBe(true);
-    expect(restored.user()?.functionLevel).toBe('student');
+    expect(restored.user()?.roles.some((role) => role.roleCode === 'student' && role.unitCode === 'school_of_computing')).toBe(true);
     expect(restored.defaultRoute()).toBe('/app/dashboard');
   });
 

@@ -26,6 +26,13 @@ function resolveActorByEmail(req, field) {
   return actor;
 }
 
+// Same resolution for routes with no body to carry the actor (DELETE).
+function resolveActorByQuery(req, field) {
+  const actor = db.users.find((u) => u.email === req.query[field]);
+  if (!actor) throw new WorkflowError(`Actor not found for the given ${field}.`, 400);
+  return actor;
+}
+
 router.get('/', async (_req, res, next) => {
   try {
     res.json(db.request.map((r) => projectProposal(r)));
@@ -55,10 +62,13 @@ router.post('/draft', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Deletes a draft (status='draft' only) — used by the Drafts list's delete action.
+// Deletes a draft (status='draft' only) — used by the Drafts list's delete action. Only the
+// applicant or a co-owner may delete; the actor is identified by the `actorEmail` query param
+// (this mock backend has no session middleware — a real deployment would read it from the token).
 router.delete('/:id', async (req, res, next) => {
   try {
-    workflow.deleteDraft(req.params.id);
+    const actor = resolveActorByQuery(req, 'actorEmail');
+    workflow.deleteDraft(req.params.id, actor.user_id);
     res.status(204).end();
   } catch (err) { next(err); }
 });
@@ -106,6 +116,8 @@ router.post('/:id/resubmit', async (req, res, next) => {
 router.post('/:id/confirm-department', async (req, res, next) => {
   try {
     const { department } = req.body;
+    // approveDepartmentTask() authorizes internally (authorizeDepartmentTask): the actor must
+    // head the unit this requirement is routed to, and the proposal must be in department review.
     const actor = resolveActorByEmail(req, 'confirmedByEmail');
     workflow.approveDepartmentTask(req.params.id, department, actor.user_id);
     res.json(projectProposal(workflow.findRequest(req.params.id)));
@@ -115,25 +127,11 @@ router.post('/:id/confirm-department', async (req, res, next) => {
 router.post('/:id/resubmit-department', async (req, res, next) => {
   try {
     const { department, comment } = req.body;
-    // NOTE: this endpoint's Angular caller (proposal-department-view.ts's resubmit()) does not
-    // send any actor identity in the body at all — it's derived from AuthService client-side in
-    // the original design, and Angular's resubmitAsDepartment() body is just { department, comment }.
-    // For the mock server, look up ANY head-of-department/head-of-school of this department's
-    // unit as a stand-in actor (acceptable simplification — a real backend would authenticate
-    // the request and use the actual session user). RBAC redesign: 5 of the 7 requirement kinds
-    // are routed by unit_code (workflow.service.js's UNIT_CODE_FOR_REQUIREMENT); fmb/
-    // fundingPurchase stay flat-role-routed (workflow.service.js's FLAT_ROLE_FOR_REQUIREMENT:
-    // fmb -> the food_beverage_services unit's head-of-department, fundingPurchase -> cfo).
-    const unitCode = workflow.UNIT_CODE_FOR_REQUIREMENT[department];
-    let actor;
-    if (unitCode) {
-      actor = db.users.find((u) => db.user_unit_roles.some((uur) => uur.user_id === u.user_id && uur.unit_code === unitCode && (uur.role_code === 'head-of-department' || uur.role_code === 'head-of-school')));
-    } else if (department === 'fmb') {
-      actor = db.users.find((u) => db.user_unit_roles.some((uur) => uur.user_id === u.user_id && uur.unit_code === 'food_beverage_services' && uur.role_code === 'head-of-department'));
-    } else if (department === 'fundingPurchase') {
-      actor = db.users.find((u) => db.user_unit_roles.some((uur) => uur.user_id === u.user_id && uur.role_code === 'cfo'));
-    }
-    if (!actor) throw new WorkflowError(`No manager found for the '${department}' department.`, 400);
+    // The acting department head is now identified by their real logged-in email (Angular's
+    // resubmitAsDepartment() sends `reviewerEmail`), not guessed by searching for "any manager of
+    // this unit" — resubmitDepartmentTask() then runs the same authorizeDepartmentTask() gate as
+    // approve, so only the head of the routed unit can push a request back.
+    const actor = resolveActorByEmail(req, 'reviewerEmail');
     workflow.resubmitDepartmentTask(req.params.id, department, actor.user_id, comment);
     res.json(projectProposal(workflow.findRequest(req.params.id)));
   } catch (err) { next(err); }
@@ -147,8 +145,9 @@ router.post('/:id/resubmit-department', async (req, res, next) => {
 // resubmission-required proposal is never itself a draft row.
 router.post('/:id/resubmit-applicant', async (req, res, next) => {
   try {
-    const { draftRequestId, ...payload } = req.body;
-    workflow.applicantResubmit(req.params.id, payload);
+    const { draftRequestId, actorEmail, ...payload } = req.body;
+    const actor = resolveActorByEmail(req, 'actorEmail');
+    workflow.applicantResubmit(req.params.id, payload, actor.user_id);
     res.json(projectProposal(workflow.findRequest(req.params.id)));
   } catch (err) { next(err); }
 });
@@ -162,11 +161,17 @@ router.post('/:id/resubmit-applicant', async (req, res, next) => {
 router.post('/:id/save-edits', async (req, res, next) => {
   try {
     const request = workflow.findRequest(req.params.id);
-    if (request.status !== 'resubmission_required') {
+    // Also allowed while a DEPARTMENT has pushed one of its tasks back: the proposal itself stays
+    // in department_review (parallel independence), so gating strictly on resubmission_required
+    // would leave that applicant unable to save work-in-progress edits.
+    const departmentSentBack = request.status === 'department_review'
+      && db.request_task.some((t) => t.request_id === request.request_id && t.status === 'resubmitted');
+    if (request.status !== 'resubmission_required' && !departmentSentBack) {
       throw new WorkflowError(`Cannot save edits from status ${request.status}.`, 400);
     }
-    const { draftRequestId, ...payload } = req.body;
-    workflow.saveRequestContent(req.params.id, payload);
+    const { draftRequestId, actorEmail, ...payload } = req.body;
+    const actor = resolveActorByEmail(req, 'actorEmail');
+    workflow.saveRequestContent(req.params.id, payload, actor.user_id);
     res.json(projectProposal(workflow.findRequest(req.params.id)));
   } catch (err) { next(err); }
 });
@@ -232,7 +237,27 @@ router.post('/:id/fmb-selections/:selectionId/resubmit', async (req, res, next) 
     const actor = resolveActorByEmail(req, 'reviewerEmail');
     const selection = workflow.findFmbSelection(req.params.selectionId);
     if (!isCafeteriaManagerOfSelection(actor.user_id, selection)) throw new WorkflowError('Only this cafeteria\'s manager can act on this selection.', 403);
-    workflow.resubmitFmbSelection(req.params.selectionId, actor.user_id);
+    workflow.resubmitFmbSelection(req.params.selectionId, actor.user_id, req.body.comment);
+    res.json(projectProposal(workflow.findRequest(req.params.id)));
+  } catch (err) { next(err); }
+});
+
+// F&B edits an order a Cafeteria Manager pushed back (or cancels it outright). Saving IS the
+// re-send — the row returns to 'pending' in whichever cafeteria now owns it, and every sibling
+// order on the same proposal is untouched. Authorization (F&B head only, editable statuses only)
+// lives in workflow.service.js's editFmbSelection().
+router.post('/:id/fmb-selections/:selectionId/edit', async (req, res, next) => {
+  try {
+    const actor = resolveActorByEmail(req, 'reviewerEmail');
+    const { cafeteriaCode, fmbOptionId, menuItemLabel, quantity, notes, cancel } = req.body;
+    if (!cancel && cafeteriaCode !== undefined) {
+      const cafeteria = db.unit.find((u) => u.code === cafeteriaCode && !u.archived_at && u.is_active);
+      if (!cafeteria) throw new WorkflowError('Cafeteria not found or inactive.', 400);
+    }
+    if (!cancel && quantity !== undefined && !(Number(quantity) > 0)) {
+      throw new WorkflowError('Quantity must be at least 1.', 400);
+    }
+    workflow.editFmbSelection(req.params.selectionId, { cafeteriaCode, fmbOptionId, menuItemLabel, quantity, notes, cancel }, actor.user_id);
     res.json(projectProposal(workflow.findRequest(req.params.id)));
   } catch (err) { next(err); }
 });

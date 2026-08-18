@@ -35,6 +35,9 @@ export interface PublishedEvent {
   readonly audience: readonly string[];
   readonly schedule: readonly ProposalEventSchedule[];
   readonly totalExpectedPax: number;
+  // Organizer-set registration capacity; null = uncapped. The server refuses registrations past
+  // this number, so the UI only uses it to show how many places are left.
+  readonly maxPax: number | null;
   readonly registrationMode: RegistrationMode;
   readonly confirmedRegistrationCount: number;
   readonly pendingRegistrationCount: number;
@@ -46,10 +49,15 @@ export interface PublishedEvent {
 
 export type PaymentStatus = 'not_required' | 'pending_review' | 'approved' | 'rejected';
 
+// Applicants reviewing a manual-approval event see the registrant's name, email and reason
+// (system specification §6), so all three travel with the registration record.
 export interface EventRegistration {
   readonly id: string;
   readonly eventId: string;
   readonly email: string;
+  readonly name: string;
+  readonly reason: string;
+  readonly registeredAt: string;
   readonly status: 'confirmed' | 'pending' | 'rejected';
   readonly paymentProofUrl: string | null;
   readonly paymentProofFileName: string | null;
@@ -57,6 +65,15 @@ export interface EventRegistration {
 }
 
 export interface RegistrationResult { readonly status: RegistrationStatus; readonly message: string; }
+
+// A pending registration enriched with the event it belongs to — what the applicant reviews in
+// their Inbox (system specification §6). Manual-approval registrations are a single-approver
+// flow with no request_task, so they arrive as their own list rather than through the workflow.
+export interface PendingEventRegistration extends EventRegistration {
+  readonly eventTitle: string;
+  readonly eventCode: string;
+  readonly paymentRequired: boolean;
+}
 
 /** Public events are visible to everyone; Private/Club Only events are APU-community-only. */
 export function isEventVisibleTo(visibility: EventVisibility, isAuthenticated: boolean): boolean {

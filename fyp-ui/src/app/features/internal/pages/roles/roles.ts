@@ -7,12 +7,14 @@ import { DeletionPreview } from '../../../../shared/models/deletion.models';
 import { FeedbackBannerComponent } from '../../../../shared/components/feedback-banner/feedback-banner';
 import { FormFieldComponent } from '../../../../shared/components/form-controls/form-field';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
+import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog';
 import { DeleteConfirmDialogComponent } from '../../../../shared/components/delete-confirm-dialog/delete-confirm-dialog';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
 import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent } from '../../../../shared/components/internal-data-page/internal-data-page.models';
 import { StatusToggleComponent } from '../../../../shared/components/status-toggle/status-toggle';
 import { SearchableDropdownComponent } from '../../../../shared/components/searchable-dropdown/searchable-dropdown';
 import { SelectOption } from '../../../../shared/components/form-controls/form-controls.models';
+import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 
 // Server-side derivation this mirrors exactly: services/unit-code.js's deriveRoleCode(), also
 // used server-side to auto-slug roleName -> role_code (admin.routes.js POST /roles). Hyphenated
@@ -24,14 +26,22 @@ function deriveRoleCode(roleName: string): string {
 
 type RolesTab = 'active' | 'deleted';
 
+// The deleted-items table names its first column differently per page (identity / name / label),
+// so the confirmation reads whichever cell actually carries the record's display name.
+function restoreLabelFor(record: InternalDataRecord): string {
+  const named = Object.values(record.cells).find((cell) => !!cell?.primary);
+  return named?.primary ? String(named.primary) : String(record.id);
+}
+
 @Component({
   selector: 'app-roles',
-  imports: [InternalDataPageComponent, FormModalComponent, FormFieldComponent, StatusToggleComponent, FeedbackBannerComponent, DeleteConfirmDialogComponent, SearchableDropdownComponent],
+  imports: [InternalDataPageComponent, FormModalComponent, FormFieldComponent, StatusToggleComponent, FeedbackBannerComponent, ConfirmDialogComponent, DeleteConfirmDialogComponent, SearchableDropdownComponent],
   templateUrl: './roles.html',
   styleUrl: './roles.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RolesComponent {
+  private readonly toast = inject(ToastService);
   private readonly service = inject(AdminDirectoryService);
   private readonly destroyRef = inject(DestroyRef);
   readonly tab = signal<RolesTab>('active');
@@ -49,7 +59,6 @@ export class RolesComponent {
   readonly modalOpen = signal(false);
   readonly editingCode = signal<string | null>(null);
   readonly draft = signal<Record<string, string | boolean | readonly string[]>>({});
-  readonly successMessage = signal('');
   readonly errorMessage = signal('');
 
   readonly deleteTarget = signal<AdminRoleRecord | null>(null);
@@ -176,7 +185,7 @@ export class RolesComponent {
     this.changeStatus(role);
   }
   handleDeletedAction(event: InternalRowActionEvent): void {
-    if (event.action.key === 'restore') { this.restore(String(event.record.id)); return; }
+    if (event.action.key === 'restore') { this.restoreTarget.set({ id: String(event.record.id), label: restoreLabelFor(event.record) }); return; }
     if (event.action.key === 'purge') this.requestPurge(String(event.record.id));
   }
   closeModal(): void { if (!this.saving()) this.modalOpen.set(false); }
@@ -201,8 +210,8 @@ export class RolesComponent {
       ? this.service.updateRole(code, this.roleDraft())
       : this.service.createRole(this.roleDraft() as AdminRoleDraft);
     request.pipe(finalize(() => this.saving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.modalOpen.set(false); this.successMessage.set(`Role ${code ? 'updated' : 'created'} successfully.`); },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The role could not be saved.'),
+      next: () => { this.modalOpen.set(false); this.toast.success(`Role ${code ? 'updated' : 'created'} successfully.`); },
+      error: (err) => this.toast.error('The role could not be saved', apiErrorMessage(err, 'Please try again.')),
     });
   }
   private roleDraft(): Partial<AdminRoleDraft> {
@@ -210,12 +219,12 @@ export class RolesComponent {
     if (this.editingProtected()) return base;
     return { ...base, unitCodes: this.unitCodes() };
   }
-  private clearMessages(): void { this.successMessage.set(''); this.errorMessage.set(''); }
+  private clearMessages(): void { this.errorMessage.set(''); }
   private changeStatus(role: AdminRoleRecord): void {
     this.clearMessages();
     this.service.updateRole(role.roleCode, { active: !role.active }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => this.successMessage.set(`Role is now ${role.active ? 'inactive' : 'active'}.`),
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The active status could not be changed.'),
+      next: () => this.toast.success(`Role is now ${role.active ? 'inactive' : 'active'}.`),
+      error: (err) => this.toast.error('The active status could not be changed', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -233,7 +242,7 @@ export class RolesComponent {
     this.checkingDeletion.set(true);
     this.service.checkRoleDeletion(role.roleCode).pipe(finalize(() => this.checkingDeletion.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (preview) => this.deletePreview.set(preview),
-      error: () => this.errorMessage.set('Could not check whether this role can be deleted.'),
+      error: () => this.toast.error('Could not check whether this role can be deleted'),
     });
   }
   cancelDelete(): void { if (!this.deleting()) { this.deleteTarget.set(null); this.deletePreview.set(null); } }
@@ -245,17 +254,31 @@ export class RolesComponent {
     this.service.deleteRole(target.roleCode).pipe(finalize(() => this.deleting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.deleteTarget.set(null); this.deletePreview.set(null);
-        this.successMessage.set('Role deleted. It can be restored from the Deleted tab within 7 days.');
+        this.toast.success('Role deleted', 'It can be restored from the Deleted tab within 7 days.');
       },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The role could not be deleted.'),
+      error: (err) => this.toast.error('The role could not be deleted', apiErrorMessage(err, 'Please try again.')),
     });
   }
+  // Restoring brings an archived record back into circulation immediately, so it is
+  // confirmed first like every other state-changing action.
+  readonly restoreTarget = signal<{ id: string; label: string } | null>(null);
+  readonly restoreMessage = computed(() => {
+    const target = this.restoreTarget();
+    return target ? `Restore ${target.label}? It becomes active again straight away.` : '';
+  });
+  cancelRestore(): void { this.restoreTarget.set(null); }
+  confirmRestore(): void {
+    const target = this.restoreTarget();
+    this.restoreTarget.set(null);
+    if (target) this.restore(target.id);
+  }
+
   restore(code: string): void {
     this.clearMessages();
     this.restoringCode.set(code);
     this.service.restoreRole(code).pipe(finalize(() => this.restoringCode.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.successMessage.set('Role restored.'); this.loadDeleted(); },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The role could not be restored.'),
+      next: () => { this.toast.success('Role restored'); this.loadDeleted(); },
+      error: (err) => this.toast.error('The role could not be restored', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -274,8 +297,8 @@ export class RolesComponent {
     if (!code) return;
     this.purging.set(true);
     this.service.purgeRole(code).pipe(finalize(() => this.purging.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.purgeTargetCode.set(null); this.successMessage.set('Role permanently deleted.'); this.loadDeleted(); },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The role could not be permanently deleted.'),
+      next: () => { this.purgeTargetCode.set(null); this.toast.success('Role permanently deleted'); this.loadDeleted(); },
+      error: (err) => this.toast.error('The role could not be permanently deleted', apiErrorMessage(err, 'Please try again.')),
     });
   }
 

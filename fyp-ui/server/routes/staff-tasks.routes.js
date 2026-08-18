@@ -20,40 +20,45 @@ function unitCodeForUser(userId) {
 // projection. Mirrors proposal-projection.service.js's departmentRequestsFor per-department item
 // derivation, but reduced to the fields StaffTask needs (request/quantity/schedule/location).
 function departmentTaskDetails(requestId, requirementName) {
-  const scheduleStr = (date, start, end) => `${date} · ${start}-${end}`;
+  const window = (date, start, end) => `${date} · ${start}-${end}`;
+  const at = (date, time) => `${date} · ${time}`;
+  // Column names below track ems_database_schema.sql exactly: transportation stores moving_time
+  // + pickup/dropoff (no end_time/location), photography/videography and campus tour dropped
+  // their personnel/coverage and time/location columns, and request_fmb stores serve_time.
+  // Reading the dropped columns used to render "undefined-undefined" in the staff task list.
   switch (requirementName) {
-    case 'logistics': {
-      const row = db.request_logistics.find((r) => r.request_id === requestId);
-      if (!row) return null;
-      return { request: row.item, quantity: String(row.quantity), schedule: scheduleStr(row.date, row.start_time, row.end_time), location: row.location, detail: row.notes || '' };
-    }
-    case 'transportation': {
-      const row = db.request_transportation.find((r) => r.request_id === requestId);
-      if (!row) return null;
-      return { request: row.type, quantity: `${row.requested_pax} pax`, schedule: scheduleStr(row.date, row.start_time, row.end_time), location: row.location, detail: row.notes || '' };
-    }
-    case 'photoVideo': {
-      const row = db.request_photography_videography.find((r) => r.request_id === requestId);
-      if (!row) return null;
-      return { request: row.service, quantity: String(row.personnel_quantity), schedule: scheduleStr(row.date, row.start_time, row.end_time), location: row.location, detail: row.coverage || row.notes || '' };
-    }
-    case 'soundLight': {
-      const row = db.request_sound_light.find((r) => r.request_id === requestId);
-      if (!row) return null;
-      return { request: row.item, quantity: undefined, schedule: scheduleStr(row.date, row.start_time, row.end_time), location: row.location, detail: row.notes || '' };
-    }
-    case 'campusTour': {
-      const row = db.request_campus_tour.find((r) => r.request_id === requestId);
-      if (!row) return null;
-      return { request: row.start_point, quantity: `${row.pax} pax`, schedule: scheduleStr(row.date, row.start_time, row.end_time), location: row.location, detail: row.notes || '' };
-    }
+    case 'logistics':
+      return db.request_logistics.filter((r) => r.request_id === requestId).map((row) => ({
+        request: row.item, quantity: String(row.quantity), schedule: window(row.date, row.start_time, row.end_time), location: row.location, detail: row.notes || '',
+      }));
+    case 'transportation':
+      return db.request_transportation.filter((r) => r.request_id === requestId).map((row) => ({
+        request: row.type, quantity: `${row.requested_pax} pax`, schedule: at(row.date, row.moving_time), location: `${row.pickup} → ${row.dropoff}`, detail: row.notes || '',
+      }));
+    case 'photoVideo':
+      return db.request_photography_videography.filter((r) => r.request_id === requestId).map((row) => ({
+        request: row.service, quantity: undefined, schedule: window(row.date, row.start_time, row.end_time), location: row.location, detail: row.notes || '',
+      }));
+    case 'soundLight':
+      return db.request_sound_light.filter((r) => r.request_id === requestId).map((row) => ({
+        request: row.item, quantity: undefined, schedule: window(row.date, row.start_time, row.end_time), location: row.location, detail: row.notes || '',
+      }));
+    case 'campusTour':
+      return db.request_campus_tour.filter((r) => r.request_id === requestId).map((row) => ({
+        request: `${row.start_point} · ${row.tour_type}`, quantity: `${row.pax} pax`, schedule: row.date, location: row.start_point, detail: row.notes || '',
+      }));
     case 'fmb': {
-      const row = db.request_fmb.find((r) => r.request_id === requestId);
-      if (!row) return null;
-      return { request: row.food_type, quantity: `${row.pax} pax`, schedule: scheduleStr(row.date, row.start_time, row.end_time), location: row.location, detail: row.notes || '' };
+      const food = db.request_fmb.filter((r) => r.request_id === requestId).map((row) => ({
+        request: row.food_type, quantity: `${row.pax} pax`, schedule: at(row.date, row.serve_time), location: row.location, detail: row.notes || '',
+      }));
+      // Mineral water shares the F&B department task (one review covers food + water together).
+      const water = db.request_mineral_water.filter((r) => r.request_id === requestId).map((row) => ({
+        request: row.with_logo ? 'Mineral Water (with logo)' : 'Mineral Water', quantity: `${row.quantity} bottles`, schedule: window(row.date, row.start_time, row.end_time), location: row.location, detail: row.notes || '',
+      }));
+      return [...food, ...water];
     }
     default:
-      return null;
+      return [];
   }
 }
 
@@ -67,14 +72,27 @@ function mapTaskStatus(status) {
   return status;
 }
 
-function projectDepartmentTask(task, assignedToEmail) {
+// One request_task can cover several requested rows (three logistics items, two vehicles, ...).
+// Every row is surfaced as its own StaffTask entry so the assignee sees the full ask rather than
+// only the first row, but they all share the SAME request_task_id - acting on any one of them
+// progresses the single underlying task.
+function projectDepartmentTasks(task, assignedToEmail) {
+  const requirement = db.event_requirements.find((r) => r.requirement_id === task.requirement_id);
+  if (!requirement) throw new WorkflowError('Event requirement not found for this task.', 404);
+  const rows = departmentTaskDetails(task.request_id, requirement.requirement_name);
+  if (rows.length === 0) return [projectDepartmentTask(task, assignedToEmail)];
+  return rows.map((row, index) => projectDepartmentTask(task, assignedToEmail, row, index));
+}
+
+function projectDepartmentTask(task, assignedToEmail, row, index = 0) {
   const request = db.request.find((r) => r.request_id === task.request_id);
   if (!request) throw new WorkflowError('Proposal not found for this task.', 404);
   const requirement = db.event_requirements.find((r) => r.requirement_id === task.requirement_id);
   if (!requirement) throw new WorkflowError('Event requirement not found for this task.', 404);
-  const details = departmentTaskDetails(task.request_id, requirement.requirement_name) || { request: requirement.requirement_name, quantity: undefined, schedule: '', location: '', detail: '' };
+  const details = row || departmentTaskDetails(task.request_id, requirement.requirement_name)[0] || { request: requirement.requirement_name, quantity: undefined, schedule: '', location: '', detail: '' };
   return {
     id: String(task.request_task_id),
+    rowKey: `${task.request_task_id}:${index}`,
     // Kept as `role` on the wire for the Angular StaffTask shape's backward-compat field name,
     // but the VALUE is now a unit_code (or, for the two flat-routed kinds, the flat role string
     // 'cfo'/'fmb') rather than a manager role token — see assigned_unit_code/assigned_role above.
@@ -114,13 +132,14 @@ function projectFmbSelection(selection, assignedToEmail) {
   const cafeteria = db.unit.find((u) => u.code === selection.unit_code);
   return {
     id: `fmb-selection:${selection.request_fmb_selection_id}`,
+    rowKey: `fmb-selection:${selection.request_fmb_selection_id}`,
     role: 'cafeteria-staff',
     assignedToEmail: assignedToEmail || '',
     eventCode: request.request_code,
     eventTitle: request.event_title,
     request: selection.menu_item_label,
     quantity: String(selection.quantity),
-    schedule: `${fmbRow.date} · ${fmbRow.start_time}-${fmbRow.end_time}`,
+    schedule: `${fmbRow.date} · ${fmbRow.serve_time}`,
     location: fmbRow.location,
     detailLabel: 'Cafeteria',
     detail: cafeteria ? cafeteria.description : '',
@@ -141,7 +160,9 @@ router.get('/', async (req, res, next) => {
       const myAssignments = db.task_assignment.filter((a) => a.staff_user_id === staffUser.user_id);
       for (const assignment of myAssignments) {
         const task = db.request_task.find((t) => t.request_task_id === assignment.request_task_id);
-        if (task && (task.assigned_unit_code === role || task.assigned_role === role)) tasks.push(projectDepartmentTask(task, assignedToEmail));
+        // Cancelled tasks stay visible (they belong in the assignee's History as cancelled -
+        // system specification section 4); the frontend buckets them by status.
+        if (task && (task.assigned_unit_code === role || task.assigned_role === role)) tasks.push(...projectDepartmentTasks(task, assignedToEmail));
       }
     }
 
@@ -179,7 +200,7 @@ router.post('/assignments', async (req, res, next) => {
     // `role` here is now the unit_code being assigned into (assignRequests() sends the
     // manager's own unitCode, since staff being assigned share the SAME unit as their manager —
     // there's no separate "staff role" to map anymore).
-    const { role, assignedToEmail, eventCode } = req.body;
+    const { role, assignedToEmail, eventCode, assignedByEmail } = req.body;
     const request = db.request.find((r) => r.request_code === eventCode);
     if (!request) throw new WorkflowError('Event not found for the given eventCode.', 400);
     const task = db.request_task.find((t) => t.request_id === request.request_id && (t.assigned_unit_code === role || t.assigned_role === role) && t.stage_code === 'department_review');
@@ -187,18 +208,13 @@ router.post('/assignments', async (req, res, next) => {
     const staffUser = db.users.find((u) => u.email === assignedToEmail);
     if (!staffUser) throw new WorkflowError('Staff member not found for the given assignedToEmail.', 400);
 
-    // Attribute the assignment to the head-of-department/head-of-school of the task's own unit
-    // (or, for fmb, the food_beverage_services unit's head-of-department — RBAC redesign retired
-    // the old flat 'cafeteria-manager' role, see workflow.service.js) so workflow_history's
-    // assigned_by_user_id is a sensible real user rather than always null.
-    let manager;
-    if (task.assigned_unit_code) {
-      manager = db.users.find((u) => db.user_unit_roles.some((uur) => uur.user_id === u.user_id && uur.unit_code === task.assigned_unit_code && (uur.role_code === 'head-of-department' || uur.role_code === 'head-of-school')));
-    } else if (task.assigned_role === 'fmb') {
-      manager = db.users.find((u) => db.user_unit_roles.some((uur) => uur.user_id === u.user_id && uur.unit_code === 'food_beverage_services' && uur.role_code === 'head-of-department'));
-    }
+    // The assigning manager is the real logged-in user (Angular sends assignedByEmail), not a
+    // best-guess lookup - assignStaffToTask() then verifies they actually head this task's unit
+    // and that the assignee belongs to it.
+    const manager = db.users.find((u) => u.email === assignedByEmail);
+    if (!manager) throw new WorkflowError('Assigning manager not found for the given assignedByEmail.', 400);
 
-    workflow.assignStaffToTask(task.request_task_id, staffUser.user_id, manager ? manager.user_id : null);
+    workflow.assignStaffToTask(task.request_task_id, staffUser.user_id, manager.user_id);
     res.json(projectDepartmentTask(db.request_task.find((t) => t.request_task_id === task.request_task_id), assignedToEmail));
   } catch (err) { next(err); }
 });
@@ -220,10 +236,10 @@ router.patch('/:id/status', async (req, res, next) => {
       return;
     }
 
-    const task = workflow.updateTaskStatus(idParam, status);
-    const assignment = db.task_assignment.find((a) => a.request_task_id === task.request_task_id);
-    const staffUser = assignment ? db.users.find((u) => u.user_id === assignment.staff_user_id) : null;
-    res.json(projectDepartmentTask(task, staffUser ? staffUser.email : ''));
+    const actor = db.users.find((u) => u.email === staffEmail);
+    if (!actor) throw new WorkflowError('Staff member not found for the given staffEmail.', 400);
+    const task = workflow.updateTaskStatus(idParam, status, actor.user_id);
+    res.json(projectDepartmentTask(task, actor.email));
   } catch (err) { next(err); }
 });
 

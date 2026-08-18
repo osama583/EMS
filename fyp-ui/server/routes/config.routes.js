@@ -5,15 +5,25 @@ const { WorkflowError } = workflow;
 
 const router = express.Router();
 
+// Every admin-settable number in `config` (ems_database_schema.sql SECTION 5) is surfaced here
+// under one camelCase wire name, so the frontend never hardcodes a threshold. Adding a row to
+// this map is the only step needed to expose a new one — GET/PUT below are generic over it.
+const CONFIG_FIELDS = [
+  { code: 'HIGH_PAX_THRESHOLD', field: 'paxReviewerThreshold', min: 1 },
+  { code: 'CANCELLATION_DEADLINE_DAYS', field: 'cancellationDaysLimit', min: 0 },
+  { code: 'MAX_EVENT_CATEGORIES', field: 'maxEventCategories', min: 1 },
+];
+
+function configRow(code) {
+  const row = db.config.find((c) => c.code === code);
+  if (!row) throw new WorkflowError(`${code} config not found.`, 404);
+  return row;
+}
+
 function projectConfig() {
-  const paxConfig = db.config.find((c) => c.code === 'HIGH_PAX_THRESHOLD');
-  const cancellationConfig = db.config.find((c) => c.code === 'CANCELLATION_DEADLINE_DAYS');
-  if (!paxConfig) throw new WorkflowError('HIGH_PAX_THRESHOLD config not found.', 404);
-  if (!cancellationConfig) throw new WorkflowError('CANCELLATION_DEADLINE_DAYS config not found.', 404);
-  return {
-    paxReviewerThreshold: paxConfig.number,
-    cancellationDaysLimit: cancellationConfig.number,
-  };
+  const projection = {};
+  for (const { code, field } of CONFIG_FIELDS) projection[field] = configRow(code).number;
+  return projection;
 }
 
 router.get('/', async (_req, res, next) => {
@@ -23,16 +33,21 @@ router.get('/', async (_req, res, next) => {
 });
 
 // Event Categories / Event Formats moved to their own id-backed catalog routes
-// (routes/event-catalog.routes.js) — this endpoint now only covers the two scalar policy values.
+// (routes/event-catalog.routes.js) — this endpoint now only covers the scalar policy values.
 router.put('/', async (req, res, next) => {
   try {
-    const { paxReviewerThreshold, cancellationDaysLimit } = req.body;
-    const paxConfig = db.config.find((c) => c.code === 'HIGH_PAX_THRESHOLD');
-    const cancellationConfig = db.config.find((c) => c.code === 'CANCELLATION_DEADLINE_DAYS');
-    if (!paxConfig) throw new WorkflowError('HIGH_PAX_THRESHOLD config not found.', 404);
-    if (!cancellationConfig) throw new WorkflowError('CANCELLATION_DEADLINE_DAYS config not found.', 404);
-    if (paxReviewerThreshold !== undefined) paxConfig.number = Number(paxReviewerThreshold);
-    if (cancellationDaysLimit !== undefined) cancellationConfig.number = Number(cancellationDaysLimit);
+    // Validate every incoming value BEFORE writing any of them, so a rejected field can't leave
+    // the other two already persisted (the shared saveDb() middleware runs on any 2xx response).
+    const updates = [];
+    for (const { code, field, min } of CONFIG_FIELDS) {
+      if (req.body[field] === undefined) continue;
+      const value = Number(req.body[field]);
+      if (!Number.isFinite(value) || !Number.isInteger(value) || value < min) {
+        throw new WorkflowError(`${field} must be a whole number of at least ${min}.`, 400);
+      }
+      updates.push({ row: configRow(code), value });
+    }
+    for (const { row, value } of updates) row.number = value;
 
     res.json(projectConfig());
   } catch (err) { next(err); }

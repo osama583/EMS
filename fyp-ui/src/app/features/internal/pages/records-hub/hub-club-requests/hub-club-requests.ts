@@ -6,6 +6,7 @@ import { ClubService } from '../../../../../core/clubs/club.service';
 import { ClubJoinRequestRecord } from '../../../../../core/clubs/club.models';
 import { FeedbackBannerComponent } from '../../../../../shared/components/feedback-banner/feedback-banner';
 import { LoadingStateComponent } from '../../../../../shared/components/loading-state/loading-state';
+import { ConfirmDialogComponent } from '../../../../../shared/components/confirm-dialog/confirm-dialog';
 import { ProposalCommentDialogComponent } from '../../../../../shared/components/proposal-comment-dialog/proposal-comment-dialog';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 
@@ -13,7 +14,7 @@ export const REJECTION_COMMENT_MIN_LENGTH = 20;
 
 @Component({
   selector: 'app-hub-club-requests',
-  imports: [FeedbackBannerComponent, LoadingStateComponent, ProposalCommentDialogComponent],
+  imports: [FeedbackBannerComponent, LoadingStateComponent, ProposalCommentDialogComponent, ConfirmDialogComponent],
   templateUrl: './hub-club-requests.html',
   styleUrl: './hub-club-requests.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -31,6 +32,7 @@ export class HubClubRequestsComponent {
   readonly loading = signal(true);
   readonly errorMessage = signal('');
   readonly processingId = signal<string | null>(null);
+  readonly approveTarget = signal<ClubJoinRequestRecord | null>(null);
   readonly rejectTarget = signal<ClubJoinRequestRecord | null>(null);
   readonly rejecting = signal(false);
 
@@ -46,14 +48,24 @@ export class HubClubRequestsComponent {
     });
   }
 
+  // Approving adds the requester to the club, so it is confirmed first like every other
+  // membership-changing action.
+  openApprove(request: ClubJoinRequestRecord): void { this.approveTarget.set(request); }
+  closeApprove(): void { if (!this.processingId()) this.approveTarget.set(null); }
+  confirmApprove(): void {
+    const request = this.approveTarget();
+    if (request) this.approve(request);
+  }
+
   approve(request: ClubJoinRequestRecord): void {
     this.processingId.set(request.id);
     this.clubService.approveJoinRequest(request.id, this.currentUserId).pipe(finalize(() => this.processingId.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.requests.update((items) => items.filter((item) => item.id !== request.id));
+        this.approveTarget.set(null);
         this.toast.success('Request approved', `${request.requester.displayName} was approved to join ${request.clubName}.`);
       },
-      error: () => this.toast.error('Could not approve request', 'Please try again.'),
+      error: () => { this.approveTarget.set(null); this.toast.error('Could not approve request', 'Please try again.'); },
     });
   }
 

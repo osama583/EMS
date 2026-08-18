@@ -22,8 +22,11 @@ import { AuthService } from '../../../../core/auth/auth.service';
 import { EventImageAsset, EventVisibility, RegistrationMode } from '../../../../core/events/published-event.models';
 import { ProposalWorkflowService } from '../../../../core/proposals/proposal-workflow.service';
 import { ProposalReviewRecord } from '../../../../core/proposals/proposal-review.models';
-import { ReviewerCommentEntry, reviewerCommentEntry } from '../../../../core/proposals/proposal-status.models';
+import { ReviewerCommentEntry, allCommentEntries } from '../../../../core/proposals/proposal-status.models';
 
+import { AdminDirectoryService } from '../../../../core/admin-directory/admin-directory.service';
+import { SystemConfigService } from '../../../../core/config/system-config.service';
+import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 import { EventCategoryService, EventFormatService } from '../../../../core/event-catalog/event-catalog.service';
 
 type RequirementKey = 'logistics' | 'transportation' | 'photoVideo' | 'soundLight' | 'fmb' | 'campusTour' | 'waterNormal' | 'fundingPurchase';
@@ -72,7 +75,9 @@ export class EventProposalComponent implements OnDestroy {
   readonly resubmitProposalId = signal<number | null>(null);
   readonly draftRequestId = signal<number | null>(null);
   readonly savingDraft = signal(false);
-  readonly reviewerComment = signal<ReviewerCommentEntry | null>(null);
+  // Every comment waiting on the applicant: the reviewer stage that sent the whole proposal back,
+  // and/or each department that asked for changes to its own part of it.
+  readonly reviewerComments = signal<readonly ReviewerCommentEntry[]>([]);
   readonly commentsPanelOpen = signal(true);
   readonly resubmitting = signal(false);
   readonly errors = signal<Readonly<Record<string, string>>>({});
@@ -80,7 +85,6 @@ export class EventProposalComponent implements OnDestroy {
   readonly validationModalOpen = signal(false);
   readonly validationGuidanceVisible = signal(false);
   readonly validationGuidanceVersion = signal(0);
-  readonly toast = signal('');
   readonly submitAttempted = signal(false);
   readonly visitedSteps = signal<readonly number[]>([0]);
   readonly checkedSteps = signal<readonly number[]>([]);
@@ -89,7 +93,7 @@ export class EventProposalComponent implements OnDestroy {
   readonly steps: readonly ProposalStep[] = [
     { label: 'Applicant Info', icon: 'person' }, { label: 'General Event Info', icon: 'event' },
     { label: 'Required for Event', icon: 'checklist' }, { label: 'Request Details', icon: 'request_page' },
-    { label: 'Detailed Event Info', icon: 'article' }, { label: 'Final Actions', icon: 'task_alt' },
+    { label: 'Detailed Event Info', icon: 'article' }, { label: 'Final Review', icon: 'task_alt' },
   ];
   readonly applicantName = signal(this.applicant?.displayName ?? '');
   readonly department = signal(this.applicant?.department ?? '');
@@ -111,6 +115,7 @@ export class EventProposalComponent implements OnDestroy {
   readonly bankAccountName = signal('');
   readonly bankAccountNumber = signal('');
   readonly selectedRequirements = signal<readonly string[]>([]);
+  readonly submitConfirmOpen = signal(false);
   readonly requestModalOpen = signal(false);
   readonly requestModalDefinition = signal<RequestDefinition | null>(null);
   readonly requestEditingIndex = signal<number | null>(null);
@@ -125,7 +130,9 @@ export class EventProposalComponent implements OnDestroy {
   readonly tableEditingIndex = signal<number | null>(null);
   readonly tableDraft = signal<EditableRow>({});
 
-  readonly departments = options('School of Computing', 'School of Technology', 'School of Business', 'School of Marketing and Management', 'School of Media, Arts and Design', 'Student Affairs', 'Facilities Management', 'Other');
+  private readonly toastService = inject(ToastService);
+  private readonly systemConfig = inject(SystemConfigService);
+  private readonly directory = inject(AdminDirectoryService);
   private readonly eventCategoryService = inject(EventCategoryService);
   private readonly eventFormatService = inject(EventFormatService);
   // ACTIVE-only options — an archived category/format must not be offered on a new proposal, even
@@ -133,6 +140,9 @@ export class EventProposalComponent implements OnDestroy {
   readonly categoryOptions = computed<readonly SelectOption[]>(() =>
     this.eventCategoryService.activeEntries().map((entry) => ({ value: entry.id, label: entry.name }))
   );
+  // Admin-settable (System Configuration -> Policies). The server enforces the same cap on
+  // submit, so this only keeps the picker honest — it is never the authority.
+  readonly maxEventCategories = computed(() => this.systemConfig.maxEventCategories());
   // Club Only visibility is gated on being the President of at least one club — a data fact
   // (AuthUser.presidentOfClubIds, sourced from the clubs table), not a role check.
   private readonly isClubPresident = Boolean(this.applicant?.presidentOfClubIds?.length);
@@ -141,13 +151,9 @@ export class EventProposalComponent implements OnDestroy {
     this.eventFormatService.activeEntries().map((entry) => ({ value: entry.id, label: entry.name }))
   );
   readonly registrationModeOptions = options('Automatic', 'Approval Required');
-  readonly staff: readonly StaffOption[] = [
-    { value: 'Aisha Rahman', label: 'Aisha Rahman', email: 'aisha.rahman@apu.edu.my', role: 'Senior Lecturer', description: 'School of Computing' },
-    { value: 'Daniel Lee', label: 'Daniel Lee', email: 'daniel.lee@apu.edu.my', role: 'Programme Leader', description: 'School of Technology' },
-    { value: 'Nur Izzati', label: 'Nur Izzati', email: 'nur.izzati@apu.edu.my', role: 'Student Affairs Executive', description: 'Student Affairs' },
-    { value: 'Marcus Tan', label: 'Marcus Tan', email: 'marcus.tan@apu.edu.my', role: 'Facilities Coordinator', description: 'Facilities Management' },
-    { value: 'Priya Nair', label: 'Priya Nair', email: 'priya.nair@apu.edu.my', role: 'Lecturer', description: 'School of Business' },
-  ];
+  // Co-owner candidates come from the live user directory (system specification §8D: every
+  // dropdown is populated from the database). Only active, internal accounts are offered.
+  readonly staff = signal<readonly StaffOption[]>([]);
 
   readonly coOwners = signal<readonly EditableRow[]>([]);
   readonly coOwnerEditorVisible = signal(false);
@@ -175,6 +181,20 @@ export class EventProposalComponent implements OnDestroy {
   private readonly pendingFormatName = signal<string | null>(null);
 
   constructor() {
+    // Co-owner candidates: every active internal account except the applicant themselves.
+    this.directory.users$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((users) => {
+      this.staff.set(users
+        // External (guest) accounts hold only the flat 'external-user' role and can never be
+        // co-owners or organizers of an internal proposal.
+        .filter((user) => user.active && !user.roles.some((role) => role.roleCode === 'external-user'))
+        .map((user) => ({
+          value: user.displayName,
+          label: user.displayName,
+          email: user.email,
+          role: user.roleLabel,
+          description: user.department,
+        })));
+    });
     effect(() => {
       const names = this.pendingCategoryNames();
       if (names === null || this.eventCategoryService.loading()) return;
@@ -214,9 +234,8 @@ export class EventProposalComponent implements OnDestroy {
   // Loads a proposal a reviewer sent back with a comment so the applicant can see what needs to
   // change and edit in place, rather than starting a fresh submission from scratch.
   private prefillFromRecord(record: ProposalReviewRecord): void {
-    const entry = reviewerCommentEntry(record.workflow);
-    this.reviewerComment.set(entry);
-    this.commentsPanelOpen.set(Boolean(entry));
+    this.reviewerComments.set(allCommentEntries(record.workflow));
+    this.commentsPanelOpen.set(this.reviewerComments().length > 0);
     this.eventTitle.set(record.eventTitle);
     this.shortIntro.set(record.shortIntroduction);
     this.goals.set(record.goals);
@@ -262,7 +281,7 @@ export class EventProposalComponent implements OnDestroy {
     { key: 'name', label: 'Name', type: 'text' }, { key: 'type', label: 'Type', type: 'select', options: options('VIP', 'Speaker', 'Partner', 'Important Guest') }, { key: 'organization', label: 'Organization', type: 'text' }, { key: 'designation', label: 'Designation', type: 'text' },
   ];
   readonly guestColumns: readonly EditableTableColumn[] = [
-    { key: 'guestType', label: 'Guest Type', type: 'select', options: options('Students', 'APU Staff', 'External Guests', 'Parents / Guardians', 'Industry Partners', 'Alumni', 'Others') }, { key: 'count', label: 'Count', type: 'number', min: 0, step: 1 }, { key: 'notes', label: 'Notes', type: 'text', span: 'full' },
+    { key: 'guestType', label: 'Guest Type', type: 'select', options: options('Students', 'APU Staff', 'External Guests', 'Parents-Guardians', 'Industry Partners', 'Alumni', 'Others') }, { key: 'count', label: 'Count', type: 'number', min: 0, step: 1 }, { key: 'notes', label: 'Notes', type: 'text', span: 'full' },
   ];
   readonly agendaColumns: readonly EditableTableColumn[] = [
     { key: 'time', label: 'Time', type: 'time', required: true }, { key: 'activity', label: 'Activity', type: 'text', required: true }, { key: 'location', label: 'Location', type: 'text', required: true }, { key: 'pic', label: 'PIC', type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'text', span: 'full' },
@@ -273,7 +292,7 @@ export class EventProposalComponent implements OnDestroy {
 
   readonly importantPeopleCount = computed(() => this.importantPeople().filter((row) => this.rowHasValue(row, ['name', 'type'])).length);
   readonly totalPax = computed(() => this.guests().reduce((sum, row) => sum + this.nonNegative(row['count']), 0) + this.importantPeopleCount());
-  readonly externalPax = computed(() => this.guests().reduce((sum, row) => ['External Guests', 'Parents / Guardians', 'Industry Partners', 'Alumni', 'Others'].includes(String(row['guestType'])) ? sum + this.nonNegative(row['count']) : sum, 0));
+  readonly externalPax = computed(() => this.guests().reduce((sum, row) => ['External Guests', 'Parents-Guardians', 'Industry Partners', 'Alumni', 'Others'].includes(String(row['guestType'])) ? sum + this.nonNegative(row['count']) : sum, 0));
   readonly selectedCoOwner = computed(() => this.coOwnerStaffOptions().find((person) => person.label === this.coOwnerStaff()));
   readonly coOwnerFormValid = computed(() => Boolean(this.selectedCoOwner()));
   // Excludes the applicant (self) and staff already added as a co-owner in another row —
@@ -287,7 +306,7 @@ export class EventProposalComponent implements OnDestroy {
         .map((row) => String(row['email'] ?? '').trim().toLowerCase())
         .filter(Boolean)
     );
-    return this.staff.filter((person) => person.email.trim().toLowerCase() !== applicantEmail && !takenEmails.has(person.email.trim().toLowerCase()));
+    return this.staff().filter((person) => person.email.trim().toLowerCase() !== applicantEmail && !takenEmails.has(person.email.trim().toLowerCase()));
   });
   readonly hasSpeaker = computed(() => this.importantPeople().some((row) => row['type'] === 'Speaker'));
   readonly agendaReasons = computed(() => {
@@ -515,7 +534,7 @@ export class EventProposalComponent implements OnDestroy {
   // its own existing selection still appears. Mirrors coOwnerStaffOptions' dedupe logic.
   tableStaffOptions(column: EditableTableColumn): readonly StaffOption[] {
     const collection = this.tableEditorCollection();
-    if (!collection || column.type !== 'staff') return this.staff;
+    if (!collection || column.type !== 'staff') return this.staff();
     const editingIndex = this.tableEditingIndex();
     const takenEmails = new Set(
       this.tableRows(collection)
@@ -523,7 +542,7 @@ export class EventProposalComponent implements OnDestroy {
         .map((row) => String(row['email'] ?? '').trim().toLowerCase())
         .filter(Boolean)
     );
-    return this.staff.filter((person) => !takenEmails.has(person.email.trim().toLowerCase()));
+    return this.staff().filter((person) => !takenEmails.has(person.email.trim().toLowerCase()));
   }
   tableFieldError(column: EditableTableColumn): string {
     const collection = this.tableEditorCollection();
@@ -828,8 +847,8 @@ export class EventProposalComponent implements OnDestroy {
     this.savingDraft.set(true);
     const payload = { ...this.buildSubmissionPayload(), draftRequestId: this.draftRequestId() ?? undefined };
     this.workflow.saveDraft(payload).pipe(finalize(() => this.savingDraft.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (record) => { this.draftRequestId.set(record.id); this.status.set('Draft saved'); this.showToast('Draft saved.'); },
-      error: () => this.showToast('The draft could not be saved. Please try again.'),
+      next: (record) => { this.draftRequestId.set(record.id); this.status.set('Draft saved'); this.showToast('Draft saved', 'Continue it any time from Drafts.'); },
+      error: (err) => this.showError('The draft could not be saved', err, 'Please try again.'),
     });
   }
 
@@ -844,9 +863,9 @@ export class EventProposalComponent implements OnDestroy {
     const proposalId = this.resubmitProposalId();
     if (proposalId === null) return;
     this.savingDraft.set(true);
-    this.workflow.saveEdits(proposalId, this.buildSubmissionPayload()).pipe(finalize(() => this.savingDraft.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => this.showToast('Changes saved. This proposal stays in your Inbox until you resubmit it.'),
-      error: () => this.showToast('Your changes could not be saved. Please try again.'),
+    this.workflow.saveEdits(proposalId, this.buildSubmissionPayload(), this.applicant?.email ?? '').pipe(finalize(() => this.savingDraft.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => this.showToast('Changes saved', 'This proposal stays in your Inbox until you resubmit it.'),
+      error: (err) => this.showError('Your changes could not be saved', err, 'Please try again.'),
     });
   }
   openPreview(): void { this.previewOpen.set(true); }
@@ -892,6 +911,8 @@ export class EventProposalComponent implements OnDestroy {
     };
   }
 
+  // Step 1 of submitting: validate every step, then ask for confirmation. submit() itself only
+  // runs once the applicant confirms in the dialog (system specification §8B).
   submit(): void {
     this.submitAttempted.set(true);
     const stepValidity = this.steps.map((_, index) => this.validateStep(index, false));
@@ -904,16 +925,25 @@ export class EventProposalComponent implements OnDestroy {
       this.validationModalOpen.set(true);
       return;
     }
+    this.submitConfirmOpen.set(true);
+  }
+
+  confirmSubmit(): void {
+    this.submitConfirmOpen.set(false);
+    this.performSubmit();
+  }
+
+  private performSubmit(): void {
     const proposalId = this.resubmitProposalId();
     if (proposalId !== null) {
       this.resubmitting.set(true);
-      this.workflow.resubmitFromApplicant(proposalId, this.buildSubmissionPayload()).pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      this.workflow.resubmitFromApplicant(proposalId, this.buildSubmissionPayload(), this.applicant?.email ?? '').pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
         next: () => {
-          this.status.set('Submitted'); this.previewOpen.set(false); this.reviewerComment.set(null);
-          this.showToast('Proposal resubmitted — it resumes at the stage that sent it back.');
+          this.status.set('Submitted'); this.previewOpen.set(false); this.reviewerComments.set([]);
+          this.showToast('Proposal resubmitted', 'It resumes at whichever stage sent it back to you.');
           void this.router.navigateByUrl('/app/ongoing/proposals');
         },
-        error: () => this.showToast('The proposal could not be resubmitted. Please try again.'),
+        error: (err) => this.showError('The proposal could not be resubmitted', err, 'Please try again.'),
       });
       return;
     }
@@ -922,10 +952,10 @@ export class EventProposalComponent implements OnDestroy {
     this.workflow.create(payload).pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.status.set('Submitted'); this.previewOpen.set(false);
-        this.showToast('Proposal submitted successfully.');
+        this.showToast('Proposal submitted', 'You can follow its progress under Ongoing.');
         void this.router.navigateByUrl('/app/ongoing/proposals');
       },
-      error: () => this.showToast('The proposal could not be submitted. Please try again.'),
+      error: (err) => this.showError('The proposal could not be submitted', err, 'Please try again.'),
     });
   }
 
@@ -1112,7 +1142,10 @@ export class EventProposalComponent implements OnDestroy {
     }));
   }
   private scrollToTop(): void { this.document.defaultView?.scrollTo({ top: 0, behavior: 'smooth' }); }
-  private showToast(message: string): void { this.toast.set(message); this.document.defaultView?.setTimeout(() => this.toast.set(''), 2800); }
+  // Every action feedback goes through the one shared ToastService (system specification §8C) —
+  // this page used to render its own bespoke toast div with different styling and timing.
+  private showToast(title: string, message?: string): void { this.toastService.success(title, message); }
+  private showError(title: string, error: unknown, fallback: string): void { this.toastService.error(title, apiErrorMessage(error, fallback)); }
   ngOnDestroy(): void {
     if (this.validationGuidanceTimer) clearTimeout(this.validationGuidanceTimer);
     if (this.requestOptionsTimer) clearTimeout(this.requestOptionsTimer);

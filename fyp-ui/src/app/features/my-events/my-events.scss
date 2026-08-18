@@ -9,14 +9,8 @@
 .my-events-page:not(.my-events-page--internal) .my-events-page__header { display: grid; place-items: center; padding: var(--space-5); border: 1px solid var(--apu-border); border-radius: var(--radius-container); background: var(--apu-white); box-shadow: var(--internal-card-shadow); text-align: center; }
 .my-events-page:not(.my-events-page--internal) .my-events-page__header span { margin-inline: auto; }
 
-.my-events-tabs { display: flex; flex-wrap: wrap; gap: .5rem; padding: .35rem; border: 1px solid var(--apu-border); border-radius: var(--radius-pill); background: var(--apu-surface); width: fit-content; }
-.my-events-tabs__tab { display: inline-flex; min-height: 2.6rem; align-items: center; padding: 0 1.15rem; border-radius: var(--radius-pill); color: var(--apu-text-muted); font-size: .88rem; font-weight: 700; text-decoration: none; transition: background 160ms ease, color 160ms ease; }
-.my-events-tabs__tab:hover { color: var(--apu-blue-700); }
-.my-events-tabs__tab--active { background: var(--apu-blue-600); color: var(--apu-white); }
 
 @media (max-width: 48rem) {
   .my-events-page { padding-inline: var(--layout-gutter); }
   .my-events-page--internal { padding: 0; }
-  .my-events-tabs { width: 100%; }
-  .my-events-tabs__tab { flex: 1 1 auto; justify-content: center; }
 }

@@ -1,13 +1,12 @@
 <section class="event-catalog-section">
-  <app-feedback-banner [message]="successMessage()" tone="success" />
   <app-feedback-banner [message]="errorMessage()" tone="error" />
 
-  <nav class="event-catalog-section__tabs" aria-label="{{ entityLabelPlural() }} sections">
-    <button type="button" class="event-catalog-section__tab" [class.event-catalog-section__tab--active]="activeTab() === 'active'" (click)="setTab('active')">
+  <nav class="shared-tabs" aria-label="{{ entityLabelPlural() }} sections">
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="activeTab() === 'active'" (click)="setTab('active')">
       <span class="material-symbols-rounded" aria-hidden="true">list_alt</span>
       {{ entityLabelPlural() }}
     </button>
-    <button type="button" class="event-catalog-section__tab" [class.event-catalog-section__tab--active]="activeTab() === 'deleted'" (click)="setTab('deleted')">
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="activeTab() === 'deleted'" (click)="setTab('deleted')">
       <span class="material-symbols-rounded" aria-hidden="true">delete</span>
       Deleted
     </button>

@@ -6,7 +6,7 @@ import { environment } from '../../../../../environments/environment';
 import { PublishedEvent } from '../../../../core/events/published-event.models';
 import { ExploreEventsComponent } from './explore-events';
 import { AuthService } from '../../../../core/auth/auth.service';
-import { UserRole } from '../../../../core/auth/auth.models';
+import { testRole, testUser } from '../../../../core/auth/auth.test-fixtures';
 
 // Mirrors the variety of the old hardcoded 8-event fixture (titles/categories/schools/cost) so
 // this spec's pre-existing assertions (search matches, school filter options, a single
@@ -37,6 +37,7 @@ const MOCK_PUBLISHED_EVENTS: readonly PublishedEvent[] = MOCK_EVENT_FIXTURES.map
   audience: ['APU Community'],
   schedule: [{ date: '2026-12-01', start: '10:00', end: '12:00', location: 'APU Atrium' }],
   totalExpectedPax: 100,
+  maxPax: null,
   registrationMode: 'Automatic',
   confirmedRegistrationCount: 10,
   pendingRegistrationCount: 0,
@@ -64,12 +65,7 @@ describe('ExploreEventsComponent', () => {
     httpMock = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
     httpMock.expectOne(environment.eventsApiUrl).flush(MOCK_PUBLISHED_EVENTS);
-    httpMock.expectOne(environment.configApiUrl).flush({
-      paxReviewerThreshold: 50,
-      cancellationDaysLimit: 3,
-      eventCategories: [],
-      eventFormats: [],
-    });
+    httpMock.match((request) => request.url.startsWith(environment.eventCatalogApiUrl)).forEach((request) => request.flush([]));
     fixture.detectChanges();
   });
 
@@ -100,18 +96,10 @@ describe('ExploreEventsComponent', () => {
   });
 
   it('toggles clear saved and unsaved states', () => {
-    TestBed.inject(AuthService).establishSession({
-      email: 'applicant@demo.apu.edu.my',
-      displayName: 'Demo Applicant',
-      username: 'applicant',
-      role: 'student' as UserRole,
-      accountType: 'internal',
-      roleLabel: 'Student — School of Computing',
-      department: 'School of Computing',
-      functionLevel: 'student',
-      unitId: 'school_of_computing',
-      unitKind: 'school',
-    });
+    TestBed.inject(AuthService).establishSession(testUser(
+      [testRole('student', 'school_of_computing', 'School of Computing')],
+      { email: 'applicant@demo.apu.edu.my', displayName: 'Demo Applicant', username: 'applicant' },
+    ));
     const saveButton = fixture.nativeElement.querySelector('.save-event') as HTMLButtonElement;
 
     expect(saveButton.getAttribute('aria-pressed')).toBe('false');
@@ -220,7 +208,7 @@ describe('ExploreEventsComponent visibility filtering', () => {
     httpMock = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
     httpMock.expectOne(environment.eventsApiUrl).flush(MIXED_VISIBILITY_EVENTS);
-    httpMock.expectOne(environment.configApiUrl).flush({ paxReviewerThreshold: 50, cancellationDaysLimit: 3, eventCategories: [], eventFormats: [] });
+    httpMock.match((request) => request.url.startsWith(environment.eventCatalogApiUrl)).forEach((request) => request.flush([]));
     fixture.detectChanges();
 
     const titles = fixture.componentInstance.events().map((event) => event.title);
@@ -232,23 +220,15 @@ describe('ExploreEventsComponent visibility filtering', () => {
       imports: [ExploreEventsComponent],
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
-    TestBed.inject(AuthService).establishSession({
-      email: 'student@demo.apu.edu.my',
-      displayName: 'Demo Student',
-      username: 'student',
-      role: 'student' as UserRole,
-      accountType: 'internal',
-      roleLabel: 'Student — School of Computing',
-      department: 'School of Computing',
-      functionLevel: 'student',
-      unitId: 'school_of_computing',
-      unitKind: 'school',
-    });
+    TestBed.inject(AuthService).establishSession(testUser(
+      [testRole('student', 'school_of_computing', 'School of Computing')],
+      { email: 'applicant@demo.apu.edu.my', displayName: 'Demo Applicant', username: 'applicant' },
+    ));
     fixture = TestBed.createComponent(ExploreEventsComponent);
     httpMock = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
     httpMock.expectOne(environment.eventsApiUrl).flush(MIXED_VISIBILITY_EVENTS);
-    httpMock.expectOne(environment.configApiUrl).flush({ paxReviewerThreshold: 50, cancellationDaysLimit: 3, eventCategories: [], eventFormats: [] });
+    httpMock.match((request) => request.url.startsWith(environment.eventCatalogApiUrl)).forEach((request) => request.flush([]));
     fixture.detectChanges();
 
     const titles = fixture.componentInstance.events().map((event) => event.title);

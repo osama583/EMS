@@ -3,9 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  ElementRef,
   HostListener,
-  ViewChild,
   computed,
   inject,
   signal,
@@ -20,6 +18,7 @@ import {
 } from '../../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../../core/events/published-event.service';
 import { AuthService } from '../../../../core/auth/auth.service';
+import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
 
 type CalendarView = 'month' | 'week' | 'agenda';
 
@@ -65,7 +64,7 @@ interface AgendaDay {
 
 @Component({
   selector: 'app-event-calendar',
-  imports: [DatePipe, ExpandableSearchComponent, FilterButtonComponent, LoadingStateComponent],
+  imports: [FormModalComponent, DatePipe, ExpandableSearchComponent, FilterButtonComponent, LoadingStateComponent],
   templateUrl: './event-calendar.html',
   styleUrl: './event-calendar.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -76,9 +75,6 @@ export class EventCalendarComponent {
   private readonly publishedEventService = inject(PublishedEventService);
   private readonly auth = inject(AuthService);
   private readonly today = this.startOfDay(new Date());
-
-  @ViewChild('modalCloseButton') private modalCloseButton?: ElementRef<HTMLButtonElement>;
-  @ViewChild('calendarFilterClose') private filterCloseButton?: ElementRef<HTMLButtonElement>;
 
   readonly weekDayLabels = [
     'Sunday',
@@ -291,7 +287,6 @@ export class EventCalendarComponent {
     this.draftCategories.set([...this.appliedCategories()]);
     this.calendarFilterOpen.set(true);
     this.document.body.classList.add('calendar-filter-open');
-    queueMicrotask(() => this.filterCloseButton?.nativeElement.focus());
   }
 
   closeCalendarFilters(): void {
@@ -369,7 +364,6 @@ export class EventCalendarComponent {
 
   private openDialog(): void {
     this.document.body.classList.add('calendar-dialog-open');
-    queueMicrotask(() => this.modalCloseButton?.nativeElement.focus());
   }
 
   private eventMatches(

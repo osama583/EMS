@@ -10,6 +10,7 @@ import { FormModalComponent } from '../../../../../shared/components/form-modal/
 import { DeleteConfirmDialogComponent } from '../../../../../shared/components/delete-confirm-dialog/delete-confirm-dialog';
 import { InternalDataPageComponent } from '../../../../../shared/components/internal-data-page/internal-data-page';
 import { InternalDataPageConfig, InternalDataRecord, InternalRowActionEvent } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
+import { ToastService, apiErrorMessage } from '../../../../../shared/components/toast/toast.service';
 
 type SectionTab = 'active' | 'deleted';
 
@@ -40,6 +41,7 @@ const EMPTY_DRAFT: Draft = { name: '', active: true };
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EventCatalogSectionComponent {
+  private readonly toast = inject(ToastService);
   private readonly destroyRef = inject(DestroyRef);
 
   // The injected catalog service (EventCategoryService or EventFormatService) — both satisfy the
@@ -51,7 +53,6 @@ export class EventCatalogSectionComponent {
 
   readonly activeTab = signal<SectionTab>('active');
   readonly loading = computed(() => this.service().loading());
-  readonly successMessage = signal('');
   readonly errorMessage = signal('');
 
   readonly search = signal('');
@@ -156,17 +157,17 @@ export class EventCatalogSectionComponent {
     request.pipe(finalize(() => this.saving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.modalOpen.set(false);
-        this.successMessage.set(`${this.entityLabel()} ${id ? 'updated' : 'created'} successfully.`);
+        this.toast.success(`${this.entityLabel()} ${id ? 'updated' : 'created'} successfully.`);
       },
-      error: (err) => this.errorMessage.set(err?.error?.message || `The ${this.entityLabel().toLowerCase()} could not be saved.`),
+      error: (err) => this.toast.error(err?.error?.message || `The ${this.entityLabel().toLowerCase()} could not be saved.`),
     });
   }
 
   toggleActive(entry: EventCatalogEntry): void {
     this.clearMessages();
     this.service().setActive(entry.id, !entry.active).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => this.successMessage.set(`${this.entityLabel()} is now ${entry.active ? 'inactive' : 'active'}.`),
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The active status could not be changed.'),
+      next: () => this.toast.success(`${this.entityLabel()} is now ${entry.active ? 'inactive' : 'active'}.`),
+      error: (err) => this.toast.error('The active status could not be changed', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -220,7 +221,7 @@ export class EventCatalogSectionComponent {
     this.checkingDeletion.set(true);
     this.service().checkDeletion(entry.id).pipe(finalize(() => this.checkingDeletion.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (preview) => this.deletePreview.set(preview),
-      error: () => this.errorMessage.set(`Could not check whether this ${this.entityLabel().toLowerCase()} can be deleted.`),
+      error: () => this.toast.error(`Could not check whether this ${this.entityLabel().toLowerCase()} can be deleted.`),
     });
   }
   cancelDelete(): void { if (!this.deleting()) { this.deleteTarget.set(null); this.deletePreview.set(null); } }
@@ -232,9 +233,9 @@ export class EventCatalogSectionComponent {
     this.service().delete(target.id).pipe(finalize(() => this.deleting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.deleteTarget.set(null); this.deletePreview.set(null);
-        this.successMessage.set(`${this.entityLabel()} deleted. It can be restored from the Deleted tab within 7 days.`);
+        this.toast.success(`${this.entityLabel()} deleted. It can be restored from the Deleted tab within 7 days.`);
       },
-      error: (err) => this.errorMessage.set(err?.error?.message || `The ${this.entityLabel().toLowerCase()} could not be deleted.`),
+      error: (err) => this.toast.error(err?.error?.message || `The ${this.entityLabel().toLowerCase()} could not be deleted.`),
     });
   }
   targetLabel(): string {
@@ -252,8 +253,8 @@ export class EventCatalogSectionComponent {
     this.clearMessages();
     this.restoringId.set(id);
     this.service().restore(id).pipe(finalize(() => this.restoringId.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => this.successMessage.set(`${this.entityLabel()} restored.`),
-      error: (err) => this.errorMessage.set(err?.error?.message || `The ${this.entityLabel().toLowerCase()} could not be restored.`),
+      next: () => this.toast.success(`${this.entityLabel()} restored.`),
+      error: (err) => this.toast.error(err?.error?.message || `The ${this.entityLabel().toLowerCase()} could not be restored.`),
     });
   }
 
@@ -276,12 +277,12 @@ export class EventCatalogSectionComponent {
     this.service().purge(id).pipe(finalize(() => this.purging.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.purgeTargetId.set(null);
-        this.successMessage.set(`${this.entityLabel()} permanently deleted.`);
+        this.toast.success(`${this.entityLabel()} permanently deleted.`);
       },
-      error: (err) => this.errorMessage.set(err?.error?.message || `The ${this.entityLabel().toLowerCase()} could not be permanently deleted.`),
+      error: (err) => this.toast.error(err?.error?.message || `The ${this.entityLabel().toLowerCase()} could not be permanently deleted.`),
     });
   }
 
   private formatDate(iso: string): string { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
-  private clearMessages(): void { this.successMessage.set(''); this.errorMessage.set(''); }
+  private clearMessages(): void { this.errorMessage.set(''); }
 }

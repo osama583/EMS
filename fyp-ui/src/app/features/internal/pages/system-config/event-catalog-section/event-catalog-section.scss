@@ -1,35 +1,7 @@
 :host { display: block; }
 .event-catalog-section { display: grid; gap: var(--space-5, 1.25rem); }
 
-.event-catalog-section__tabs {
-  display: flex;
-  gap: 0.4rem;
-  border-bottom: 1px solid var(--apu-border, #e5e7eb);
-}
 
-.event-catalog-section__tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.65rem 1rem;
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--color-text-muted, #6b7280);
-  font-size: 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
-
-  .material-symbols-rounded { font-size: 1.15rem; }
-
-  &:hover { color: var(--apu-navy-950, #041f41); }
-
-  &--active {
-    color: var(--apu-blue-600, #2a83ff);
-    border-bottom-color: var(--apu-blue-600, #2a83ff);
-  }
-}
 
 .event-catalog-section__form { display: grid; gap: var(--space-5, 1.25rem); }
 

@@ -3,19 +3,6 @@
 
 .club-request-history__view-row { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); margin-top: var(--space-4); }
 .club-request-history__controls { margin-top: var(--space-4); margin-bottom: var(--space-5); }
-.club-request-history__view-toggle {
-  display: inline-flex; gap: .35rem; padding: .3rem;
-  border: 1px solid var(--apu-border); border-radius: var(--radius-pill); background: var(--apu-surface-muted);
-}
-.club-request-history__view-toggle button {
-  display: inline-flex; align-items: center; gap: .4rem;
-  min-height: 2.35rem; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-pill);
-  background: transparent; color: var(--apu-text-muted); font-size: .85rem; font-weight: 700; cursor: pointer;
-  transition: background var(--motion-control) var(--ease-standard), color var(--motion-control) var(--ease-standard);
-}
-.club-request-history__view-toggle button .material-symbols-rounded { font-size: 1.1rem; }
-.club-request-history__view-toggle button:hover { color: var(--apu-blue-700); }
-.club-request-history__view-toggle button.active { background: var(--apu-white); color: var(--apu-blue-700); box-shadow: var(--shadow-card); }
 
 // Same card grid look as My Clubs / Pending Requests (.club-page__grid/__card/__image/__body).
 .club-page__grid-loading {
@@ -105,6 +92,5 @@
 .club-request-history__details dd { margin: 0; color: var(--apu-navy-900); line-height: 1.55; }
 
 @media (max-width: 47.99rem) {
-  .club-request-history__view-toggle { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
   .club-request-history__view-row { flex-direction: column; align-items: stretch; }
 }

@@ -10,6 +10,7 @@ import { DeletionPreview } from '../../../../shared/models/deletion.models';
 import { FormFieldComponent } from '../../../../shared/components/form-controls/form-field';
 import { SelectOption } from '../../../../shared/components/form-controls/form-controls.models';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
+import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog';
 import { DeleteConfirmDialogComponent } from '../../../../shared/components/delete-confirm-dialog/delete-confirm-dialog';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
 import { InternalFilterControlsComponent, InternalPageHeaderComponent, InternalResetButtonComponent, InternalSearchFieldComponent } from '../../../../shared/components/internal-data-page/internal-data-page-parts';
@@ -39,21 +40,31 @@ const KIND_LABELS: Readonly<Record<RequestOptionKind, string>> = {
 };
 
 import { ImageUploadFieldComponent } from '../../../../shared/components/image-upload-field/image-upload-field';
+import { ViewToggleComponent } from '../../../../shared/components/view-toggle/view-toggle';
+import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 
 const CAFETERIA_OPTION_KINDS: readonly RequestOptionKind[] = ['fmb', 'servingUnit'];
+
+// The deleted-items table names its first column differently per page (identity / name / label),
+// so the confirmation reads whichever cell actually carries the record's display name.
+function restoreLabelFor(record: InternalDataRecord): string {
+  const named = Object.values(record.cells).find((cell) => !!cell?.primary);
+  return named?.primary ? String(named.primary) : String(record.id);
+}
 
 @Component({
   selector: 'app-request-option-management',
   imports: [
     InternalDataPageComponent, FormModalComponent, FormFieldComponent, SearchableDropdownComponent, StatusToggleComponent, FeedbackBannerComponent,
-    DeleteConfirmDialogComponent, OptionCardGridComponent, OptionItemDetailsModalComponent, InternalPageHeaderComponent,
-    InternalSearchFieldComponent, InternalFilterControlsComponent, InternalResetButtonComponent, ImageUploadFieldComponent,
+    ConfirmDialogComponent, DeleteConfirmDialogComponent, OptionCardGridComponent, OptionItemDetailsModalComponent, InternalPageHeaderComponent,
+    InternalSearchFieldComponent, InternalFilterControlsComponent, InternalResetButtonComponent, ImageUploadFieldComponent, ViewToggleComponent,
   ],
   templateUrl: './request-option-management.html',
   styleUrl: './request-option-management.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RequestOptionManagementComponent {
+  private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly auth = inject(AuthService);
   private readonly optionService = inject(RequestOptionService);
@@ -82,7 +93,6 @@ export class RequestOptionManagementComponent {
   readonly modalOpen = signal(false);
   readonly editingId = signal<string | null>(null);
   readonly draft = signal<Record<string, string | number | boolean>>({});
-  readonly successMessage = signal('');
   readonly errorMessage = signal('');
   readonly imageError = signal('');
   readonly viewMode = signal<'table' | 'card'>('table');
@@ -232,7 +242,7 @@ export class RequestOptionManagementComponent {
     this.checkingDeletion.set(true);
     this.optionService.checkDeletion(option.id).pipe(finalize(() => this.checkingDeletion.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (preview) => this.deletePreview.set(preview),
-      error: () => this.errorMessage.set('Could not check whether this option can be deleted.'),
+      error: () => this.toast.error('Could not check whether this option can be deleted'),
     });
   }
   cancelDelete(): void { if (!this.deleting()) { this.deleteTarget.set(null); this.deletePreview.set(null); } }
@@ -244,9 +254,9 @@ export class RequestOptionManagementComponent {
     this.optionService.delete(option.id).pipe(finalize(() => this.deleting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.deleteTarget.set(null); this.deletePreview.set(null);
-        this.successMessage.set(`${option.label} was deleted. It can be restored within 7 days.`);
+        this.toast.success(`${option.label} was deleted. It can be restored within 7 days.`);
       },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The option could not be deleted. Please try again.'),
+      error: (err) => this.toast.error('The option could not be deleted', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -278,14 +288,28 @@ export class RequestOptionManagementComponent {
     mobile: { eyebrow: 'Deleted', status: `${option.daysRemaining}d left`, title: option.label, details: [{ icon: 'schedule', text: `Deleted ${this.formatDate(option.deletedAt)}` }, { icon: 'delete_forever', text: `Permanently deleted ${this.formatDate(option.permanentDeletionAt)}` }] },
   })));
   handleDeletedAction(event: InternalRowActionEvent): void {
-    if (event.action.key === 'restore') this.restoreOption(String(event.record.id));
+    if (event.action.key === 'restore') { this.restoreTarget.set({ id: String(event.record.id), label: restoreLabelFor(event.record) }); return; }
   }
+  // Restoring brings an archived record back into circulation immediately, so it is
+  // confirmed first like every other state-changing action.
+  readonly restoreTarget = signal<{ id: string; label: string } | null>(null);
+  readonly restoreMessage = computed(() => {
+    const target = this.restoreTarget();
+    return target ? `Restore ${target.label}? It becomes active again straight away.` : '';
+  });
+  cancelRestore(): void { this.restoreTarget.set(null); }
+  confirmRestore(): void {
+    const target = this.restoreTarget();
+    this.restoreTarget.set(null);
+    if (target) this.restoreOption(target.id);
+  }
+
   restoreOption(id: string): void {
     this.clearNotices();
     this.restoringId.set(id);
     this.optionService.restore(id).pipe(finalize(() => this.restoringId.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.successMessage.set('Option restored.'); this.loadDeleted(); },
-      error: (err) => this.errorMessage.set(err?.error?.message || 'The option could not be restored.'),
+      next: () => { this.toast.success('Option restored'); this.loadDeleted(); },
+      error: (err) => this.toast.error('The option could not be restored', apiErrorMessage(err, 'Please try again.')),
     });
   }
   private formatDate(iso: string): string { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
@@ -301,8 +325,8 @@ export class RequestOptionManagementComponent {
     const id = this.editingId();
     const request = id ? this.optionService.update(id, this.draft() as unknown as RequestOptionDraft) : this.optionService.create(this.draft() as unknown as RequestOptionDraft);
     request.pipe(finalize(() => this.saving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.modalOpen.set(false); this.successMessage.set(id ? 'Option updated successfully.' : 'Option added successfully.'); },
-      error: () => this.errorMessage.set('The option could not be saved. Please try again.'),
+      next: () => { this.modalOpen.set(false); this.toast.success(id ? 'Option updated successfully.' : 'Option added successfully.'); },
+      error: () => this.toast.error('The option could not be saved', 'Please try again.'),
     });
   }
   fieldValue(key: string): string | number { const value = this.draft()[key]; return typeof value === 'boolean' ? '' : value ?? ''; }
@@ -353,11 +377,11 @@ export class RequestOptionManagementComponent {
   private changeStatus(option: RequestOption): void {
     this.clearNotices();
     this.optionService.setActive(option.id, !option.active).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => this.successMessage.set(`${option.label} is now ${option.active ? 'inactive' : 'active'}.`),
-      error: () => this.errorMessage.set('The option status could not be changed.'),
+      next: () => this.toast.success(`${option.label} is now ${option.active ? 'inactive' : 'active'}.`),
+      error: () => this.toast.error('The option status could not be changed'),
     });
   }
-  private clearNotices(): void { this.successMessage.set(''); this.errorMessage.set(''); }
+  private clearNotices(): void { this.errorMessage.set(''); }
   private emptyDraft(kind: RequestOptionKind): Record<string, string | number | boolean> {
     const draft: Record<string, string | number | boolean> = { kind, label: '', description: '', active: true };
     if (kind === 'fmb' && this.auth.user()?.cafeteriaCode !== undefined) draft['cafeteriaCode'] = this.auth.user()!.cafeteriaCode!;

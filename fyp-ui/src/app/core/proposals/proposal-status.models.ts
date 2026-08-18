@@ -15,9 +15,16 @@ export enum ProposalStage {
   Cancelled = 'cancelled',
 }
 
+export type DepartmentTaskStatus = 'pending' | 'approved' | 'resubmitted' | 'preparing' | 'completed' | 'cancelled';
+
 export interface DepartmentConfirmation {
   readonly department: string;
   readonly confirmed: boolean;
+  // Raw request_task.status, so the UI can distinguish "still waiting on this department" from
+  // "this department asked the applicant for changes" — `confirmed` alone cannot.
+  readonly status?: DepartmentTaskStatus;
+  // The department's push-back comment when status === 'resubmitted'.
+  readonly comment?: string;
   readonly confirmedAt?: string;
   readonly confirmedBy?: string;
 }
@@ -65,6 +72,39 @@ export interface ReviewerCommentEntry {
   readonly reviewer: string;
   readonly initials: string;
   readonly text: string;
+}
+
+// Human labels for the department a request_task is routed to — used when a DEPARTMENT (rather
+// than a single-actor reviewer) asks the applicant for changes.
+const DEPARTMENT_LABELS: Readonly<Record<string, string>> = {
+  logistics: 'Logistics',
+  transportation: 'Transportation',
+  photoVideo: 'Photography / Videography',
+  soundLight: 'Sound & Light',
+  campusTour: 'Campus Tour',
+  fmb: 'Food & Beverage',
+  waterNormal: 'Mineral Water',
+  fundingPurchase: 'Funding / Purchase',
+};
+
+// Every comment the applicant needs to answer: the single-actor reviewer stage's comment (when
+// the whole proposal was sent back) plus one entry per department that asked for changes while
+// department review continues in parallel.
+export function allCommentEntries(state: ProposalWorkflowState): readonly ReviewerCommentEntry[] {
+  const entries: ReviewerCommentEntry[] = [];
+  const reviewer = reviewerCommentEntry(state);
+  if (reviewer) entries.push(reviewer);
+  for (const confirmation of state.departmentConfirmations) {
+    if (confirmation.status !== 'resubmitted' || !confirmation.comment) continue;
+    const label = DEPARTMENT_LABELS[confirmation.department] ?? confirmation.department;
+    entries.push({
+      stage: 'Department review',
+      reviewer: label,
+      initials: label.split(/[\s/&]+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase(),
+      text: confirmation.comment,
+    });
+  }
+  return entries;
 }
 
 // Shared by proposal-reviewer-view.ts (the reviewer's own read of the comment chain) and

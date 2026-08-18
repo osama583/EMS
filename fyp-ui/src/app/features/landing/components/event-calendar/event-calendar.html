@@ -245,123 +245,69 @@
   </div>
 </section>
 
-@if (calendarFilterOpen()) {
-  <div class="calendar-filter-overlay" role="presentation" (click)="closeCalendarFilters()">
-    <section
-      class="calendar-filter-dialog"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="calendar-filter-title"
-      (click)="$event.stopPropagation()"
-    >
-      <header class="calendar-filter-dialog__header">
-        <div>
-          <p>Refine calendar</p>
-          <h2 id="calendar-filter-title">Filter events</h2>
-        </div>
-        <button
-          #calendarFilterClose
-          type="button"
-          aria-label="Close calendar filters"
-          (click)="closeCalendarFilters()"
-        >
-          ×
-        </button>
-      </header>
-
-      <div class="calendar-filter-dialog__body">
-        <fieldset>
-          <legend>Event Category</legend>
-          <div class="calendar-filter-options">
-            @for (category of categoryOptions(); track category) {
-              <button
-                type="button"
-                class="calendar-filter-option"
-                [class.calendar-filter-option--selected]="isDraftCategorySelected(category)"
-                [attr.aria-pressed]="isDraftCategorySelected(category)"
-                (click)="toggleDraftCategory(category)"
-              >
-                @if (isDraftCategorySelected(category)) {
-                  <span aria-hidden="true">✓</span>
-                }
-                {{ category }}
-              </button>
+<app-form-modal
+  [open]="calendarFilterOpen()"
+  title="Filter events"
+  [primaryLabel]="'Show ' + draftResultCount() + (draftResultCount() === 1 ? ' Result' : ' Results')"
+  secondaryLabel="Reset Filters"
+  (close)="closeCalendarFilters()"
+  (cancel)="resetCalendarFilters()"
+  (submit)="applyCalendarFilters()"
+>
+  <div class="calendar-filter-dialog__body">
+    <fieldset>
+      <legend>Event Category</legend>
+      <div class="calendar-filter-options">
+        @for (category of categoryOptions(); track category) {
+          <button
+            type="button"
+            class="calendar-filter-option"
+            [class.calendar-filter-option--selected]="isDraftCategorySelected(category)"
+            [attr.aria-pressed]="isDraftCategorySelected(category)"
+            (click)="toggleDraftCategory(category)"
+          >
+            @if (isDraftCategorySelected(category)) {
+              <span aria-hidden="true">&#10003;</span>
             }
-          </div>
-        </fieldset>
+            {{ category }}
+          </button>
+        }
       </div>
-
-      <footer class="calendar-filter-dialog__footer">
-        <button type="button" class="calendar-filter-reset" (click)="resetCalendarFilters()">
-          Reset Filters
-        </button>
-        <button type="button" class="calendar-filter-apply" (click)="applyCalendarFilters()">
-          Show {{ draftResultCount() }} {{ draftResultCount() === 1 ? 'Result' : 'Results' }}
-        </button>
-      </footer>
-    </section>
+    </fieldset>
   </div>
-}
+</app-form-modal>
 
-@if (selectedEvent() || selectedDay()) {
-  <div class="calendar-dialog-overlay" role="presentation" (click)="closeDialog()">
-    <section
-      class="calendar-dialog"
-      role="dialog"
-      aria-modal="true"
-      [attr.aria-labelledby]="selectedEvent() ? 'event-dialog-title' : 'day-dialog-title'"
-      (click)="$event.stopPropagation()"
-    >
-      <button
-        #modalCloseButton
-        type="button"
-        class="calendar-dialog__close"
-        aria-label="Close calendar dialog"
-        (click)="closeDialog()"
-      >
-        ×
-      </button>
-
-      @if (selectedEvent(); as event) {
-        <div
-          [class]="'calendar-dialog__accent calendar-dialog__accent--' + event.categoryClass"
-        ></div>
-        <p class="calendar-dialog__category">{{ event.category }}</p>
-        <h2 id="event-dialog-title">{{ event.title }}</h2>
-        <p class="calendar-dialog__date">{{ formatFullDate(event.date) }}</p>
-        <dl class="calendar-dialog__details">
-          <div>
-            <dt>Time</dt>
-            <dd>{{ event.time }}</dd>
-          </div>
-          <div>
-            <dt>Venue</dt>
-            <dd>{{ event.venue }}</dd>
-          </div>
-          <div>
-            <dt>Category</dt>
-            <dd>{{ event.category }}</dd>
-          </div>
-        </dl>
-        <p class="calendar-dialog__description">{{ event.description }}</p>
-        <a class="calendar-dialog__action" href="#explore-events" (click)="closeDialog()">
-          Explore Event
-        </a>
-      } @else if (selectedDay(); as day) {
-        <p class="calendar-dialog__category">Day agenda</p>
-        <h2 id="day-dialog-title">{{ formatFullDate(day.date) }}</h2>
-        <div class="day-dialog__events">
-          @for (event of day.events; track event.id) {
-            <button type="button" (click)="openEvent(event)">
-              <span [class]="'agenda-event__dot agenda-event__dot--' + event.categoryClass"></span>
-              <span>
-                <strong>{{ event.title }}</strong>
-                <small>{{ event.time }} · {{ event.venue }}</small>
-              </span>
-            </button>
-          }
-        </div>
+<app-form-modal
+  [open]="selectedEvent() !== null || selectedDay() !== null"
+  [title]="selectedEvent()?.title ?? (selectedDay() ? formatFullDate(selectedDay()!.date) : '')"
+  [hidePrimary]="true"
+  secondaryLabel="Close"
+  (close)="closeDialog()"
+  (cancel)="closeDialog()"
+>
+  @if (selectedEvent(); as event) {
+    <div [class]="'calendar-dialog__accent calendar-dialog__accent--' + event.categoryClass"></div>
+    <p class="calendar-dialog__category">{{ event.category }}</p>
+    <p class="calendar-dialog__date">{{ formatFullDate(event.date) }}</p>
+    <dl class="calendar-dialog__details">
+      <div><dt>Time</dt><dd>{{ event.time }}</dd></div>
+      <div><dt>Venue</dt><dd>{{ event.venue }}</dd></div>
+      <div><dt>Category</dt><dd>{{ event.category }}</dd></div>
+    </dl>
+    <p class="calendar-dialog__description">{{ event.description }}</p>
+    <a class="calendar-dialog__action" href="#explore-events" (click)="closeDialog()">Explore Event</a>
+  } @else if (selectedDay(); as day) {
+    <p class="calendar-dialog__category">Day agenda</p>
+    <div class="day-dialog__events">
+      @for (event of day.events; track event.id) {
+        <button type="button" (click)="openEvent(event)">
+          <span [class]="'agenda-event__dot agenda-event__dot--' + event.categoryClass"></span>
+          <span>
+            <strong>{{ event.title }}</strong>
+            <small>{{ event.time }} &middot; {{ event.venue }}</small>
+          </span>
+        </button>
       }
-    </section>
-  </div>
-}
+    </div>
+  }
+</app-form-modal>

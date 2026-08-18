@@ -28,10 +28,15 @@ export interface FmbSelection {
   // server/db.js's seedCafeteriaDomain().
   readonly cafeteriaCode: string;
   readonly cafeteriaName: string;
+  // The fmb_options row this order was placed against — needed so F&B's edit form can preselect
+  // the current menu item when the owning Cafeteria Manager pushes the order back.
+  readonly fmbOptionId: string;
   readonly menuItemLabel: string;
   readonly quantity: number;
   readonly notes: string;
   readonly status: FmbSelectionStatus;
+  // Why the owning Cafeteria Manager sent this specific order back to F&B. Empty otherwise.
+  readonly managerComment: string;
 }
 
 export interface ProposalReviewRecord {
@@ -71,6 +76,11 @@ export interface ProposalReviewRecord {
   readonly bankAccountNumber?: string | null;
   readonly selectedRequirements: readonly DepartmentRequestKind[];
   readonly externalPax: number;
+  // Organizer-set registration capacity; null = uncapped.
+  readonly maxPax?: number | null;
+  // Server-computed: is this proposal still inside its CANCELLATION_DEADLINE_DAYS window? The
+  // backend enforces the same rule on POST /cancel — this only decides whether the button shows.
+  readonly cancellationOpen?: boolean;
   readonly fmbSelections?: readonly FmbSelection[];
 
   readonly workflow: ProposalWorkflowState;

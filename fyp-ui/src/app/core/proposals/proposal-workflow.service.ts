@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { DepartmentRequestKind } from '../departments/department-workflow.config';
 import { ProposalReviewRecord } from './proposal-review.models';
-import { FmbSelectionDraft, PROPOSAL_WORKFLOW_REPOSITORY } from './proposal-workflow.repository';
+import { FmbSelectionDraft, FmbSelectionEdit, PROPOSAL_WORKFLOW_REPOSITORY } from './proposal-workflow.repository';
 
 @Injectable({ providedIn: 'root' })
 export class ProposalWorkflowService {
@@ -12,7 +12,7 @@ export class ProposalWorkflowService {
   getById(id: number): Observable<ProposalReviewRecord | undefined> { return this.repository.getById(id); }
   create(payload: Record<string, unknown>): Observable<ProposalReviewRecord> { return this.repository.create(payload); }
   saveDraft(payload: Record<string, unknown>): Observable<ProposalReviewRecord> { return this.repository.saveDraft(payload); }
-  deleteDraft(id: number): Observable<void> { return this.repository.deleteDraft(id); }
+  deleteDraft(id: number, actorEmail: string): Observable<void> { return this.repository.deleteDraft(id, actorEmail); }
 
   approveAsReviewer(id: number, reviewerEmail: string): Observable<ProposalReviewRecord> {
     return this.repository.approveAsReviewer(id, reviewerEmail);
@@ -30,16 +30,16 @@ export class ProposalWorkflowService {
     return this.repository.confirmDepartment(id, department, confirmedByEmail);
   }
 
-  resubmitAsDepartment(id: number, department: DepartmentRequestKind, comment: string): Observable<ProposalReviewRecord> {
-    return this.repository.resubmitAsDepartment(id, department, comment);
+  resubmitAsDepartment(id: number, department: DepartmentRequestKind, comment: string, reviewerEmail: string): Observable<ProposalReviewRecord> {
+    return this.repository.resubmitAsDepartment(id, department, comment, reviewerEmail);
   }
 
-  resubmitFromApplicant(id: number, payload: Record<string, unknown>): Observable<ProposalReviewRecord> {
-    return this.repository.resubmitFromApplicant(id, payload);
+  resubmitFromApplicant(id: number, payload: Record<string, unknown>, actorEmail: string): Observable<ProposalReviewRecord> {
+    return this.repository.resubmitFromApplicant(id, payload, actorEmail);
   }
 
-  saveEdits(id: number, payload: Record<string, unknown>): Observable<ProposalReviewRecord> {
-    return this.repository.saveEdits(id, payload);
+  saveEdits(id: number, payload: Record<string, unknown>, actorEmail: string): Observable<ProposalReviewRecord> {
+    return this.repository.saveEdits(id, payload, actorEmail);
   }
 
   cancelProposal(id: number, cancelledBy: string): Observable<ProposalReviewRecord> {
@@ -56,5 +56,9 @@ export class ProposalWorkflowService {
 
   resubmitFmbSelection(id: number, selectionId: number, reviewerEmail: string, comment: string): Observable<ProposalReviewRecord> {
     return this.repository.resubmitFmbSelection(id, selectionId, reviewerEmail, comment);
+  }
+
+  editFmbSelection(id: number, selectionId: number, edit: FmbSelectionEdit, reviewerEmail: string): Observable<ProposalReviewRecord> {
+    return this.repository.editFmbSelection(id, selectionId, edit, reviewerEmail);
   }
 }

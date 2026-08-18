@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AuthUser, UserRole } from '../auth/auth.models';
+import { testNavPage, testRole, testUser } from '../auth/auth.test-fixtures';
 import { roleCanAccess } from '../auth/role-navigation';
 import { AdminUnitRecord, AdminUserRecord } from './admin-directory.models';
 import { AdminDirectoryService } from './admin-directory.service';
@@ -11,8 +11,8 @@ import { AdminDirectoryService } from './admin-directory.service';
 const SEED_USERS: readonly AdminUserRecord[] = [
   {
     id: 'user-1', displayName: 'Cafeteria Admin', username: 'cafeteria.admin',
-    email: 'cafeteria.admin@demo.apu.edu.my', role: UserRole.CafeteriaAdmin, roleLabel: 'Cafeteria Admin',
-    unitId: 'unit-cafeteria-services', department: 'Cafeteria Services', active: true,
+    email: 'cafeteria.admin@demo.apu.edu.my', roles: [{ assignmentId: '1', roleCode: 'cafeteria-admin', roleName: 'Cafeteria Admin', unitCode: null, unitDescription: null }],
+    roleLabel: 'Cafeteria Admin', department: 'Cafeteria Services', active: true,
   },
 ];
 
@@ -52,10 +52,9 @@ describe('AdminDirectoryService', () => {
     const httpMock = TestBed.inject(HttpTestingController);
 
     const createdPromise = firstValueFrom(service.createUnit({
-      name: 'Student Experience',
-      code: 'SE',
       description: 'Student experience operations.',
       active: true,
+      roleCodes: [],
     }));
     const createdRecord: AdminUnitRecord = {
       id: 'unit-student-experience', name: 'Student Experience', code: 'SE',
@@ -73,19 +72,17 @@ describe('AdminDirectoryService', () => {
   });
 
   it('keeps directory routes restricted to System Admin', () => {
-    const asUser = (role: UserRole): AuthUser => ({
-      email: `${role}@demo.apu.edu.my`, displayName: role, username: role, role,
-      accountType: 'internal', roleLabel: role, department: '',
-    });
-    const unitScopedStudent: AuthUser = {
-      email: 'student@demo.apu.edu.my', displayName: 'Student', username: 'student', role: 'student' as UserRole,
-      accountType: 'internal', roleLabel: 'Student — School of Computing', department: 'School of Computing',
-      functionLevel: 'student', unitId: 'school_of_computing', unitKind: 'school',
-    };
-    expect(roleCanAccess(asUser(UserRole.SystemAdmin), '/app/users')).toBe(true);
-    expect(roleCanAccess(asUser(UserRole.SystemAdmin), '/app/units')).toBe(true);
-    expect(roleCanAccess(asUser(UserRole.CafeteriaAdmin), '/app/users')).toBe(false);
-    expect(roleCanAccess(unitScopedStudent, '/app/users')).toBe(false);
-    expect(roleCanAccess(asUser(UserRole.CafeteriaManager), '/app/units')).toBe(false);
+    // Access is decided by the server-supplied nav tree, so each identity is built with exactly
+    // the pages that role would really be granted.
+    const adminUser = testUser([testRole('system-admin')], { nav: [testNavPage('users'), testNavPage('units')] });
+    const cafeteriaAdmin = testUser([testRole('cafeteria-admin')], { nav: [testNavPage('cafeterias')] });
+    const cafeteriaManager = testUser([testRole('cafeteria-manager', 'cafeteria__atrium_cafeteria', 'Atrium Cafeteria')], { nav: [testNavPage('menu')] });
+    const student = testUser([testRole('student', 'school_of_computing', 'School of Computing')], { nav: [testNavPage('dashboard')] });
+
+    expect(roleCanAccess(adminUser, '/app/users')).toBe(true);
+    expect(roleCanAccess(adminUser, '/app/units')).toBe(true);
+    expect(roleCanAccess(cafeteriaAdmin, '/app/users')).toBe(false);
+    expect(roleCanAccess(student, '/app/users')).toBe(false);
+    expect(roleCanAccess(cafeteriaManager, '/app/units')).toBe(false);
   });
 });

@@ -106,19 +106,18 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const { AuthService } = await import('./core/auth/auth.service');
-    const { UserRole } = await import('./core/auth/auth.models');
-    TestBed.inject(AuthService).establishSession({
-      email: 'applicant@demo.apu.edu.my',
-      displayName: 'Demo Applicant',
-      username: 'applicant',
-      role: 'student' as (typeof UserRole)[keyof typeof UserRole],
-      accountType: 'internal',
-      roleLabel: 'Student — School of Computing',
-      department: 'School of Computing',
-      functionLevel: 'student',
-      unitId: 'school_of_computing',
-      unitKind: 'school',
-    });
+    const { testUser, testRole, testNavPage } = await import('./core/auth/auth.test-fixtures');
+    // The sidebar is rendered straight from the server-supplied nav tree, so the session needs a
+    // real nav node for the route under test to be reachable.
+    TestBed.inject(AuthService).establishSession(testUser(
+      [testRole('student', 'school_of_computing', 'School of Computing')],
+      {
+        email: 'applicant@demo.apu.edu.my',
+        displayName: 'Demo Applicant',
+        username: 'applicant',
+        nav: [testNavPage('how-it-works', 'How It Works')],
+      },
+    ));
     await TestBed.inject(Router).navigateByUrl('/app/how-it-works');
     await fixture.whenStable();
     fixture.detectChanges();

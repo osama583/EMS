@@ -1,4 +1,4 @@
-<section class="internal-table-workspace" [attr.aria-label]="ariaLabel()">
+<section class="internal-table-workspace" [attr.data-view]="viewMode()" [attr.aria-label]="ariaLabel()">
   @if (!hideHeader()) {
     <header class="internal-table-workspace__header">
       <ng-content select="[workspaceHeader]"></ng-content>

@@ -1,9 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { isClubPresident } from '../../../../core/auth/role-navigation';
 import { requestKindsForRole } from '../../../../core/departments/department-workflow.config';
 import { staffTaskRoutingKeyFor } from '../../../../core/staff-tasks/staff-task-routing';
+import { PublishedEventService } from '../../../../core/events/published-event.service';
 
 export type RecordsHubBucket = 'inbox' | 'ongoing' | 'history';
 
@@ -22,6 +24,8 @@ export type RecordsHubBucket = 'inbox' | 'ongoing' | 'history';
 export class RecordsHubComponent {
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
+  private readonly events = inject(PublishedEventService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly bucket = this.route.snapshot.data['bucket'] as RecordsHubBucket;
 
@@ -47,10 +51,26 @@ export class RecordsHubComponent {
     return !!user && requestKindsForRole(user).length > 0;
   });
 
+  // Registrations tab: Inbox only, and only once the viewer actually has registrations waiting
+  // on them (manual-approval events they own). Resolved from the server rather than guessed from
+  // roles — any account can own an event with registration_approval = 'manual'.
+  readonly showRegistrationsTab = computed(() => this.bucket === 'inbox' && this.pendingRegistrationCount() > 0);
+  private readonly pendingRegistrationCount = signal(0);
+
   readonly showClubRequestsTab = computed(() => {
     const user = this.auth.user();
     return this.bucket === 'inbox' && !!user && isClubPresident(user);
   });
 
   readonly title = this.bucket === 'inbox' ? 'Inbox' : this.bucket === 'ongoing' ? 'Ongoing' : 'History';
+
+  constructor() {
+    const email = this.auth.user()?.email;
+    if (this.bucket !== 'inbox' || !email) return;
+    this.events.getMyPendingRegistrations(email).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (rows) => this.pendingRegistrationCount.set(rows.length),
+      // A failed count simply hides the tab — the page it would open is reachable by URL anyway.
+      error: () => this.pendingRegistrationCount.set(0),
+    });
+  }
 }

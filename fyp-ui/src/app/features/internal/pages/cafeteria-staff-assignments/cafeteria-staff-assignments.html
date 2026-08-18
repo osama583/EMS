@@ -1,5 +1,4 @@
 <section class="cafeteria-staff-assignments">
-  <app-feedback-banner [message]="successMessage()" tone="success" />
   <app-feedback-banner [message]="errorMessage()" tone="error" />
 
   @if (pendingRequests().length) {
@@ -15,7 +14,7 @@
               <span class="cafeteria-staff-assignments__request-by">Requested by {{ request.requestedByName }}</span>
             </div>
             <div class="cafeteria-staff-assignments__request-actions">
-              <button type="button" class="table-control table-control--primary" [disabled]="requestActionPending() === request.id" (click)="approveRequest(request)">Approve</button>
+              <button type="button" class="table-control table-control--primary" [disabled]="requestActionPending() === request.id" (click)="openApproveRequest(request)">Approve</button>
               <button type="button" class="table-control table-control--danger" [disabled]="requestActionPending() === request.id" (click)="openRejectModal(request)">Reject</button>
             </div>
           </li>
@@ -76,3 +75,14 @@
     <textarea id="reject-comment" rows="3" [value]="rejectComment()" (input)="rejectComment.set($any($event.target).value)"></textarea>
   </div>
 </app-form-modal>
+
+<app-confirm-dialog
+  [open]="!!approveRequestTarget()"
+  title="Approve staff request"
+  [message]="approveRequestTarget() ? (requestActionLabel(approveRequestTarget()!.action) + ' — ' + approveRequestTarget()!.displayName + ' at ' + approveRequestTarget()!.cafeteriaName + '. Apply this change now?') : ''"
+  confirmLabel="Approve"
+  [danger]="false"
+  [loading]="!!requestActionPending()"
+  (confirm)="confirmApproveRequest()"
+  (cancel)="closeApproveRequest()"
+/>

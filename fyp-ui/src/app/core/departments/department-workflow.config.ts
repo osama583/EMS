@@ -44,8 +44,14 @@ export const UNIT_DEPARTMENT_WORKFLOWS: readonly UnitDepartmentWorkflowConfig[] 
   { unitCode: 'transport_services', requestKinds: ['transportation'], optionKinds: ['transportation'], assignmentRequired: true },
 ];
 
+// The CFO owns NO department-review request kind: Funding/Purchase is recorded on the form but
+// is not part of the approval workflow (no request_task is created for it — see
+// server/services/workflow.service.js's NON_WORKFLOW_REQUIREMENTS). The CFO's single workflow
+// role is the cfo_review approval stage, which is a REVIEWER action, not a department one — so
+// requestKinds is empty and the CFO renders the reviewer view. The optionKinds entry stays,
+// because the CFO still curates the Funding/Purchase dropdown catalogs.
 export const FLAT_DEPARTMENT_WORKFLOWS: readonly FlatDepartmentWorkflowConfig[] = [
-  { roleCode: 'cfo', requestKinds: ['fundingPurchase'], optionKinds: ['fundingMain', 'fundingSub'], assignmentRequired: false },
+  { roleCode: 'cfo', requestKinds: [], optionKinds: ['fundingMain', 'fundingSub'], assignmentRequired: false },
 ];
 
 // Accepts either a bare role_code string ('cfo') or a full AuthUser — every caller below

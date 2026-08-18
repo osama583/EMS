@@ -1,52 +1,38 @@
-import { AuthUser, UserRole } from './auth.models';
-import { navigationFor, roleCanAccess, roleCanUseSavedEvents, unitNavigationFor } from './role-navigation';
+import { navigationFor, roleCanAccess, roleCanUseSavedEvents } from './role-navigation';
+import { TEST_CAFETERIA_MANAGER, TEST_EXTERNAL_USER, TEST_FMB_HEAD, TEST_LOGISTICS_STAFF, testNavPage, testUser, testRole } from './auth.test-fixtures';
 
-// Unit + Level model fixtures — F&B is now unit-scoped (functionLevel='manager' on the
-// 'food_beverage_services' Service department unit) rather than its own UserRole.
-const fmbManager: AuthUser = {
-  email: 'fmb@demo.apu.edu.my', displayName: 'F&B Demo', username: 'fmb', role: 'manager' as UserRole,
-  accountType: 'internal', roleLabel: 'Food & Beverage Services Manager', department: 'Food & Beverage Services',
-  functionLevel: 'manager', unitId: 'food_beverage_services', unitKind: 'service_department',
-};
-const logisticsStaff: AuthUser = {
-  email: 'logistics.staff@demo.apu.edu.my', displayName: 'Ahmad', username: 'logistics.staff', role: 'staff' as UserRole,
-  accountType: 'internal', roleLabel: 'Logistics and Facilities Staff', department: 'Logistics and Facilities',
-  functionLevel: 'staff', unitId: 'logistics_and_facilities', unitKind: 'service_department',
-};
-const cafeteriaManager: AuthUser = {
-  email: 'cafeteria.manager@demo.apu.edu.my', displayName: 'Cafeteria Manager', username: 'cafeteria.manager', role: UserRole.CafeteriaManager,
-  accountType: 'internal', roleLabel: 'Cafeteria Manager', department: 'Cafeteria Services',
-};
-
+// The sidebar is server-computed (nav_page + nav_page_grants, projected onto AuthUser.nav by
+// nav-tree.service.js) — the client only renders whatever tree it was handed. These tests cover
+// that rendering contract, not any client-side role-to-nav mapping, because there is no longer
+// such a mapping to test.
 describe('role-navigation', () => {
-  it('gives the unit-scoped F&B manager both proposal-review nav and dropdown settings', () => {
-    const navigation = unitNavigationFor(fmbManager)!;
-    const sectionKeys = navigation.sections.map((section) => section.key);
-    expect(sectionKeys).toContain('proposals');
-    expect(sectionKeys).toContain('dropdown-settings');
-  });
-
-  it('has no navigation entry left for the removed FmbWaterServicesStaff role', () => {
-    expect((UserRole as Record<string, string>)['FmbWaterServicesStaff']).toBeUndefined();
-  });
-
-  it('has no navigation entry left for the removed per-department UserRole members', () => {
-    expect((UserRole as Record<string, string>)['LogisticsManager']).toBeUndefined();
-    expect((UserRole as Record<string, string>)['HosHod']).toBeUndefined();
-    expect((UserRole as Record<string, string>)['Fmb']).toBeUndefined();
-  });
-
-  it('lets CafeteriaManager manage the My Menu route', () => {
-    expect(roleCanAccess(cafeteriaManager, '/app/menu')).toBe(true);
-  });
-
-  it('includes the unit-scoped F&B manager in users who can use saved events, and excludes nobody unit-scoped', () => {
-    expect(roleCanUseSavedEvents(fmbManager)).toBe(true);
-    expect(roleCanUseSavedEvents(logisticsStaff)).toBe(true);
-  });
-
-  it('builds nav for a unit-scoped Service department staff member as a tasks-only page', () => {
-    const navigation = navigationFor(logisticsStaff);
+  it('builds its entries from the server-supplied nav tree', () => {
+    const user = testUser([testRole('staff', 'logistics_and_facilities', 'Logistics and Facilities')], {
+      nav: [testNavPage('tasks', 'My Tasks'), testNavPage('inbox', 'Inbox')],
+    });
+    const navigation = navigationFor(user);
+    expect(navigation.entries.length).toBe(2);
     expect(navigation.defaultRoute).toBe('/app/tasks');
+  });
+
+  it('falls back to the no-access route when the server granted no pages', () => {
+    expect(navigationFor(TEST_LOGISTICS_STAFF).defaultRoute).toBe('/app/no-access');
+  });
+
+  it('allows a route the server granted and refuses one it did not', () => {
+    const manager = testUser([testRole('cafeteria-manager', 'cafeteria__atrium_cafeteria', 'Atrium Cafeteria')], {
+      nav: [testNavPage('menu', 'My Menu')],
+    });
+    expect(roleCanAccess(manager, '/app/menu')).toBe(true);
+    expect(roleCanAccess(manager, '/app/roles')).toBe(false);
+  });
+
+  // Saved events are an internal-shell feature: guests reach the same events through the public
+  // landing page, which has its own saved-events path (see role-access.ts's comment).
+  it('lets every unit-scoped identity use saved events, but not a flat guest account', () => {
+    expect(roleCanUseSavedEvents(TEST_FMB_HEAD)).toBe(true);
+    expect(roleCanUseSavedEvents(TEST_LOGISTICS_STAFF)).toBe(true);
+    expect(roleCanUseSavedEvents(TEST_CAFETERIA_MANAGER)).toBe(true);
+    expect(roleCanUseSavedEvents(TEST_EXTERNAL_USER)).toBe(false);
   });
 });

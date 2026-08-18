@@ -45,10 +45,17 @@ const UNIT_CODE_FOR_REQUIREMENT = {
   soundLight: 'a_v_services',
   campusTour: 'student_services',
 };
+// Funding/Purchase is deliberately ABSENT here: per the system specification it is recorded on
+// the form (request_funding_purchase rows) but never enters the approval workflow — no
+// department-review task, no CFO sign-off on the line items, purely informational. The CFO's
+// only workflow role is the cfo_review approval stage for high-pax proposals. See
+// createDepartmentTasks() below, which skips it explicitly.
 const FLAT_ROLE_FOR_REQUIREMENT = {
-  fundingPurchase: 'cfo',
   fmb: 'fmb',
 };
+
+// Requirement keys that carry data on the form but never create a request_task.
+const NON_WORKFLOW_REQUIREMENTS = new Set(['fundingPurchase']);
 // F&B's own unit — used by the fmb_review gate below (F&B is unit-scoped: role/function_level
 // 'manager' on the 'food_beverage_services' Service department unit) even though its
 // request_task routing above still uses the legacy flat 'fmb' assigned_role token.
@@ -77,6 +84,70 @@ function isApplicantSelf(requestId, userId) {
   return request.applicant_user_id === Number(userId);
 }
 
+// Co-owners are stored as snapshot rows (name/email, staff_id optional) — match on the email
+// snapshot as well as staff_id so a co-owner added by picking them from the staff directory is
+// recognised even when staff_id was never resolved. Co-owners share the applicant's rights to
+// edit, resubmit and cancel the proposal (system specification §4 "Applicant or co-owners").
+function isCoOwner(requestId, userId) {
+  const actor = db.users.find((u) => u.user_id === Number(userId));
+  if (!actor) return false;
+  const actorEmail = String(actor.email || '').trim().toLowerCase();
+  return db.co_owners.some((c) => {
+    if (c.request_id !== Number(requestId)) return false;
+    if (c.staff_id && db.staff.find((s) => s.staff_id === c.staff_id)?.user_id === Number(userId)) return true;
+    return !!actorEmail && String(c.staff_email || '').trim().toLowerCase() === actorEmail;
+  });
+}
+
+// "Owns this proposal" = the applicant themselves or any co-owner. The single gate every
+// applicant-side mutation (save-edits, resubmit, delete draft, cancel, registration approval)
+// runs through, so the frontend never decides who may edit a proposal.
+function isProposalOwner(requestId, userId) {
+  return isApplicantSelf(requestId, userId) || isCoOwner(requestId, userId);
+}
+
+function assertProposalOwner(requestId, userId) {
+  if (!isProposalOwner(requestId, userId)) {
+    throw new WorkflowError('Only the applicant or a co-owner of this proposal can do that.', 403);
+  }
+}
+
+// The earliest scheduled date across every event_schedule row — the cancellation deadline is
+// measured from when the event STARTS, so a multi-day event locks on its first day, not its
+// last. Returns null when the proposal has no schedule rows at all (draft with nothing entered).
+function earliestEventDate(requestId) {
+  const dates = db.event_schedule
+    .filter((s) => s.request_id === Number(requestId) && s.date)
+    .map((s) => new Date(`${s.date}T00:00:00`))
+    .filter((d) => !isNaN(d.getTime()));
+  if (dates.length === 0) return null;
+  return new Date(Math.min(...dates.map((d) => d.getTime())));
+}
+
+function cancellationDeadlineDays() {
+  const config = db.config.find((c) => c.code === 'CANCELLATION_DEADLINE_DAYS');
+  if (!config) throw new WorkflowError('CANCELLATION_DEADLINE_DAYS config not found.', 404);
+  return config.number;
+}
+
+function maxEventCategories() {
+  const config = db.config.find((c) => c.code === 'MAX_EVENT_CATEGORIES');
+  if (!config) throw new WorkflowError('MAX_EVENT_CATEGORIES config not found.', 404);
+  return config.number;
+}
+
+// The cancellation window closes CANCELLATION_DEADLINE_DAYS whole days before the event's first
+// scheduled day, at the end of that day. Shared by authorizeAction('cancel') and
+// cancelProposal() so the check can never be bypassed by calling the mutation directly.
+function isWithinCancellationWindow(requestId) {
+  const eventDate = earliestEventDate(requestId);
+  if (!eventDate) return true;
+  const deadline = new Date(eventDate);
+  deadline.setDate(deadline.getDate() - cancellationDeadlineDays());
+  deadline.setHours(23, 59, 59, 999);
+  return Date.now() <= deadline.getTime();
+}
+
 // Authorization is a pure lookup against the CURRENT request status — this is the single
 // place that decides "does this actor's role/identity match what the current stage needs."
 // Every mutating function below calls this FIRST, before touching any data. The frontend's
@@ -100,19 +171,43 @@ function authorizeAction(requestId, actorUser, action) {
     return;
   }
   if (action === 'cancel') {
-    if (status === 'cancelled' || status === 'completed_rejected') throw new WorkflowError('This proposal cannot be cancelled.', 400);
-    const isCoOwner = db.co_owners.some((c) => c.request_id === request.request_id && c.staff_id && db.staff.find((s) => s.staff_id === c.staff_id)?.user_id === Number(actorUser.user_id));
-    if (!isApplicantSelf(requestId, actorUser.user_id) && !isCoOwner) throw new WorkflowError('Only the applicant or a co-owner can cancel.', 403);
-    const config = db.config.find((c) => c.code === 'CANCELLATION_DEADLINE_DAYS');
-    const schedule = db.event_schedule.find((s) => s.request_id === request.request_id);
-    if (schedule && config) {
-      const deadline = new Date(schedule.date);
-      deadline.setDate(deadline.getDate() - config.number);
-      if (new Date() > deadline) throw new WorkflowError('The cancellation deadline for this event has passed.', 400);
+    if (['cancelled', 'completed_rejected', 'completed_approved'].includes(status)) {
+      throw new WorkflowError('This proposal cannot be cancelled.', 400);
+    }
+    if (!isProposalOwner(requestId, actorUser.user_id)) throw new WorkflowError('Only the applicant or a co-owner can cancel.', 403);
+    if (!isWithinCancellationWindow(requestId)) {
+      throw new WorkflowError(`The cancellation deadline for this event has passed (cancellation closes ${cancellationDeadlineDays()} day(s) before the event date).`, 400);
     }
     return;
   }
   throw new WorkflowError(`This action is not available at the current stage (${status}).`, 400);
+}
+
+// Department-stage authorization: who may act on ONE request_task. Unit-routed tasks
+// (logistics/transportation/photoVideo/soundLight/campusTour) are owned by any head of that
+// unit; the flat 'fmb' task is owned by the F&B unit's head-of-department. Departments may only
+// approve or resubmit — never reject (see chk_task_status in ems_database_schema.sql).
+function authorizeDepartmentTask(task, actorUserId) {
+  const request = findRequest(task.request_id);
+  if (request.status !== 'department_review') {
+    throw new WorkflowError(`This proposal is not in department review (currently ${request.status}).`, 400);
+  }
+  if (task.status === 'completed' || task.status === 'cancelled') {
+    throw new WorkflowError('This department task is already closed.', 400);
+  }
+  if (task.assigned_unit_code) {
+    if (!isManagerOfUnit(actorUserId, task.assigned_unit_code)) {
+      throw new WorkflowError('You do not head the department this request is routed to.', 403);
+    }
+    return;
+  }
+  if (task.assigned_role === 'fmb') {
+    if (!isManagerOfUnit(actorUserId, FMB_UNIT_CODE)) {
+      throw new WorkflowError('Only Food & Beverage Services can act on this request.', 403);
+    }
+    return;
+  }
+  throw new WorkflowError('This task has no recognised routing.', 400);
 }
 
 function highPaxThreshold() {
@@ -147,6 +242,22 @@ function recordHistory(requestId, requestTaskId, requirementId, action, actorUse
   });
 }
 
+// The single gate that runs once the HOS/HOD box has resolved — whether it was skipped
+// (applicant heads their own School) or approved. Mirrors the specification's workflow diagram
+// exactly, in order:
+//   1. Applicant is CFO or the F&B head?  -> straight to department_review (they would
+//      otherwise be reviewing their own proposal at the fmb_review/cfo_review stages).
+//   2. total_pax > HIGH_PAX_THRESHOLD (read from `config`, never hardcoded)? -> fmb_review,
+//      which on approval advances to cfo_review, then department_review.
+//   3. Otherwise -> department_review.
+function stageAfterHosHod(request) {
+  const { hasRole } = require('./user-access.service');
+  if (hasRole(request.applicant_user_id, 'cfo') || isManagerOfUnit(request.applicant_user_id, FMB_UNIT_CODE)) {
+    return 'department_review';
+  }
+  return request.total_pax > highPaxThreshold() ? 'fmb_review' : 'department_review';
+}
+
 // Called once, right after the applicant's form-submit action creates the `request` row with
 // status='draft'. Decides the FIRST real stage per the self-review/CFO-skip rules (Phase 1's
 // corrected workflow diagram).
@@ -155,17 +266,12 @@ function submitProposal(requestId) {
   const applicant = db.users.find((u) => u.user_id === request.applicant_user_id);
   const previousStatus = request.status;
 
-  const { hasRole } = require('./user-access.service');
-  let nextStatus;
-  if (isHosHodOfUnit(applicant.user_id, request)) {
-    // Self-review: skip hos_hod_review entirely, go straight to the F&B/CFO check.
-    nextStatus = request.total_pax > highPaxThreshold() ? 'fmb_review' : 'department_review';
-  } else if (hasRole(applicant.user_id, 'cfo') || isManagerOfUnit(applicant.user_id, FMB_UNIT_CODE)) {
-    // CFO/F&B manager applying for themselves: skip ALL higher approval.
-    nextStatus = 'department_review';
-  } else {
-    nextStatus = 'hos_hod_review';
-  }
+  // Self-review guard: an applicant who heads their own School would otherwise review their own
+  // proposal, so hos_hod_review is skipped and the flow resumes at the next gate. Everyone else
+  // starts at hos_hod_review.
+  const nextStatus = isHosHodOfUnit(applicant.user_id, request)
+    ? stageAfterHosHod(request)
+    : 'hos_hod_review';
 
   request.status = nextStatus;
   request.submitted_at = new Date().toISOString();
@@ -182,12 +288,11 @@ function approveReviewerStage(requestId, actorUserId) {
 
   let nextStatus;
   if (previousStatus === 'hos_hod_review') {
-    nextStatus = request.total_pax > highPaxThreshold() ? 'fmb_review' : 'department_review';
+    nextStatus = stageAfterHosHod(request);
   } else if (previousStatus === 'fmb_review') {
-    nextStatus = request.total_pax > highPaxThreshold() ? 'cfo_review' : 'department_review';
-    // (fmb_review is only ever entered when pax IS high per submitProposal's/resubmit's logic,
-    // so the `total_pax > highPaxThreshold()` check here is defensive, not reachable via the
-    // false branch under normal flow — but kept explicit rather than assumed.)
+    // F&B and CFO are sequential: F&B's approval always hands off to the CFO, who is the last
+    // approval gate before department review.
+    nextStatus = 'cfo_review';
   } else if (previousStatus === 'cfo_review') {
     nextStatus = 'department_review';
   } else {
@@ -237,19 +342,41 @@ function resubmitReviewerStage(requestId, actorUserId, comment) {
 // edits to the schedule/co-owners/requests/etc. actually survive a resubmit. Persisting is
 // delegated entirely to saveRequestContent(); this function's own job is only the stage
 // transition (resume at whichever stage sent it back, clear resume_stage/reviewer_comment).
-function applicantResubmit(requestId, payload) {
+function applicantResubmit(requestId, payload, actorUserId) {
   const request = findRequest(requestId);
+  assertProposalOwner(requestId, actorUserId);
+
+  // Case 2 — a DEPARTMENT sent one of its tasks back. The proposal itself never left
+  // department_review (parallel independence: sibling departments keep working), so resubmitting
+  // resets only the tasks that asked for changes, back into their own department's Inbox. Every
+  // other task's progress is untouched.
+  const resubmittedTasks = db.request_task.filter((t) => t.request_id === request.request_id && t.status === 'resubmitted');
+  if (request.status === 'department_review' && resubmittedTasks.length > 0) {
+    if (payload) saveRequestContent(requestId, payload, actorUserId);
+    for (const task of resubmittedTasks) {
+      task.status = 'pending';
+      task.comment = null;
+      recordHistory(request.request_id, task.request_task_id, task.requirement_id, 'applicant-resubmit', actorUserId, 'applicant', null, 'resubmitted', 'pending');
+    }
+    request.updated_at = new Date().toISOString();
+    return request;
+  }
+
+  // Case 1 — a single-actor reviewer stage (HOS/HOD, F&B or CFO) sent the whole proposal back.
   if (request.status !== 'resubmission_required') {
     throw new WorkflowError(`Cannot resubmit from status ${request.status}.`, 400);
   }
-  if (payload) saveRequestContent(requestId, payload);
+  if (payload) {
+    validateProposalPayload(payload);
+    saveRequestContent(requestId, payload, actorUserId);
+  }
   const resumeStatus = request.resume_stage || 'hos_hod_review';
   const previousStatus = request.status;
   request.status = resumeStatus;
   request.resume_stage = null;
   request.reviewer_comment = null;
   request.updated_at = new Date().toISOString();
-  recordHistory(request.request_id, null, null, 'applicant-resubmit', request.applicant_user_id, 'applicant', null, previousStatus, resumeStatus);
+  recordHistory(request.request_id, null, null, 'applicant-resubmit', actorUserId ?? request.applicant_user_id, 'applicant', null, previousStatus, resumeStatus);
   return request;
 }
 
@@ -264,14 +391,16 @@ function applicantResubmit(requestId, payload) {
 // shape (a reviewer drafting a comment without committing to approve/reject/resubmit, etc.),
 // rather than each such case growing its own narrow save function like applicantResubmit()'s
 // hardcoded 5-field allowlist did.
-function saveRequestContent(requestId, payload) {
+function saveRequestContent(requestId, payload, actorUserId) {
   const request = findRequest(requestId);
   const applicant = db.users.find((u) => u.user_id === request.applicant_user_id);
   if (!applicant) throw new WorkflowError('Applicant not found for this proposal.', 400);
+  if (actorUserId != null) assertProposalOwner(requestId, actorUserId);
   clearRequestChildRows(request.request_id);
   applyRequestScalarFields(request, payload, applicant);
   buildRequestChildRows(request, payload);
-  recordHistory(request.request_id, null, null, 'save-content', applicant.user_id, primaryRoleCodeFor(applicant.user_id), null, request.status, request.status);
+  const editorId = actorUserId != null ? Number(actorUserId) : applicant.user_id;
+  recordHistory(request.request_id, null, null, 'save-content', editorId, primaryRoleCodeFor(editorId), null, request.status, request.status);
   return request;
 }
 
@@ -296,12 +425,61 @@ function clearRequestChildRows(requestId) {
 // (Angular's EventProposalComponent, via proposal-workflow.routes.js's POST / and PUT /:id)
 // onto an already-created `request` row. Shared by createProposal() (submits immediately) and
 // saveDraft() (stays in status='draft').
+
+// ---------------------------------------------------------------------------------------------
+// Manager-configured options are SNAPSHOTS (system specification, core principle 2). The Angular
+// pickers send the catalog reference `${kind}:${id}` (request-options.routes.js's projectOption);
+// this resolves that reference ONCE at save time into the numeric FK plus a frozen copy of the
+// option's label. Editing or archiving the option afterwards can never change an already-saved
+// request row, because nothing re-reads the catalog on the way out.
+//
+// Before this existed, the raw reference string ("logistics:2") was written into BOTH the
+// option_id column and the label column, so every department saw "logistics:2" where the item
+// name should be.
+// ---------------------------------------------------------------------------------------------
+const OPTION_CATALOGS = {
+  logistics: { table: 'logistics_options', pk: 'logistics_option_id' },
+  transportation: { table: 'transportation_options', pk: 'transportation_option_id' },
+  photoVideo: { table: 'media_options', pk: 'media_option_id' },
+  soundLight: { table: 'sound_light_options', pk: 'sound_light_option_id' },
+  fmb: { table: 'fmb_options', pk: 'fmb_option_id' },
+  dietaryInformation: { table: 'dietary_information_options', pk: 'dietary_information_option_id' },
+  servingUnit: { table: 'serving_unit_options', pk: 'serving_unit_option_id' },
+  campusTourStart: { table: 'campus_tour_start_options', pk: 'campus_tour_start_option_id' },
+  campusTourType: { table: 'campus_tour_type_options', pk: 'campus_tour_type_option_id' },
+  waterNormal: { table: 'water_normal_options', pk: 'water_normal_option_id' },
+  fundingMain: { table: 'funding_main_options', pk: 'funding_main_option_id' },
+  fundingSub: { table: 'funding_sub_options', pk: 'funding_sub_option_id' },
+};
+
+// Accepts a `${kind}:${id}` reference, a bare numeric id, or a plain label (drafts saved before
+// the id-backed pickers shipped, and the seeded demo rows, both use labels). Returns
+// { optionId, label } with optionId null when nothing in the catalog matches.
+function resolveOptionSnapshot(kind, reference) {
+  const catalog = OPTION_CATALOGS[kind];
+  const raw = reference == null ? '' : String(reference).trim();
+  if (!catalog || !raw) return { optionId: null, label: raw };
+  const rows = db[catalog.table] || [];
+
+  const parts = raw.split(':');
+  const numeric = Number(parts[parts.length - 1]);
+  if (Number.isFinite(numeric) && String(numeric) === parts[parts.length - 1]) {
+    const byId = rows.find((row) => row[catalog.pk] === numeric);
+    if (byId) return { optionId: byId[catalog.pk], label: byId.label };
+  }
+
+  const byLabel = rows.find((row) => row.label === raw);
+  if (byLabel) return { optionId: byLabel[catalog.pk], label: byLabel.label };
+  // Unknown reference: keep whatever the applicant sent so nothing is silently lost.
+  return { optionId: null, label: raw };
+}
+
 function buildRequestChildRows(request, payload) {
   // payload.eventCategories now carries event_category_id values (the Angular picker's `value` is
   // the catalog id, not the name — see event-proposal.ts's categoryOptions). The by-name fallback
   // below is a compatibility net for any in-flight draft saved under the old name-based payload
   // shape before this change shipped; it can be removed once no such drafts remain.
-  for (const categoryRef of payload.eventCategories || []) {
+  for (const categoryRef of (payload.eventCategories || []).slice(0, maxEventCategories())) {
     const category = db.event_category.find((c) => c.event_category_id === Number(categoryRef)) || db.event_category.find((c) => c.name === categoryRef);
     if (category) db.request_categories.push({ request_id: request.request_id, category_id: category.event_category_id, category_name: category.name });
   }
@@ -338,28 +516,102 @@ function buildRequestChildRows(request, payload) {
 
   const requestRows = payload.requestRows || {};
   for (const row of requestRows.logistics || []) {
-    db.request_logistics.push({ request_logistics_id: nextId('request_logistics'), request_id: request.request_id, option_id: row.item || null, item: row.item, quantity: Number(row.quantity) || 0, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
+    const item = resolveOptionSnapshot('logistics', row.item);
+    db.request_logistics.push({ request_logistics_id: nextId('request_logistics'), request_id: request.request_id, option_id: item.optionId, item: item.label, quantity: Number(row.quantity) || 0, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
   }
   for (const row of requestRows.transportation || []) {
-    db.request_transportation.push({ request_transportation_id: nextId('request_transportation'), request_id: request.request_id, option_id: row.type || null, type: row.type, requested_pax: Number(row.requestedPax) || 0, pickup: row.pickup, dropoff: row.dropoff, date: row.date, moving_time: row.start, notes: row.notes || null });
+    const type = resolveOptionSnapshot('transportation', row.type);
+    db.request_transportation.push({ request_transportation_id: nextId('request_transportation'), request_id: request.request_id, option_id: type.optionId, type: type.label, requested_pax: Number(row.requestedPax) || 0, pickup: row.pickup, dropoff: row.dropoff, date: row.date, moving_time: row.start, notes: row.notes || null });
   }
   for (const row of requestRows.photoVideo || []) {
-    db.request_photography_videography.push({ request_photography_videography_id: nextId('request_photography_videography'), request_id: request.request_id, option_id: row.service || null, service: row.service, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
+    const service = resolveOptionSnapshot('photoVideo', row.service);
+    db.request_photography_videography.push({ request_photography_videography_id: nextId('request_photography_videography'), request_id: request.request_id, option_id: service.optionId, service: service.label, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
   }
   for (const row of requestRows.soundLight || []) {
-    db.request_sound_light.push({ request_sound_light_id: nextId('request_sound_light'), request_id: request.request_id, option_id: row.item || null, item: row.item, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
+    const item = resolveOptionSnapshot('soundLight', row.item);
+    db.request_sound_light.push({ request_sound_light_id: nextId('request_sound_light'), request_id: request.request_id, option_id: item.optionId, item: item.label, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
   }
   for (const row of requestRows.fmb || []) {
-    db.request_fmb.push({ request_fmb_id: nextId('request_fmb'), request_id: request.request_id, option_id: row.foodType || null, food_type: row.foodType, pax: Number(row.quantity) || 0, date: row.date, serve_time: row.start, location: row.location, notes: row.notes || null });
+    const foodType = resolveOptionSnapshot('fmb', row.foodType);
+    db.request_fmb.push({ request_fmb_id: nextId('request_fmb'), request_id: request.request_id, option_id: foodType.optionId, food_type: foodType.label, pax: Number(row.quantity) || 0, date: row.date, serve_time: row.start, location: row.location, notes: row.notes || null });
   }
   for (const row of requestRows.campusTour || []) {
-    db.request_campus_tour.push({ request_campus_tour_id: nextId('request_campus_tour'), request_id: request.request_id, date: row.date, pax: Number(row.pax) || 0, start_point_option_id: row.startPoint || null, start_point: row.startPoint, tour_type_option_id: row.tourType || null, tour_type: row.tourType, notes: row.notes || null });
+    const startPoint = resolveOptionSnapshot('campusTourStart', row.startPoint);
+    const tourType = resolveOptionSnapshot('campusTourType', row.tourType);
+    db.request_campus_tour.push({ request_campus_tour_id: nextId('request_campus_tour'), request_id: request.request_id, date: row.date, pax: Number(row.pax) || 0, start_point_option_id: startPoint.optionId, start_point: startPoint.label, tour_type_option_id: tourType.optionId, tour_type: tourType.label, notes: row.notes || null });
   }
   for (const row of requestRows.waterNormal || []) {
-    db.request_mineral_water.push({ request_mineral_water_id: nextId('request_mineral_water'), request_id: request.request_id, option_id: row.quantity || null, quantity: Number(row.quantity) || 0, with_logo: row.withLogo === 'Yes', date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
+    // The Mineral Water picker's value IS the quantity option (e.g. "48 bottles"), so the
+    // catalog row carries the real bottle count — the snapshot freezes both.
+    const pack = resolveOptionSnapshot('waterNormal', row.quantity);
+    const packRow = pack.optionId != null ? db.water_normal_options.find((o) => o.water_normal_option_id === pack.optionId) : null;
+    db.request_mineral_water.push({ request_mineral_water_id: nextId('request_mineral_water'), request_id: request.request_id, option_id: pack.optionId, quantity: packRow ? Number(packRow.number_of_bottles) || 0 : Number(row.quantity) || 0, option_label: pack.label, with_logo: row.withLogo === 'Yes', date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
   }
   for (const row of requestRows.fundingPurchase || []) {
-    db.request_funding_purchase.push({ request_funding_purchase_id: nextId('request_funding_purchase'), request_id: request.request_id, main_option_id: row.mainItem || null, main_item: row.mainItem, sub_option_id: row.subItem || null, sub_item: row.subItem, quantity: Number(row.quantity) || 0, unit_price_rm: Number(row.unit) || 0, notes: row.notes || null });
+    const mainItem = resolveOptionSnapshot('fundingMain', row.mainItem);
+    const subItem = resolveOptionSnapshot('fundingSub', row.subItem);
+    db.request_funding_purchase.push({ request_funding_purchase_id: nextId('request_funding_purchase'), request_id: request.request_id, main_option_id: mainItem.optionId, main_item: mainItem.label, sub_option_id: subItem.optionId, sub_item: subItem.label, quantity: Number(row.quantity) || 0, unit_price_rm: Number(row.unit) || 0, notes: row.notes || null });
+  }
+}
+
+// Server-side validation of a full proposal submission. The Angular form validates the same
+// rules for immediate feedback, but this is the authority — a payload that reaches the API
+// without passing here never enters the workflow (system specification §8E: "Validate all forms
+// both client-side and server-side"). Deliberately only applied on SUBMIT/RESUBMIT paths, never
+// on save-as-draft, since a draft is expected to be incomplete.
+const REQUIRED_PROPOSAL_FIELDS = [
+  ['eventTitle', 'Event title'],
+  ['shortIntroduction', 'Short introduction'],
+  ['goals', 'Goals and objectives'],
+  ['benefits', 'Expected benefits'],
+];
+function validateProposalPayload(payload) {
+  const errors = [];
+  for (const [field, label] of REQUIRED_PROPOSAL_FIELDS) {
+    if (!String(payload[field] ?? '').trim()) errors.push(`${label} is required.`);
+  }
+
+  const scheduleRows = (payload.scheduleRows || []).filter((row) => row && row.date && row.start && row.end && row.location);
+  if (scheduleRows.length === 0) errors.push('At least one complete event schedule row (date, start, end, location) is required.');
+  for (const row of scheduleRows) {
+    if (String(row.end) <= String(row.start)) errors.push(`Schedule row on ${row.date}: the end time must be after the start time.`);
+  }
+
+  const selectedRequirements = payload.selectedRequirements || [];
+  if (selectedRequirements.length === 0) errors.push('Select at least one requirement for this event.');
+  for (const key of selectedRequirements) {
+    if (!db.event_requirements.some((r) => r.requirement_name === key) && key !== 'waterNormal') {
+      errors.push(`Unknown requirement "${key}".`);
+    }
+  }
+
+  const categories = payload.eventCategories || [];
+  const maxCategories = maxEventCategories();
+  if (categories.length > maxCategories) {
+    errors.push(`Select at most ${maxCategories} event categor${maxCategories === 1 ? 'y' : 'ies'}.`);
+  }
+  if (payload.eventVisibility === 'Public' && categories.length === 0) {
+    errors.push('A public event needs at least one event category.');
+  }
+
+  const totalPax = Number(payload.totalPax);
+  if (!Number.isFinite(totalPax) || totalPax < 0) errors.push('Total expected pax must be zero or more.');
+  const maxPax = payload.maxPax;
+  if (maxPax != null && maxPax !== '' && (!Number.isFinite(Number(maxPax)) || Number(maxPax) < 0)) {
+    errors.push('Registration capacity must be zero or more.');
+  }
+
+  const cost = payload.costAmount;
+  if (cost != null && cost !== '' && Number(cost) > 0) {
+    if (!String(payload.bankAccountName ?? '').trim() || !String(payload.bankAccountNumber ?? '').trim()) {
+      errors.push('A paid event needs both a bank account name and number so attendees can pay.');
+    }
+  }
+
+  if (errors.length > 0) {
+    const error = new WorkflowError(errors[0], 400);
+    error.details = errors;
+    throw error;
   }
 }
 
@@ -399,9 +651,17 @@ function applyRequestScalarFields(request, payload, applicant) {
 function createProposal(payload, draftRequestId) {
   const applicant = db.users.find((u) => u.email === payload.applicantEmail);
   if (!applicant) throw new WorkflowError('Applicant not found for the given applicantEmail.', 400);
+  // External (self-registered guest) accounts may explore, register and save public events, but
+  // never submit a proposal — system specification §6.
+  const { hasRole } = require('./user-access.service');
+  if (hasRole(applicant.user_id, 'external-user')) {
+    throw new WorkflowError('Guest accounts cannot submit event proposals.', 403);
+  }
+  validateProposalPayload(payload);
 
   let request = draftRequestId ? db.request.find((r) => r.request_id === Number(draftRequestId)) : null;
   if (request && request.status !== 'draft') throw new WorkflowError('This proposal is no longer a draft and cannot be submitted as one.', 400);
+  if (request) assertProposalOwner(request.request_id, applicant.user_id);
 
   if (request) {
     clearRequestChildRows(request.request_id);
@@ -442,9 +702,16 @@ function createProposal(payload, draftRequestId) {
 function saveDraft(payload, draftRequestId) {
   const applicant = db.users.find((u) => u.email === payload.applicantEmail);
   if (!applicant) throw new WorkflowError('Applicant not found for the given applicantEmail.', 400);
+  const { hasRole } = require('./user-access.service');
+  if (hasRole(applicant.user_id, 'external-user')) {
+    throw new WorkflowError('Guest accounts cannot submit event proposals.', 403);
+  }
 
   let request = draftRequestId ? db.request.find((r) => r.request_id === Number(draftRequestId)) : null;
   if (request && request.status !== 'draft') throw new WorkflowError('This proposal is no longer a draft and cannot be saved as one.', 400);
+  // Updating an existing draft is only ever the owner's (or a co-owner's) to do — a draft id is
+  // otherwise just a guessable integer.
+  if (request) assertProposalOwner(request.request_id, applicant.user_id);
 
   if (request) {
     clearRequestChildRows(request.request_id);
@@ -479,27 +746,65 @@ function saveDraft(payload, draftRequestId) {
 // Permanently removes a draft (status='draft' only — never a submitted proposal, which must go
 // through cancelProposal() instead to preserve its workflow_history trail) and all its child
 // rows. Used by the Drafts list's delete action.
-function deleteDraft(requestId) {
+function deleteDraft(requestId, actorUserId) {
   const request = findRequest(requestId);
   if (request.status !== 'draft') throw new WorkflowError('Only drafts can be deleted.', 400);
+  if (actorUserId != null) assertProposalOwner(requestId, actorUserId);
   clearRequestChildRows(request.request_id);
   db.request = db.request.filter((r) => r.request_id !== request.request_id);
   db.workflow_history = db.workflow_history.filter((h) => h.request_id !== request.request_id);
 }
 
+// Cancelling a proposal cascades: every department task and every cafeteria order attached to it
+// is marked 'cancelled' too, each with its own workflow_history row, so the departments and
+// cafeteria staff who were mid-fulfilment see it disappear from their Inbox and land in History
+// as cancelled rather than silently lingering as 'pending'/'preparing' work for a dead event
+// (system specification §4, Cancellation).
 function cancelProposal(requestId, actorUserId) {
   const request = findRequest(requestId);
-  const actor = db.users.find((u) => u.user_id === Number(actorUserId));
   const previousStatus = request.status;
   if (['completed_approved', 'completed_rejected', 'cancelled'].includes(previousStatus)) {
     throw new WorkflowError(`Cannot cancel from status ${previousStatus}.`, 400);
   }
+  if (!isProposalOwner(requestId, actorUserId)) {
+    throw new WorkflowError('Only the applicant or a co-owner can cancel.', 403);
+  }
+  if (!isWithinCancellationWindow(requestId)) {
+    throw new WorkflowError(`The cancellation deadline for this event has passed (cancellation closes ${cancellationDeadlineDays()} day(s) before the event date).`, 400);
+  }
+
+  const actorRole = primaryRoleCodeFor(actorUserId);
+  const now = new Date().toISOString();
   request.status = 'cancelled';
-  request.cancelled_at = new Date().toISOString();
+  request.cancelled_at = now;
   request.cancelled_by_user_id = Number(actorUserId);
-  request.updated_at = new Date().toISOString();
-  recordHistory(request.request_id, null, null, 'cancel', actorUserId, primaryRoleCodeFor(actorUserId), null, previousStatus, 'cancelled');
+  request.updated_at = now;
+  recordHistory(request.request_id, null, null, 'cancel', actorUserId, actorRole, null, previousStatus, 'cancelled');
+
+  for (const task of db.request_task.filter((t) => t.request_id === request.request_id)) {
+    if (task.status === 'cancelled' || task.status === 'completed') continue;
+    const taskPrevious = task.status;
+    task.status = 'cancelled';
+    task.resolved_at = now;
+    task.resolved_by_user_id = Number(actorUserId);
+    recordHistory(request.request_id, task.request_task_id, task.requirement_id, 'cancel', actorUserId, actorRole, 'Cancelled because the proposal was cancelled.', taskPrevious, 'cancelled');
+  }
+
+  for (const selection of fmbSelectionsForRequest(request.request_id)) {
+    if (selection.status === 'cancelled' || selection.status === 'fulfilled') continue;
+    const selectionPrevious = selection.status;
+    selection.status = 'cancelled';
+    recordHistory(request.request_id, null, null, 'cancel-selection', actorUserId, actorRole, 'Cancelled because the proposal was cancelled.', selectionPrevious, 'cancelled');
+  }
+
   return request;
+}
+
+// Every request_fmb_selection row belonging to a request, across all of its request_fmb rows.
+function fmbSelectionsForRequest(requestId) {
+  return db.request_fmb
+    .filter((f) => f.request_id === Number(requestId))
+    .flatMap((f) => db.request_fmb_selection.filter((s) => s.request_fmb_id === f.request_fmb_id));
 }
 
 // Called once, the moment a request enters department_review. Creates one request_task per
@@ -517,8 +822,10 @@ function createDepartmentTasks(requestId) {
   // Water rows never get their own task row — they're folded into 'fmb'. If the applicant
   // selected water but NOT fmb explicitly (the Angular form always includes fmb whenever water
   // is picked, per Task 2.5's corrected requirement checklist merge — but defend against it
-  // anyway), still create exactly one 'fmb' task.
-  const distinctTaskRequirements = [...new Set(requirementNames.map((name) => (name === 'waterNormal') ? 'fmb' : name))];
+  // anyway), still create exactly one 'fmb' task. Funding/Purchase is filtered out entirely:
+  // its rows are stored for the record but it is not part of the approval workflow.
+  const distinctTaskRequirements = [...new Set(requirementNames.map((name) => (name === 'waterNormal') ? 'fmb' : name))]
+    .filter((name) => !NON_WORKFLOW_REQUIREMENTS.has(name));
 
   for (const requirementName of distinctTaskRequirements) {
     const requirement = db.event_requirements.find((r) => r.requirement_name === requirementName);
@@ -550,6 +857,18 @@ function createDepartmentTasks(requestId) {
       resolved_by_user_id: null,
     });
   }
+
+  // A proposal whose only requirements are non-workflow ones (e.g. Funding/Purchase alone) has
+  // nothing left to fulfil, so department review completes the moment it opens — without this,
+  // checkAllDepartmentTasksResolved()'s `tasks.length > 0` guard would leave it stuck in
+  // department_review with no actor able to move it.
+  if (distinctTaskRequirements.length === 0) {
+    const request = findRequest(requestId);
+    const previousStatus = request.status;
+    request.status = 'completed_approved';
+    request.updated_at = new Date().toISOString();
+    recordHistory(requestId, null, null, 'auto-complete', null, 'system', 'No department fulfilment was required.', previousStatus, 'completed_approved');
+  }
 }
 
 function findDepartmentTask(requestId, requirementKey) {
@@ -574,7 +893,7 @@ function checkAllDepartmentTasksResolved(requestId) {
 
 function approveDepartmentTask(requestId, requirementKey, actorUserId) {
   const task = findDepartmentTask(requestId, requirementKey);
-  const actor = db.users.find((u) => u.user_id === Number(actorUserId));
+  authorizeDepartmentTask(task, actorUserId);
   const previousStatus = task.status;
   task.status = 'approved';
   task.resolved_at = new Date().toISOString();
@@ -586,15 +905,29 @@ function approveDepartmentTask(requestId, requirementKey, actorUserId) {
   // createFmbSelection() once per cafeteria after this approval) — it does NOT immediately
   // mark the task 'completed'. Every other department's approve DOES immediately complete the
   // task once staff assignment has happened (assignStaffToTask marks it, not this function).
+  //
+  // Exception: a mineral-water-only request has no request_fmb rows to fan out into cafeteria
+  // orders at all, so there is nothing left for checkFmbTaskResolved() to wait on — F&B's
+  // approval IS the fulfilment, and the task completes here.
+  if (requirementKey === 'fmb' && !db.request_fmb.some((f) => f.request_id === Number(requestId))) {
+    task.status = 'completed';
+    recordHistory(requestId, task.request_task_id, task.requirement_id, 'complete', actorUserId, primaryRoleCodeFor(actorUserId), null, 'approved', 'completed');
+    checkAllDepartmentTasksResolved(requestId);
+  }
   return task;
 }
 
 function resubmitDepartmentTask(requestId, requirementKey, actorUserId, comment) {
   const task = findDepartmentTask(requestId, requirementKey);
-  const actor = db.users.find((u) => u.user_id === Number(actorUserId));
+  authorizeDepartmentTask(task, actorUserId);
+  const trimmedComment = String(comment || '').trim();
+  // A department cannot reject — resubmit-with-comment is its only pushback, so the comment is
+  // the entire message to the applicant and must actually say something.
+  if (!trimmedComment) throw new WorkflowError('Explain what needs to change so the applicant can fix it.', 400);
   const previousStatus = task.status;
   task.status = 'resubmitted';
-  task.comment = comment;
+  task.comment = trimmedComment;
+  comment = trimmedComment;
   recordHistory(requestId, task.request_task_id, task.requirement_id, 'resubmit', actorUserId, primaryRoleCodeFor(actorUserId), comment, previousStatus, 'resubmitted');
   // Per the design spec's "parallel independence": this does NOT touch request.status or any
   // sibling request_task row. The applicant sees this specific department's resubmission in
@@ -606,6 +939,16 @@ function resubmitDepartmentTask(requestId, requirementKey, actorUserId, comment)
 function assignStaffToTask(requestTaskId, staffUserId, assignedByUserId) {
   const task = db.request_task.find((t) => t.request_task_id === Number(requestTaskId));
   if (!task) throw new WorkflowError('Task not found.', 404);
+  // Only the head of the routed unit may assign, and only to someone who actually belongs to
+  // that unit — otherwise a manager could hand their department's work to an unrelated account.
+  authorizeDepartmentTask(task, assignedByUserId);
+  if (task.assigned_unit_code) {
+    const staffBelongsToUnit = db.user_unit_roles.some((uur) => uur.user_id === Number(staffUserId) && uur.unit_code === task.assigned_unit_code);
+    if (!staffBelongsToUnit) throw new WorkflowError('That team member does not belong to this department.', 400);
+  }
+  if (db.task_assignment.some((a) => a.request_task_id === task.request_task_id && a.staff_user_id === Number(staffUserId))) {
+    throw new WorkflowError('That team member is already assigned to this task.', 400);
+  }
   db.task_assignment.push({
     task_assignment_id: nextId('task_assignment'),
     request_task_id: task.request_task_id,
@@ -621,27 +964,43 @@ function assignStaffToTask(requestTaskId, staffUserId, assignedByUserId) {
   return task;
 }
 
-function updateTaskStatus(requestTaskId, status) {
+function updateTaskStatus(requestTaskId, status, actorUserId) {
   const task = db.request_task.find((t) => t.request_task_id === Number(requestTaskId));
   if (!task) throw new WorkflowError('Task not found.', 404);
   if (!['preparing', 'completed'].includes(status)) throw new WorkflowError('Staff can only set preparing or completed.', 400);
+  // Only a staff member this task was actually assigned to may progress it — the frontend hides
+  // other people's tasks, but this is the gate that enforces it.
+  if (!db.task_assignment.some((a) => a.request_task_id === task.request_task_id && a.staff_user_id === Number(actorUserId))) {
+    throw new WorkflowError('This task is not assigned to you.', 403);
+  }
+  if (task.status === 'cancelled') throw new WorkflowError('This task was cancelled and can no longer be updated.', 400);
+  if (task.status === 'completed') throw new WorkflowError('This task is already completed.', 400);
+  if (status === 'preparing' && task.status !== 'approved') {
+    throw new WorkflowError('Only a newly assigned task can be moved to preparing.', 400);
+  }
   const previousStatus = task.status;
   task.status = status;
-  if (status === 'completed') { task.resolved_at = new Date().toISOString(); checkAllDepartmentTasksResolved(task.request_id); }
-  recordHistory(task.request_id, task.request_task_id, task.requirement_id, status, null, 'staff', null, previousStatus, status);
+  if (status === 'completed') { task.resolved_at = new Date().toISOString(); }
+  recordHistory(task.request_id, task.request_task_id, task.requirement_id, status, actorUserId, 'staff', null, previousStatus, status);
+  if (status === 'completed') checkAllDepartmentTasksResolved(task.request_id);
   return task;
 }
 
 function createFmbSelection(requestFmbId, cafeteriaUnitCode, fmbOptionId, menuItemLabel, quantity, notes) {
+  const menuItem = resolveOptionSnapshot('fmb', fmbOptionId);
   const selection = {
     request_fmb_selection_id: nextId('request_fmb_selection'),
     request_fmb_id: Number(requestFmbId),
     unit_code: cafeteriaUnitCode,
-    fmb_option_id: Number(fmbOptionId),
-    menu_item_label: menuItemLabel,
+    fmb_option_id: menuItem.optionId,
+    menu_item_label: menuItemLabel || menuItem.label,
     quantity: Number(quantity),
     status: 'pending',
     notes: notes || null,
+    // Set by resubmitFmbSelection() when the owning Cafeteria Manager pushes this specific order
+    // back to F&B — cleared again once F&B edits and re-sends it. Mock-layer addition alongside
+    // claimed_by_user_id below (not in the original DDL).
+    manager_comment: null,
     // NOT part of the original ems_database_schema.sql request_fmb_selection table — a
     // mock-layer addition (mirrors request.resume_stage's precedent) so the staff-tasks router
     // can resolve "who claimed/fulfilled THIS specific selection" without misattributing across
@@ -669,7 +1028,7 @@ function requestIdForFmbSelection(selectionId) {
 // cafeteria's staff. Does not touch sibling selection rows for the same request_fmb.
 function approveFmbSelection(selectionId, actorUserId) {
   const selection = findFmbSelection(selectionId);
-  const actor = db.users.find((u) => u.user_id === Number(actorUserId));
+  if (selection.status !== 'pending') throw new WorkflowError('This order is not awaiting your review.', 400);
   const previousStatus = selection.status;
   selection.status = 'approved';
   recordHistory(requestIdForFmbSelection(selectionId), null, null, 'approve-selection', actorUserId, primaryRoleCodeFor(actorUserId), null, previousStatus, 'approved');
@@ -680,12 +1039,17 @@ function approveFmbSelection(selectionId, actorUserId) {
 // Cafeteria Manager resubmits ONE selection row -> goes back to F&B with status
 // 'resubmitted'. Per the design spec, this does NOT touch the applicant or the parent
 // request_task's status at all — it's purely a signal that F&B needs to edit this row.
-function resubmitFmbSelection(selectionId, actorUserId) {
+function resubmitFmbSelection(selectionId, actorUserId, comment) {
   const selection = findFmbSelection(selectionId);
-  const actor = db.users.find((u) => u.user_id === Number(actorUserId));
+  if (selection.status !== 'pending') throw new WorkflowError('This order is not awaiting your review.', 400);
+  const trimmedComment = String(comment || '').trim();
+  if (!trimmedComment) throw new WorkflowError('Explain what needs to change so F&B can fix this order.', 400);
   const previousStatus = selection.status;
   selection.status = 'resubmitted';
-  recordHistory(requestIdForFmbSelection(selectionId), null, null, 'resubmit-selection', actorUserId, primaryRoleCodeFor(actorUserId), null, previousStatus, 'resubmitted');
+  // Stored on the selection row itself (not the parent request_task) so F&B sees exactly which
+  // order was pushed back and why — sibling orders for other cafeterias are unaffected.
+  selection.manager_comment = trimmedComment;
+  recordHistory(requestIdForFmbSelection(selectionId), null, null, 'resubmit-selection', actorUserId, primaryRoleCodeFor(actorUserId), trimmedComment, previousStatus, 'resubmitted');
   return selection;
 }
 
@@ -695,7 +1059,12 @@ function resubmitFmbSelection(selectionId, actorUserId) {
 // re-send, per the design spec.
 function editFmbSelection(selectionId, updates, actorUserId) {
   const selection = findFmbSelection(selectionId);
-  const actor = db.users.find((u) => u.user_id === Number(actorUserId));
+  if (!isManagerOfUnit(actorUserId, FMB_UNIT_CODE)) {
+    throw new WorkflowError('Only Food & Beverage Services can edit a cafeteria order.', 403);
+  }
+  if (!['pending', 'resubmitted'].includes(selection.status)) {
+    throw new WorkflowError('This order has already been approved and can no longer be edited.', 400);
+  }
   const previousStatus = selection.status;
   if (updates.cancel) {
     selection.status = 'cancelled';
@@ -704,11 +1073,15 @@ function editFmbSelection(selectionId, updates, actorUserId) {
     return selection;
   }
   if (updates.cafeteriaCode !== undefined) selection.unit_code = updates.cafeteriaCode;
-  if (updates.fmbOptionId !== undefined) selection.fmb_option_id = Number(updates.fmbOptionId);
+  if (updates.fmbOptionId !== undefined) selection.fmb_option_id = resolveOptionSnapshot('fmb', updates.fmbOptionId).optionId;
   if (updates.menuItemLabel !== undefined) selection.menu_item_label = updates.menuItemLabel;
   if (updates.quantity !== undefined) selection.quantity = Number(updates.quantity);
   if (updates.notes !== undefined) selection.notes = updates.notes;
+  // Saving the edit IS the re-send: the row goes straight back to whichever cafeteria now owns
+  // it (the same manager, or a different one if F&B switched cafeterias). The manager's pushback
+  // comment is cleared now that it has been acted on.
   selection.status = 'pending';
+  selection.manager_comment = null;
   recordHistory(requestIdForFmbSelection(selectionId), null, null, 'edit-selection', actorUserId, primaryRoleCodeFor(actorUserId), null, previousStatus, 'pending');
   return selection;
 }
@@ -719,22 +1092,34 @@ function editFmbSelection(selectionId, updates, actorUserId) {
 // staff-tasks.routes.js's claimingStaffEmail), scoped further by which cafeteria this specific
 // staff member is assigned to (checked by the routes layer before calling this, using
 // cafeteria_assignment).
+function isCafeteriaStaffOf(userId, cafeteriaCode) {
+  return db.user_unit_roles.some((uur) => uur.user_id === Number(userId) && uur.unit_code === cafeteriaCode && uur.role_code === 'cafeteria-staff');
+}
+
 function claimSharedFmbSelection(selectionId, staffUserId) {
   const selection = findFmbSelection(selectionId);
   if (selection.status !== 'approved') throw new WorkflowError('This order is not available to claim.', 400);
+  // Shared pool, but scoped: only staff assigned to THIS cafeteria may claim its orders. First
+  // claim wins — the row then leaves everyone else's inbox (its status is no longer 'approved').
+  if (!isCafeteriaStaffOf(staffUserId, selection.unit_code)) {
+    throw new WorkflowError('You are not assigned to the cafeteria this order belongs to.', 403);
+  }
   selection.status = 'preparing';
   selection.claimed_by_user_id = Number(staffUserId);
   const requestId = requestIdForFmbSelection(selectionId);
-  recordHistory(requestId, null, null, 'claim-selection', staffUserId, 'cafeteria_staff', null, 'approved', 'preparing');
+  recordHistory(requestId, null, null, 'claim-selection', staffUserId, 'cafeteria-staff', null, 'approved', 'preparing');
   return selection;
 }
 
 function fulfilFmbSelection(selectionId, actorUserId) {
   const selection = findFmbSelection(selectionId);
+  if (selection.status !== 'preparing') throw new WorkflowError('Claim this order before marking it fulfilled.', 400);
+  if (selection.claimed_by_user_id !== Number(actorUserId)) {
+    throw new WorkflowError('This order was claimed by another staff member.', 403);
+  }
   const previousStatus = selection.status;
   selection.status = 'fulfilled';
-  selection.claimed_by_user_id = Number(actorUserId);
-  recordHistory(requestIdForFmbSelection(selectionId), null, null, 'fulfil-selection', actorUserId, 'cafeteria_staff', null, previousStatus, 'fulfilled');
+  recordHistory(requestIdForFmbSelection(selectionId), null, null, 'fulfil-selection', actorUserId, 'cafeteria-staff', null, previousStatus, 'fulfilled');
   checkFmbTaskResolved(selectionId);
   return selection;
 }
@@ -778,6 +1163,15 @@ module.exports = {
   FLAT_ROLE_FOR_REQUIREMENT,
   FMB_UNIT_CODE,
   authorizeAction,
+  authorizeDepartmentTask,
+  isProposalOwner,
+  assertProposalOwner,
+  isWithinCancellationWindow,
+  cancellationDeadlineDays,
+  maxEventCategories,
+  validateProposalPayload,
+  fmbSelectionsForRequest,
+  isCafeteriaStaffOf,
   submitProposal,
   createProposal,
   saveDraft,
@@ -795,6 +1189,7 @@ module.exports = {
   assignStaffToTask,
   updateTaskStatus,
   createFmbSelection,
+  resolveOptionSnapshot,
   findFmbSelection,
   approveFmbSelection,
   resubmitFmbSelection,

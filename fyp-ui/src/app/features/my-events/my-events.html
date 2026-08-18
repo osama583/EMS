@@ -7,12 +7,12 @@
       <span>Everything you have saved, registered for, or attended in one place.</span>
     </header>
 
-    <nav class="my-events-tabs" aria-label="My Events sections">
+    <nav class="shared-tabs" aria-label="My Events sections">
       @for (tab of tabs; track tab.key) {
         <a
-          class="my-events-tabs__tab"
+          class="shared-tabs__tab"
           [routerLink]="[basePath, tab.path]"
-          routerLinkActive="my-events-tabs__tab--active"
+          routerLinkActive="shared-tabs__tab--active"
         >
           {{ tab.label }}
         </a>

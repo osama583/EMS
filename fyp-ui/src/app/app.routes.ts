@@ -126,6 +126,11 @@ export const routes: Routes = [
             loadComponent: () => import('./features/internal/pages/records-hub/hub-club-requests/hub-club-requests').then((module) => module.HubClubRequestsComponent),
             title: 'Club Requests | APU Events',
           },
+          {
+            path: 'registrations',
+            loadComponent: () => import('./features/internal/pages/records-hub/hub-registrations/hub-registrations').then((module) => module.HubRegistrationsComponent),
+            title: 'Registrations | APU Events',
+          },
         ],
       },
       {

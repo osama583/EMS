@@ -14,6 +14,7 @@ import { ProposalTableColumn, ProposalTableComponent } from '../proposal-table/p
 
 import { AuthService } from '../../../core/auth/auth.service';
 import { SystemConfigService } from '../../../core/config/system-config.service';
+import { ToastService, apiErrorMessage } from '../toast/toast.service';
 
 interface RequirementTable {
   readonly key: DepartmentRequestKind;
@@ -80,6 +81,7 @@ export class ProposalReviewerViewComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(AuthService);
   private readonly configService = inject(SystemConfigService);
+  private readonly toast = inject(ToastService);
 
   readonly proposal = input<ProposalReviewRecord | null>(null);
   // Unit + Level model: approve/reject/resubmit no longer need a `role` input at all — the
@@ -97,8 +99,6 @@ export class ProposalReviewerViewComponent {
   readonly rejectConfirm = signal(false);
   readonly cancelConfirm = signal(false);
   readonly rejectCommentError = signal(false);
-  readonly actionMessage = signal('');
-  readonly actionBannerKind = signal<'success' | 'error' | 'info'>('info');
   readonly comment = signal('');
   readonly commentValidationError = signal(false);
 
@@ -148,26 +148,25 @@ export class ProposalReviewerViewComponent {
     return false;
   });
 
+  // The server computes this (see server/services/proposal-projection.service.js's
+  // canStillBeCancelled) using the same CANCELLATION_DEADLINE_DAYS config it enforces on
+  // POST /cancel, so the button state and the actual rule can never drift apart. The local
+  // date-parsing fallback below only applies to records that predate the field.
   readonly isWithinCancellationWindow = computed(() => {
     const proposal = this.proposal();
     if (!proposal) return false;
+    if (proposal.cancellationOpen !== undefined) return proposal.cancellationOpen;
+
     const limitDays = this.configService.cancellationDaysLimit();
-
     let dateStr = proposal.scheduleRows?.[0]?.['date'] as string | undefined;
-    if (!dateStr && proposal.schedule) {
-      dateStr = proposal.schedule.split('·')[0]?.trim();
-    }
+    if (!dateStr && proposal.schedule) dateStr = proposal.schedule.split('\u00b7')[0]?.trim();
     if (!dateStr) return false;
-
     const eventDate = parseEventDate(dateStr);
     if (!eventDate || isNaN(eventDate.getTime())) return false;
-
     const deadline = new Date(eventDate);
     deadline.setDate(deadline.getDate() - limitDays);
     deadline.setHours(23, 59, 59, 999);
-
-    const now = new Date();
-    return now.getTime() <= deadline.getTime();
+    return Date.now() <= deadline.getTime();
   });
 
   readonly canCancel = computed(() => {
@@ -182,13 +181,6 @@ export class ProposalReviewerViewComponent {
   readonly commentRequired = computed(() =>
     this.comment().trim().length === 0
   );
-
-  readonly actionBannerIcon = computed(() => {
-    const kind = this.actionBannerKind();
-    if (kind === 'success') return 'check_circle';
-    if (kind === 'error') return 'error';
-    return 'info';
-  });
 
   /** Timeline steps for approval history sidebar */
   readonly timelineSteps = computed<readonly TimelineStep[]>(() => {
@@ -281,13 +273,12 @@ export class ProposalReviewerViewComponent {
     ).subscribe({
       next: () => {
         this.cancelConfirm.set(false);
-        this.actionBannerKind.set('info');
-        this.actionMessage.set('Application cancelled successfully.');
+        this.toast.success('Application cancelled', 'Every task raised for this event has been cancelled too.');
         this.actionComplete.emit(proposal.id);
       },
-      error: () => {
-        this.actionBannerKind.set('error');
-        this.actionMessage.set('Could not cancel application. Please try again.');
+      error: (err) => {
+        this.cancelConfirm.set(false);
+        this.toast.error('Could not cancel this application', apiErrorMessage(err, 'Please try again.'));
       },
     });
   }
@@ -305,13 +296,12 @@ export class ProposalReviewerViewComponent {
     const proposal = this.proposal();
     if (!proposal) return;
     this.approving.set(true);
-    this.actionMessage.set('');
     this.workflow.approveAsReviewer(proposal.id, this.auth.user()?.email ?? '').pipe(
       finalize(() => this.approving.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: () => { this.actionBannerKind.set('success'); this.actionMessage.set('Proposal approved — moved to the next stage.'); this.actionComplete.emit(proposal.id); },
-      error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not approve. Please try again.'); },
+      next: () => { this.toast.success('Proposal approved', 'It has moved to the next stage of the workflow.'); this.actionComplete.emit(proposal.id); },
+      error: (err) => this.toast.error('Could not approve this proposal', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
@@ -358,8 +348,8 @@ export class ProposalReviewerViewComponent {
       finalize(() => this.rejecting.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: () => { this.rejectConfirm.set(false); this.actionBannerKind.set('error'); this.actionMessage.set('Proposal rejected.'); this.actionComplete.emit(proposal.id); },
-      error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not reject. Please try again.'); },
+      next: () => { this.rejectConfirm.set(false); this.toast.warning('Proposal rejected', 'The applicant has been given your reason.'); this.actionComplete.emit(proposal.id); },
+      error: (err) => { this.rejectConfirm.set(false); this.toast.error('Could not reject this proposal', apiErrorMessage(err, 'Please try again.')); },
     });
   }
 
@@ -371,8 +361,8 @@ export class ProposalReviewerViewComponent {
       finalize(() => this.resubmitting.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
-      next: () => { this.actionBannerKind.set('info'); this.actionMessage.set('Sent back to the applicant with your comment.'); this.comment.set(''); this.actionComplete.emit(proposal.id); },
-      error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not resubmit. Please try again.'); },
+      next: () => { this.toast.info('Sent back to the applicant', 'They will see your comment and can resubmit.'); this.comment.set(''); this.actionComplete.emit(proposal.id); },
+      error: (err) => this.toast.error('Could not send this back', apiErrorMessage(err, 'Please try again.')),
     });
   }
 

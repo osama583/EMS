@@ -10,12 +10,13 @@ import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, Inter
 import { FeedbackBannerComponent } from '../../../../../shared/components/feedback-banner/feedback-banner';
 import { ProposalCommentDialogComponent } from '../../../../../shared/components/proposal-comment-dialog/proposal-comment-dialog';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { ViewToggleComponent } from '../../../../../shared/components/view-toggle/view-toggle';
 
 type ViewMode = 'table' | 'card';
 
 @Component({
   selector: 'app-club-discover',
-  imports: [
+  imports: [ViewToggleComponent, 
     InternalDataPageComponent, FeedbackBannerComponent, InternalPageHeaderComponent,
     InternalSearchFieldComponent, InternalFilterControlsComponent, InternalResetButtonComponent,
     ProposalCommentDialogComponent,

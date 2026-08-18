@@ -9,6 +9,9 @@ import { InternalPaginationComponent } from '../internal-data-page/internal-data
 })
 export class InternalTableWorkspaceComponent {
   readonly ariaLabel = input('Table workspace');
+  // 'card' forces the card list at every viewport; 'table' keeps the default responsive behaviour
+  // (table on desktop, cards below 48rem). See _internal-table-workspace.scss.
+  readonly viewMode = input<'card' | 'table'>('table');
   readonly hideHeader = input(false);
   readonly hideControls = input(false);
   readonly paginationLabel = input('Pagination');

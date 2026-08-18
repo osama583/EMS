@@ -162,84 +162,49 @@
 
 <app-event-details-modal [open]="!!selectedPublishedEvent()" [event]="selectedPublishedEvent()" (close)="closeEvent()" (registered)="onModalRegistered($event)" />
 
-@if (filterOpen()) {
-  <div class="filter-overlay" role="presentation" (click)="closeFilters()">
-    <section
-      class="filter-dialog"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="filter-dialog-title"
-      (click)="$event.stopPropagation()"
-    >
-      <header class="filter-dialog__header">
-        <div>
-          <p>Refine your discovery</p>
-          <h2 id="filter-dialog-title">Filter events</h2>
-        </div>
-        <button
-          #filterCloseButton
-          type="button"
-          class="filter-dialog__close"
-          aria-label="Close filters"
-          (click)="closeFilters()"
-        >
-          ×
-        </button>
-      </header>
-
-      <div class="filter-dialog__body">
-        @for (group of filterGroups(); track group.key) {
-          <fieldset class="filter-group" [class.filter-group--wide]="group.wide">
-            <legend>{{ group.label }}</legend>
-            <div class="filter-options">
-              @for (option of group.options; track option) {
-                <button
-                  type="button"
-                  class="filter-option"
-                  [class.filter-option--selected]="isDraftSelected(group.key, option)"
-                  [attr.aria-pressed]="isDraftSelected(group.key, option)"
-                  (click)="toggleDraftFilter(group.key, option)"
-                >
-                  @if (isDraftSelected(group.key, option)) {
-                    <span class="filter-option__check" aria-hidden="true">✓</span>
-                  }
-                  <span>{{ option }}</span>
-                </button>
+<app-form-modal
+  [open]="filterOpen()"
+  title="Filter events"
+  [primaryLabel]="'Show ' + draftResultCount() + (draftResultCount() === 1 ? ' Result' : ' Results')"
+  secondaryLabel="Reset filters"
+  (close)="closeFilters()"
+  (cancel)="resetDraftFilters()"
+  (submit)="applyFilters()"
+>
+  <div class="filter-dialog__body">
+    @for (group of filterGroups(); track group.key) {
+      <fieldset class="filter-group" [class.filter-group--wide]="group.wide">
+        <legend>{{ group.label }}</legend>
+        <div class="filter-options">
+          @for (option of group.options; track option) {
+            <button
+              type="button"
+              class="filter-option"
+              [class.filter-option--selected]="isDraftSelected(group.key, option)"
+              [attr.aria-pressed]="isDraftSelected(group.key, option)"
+              (click)="toggleDraftFilter(group.key, option)"
+            >
+              @if (isDraftSelected(group.key, option)) {
+                <span class="filter-option__check" aria-hidden="true">&#10003;</span>
               }
-            </div>
+              <span>{{ option }}</span>
+            </button>
+          }
+        </div>
 
-            @if (group.key === 'date' && isDraftSelected('date', 'Custom Date Range')) {
-              <div class="custom-range">
-                <label>
-                  <span>From</span>
-                  <input
-                    type="date"
-                    [value]="draftCustomFrom()"
-                    (input)="onCustomDate($event, 'from')"
-                  />
-                </label>
-                <label>
-                  <span>To</span>
-                  <input
-                    type="date"
-                    [value]="draftCustomTo()"
-                    (input)="onCustomDate($event, 'to')"
-                  />
-                </label>
-              </div>
-            }
-          </fieldset>
+        @if (group.key === 'date' && isDraftSelected('date', 'Custom Date Range')) {
+          <div class="custom-range">
+            <label>
+              <span>From</span>
+              <input type="date" [value]="draftCustomFrom()" (input)="onCustomDate($event, 'from')" />
+            </label>
+            <label>
+              <span>To</span>
+              <input type="date" [value]="draftCustomTo()" (input)="onCustomDate($event, 'to')" />
+            </label>
+          </div>
         }
-      </div>
-
-      <footer class="filter-dialog__footer">
-        <button type="button" class="filter-reset" (click)="resetDraftFilters()">
-          Reset filters
-        </button>
-        <button type="button" class="filter-apply" (click)="applyFilters()">
-          Show {{ draftResultCount() }} {{ draftResultCount() === 1 ? 'Result' : 'Results' }}
-        </button>
-      </footer>
-    </section>
+      </fieldset>
+    }
   </div>
-}
+</app-form-modal>

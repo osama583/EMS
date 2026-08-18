@@ -37,6 +37,18 @@
       <p class="policies-tab__note">
         Submitters and designated co-owners are allowed to cancel an application up to <strong>{{ cancellationDays() }} days before</strong> the scheduled event date. After this deadline, the application remains read-only.
       </p>
+
+      <app-form-field
+        controlId="config-max-categories"
+        label="Maximum Event Categories (Per public event)"
+        type="number"
+        min="1"
+        [value]="maxCategories()"
+        (valueChange)="setMaxCategories($event)"
+      />
+      <p class="policies-tab__note">
+        Applicants may tag a public event with at most <strong>{{ maxCategories() }}</strong> categor{{ maxCategories() === 1 ? 'y' : 'ies' }} on the proposal form. Existing proposals keep the categories they were submitted with.
+      </p>
     </div>
   }
 </div>

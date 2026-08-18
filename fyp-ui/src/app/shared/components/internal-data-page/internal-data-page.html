@@ -1,5 +1,6 @@
 <app-internal-table-workspace
   class="shared-data-page"
+  [viewMode]="viewMode()"
   [ariaLabel]="config().ariaLabel"
   [paginationLabel]="config().paginationLabel"
   [rowsPerPageLabel]="config().rowsPerPageLabel"
@@ -30,6 +31,9 @@
           (filterChange)="filterChange.emit($event)"
         />
         <app-internal-reset-button (reset)="reset.emit()" />
+        @if (showViewToggle()) {
+          <app-view-toggle [mode]="viewMode()" [ariaLabel]="'Choose ' + config().ariaLabel + ' view'" (modeChange)="setViewMode($event)" />
+        }
       </div>
     </div>
   }

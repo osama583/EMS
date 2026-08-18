@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
-import { UserRole } from '../../../core/auth/auth.models';
+import { testNavPage, testRole, testUser } from '../../../core/auth/auth.test-fixtures';
 import { InternalLayoutComponent } from './internal-layout';
 
 describe('InternalLayoutComponent', () => {
@@ -26,18 +26,27 @@ describe('InternalLayoutComponent', () => {
     // inheriting whatever ROLE_NAVIGATION[UserRole.Applicant] happened to contain. These tests
     // exercise the "My Proposals"/Events sidebar shape, so establish a real unit-scoped Student
     // session up front (same nav shape the old Applicant fallback coincidentally provided).
-    TestBed.inject(AuthService).establishSession({
-      email: 'student@demo.apu.edu.my',
-      displayName: 'Demo Student',
-      username: 'student',
-      role: 'student' as UserRole,
-      accountType: 'internal',
-      roleLabel: 'Student — School of Computing',
-      department: 'School of Computing',
-      functionLevel: 'student',
-      unitId: 'school_of_computing',
-      unitKind: 'school',
-    });
+    // The sidebar renders the SERVER-supplied nav tree verbatim (nav-tree.service.js), so the
+    // session carries the same tree a Student is really granted: a standalone Dashboard, the
+    // Proposals folder, the Forms folder and the Events folder.
+    TestBed.inject(AuthService).establishSession(testUser([testRole('student', 'school_of_computing', 'School of Computing')], {
+      email: 'student@demo.apu.edu.my', displayName: 'Demo Student', username: 'student',
+      nav: [
+        testNavPage('dashboard', 'Dashboard'),
+        {
+          pageCode: 'proposals', label: 'My Proposals', entryType: 'folder', icon: null, routePath: null,
+          children: [testNavPage('drafts', 'Drafts'), testNavPage('ongoing', 'Ongoing'), testNavPage('history', 'History')],
+        },
+        {
+          pageCode: 'forms', label: 'Forms', entryType: 'folder', icon: null, routePath: null,
+          children: [testNavPage('forms/event-proposal', 'Event Proposal')],
+        },
+        {
+          pageCode: 'events', label: 'Events', entryType: 'folder', icon: null, routePath: null,
+          children: [testNavPage('events/explore-events', 'Explore Events')],
+        },
+      ],
+    }));
 
     fixture = TestBed.createComponent(InternalLayoutComponent);
     component = fixture.componentInstance;
@@ -138,7 +147,7 @@ describe('InternalLayoutComponent', () => {
   });
 
   it('keeps an active parent highlighted while its child links are hidden', () => {
-    component.activeRoute.set('/app/proposals/pending');
+    component.activeRoute.set('/app/ongoing');
     fixture.detectChanges();
 
     const trigger = fixture.nativeElement.querySelector(
@@ -152,7 +161,7 @@ describe('InternalLayoutComponent', () => {
   });
 
   it('shows the current route as a breadcrumb in the top bar', () => {
-    component.activeRoute.set('/app/proposals/pending');
+    component.activeRoute.set('/app/ongoing');
     fixture.detectChanges();
 
     const breadcrumb = fixture.nativeElement.querySelector('.internal-breadcrumb') as HTMLElement;
@@ -185,15 +194,14 @@ describe('InternalLayoutComponent', () => {
 
   it('shows My Tasks without Inbox for task-based staff roles', () => {
     const auth = TestBed.inject(AuthService);
-    auth.establishSession({
+    // Cafeteria Staff is unit-linked now (their cafeteria IS a unit), and their sidebar is the
+    // server-supplied nav tree — only "My Tasks" is granted to them.
+    auth.establishSession(testUser([testRole('cafeteria-staff', 'cafeteria__atrium_cafeteria', 'Atrium Cafeteria')], {
       email: 'cafeteria.staff@apu.edu.my',
       displayName: 'Cafeteria Staff',
       username: 'cafeteria.staff',
-      role: UserRole.CafeteriaStaff,
-      accountType: 'internal',
-      roleLabel: 'Cafeteria Staff',
-      department: 'Cafeteria Services',
-    });
+      nav: [testNavPage('tasks', 'My Tasks')],
+    }));
 
     fixture.detectChanges();
 

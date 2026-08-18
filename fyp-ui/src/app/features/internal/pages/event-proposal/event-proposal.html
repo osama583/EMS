@@ -3,10 +3,10 @@
     <div class="proposal-title-banner">Event Proposal</div>
   </header>
 
-  @if (reviewerComment(); as comment) {
+  @if (reviewerComments().length) {
     <button type="button" class="comments-drawer-toggle" [class.comments-drawer-toggle--open]="commentsPanelOpen()" (click)="toggleCommentsPanel()">
       <span class="material-symbols-rounded" aria-hidden="true">forum</span>
-      Reviewer comment
+      Reviewer comment{{ reviewerComments().length === 1 ? '' : 's' }}
       <span class="material-symbols-rounded comments-drawer-toggle__chevron" aria-hidden="true">{{ commentsPanelOpen() ? 'chevron_right' : 'chevron_left' }}</span>
     </button>
     <aside class="comments-drawer" [class.comments-drawer--open]="commentsPanelOpen()" aria-label="Reviewer comments">
@@ -14,23 +14,25 @@
         <span class="material-symbols-rounded" aria-hidden="true">forum</span>
         <div>
           <h3>Reviewer Comments</h3>
-          <p class="comments-drawer__subtitle">Comments left by reviewers in this chain.</p>
+          <p class="comments-drawer__subtitle">Everything that needs your attention before you resubmit.</p>
         </div>
         <button type="button" class="comments-drawer__close" (click)="toggleCommentsPanel()" aria-label="Collapse reviewer comments panel">
           <span class="material-symbols-rounded" aria-hidden="true">close</span>
         </button>
       </header>
       <ul class="comments-drawer__list">
-        <li class="comments-drawer__entry">
-          <div class="comments-drawer__avatar" aria-hidden="true">{{ comment.initials }}</div>
-          <div class="comments-drawer__entry-body">
-            <div class="comments-drawer__entry-meta">
-              <strong>{{ comment.reviewer }}</strong>
-              <span class="comments-drawer__entry-stage">{{ comment.stage }}</span>
+        @for (comment of reviewerComments(); track comment.reviewer + comment.text) {
+          <li class="comments-drawer__entry">
+            <div class="comments-drawer__avatar" aria-hidden="true">{{ comment.initials }}</div>
+            <div class="comments-drawer__entry-body">
+              <div class="comments-drawer__entry-meta">
+                <strong>{{ comment.reviewer }}</strong>
+                <span class="comments-drawer__entry-stage">{{ comment.stage }}</span>
+              </div>
+              <p class="comments-drawer__entry-text">{{ comment.text }}</p>
             </div>
-            <p class="comments-drawer__entry-text">{{ comment.text }}</p>
-          </div>
-        </li>
+          </li>
+        }
       </ul>
     </aside>
   }
@@ -251,7 +253,7 @@
           <div class="proposal-card__title"><h3>Event Settings</h3><p>Control who can see this event and how people register.</p></div>
           <div class="proposal-grid">
             @if (eventVisibility() === 'Public') {
-              <app-searchable-dropdown controlId="event-categories" label="Event Categories" placeholder="Select one or two categories" [required]="true" [isMulti]="true" [maxSelections]="2" [options]="categoryOptions()" [value]="eventCategories()" [error]="error('eventCategories')" (valueChange)="setEventCategories($event)" />
+              <app-searchable-dropdown controlId="event-categories" label="Event Categories" placeholder="Select up to {{ maxEventCategories() }} categor{{ maxEventCategories() === 1 ? 'y' : 'ies' }}" [required]="true" [isMulti]="true" [maxSelections]="maxEventCategories()" [options]="categoryOptions()" [value]="eventCategories()" [error]="error('eventCategories')" (valueChange)="setEventCategories($event)" />
             }
             <app-searchable-dropdown controlId="event-visibility" label="Event Visibility" [required]="true" [searchable]="false" [options]="visibilityOptions" [value]="eventVisibility()" [error]="error('eventVisibility')" (valueChange)="setEventVisibility($event)" />
             <app-searchable-dropdown controlId="event-format" label="Event Format" [required]="true" [searchable]="false" [options]="formatOptions()" [value]="eventFormat()" (valueChange)="setEventFormat($event)" />
@@ -284,7 +286,7 @@
 
     @if (currentStep() === 5) {
       <section class="proposal-step" aria-labelledby="final-step-title">
-        <header><span class="material-symbols-rounded">task_alt</span><div><h2 id="final-step-title">Final Actions</h2></div></header>
+        <header><span class="material-symbols-rounded">task_alt</span><div><h2 id="final-step-title">Final Review</h2></div></header>
         <section class="proposal-card proposal-review">
           <div class="proposal-card__title"><h3>Live Review Summary</h3><p>Review the essential event information you entered before submission.</p></div>
           <div class="proposal-review__sections">
@@ -363,9 +365,28 @@
   </div>
 </app-form-modal>
 
-@if (previewOpen()) {
-  <div class="proposal-modal" role="presentation" (click)="closePreview()"><section role="dialog" aria-modal="true" aria-labelledby="preview-title" (click)="$event.stopPropagation()"><header><div><p>Proposal preview</p><h2 id="preview-title">{{ eventTitle() || 'Untitled Event' }}</h2></div><button type="button" aria-label="Close preview" (click)="closePreview()"><span class="material-symbols-rounded">close</span></button></header><div class="proposal-review__sections proposal-review__sections--preview">@for (section of reviewSections(); track section.title) { <section class="proposal-review__section"><h4><span class="material-symbols-rounded" aria-hidden="true">{{ section.icon }}</span>{{ section.title }}</h4><div class="proposal-summary">@for (item of section.items; track item.label) { <article [class.proposal-summary__wide]="item.wide"><span>{{ item.label }}</span><strong>{{ item.value }}</strong></article> }</div></section> }</div><footer><button type="button" class="table-control" (click)="closePreview()">Close</button><button type="button" class="table-control table-control--primary" (click)="submit()">Submit Proposal</button></footer></section></div>
-}
+<app-form-modal
+  [open]="previewOpen()"
+  [title]="eventTitle() || 'Untitled Event'"
+  primaryLabel="Submit Proposal"
+  secondaryLabel="Close"
+  (close)="closePreview()"
+  (cancel)="closePreview()"
+  (submit)="submit()"
+>
+  <div class="proposal-review__sections proposal-review__sections--preview">
+    @for (section of reviewSections(); track section.title) {
+      <section class="proposal-review__section">
+        <h4><span class="material-symbols-rounded" aria-hidden="true">{{ section.icon }}</span>{{ section.title }}</h4>
+        <div class="proposal-summary">
+          @for (item of section.items; track item.label) {
+            <article [class.proposal-summary__wide]="item.wide"><span>{{ item.label }}</span><strong>{{ item.value }}</strong></article>
+          }
+        </div>
+      </section>
+    }
+  </div>
+</app-form-modal>
 <app-form-modal
   title="Missing Required Fields"
   primaryLabel="Review Fields"
@@ -380,5 +401,25 @@
     <p>Your proposal has missing or invalid information. Please review the highlighted steps before submitting.</p>
   </div>
 </app-form-modal>
-@if (toast()) { <div class="proposal-toast" role="status">{{ toast() }}</div> }
+<!-- Submit / resubmit confirmation. Every critical action states what it does before it runs. -->
+<app-form-modal
+  [open]="submitConfirmOpen()"
+  [title]="resubmitProposalId() !== null ? 'Resubmit this proposal' : 'Submit this proposal'"
+  [primaryLabel]="resubmitProposalId() !== null ? 'Resubmit' : 'Submit Proposal'"
+  secondaryLabel="Keep Editing"
+  [loading]="resubmitting()"
+  (close)="submitConfirmOpen.set(false)"
+  (cancel)="submitConfirmOpen.set(false)"
+  (submit)="confirmSubmit()"
+>
+  <p class="proposal-submit-confirm">
+    @if (resubmitProposalId() !== null) {
+      Resubmit <strong>{{ eventTitle() || 'this proposal' }}</strong>? It returns to whichever
+      stage sent it back to you, and you will not be able to edit it again until someone reviews it.
+    } @else {
+      Submit <strong>{{ eventTitle() || 'this proposal' }}</strong> for approval? It enters the
+      review workflow immediately and can no longer be edited unless a reviewer sends it back.
+    }
+  </p>
+</app-form-modal>
 

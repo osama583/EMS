@@ -45,6 +45,9 @@ function projectPublishedEvent(request) {
     audience: ['APU Community'],
     schedule,
     totalExpectedPax: request.total_pax,
+    // Organizer-set registration cap (request.max_pax). null = uncapped. Enforced server-side in
+    // events.routes.js's POST /:id/register; surfaced here so the UI can show "X of Y places".
+    maxPax: request.max_pax != null ? Number(request.max_pax) : null,
     registrationMode: request.registration_approval,
     confirmedRegistrationCount,
     pendingRegistrationCount,

@@ -8,12 +8,13 @@ import { InternalDataPageComponent } from '../../../../../../shared/components/i
 import { InternalPageHeaderComponent, InternalResetButtonComponent, InternalSearchFieldComponent } from '../../../../../../shared/components/internal-data-page/internal-data-page-parts';
 import { InternalDataPageConfig, InternalDataRecord, InternalFilterConfig, InternalPageHeaderConfig, InternalRowActionEvent } from '../../../../../../shared/components/internal-data-page/internal-data-page.models';
 import { ClubCategoryPickerComponent } from '../../../../../../shared/components/club-category-picker/club-category-picker';
+import { ViewToggleComponent } from '../../../../../../shared/components/view-toggle/view-toggle';
 
 type ViewMode = 'table' | 'card';
 
 @Component({
   selector: 'app-hub-my-clubs',
-  imports: [FeedbackBannerComponent, InternalPageHeaderComponent, InternalDataPageComponent, ClubCategoryPickerComponent, InternalSearchFieldComponent, InternalResetButtonComponent],
+  imports: [ViewToggleComponent, FeedbackBannerComponent, InternalPageHeaderComponent, InternalDataPageComponent, ClubCategoryPickerComponent, InternalSearchFieldComponent, InternalResetButtonComponent],
   templateUrl: './hub-my-clubs.html',
   styleUrl: './hub-my-clubs.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

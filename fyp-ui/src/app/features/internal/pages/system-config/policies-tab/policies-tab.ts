@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, signal 
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import { SystemConfigService } from '../../../../../core/config/system-config.service';
+import { ToastService, apiErrorMessage } from '../../../../../shared/components/toast/toast.service';
 import { FormFieldComponent } from '../../../../../shared/components/form-controls/form-field';
 import { LoadingStateComponent } from '../../../../../shared/components/loading-state/loading-state';
 
@@ -15,9 +16,11 @@ import { LoadingStateComponent } from '../../../../../shared/components/loading-
 export class PoliciesTabComponent {
   private readonly configService = inject(SystemConfigService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
   readonly configLoading = this.configService.loading;
   readonly paxThreshold = signal(this.configService.paxReviewerThreshold());
   readonly cancellationDays = signal(this.configService.cancellationDaysLimit());
+  readonly maxCategories = signal(this.configService.maxEventCategories());
   readonly policiesSaved = signal(false);
   readonly saving = signal(false);
 
@@ -30,6 +33,7 @@ export class PoliciesTabComponent {
       if (this.configService.loading()) return;
       this.paxThreshold.set(this.configService.paxReviewerThreshold());
       this.cancellationDays.set(this.configService.cancellationDaysLimit());
+      this.maxCategories.set(this.configService.maxEventCategories());
     });
   }
 
@@ -43,16 +47,24 @@ export class PoliciesTabComponent {
     this.policiesSaved.set(false);
   }
 
+  setMaxCategories(value: string | number): void {
+    this.maxCategories.set(Math.max(1, Number(value) || 1));
+    this.policiesSaved.set(false);
+  }
+
   savePolicies(): void {
     this.saving.set(true);
     this.configService.updateConfig({
       paxReviewerThreshold: this.paxThreshold(),
       cancellationDaysLimit: this.cancellationDays(),
+      maxEventCategories: this.maxCategories(),
     }).pipe(finalize(() => this.saving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.policiesSaved.set(true);
+        this.toast.success('Policies saved', 'New proposals use these values immediately.');
         setTimeout(() => this.policiesSaved.set(false), 2000);
       },
+      error: (err) => this.toast.error('Could not save these policies', apiErrorMessage(err, 'Please try again.')),
     });
   }
 }
