@@ -9,6 +9,10 @@ import { SavedEventsService } from '../../../core/events/saved-events.service';
 import { roleCanUseSavedEvents } from '../../../core/auth/role-navigation';
 import { FormFieldComponent } from '../../../shared/components/form-controls/form-field';
 import { GuestRegistrationModalComponent } from '../../../shared/components/guest-registration-modal/guest-registration-modal';
+import { DevUser, DevUsersService } from '../../../core/auth/dev-users.service';
+
+// TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
+interface DemoUserGroup { readonly label: string; readonly users: readonly DevUser[]; }
 
 @Component({
   selector: 'app-login',
@@ -25,6 +29,8 @@ export class LoginComponent implements OnDestroy {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  // TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
+  private readonly devUsersService = inject(DevUsersService);
   private timer: ReturnType<typeof setTimeout> | undefined;
   private messageIndex = 0;
   private deleting = false;
@@ -42,6 +48,28 @@ export class LoginComponent implements OnDestroy {
   readonly passwordError = signal('');
   readonly loginError = signal('');
   readonly submitting = signal(false);
+  // TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
+  readonly demoUsers = signal<readonly DevUser[]>([]);
+  readonly demoSearch = signal('');
+  readonly selectedDemoEmail = signal<string | null>(null);
+  readonly demoGroups = computed<readonly DemoUserGroup[]>(() => {
+    const query = this.demoSearch().trim().toLowerCase();
+    const matches = (user: DevUser): boolean =>
+      !query
+      || user.displayName.toLowerCase().includes(query)
+      || user.email.toLowerCase().includes(query)
+      || user.roleLabel.toLowerCase().includes(query)
+      || user.department.toLowerCase().includes(query);
+
+    const filtered = [...this.demoUsers()].filter(matches).sort((a, b) => a.roleLabel.localeCompare(b.roleLabel));
+    const groups: { label: string; users: DevUser[] }[] = [];
+    for (const user of filtered) {
+      const last = groups[groups.length - 1];
+      if (last && last.label === user.roleLabel) last.users = [...last.users, user];
+      else groups.push({ label: user.roleLabel, users: [user] });
+    }
+    return groups;
+  });
   readonly year = new Date().getFullYear();
 
   constructor() {
@@ -49,10 +77,26 @@ export class LoginComponent implements OnDestroy {
     this.reducedMotion.set(prefersReducedMotion);
     if (prefersReducedMotion) this.typedMessage.set(this.messages[0]);
     else this.timer = setTimeout(() => this.tickTypewriter(), 420);
+
+    // TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
+    this.devUsersService.list().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((users) => this.demoUsers.set(users));
   }
 
   setEmail(value: string): void { this.email.set(value); if (/^\S+@\S+\.\S+$/.test(value)) this.emailError.set(''); this.loginError.set(''); }
   setPassword(value: string): void { this.password.set(value); if (value) this.passwordError.set(''); this.loginError.set(''); }
+
+  // TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
+  setDemoSearch(value: string): void { this.demoSearch.set(value); }
+
+  // TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
+  selectDemoUser(user: DevUser): void {
+    this.selectedDemoEmail.set(user.email);
+    this.email.set(user.email);
+    this.password.set(user.password);
+    this.emailError.set('');
+    this.passwordError.set('');
+    this.loginError.set('');
+  }
 
   openRegister(): void { this.guestFlow.requestRegistration(); this.guestFlow.open.set(true); }
 
