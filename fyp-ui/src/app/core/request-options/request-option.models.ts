@@ -7,7 +7,7 @@ export type RequestOptionKind =
   | 'dietaryInformation'
   | 'servingUnit'
   | 'campusTourStart'
-  | 'waterLogo'
+  | 'campusTourType'
   | 'waterNormal'
   | 'fundingMain'
   | 'fundingSub';
@@ -37,12 +37,10 @@ export interface TransportationRequestOption extends RequestOptionBase {
 
 export interface MediaRequestOption extends RequestOptionBase {
   readonly kind: 'photoVideo';
-  readonly maximumPersonnel?: number;
 }
 
 export interface SoundLightRequestOption extends RequestOptionBase {
   readonly kind: 'soundLight';
-  readonly availableQuantity?: number;
   readonly setupRequirements?: string;
 }
 
@@ -51,6 +49,10 @@ export interface FoodRequestOption extends RequestOptionBase {
   readonly servingUnitId?: string;
   readonly orderingNotes?: string;
   readonly dietaryInformationId?: string;
+  // Cafeteria unit code (unit.code, CAFETERIA_UNIT_PREFIX-coded) — a Cafeteria is a Unit, see
+  // server/db.js's seedCafeteriaDomain().
+  readonly cafeteriaCode?: string;
+  readonly cafeteriaName?: string;
 }
 
 export interface DietaryInformationOption extends RequestOptionBase {
@@ -67,8 +69,16 @@ export interface CampusTourStartOption extends RequestOptionBase {
   readonly maximumGroupSize?: number;
 }
 
+export interface CampusTourTypeOption extends RequestOptionBase {
+  readonly kind: 'campusTourType';
+}
+
+// Merged catalog — one Mineral Water source consumed everywhere (manager admin page and the
+// applicant's single Mineral Water request, which toggles "with logo" rather than picking a
+// separate option kind). brandingRequirement is optional guidance a manager can fill in when an
+// option supports logo printing; leaving it blank just means no logo-specific note is shown.
 export interface WaterRequestOption extends RequestOptionBase {
-  readonly kind: 'waterLogo' | 'waterNormal';
+  readonly kind: 'waterNormal';
   readonly bottleCount: number;
   readonly availableStock: number;
   readonly brandingRequirement?: string;
@@ -97,6 +107,7 @@ export type RequestOption =
   | DietaryInformationOption
   | ServingUnitOption
   | CampusTourStartOption
+  | CampusTourTypeOption
   | WaterRequestOption
   | FundingMainOption
   | FundingSubOption;
@@ -107,7 +118,10 @@ export interface RequestOptionQuery {
   readonly kinds?: readonly RequestOptionKind[];
   readonly activeOnly?: boolean;
   readonly search?: string;
+  readonly cafeteriaCode?: string;
 }
+
+export type ArchivedRequestOption = RequestOption & import('../../shared/models/deletion.models').DeletionMetadata;
 
 export interface RequestOptionRepository {
   getOptions(query: RequestOptionQuery): import('rxjs').Observable<readonly RequestOption[]>;
@@ -115,5 +129,9 @@ export interface RequestOptionRepository {
   createOption(draft: RequestOptionDraft): import('rxjs').Observable<RequestOption>;
   updateOption(id: string, draft: RequestOptionDraft): import('rxjs').Observable<RequestOption>;
   setOptionActive(id: string, active: boolean): import('rxjs').Observable<RequestOption>;
-  deleteOption(id: string): import('rxjs').Observable<void>;
+  checkOptionDeletion(id: string): import('rxjs').Observable<import('../../shared/models/deletion.models').DeletionPreview>;
+  deleteOption(id: string): import('rxjs').Observable<RequestOption>;
+  restoreOption(id: string): import('rxjs').Observable<RequestOption>;
+  purgeOption(id: string): import('rxjs').Observable<void>;
+  getDeletedOptions(): import('rxjs').Observable<readonly ArchivedRequestOption[]>;
 }

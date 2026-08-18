@@ -2,14 +2,13 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, InjectionToken, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { UserRole } from '../auth/auth.models';
-import { StaffTask, StaffTaskAssignmentDraft, StaffTaskRepository, StaffTaskStatus } from './staff-task.models';
+import { StaffTask, StaffTaskAssignmentDraft, StaffTaskRepository, StaffTaskRoutingKey, StaffTaskStatus } from './staff-task.models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiStaffTaskRepository implements StaffTaskRepository {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = environment.staffTasksApiUrl;
-  list(role: UserRole, assignedToEmail: string): Observable<readonly StaffTask[]> { return this.http.get<readonly StaffTask[]>(this.baseUrl, { params: { role, assignedToEmail } }); }
+  list(role: StaffTaskRoutingKey, assignedToEmail: string): Observable<readonly StaffTask[]> { return this.http.get<readonly StaffTask[]>(this.baseUrl, { params: { role, assignedToEmail } }); }
   assign(draft: StaffTaskAssignmentDraft): Observable<StaffTask> { return this.http.post<StaffTask>(`${this.baseUrl}/assignments`, draft); }
   updateStatus(id: string, status: StaffTaskStatus, staffEmail: string): Observable<StaffTask> { return this.http.patch<StaffTask>(`${this.baseUrl}/${encodeURIComponent(id)}/status`, { status, staffEmail }); }
 }

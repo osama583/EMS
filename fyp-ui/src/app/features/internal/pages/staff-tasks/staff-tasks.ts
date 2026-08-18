@@ -3,9 +3,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../../../core/auth/auth.service';
-import { UserRole } from '../../../../core/auth/auth.models';
-import { StaffTask, StaffTaskStatus } from '../../../../core/staff-tasks/staff-task.models';
+import { StaffTask, StaffTaskRoutingKey, StaffTaskStatus } from '../../../../core/staff-tasks/staff-task.models';
 import { StaffTaskService } from '../../../../core/staff-tasks/staff-task.service';
+import { staffTaskRoutingKeyFor } from '../../../../core/staff-tasks/staff-task-routing';
 import { FeedbackBannerComponent } from '../../../../shared/components/feedback-banner/feedback-banner';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
@@ -15,13 +15,16 @@ type PageMode = 'active' | 'history';
 interface RolePresentation { noun: string; begin: string; complete: string; beginIcon: string; columns: readonly InternalTableColumn[]; }
 
 const COMMON_END: readonly InternalTableColumn[] = [{ key: 'status', label: 'Status', width: '9rem' }, { key: 'actions', label: 'Actions', actions: true, width: '8rem' }];
-const ROLE_PRESENTATION: Readonly<Partial<Record<UserRole, RolePresentation>>> = {
-  [UserRole.CafeteriaStaff]: { noun: 'order', begin: 'Prepare Order', complete: 'Order Prepared', beginIcon: 'skillet', columns: [{ key: 'event', label: 'Event', width: '19rem' }, { key: 'request', label: 'Order', width: '15rem' }, { key: 'quantity', label: 'Quantity', width: '8rem' }, { key: 'detail', label: 'Dietary / Serving', width: '15rem' }, { key: 'schedule', label: 'Schedule & Venue', width: '17rem' }, ...COMMON_END] },
-  [UserRole.LogisticsStaff]: { noun: 'preparation', begin: 'Start Preparation', complete: 'Preparation Completed', beginIcon: 'inventory_2', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Logistics Item', width: '15rem' }, { key: 'quantity', label: 'Requested / Available', width: '11rem' }, { key: 'schedule', label: 'Setup Schedule', width: '17rem' }, { key: 'location', label: 'Location', width: '12rem' }, ...COMMON_END] },
-  [UserRole.StudentServicesMember]: { noun: 'campus tour', begin: 'Start Tour', complete: 'Tour Completed', beginIcon: 'tour', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Campus Tour', width: '15rem' }, { key: 'quantity', label: 'Visitors', width: '9rem' }, { key: 'detail', label: 'Tour Route', width: '18rem' }, { key: 'schedule', label: 'Tour Schedule', width: '17rem' }, { key: 'location', label: 'Starting Point', width: '12rem' }, ...COMMON_END] },
-  [UserRole.AvTechnician]: { noun: 'setup', begin: 'Start Setup', complete: 'Setup Completed', beginIcon: 'settings_input_component', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'A/V Request', width: '15rem' }, { key: 'detail', label: 'Equipment', width: '20rem' }, { key: 'schedule', label: 'Setup Window', width: '17rem' }, { key: 'location', label: 'Venue', width: '12rem' }, ...COMMON_END] },
-  [UserRole.PhotographyStaff]: { noun: 'coverage', begin: 'Start Coverage', complete: 'Coverage Completed', beginIcon: 'photo_camera', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Coverage', width: '15rem' }, { key: 'detail', label: 'Personnel', width: '15rem' }, { key: 'schedule', label: 'Coverage Schedule', width: '17rem' }, { key: 'location', label: 'Venue', width: '12rem' }, ...COMMON_END] },
-  [UserRole.TransportStaff]: { noun: 'trip', begin: 'Start Trip', complete: 'Trip Completed', beginIcon: 'directions_bus', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Trip', width: '14rem' }, { key: 'detail', label: 'Passengers / Capacity', width: '15rem' }, { key: 'location', label: 'Route', width: '18rem' }, { key: 'schedule', label: 'Schedule', width: '17rem' }, ...COMMON_END] },
+// RBAC redesign: keyed by StaffTaskRoutingKey (unitCode for the 5 Service department-routed
+// kinds, or the flat 'cafeteria-staff' role_code) instead of UserRole — see staff-task.models.ts.
+// Unit codes below MUST match server/db.js's seeded unit codes exactly.
+const ROLE_PRESENTATION: Readonly<Partial<Record<StaffTaskRoutingKey, RolePresentation>>> = {
+  'cafeteria-staff': { noun: 'order', begin: 'Prepare Order', complete: 'Order Prepared', beginIcon: 'skillet', columns: [{ key: 'event', label: 'Event', width: '19rem' }, { key: 'request', label: 'Order', width: '15rem' }, { key: 'quantity', label: 'Quantity', width: '8rem' }, { key: 'detail', label: 'Dietary / Serving', width: '15rem' }, { key: 'schedule', label: 'Schedule & Venue', width: '17rem' }, ...COMMON_END] },
+  logistics_and_facilities: { noun: 'preparation', begin: 'Start Preparation', complete: 'Preparation Completed', beginIcon: 'inventory_2', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Logistics Item', width: '15rem' }, { key: 'quantity', label: 'Requested / Available', width: '11rem' }, { key: 'schedule', label: 'Setup Schedule', width: '17rem' }, { key: 'location', label: 'Location', width: '12rem' }, ...COMMON_END] },
+  student_services: { noun: 'campus tour', begin: 'Start Tour', complete: 'Tour Completed', beginIcon: 'tour', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Campus Tour', width: '15rem' }, { key: 'quantity', label: 'Visitors', width: '9rem' }, { key: 'detail', label: 'Tour Route', width: '18rem' }, { key: 'schedule', label: 'Tour Schedule', width: '17rem' }, { key: 'location', label: 'Starting Point', width: '12rem' }, ...COMMON_END] },
+  a_v_services: { noun: 'setup', begin: 'Start Setup', complete: 'Setup Completed', beginIcon: 'settings_input_component', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'A/V Request', width: '15rem' }, { key: 'detail', label: 'Equipment', width: '20rem' }, { key: 'schedule', label: 'Setup Window', width: '17rem' }, { key: 'location', label: 'Venue', width: '12rem' }, ...COMMON_END] },
+  photography_services: { noun: 'coverage', begin: 'Start Coverage', complete: 'Coverage Completed', beginIcon: 'photo_camera', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Coverage', width: '15rem' }, { key: 'detail', label: 'Personnel', width: '15rem' }, { key: 'schedule', label: 'Coverage Schedule', width: '17rem' }, { key: 'location', label: 'Venue', width: '12rem' }, ...COMMON_END] },
+  transport_services: { noun: 'trip', begin: 'Start Trip', complete: 'Trip Completed', beginIcon: 'directions_bus', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Trip', width: '14rem' }, { key: 'detail', label: 'Passengers / Capacity', width: '15rem' }, { key: 'location', label: 'Route', width: '18rem' }, { key: 'schedule', label: 'Schedule', width: '17rem' }, ...COMMON_END] },
 };
 
 @Component({
@@ -37,7 +40,12 @@ export class StaffTasksComponent {
   private readonly service = inject(StaffTaskService);
   private readonly destroyRef = inject(DestroyRef);
   readonly mode = this.route.snapshot.data['taskPage'] as PageMode;
-  readonly role = this.auth.user()!.role;
+  // RBAC redesign: the routing key sent to the backend (and used to look up this staff member's
+  // task-page presentation) is their own unitCode for a Service department staff member, or the
+  // flat 'cafeteria-staff' role_code for cafeteria staff — see staff-task-routing.ts (shared with
+  // records-hub.ts's "does this viewer even have a Tasks tab" check, so both always agree).
+  private readonly currentUser = this.auth.user()!;
+  readonly role: StaffTaskRoutingKey = staffTaskRoutingKeyFor(this.currentUser) ?? '';
   readonly presentation = ROLE_PRESENTATION[this.role]!;
   readonly tasks = signal<readonly StaffTask[]>([]);
   readonly loading = signal(true);

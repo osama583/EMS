@@ -1,0 +1,10 @@
+.club-category-picker { display: grid; gap: var(--space-4); }
+
+.club-category-picker__error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--apu-red-50, #fef2f2);
+  color: var(--apu-red-700, #b91c1c);
+  font-size: .88rem;
+}

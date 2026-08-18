@@ -111,10 +111,13 @@ describe('App', () => {
       email: 'applicant@demo.apu.edu.my',
       displayName: 'Demo Applicant',
       username: 'applicant',
-      role: UserRole.Applicant,
+      role: 'student' as (typeof UserRole)[keyof typeof UserRole],
       accountType: 'internal',
-      roleLabel: 'Applicant',
+      roleLabel: 'Student — School of Computing',
       department: 'School of Computing',
+      functionLevel: 'student',
+      unitId: 'school_of_computing',
+      unitKind: 'school',
     });
     await TestBed.inject(Router).navigateByUrl('/app/how-it-works');
     await fixture.whenStable();

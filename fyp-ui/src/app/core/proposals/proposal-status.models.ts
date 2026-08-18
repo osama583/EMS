@@ -48,3 +48,33 @@ export function stageLabel(stage: ProposalStage): string {
     case ProposalStage.Cancelled: return 'Cancelled';
   }
 }
+
+const STAGE_ROLE_LABELS: Partial<Record<ProposalStage, string>> = {
+  [ProposalStage.HosHodReview]: 'HOS/HOD',
+  [ProposalStage.FmbReview]: 'F&B',
+  [ProposalStage.CfoReview]: 'CFO',
+};
+const ROLE_LABELS: Readonly<Record<string, string>> = {
+  cfo: 'CFO',
+  'head-of-school': 'HOS/HOD',
+  'head-of-department': 'F&B',
+};
+
+export interface ReviewerCommentEntry {
+  readonly stage: string;
+  readonly reviewer: string;
+  readonly initials: string;
+  readonly text: string;
+}
+
+// Shared by proposal-reviewer-view.ts (the reviewer's own read of the comment chain) and
+// event-proposal.ts (the applicant's read of the same comment when editing a resubmission-
+// required proposal) — same "who said this, at what stage" resolution, one definition.
+export function reviewerCommentEntry(state: ProposalWorkflowState): ReviewerCommentEntry | null {
+  if (!state.reviewerComment) return null;
+  const roleLabel = (state.resumeStage && STAGE_ROLE_LABELS[state.resumeStage])
+    ?? ROLE_LABELS[state.rejectedBy ?? '']
+    ?? 'Reviewer';
+  const initials = roleLabel.split(/[\s/&]+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+  return { stage: stageLabel(state.stage), reviewer: roleLabel, initials, text: state.reviewerComment };
+}

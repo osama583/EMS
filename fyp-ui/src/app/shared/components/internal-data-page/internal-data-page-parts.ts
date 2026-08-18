@@ -6,6 +6,7 @@ import {
   output,
 } from '@angular/core';
 import {
+  InternalCellClickEvent,
   InternalDataPageConfig,
   InternalDataRecord,
   InternalFilterChange,
@@ -169,7 +170,19 @@ export class InternalResetButtonComponent {
                         </span>
                       }
                       <span class="shared-data-cell__copy">
-                        @if (cell.badge) {
+                        @if (cell.badge && cell.clickable) {
+                          <button
+                            type="button"
+                            class="shared-data-cell__badge shared-data-cell__badge--clickable"
+                            [attr.data-tone]="cell.tone ?? 'neutral'"
+                            (click)="cellClick.emit({ columnKey: column.key, record })"
+                          >
+                            @if (cell.badgeIcon) {
+                              <span class="material-symbols-rounded shared-data-cell__badge-icon" aria-hidden="true">{{ cell.badgeIcon }}</span>
+                            }
+                            {{ cell.primary }}
+                          </button>
+                        } @else if (cell.badge) {
                           <span class="shared-data-cell__badge" [attr.data-tone]="cell.tone ?? 'neutral'">
                             {{ cell.primary }}
                           </span>
@@ -199,6 +212,7 @@ export class InternalDataTableComponent {
   readonly records = input.required<readonly InternalDataRecord[]>();
   readonly actions = input.required<readonly InternalRowAction[]>();
   readonly actionSelect = output<InternalRowActionEvent>();
+  readonly cellClick = output<InternalCellClickEvent>();
   visibleActions(record: InternalDataRecord): readonly InternalRowAction[] {
     return record.actionKeys ? this.actions().filter((action) => record.actionKeys!.includes(action.key)) : this.actions();
   }

@@ -1,7 +1,7 @@
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { UserRole } from '../../../../core/auth/auth.models';
 import { environment } from '../../../../../environments/environment';
@@ -24,6 +24,10 @@ async function configureWithRoute(id: string): Promise<void> {
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
+      // Approving/rejecting/resubmitting navigates to /app/proposals/pending on completion
+      // (handleActionComplete) — a real route table is needed so that navigation resolves
+      // instead of throwing NG04002.
+      provideRouter([{ path: 'app/proposals/pending', children: [] }]),
       { provide: ActivatedRoute, useValue: activatedRouteStub(id) },
     ],
   }).compileComponents();
@@ -41,7 +45,8 @@ describe('ProposalReviewPageComponent', () => {
     await configureWithRoute(String(pendingProposal.id));
     TestBed.inject(AuthService).establishSession({
       email: 'hoshod@demo.apu.edu.my', displayName: 'HOS / HOD Demo', username: 'hoshod',
-      role: UserRole.HosHod, accountType: 'internal', roleLabel: 'HOS / HOD', department: 'School Leadership',
+      role: 'manager' as UserRole, accountType: 'internal', roleLabel: 'HOS/HOD — School of Computing', department: 'School of Computing',
+      functionLevel: 'manager', unitId: 'school_of_computing', unitKind: 'school',
     });
 
     const fixture = TestBed.createComponent(ProposalReviewPageComponent);
@@ -77,20 +82,23 @@ describe('ProposalReviewPageComponent', () => {
       ...pendingProposal,
       workflow: { ...pendingProposal.workflow, stage: ProposalStage.FmbReview },
     };
+    // Approving no longer re-fetches the proposal by id — handleActionComplete navigates the
+    // user away to /app/proposals/pending once the approve call resolves (see
+    // proposal-review-page.ts), rather than staying on this page and refreshing its data.
     httpMock.expectOne(`${environment.proposalWorkflowApiUrl}/${pendingProposal.id}/approve`).flush(approvedProposal);
-    httpMock.expectOne(`${environment.proposalWorkflowApiUrl}/${pendingProposal.id}`).flush(approvedProposal);
 
     await new Promise((resolve) => setTimeout(resolve, 250));
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.proposal()?.workflow.stage).not.toBe(ProposalStage.HosHodReview);
+    expect(TestBed.inject(Router).url).toBe('/app/proposals/pending');
   });
 
   it('shows a not-found state when the proposal cannot be resolved', async () => {
     await configureWithRoute('999999');
     TestBed.inject(AuthService).establishSession({
       email: 'hoshod@demo.apu.edu.my', displayName: 'HOS / HOD Demo', username: 'hoshod',
-      role: UserRole.HosHod, accountType: 'internal', roleLabel: 'HOS / HOD', department: 'School Leadership',
+      role: 'manager' as UserRole, accountType: 'internal', roleLabel: 'HOS/HOD — School of Computing', department: 'School of Computing',
+      functionLevel: 'manager', unitId: 'school_of_computing', unitKind: 'school',
     });
 
     const fixture = TestBed.createComponent(ProposalReviewPageComponent);

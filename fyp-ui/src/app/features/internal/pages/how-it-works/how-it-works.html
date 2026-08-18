@@ -25,13 +25,12 @@
       preserveAspectRatio="none"
       aria-hidden="true"
     >
-      <path class="process-route__base" [attr.d]="processPath()"></path>
+      <path #routePath class="process-route__base" [attr.d]="processPath()"></path>
       <path
         class="process-route__progress"
         [attr.d]="processPath()"
-        pathLength="1"
-        stroke-dasharray="1"
-        [attr.stroke-dashoffset]="1 - timelineProgress() / 100"
+        [attr.stroke-dasharray]="pathTotalLength()"
+        [attr.stroke-dashoffset]="pathDashOffset()"
       ></path>
 
       @for (marker of pathMarkers(); track marker.progress) {

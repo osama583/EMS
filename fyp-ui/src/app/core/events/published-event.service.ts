@@ -19,8 +19,12 @@ export class PublishedEventService implements EventRegistrationApi {
     return this.http.get<EventRegistration | null>(`${this.baseUrl}/${encodeURIComponent(eventId)}/registrations/mine`, { params: { email: email.trim().toLowerCase() } });
   }
 
-  registerForEvent(eventId: string, email: string): Observable<RegistrationResult> {
-    return this.http.post<RegistrationResult>(`${this.baseUrl}/${encodeURIComponent(eventId)}/register`, { email: email.trim().toLowerCase() });
+  registerForEvent(eventId: string, email: string, paymentProof?: { url: string; fileName: string }): Observable<RegistrationResult> {
+    return this.http.post<RegistrationResult>(`${this.baseUrl}/${encodeURIComponent(eventId)}/register`, {
+      email: email.trim().toLowerCase(),
+      paymentProofUrl: paymentProof?.url,
+      paymentProofFileName: paymentProof?.fileName,
+    });
   }
   approveRegistration(id: string): Observable<EventRegistration | undefined> { return this.http.post<EventRegistration>(`${this.baseUrl}/registrations/${encodeURIComponent(id)}/approve`, {}); }
   rejectRegistration(id: string): Observable<EventRegistration | undefined> { return this.http.post<EventRegistration>(`${this.baseUrl}/registrations/${encodeURIComponent(id)}/reject`, {}); }

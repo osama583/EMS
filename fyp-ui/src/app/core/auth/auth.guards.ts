@@ -1,9 +1,6 @@
 import { inject } from '@angular/core';
 import { CanActivateChildFn, CanActivateFn, Router } from '@angular/router';
 import { AuthService } from './auth.service';
-import { UserRole } from './auth.models';
-import { RequestOptionKind } from '../request-options/request-option.models';
-import { canManageRequestOptions, managerOptionKinds } from '../request-options/request-option.permissions';
 
 export const authGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthService);
@@ -37,22 +34,13 @@ export const externalUserGuard: CanActivateFn = (_route, state) => {
   return inject(Router).createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
 };
 
-export const requestOptionManagerGuard: CanActivateFn = (route) => {
-  const auth = inject(AuthService);
-  const user = auth.user();
-  const optionKind = route.data['optionKind'] as RequestOptionKind | undefined;
-  const cafeteriaPage = route.data['optionPage'] === 'menu';
-  const authorised = user && (optionKind
-    ? managerOptionKinds(user.role).includes(optionKind)
-    : canManageRequestOptions(user.role, cafeteriaPage));
-  return authorised
-    ? true
-    : inject(Router).createUrlTree([auth.defaultRoute()]);
-};
-
-export const systemAdminGuard: CanActivateFn = () => {
-  const auth = inject(AuthService);
-  return auth.user()?.role === UserRole.SystemAdmin
-    ? true
-    : inject(Router).createUrlTree([auth.defaultRoute()]);
-};
+// Page-level authorization (system-admin-only pages, F&B-only pages, cafeteria-admin-only pages,
+// dropdown-option/My Menu pages, ...) has NO bespoke guard any more — nav_page_grants IS the
+// single source of truth for who can reach a URL, enforced once via roleGuard's (above)
+// auth.canAccess(state.url), which checks the URL against the user's server-computed nav tree
+// (role-navigation.ts's roleCanAccess()). A page visible in the sidebar and a page whose URL
+// actually loads can no longer drift out of sync, since both read the exact same
+// nav_page_grants rows. Previously this file exported systemAdminGuard/cafeteriaMenuViewerGuard/
+// cafeteriaAdminGuard/requestOptionManagerGuard, each duplicating in TypeScript a rule already
+// expressed in nav_page_grants — removed 2026-08-17 (see docs/superpowers/specs history for the
+// audit that confirmed every one of those guards had an exact-matching grant row already).

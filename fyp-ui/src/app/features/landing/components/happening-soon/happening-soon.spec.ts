@@ -39,6 +39,9 @@ const MOCK_PUBLISHED_EVENTS: readonly PublishedEvent[] = MOCK_EVENT_FIXTURES.map
   registrationMode: 'Automatic',
   confirmedRegistrationCount: 10,
   pendingRegistrationCount: 0,
+  cost: null,
+  bankAccountName: null,
+  bankAccountNumber: null,
   isFree: true,
 }));
 

@@ -5,8 +5,7 @@ import { ProposalStage, ProposalWorkflowState } from './proposal-status.models';
 
 const REQUEST_DETAILS: Readonly<Record<ProposalDepartmentKey, readonly Omit<ProposalDepartmentRequest, 'id' | 'department'>[]>> = {
   campusTour: [{ item: 'Campus overview tour', quantity: '30 visitors', schedule: '8 Aug 2026 - 3:00 PM-4:00 PM', location: 'Main Lobby', notes: 'Include innovation labs and student spaces.' }],
-  waterLogo: [{ item: 'Mineral Water with APU Logo', quantity: '180 bottles', schedule: 'Required by 8 Aug 2026 - 3:00 PM', location: 'Atrium', notes: 'Deliver before guest registration opens.' }],
-  waterNormal: [{ item: 'Mineral Water Normal', quantity: '96 bottles', schedule: 'Required by 8 Aug 2026 - 3:00 PM', location: 'Atrium', notes: 'Place at volunteer and backstage stations.' }],
+  waterNormal: [{ item: 'Mineral Water (with Logo)', quantity: '180 bottles', schedule: 'Required by 8 Aug 2026 - 3:00 PM', location: 'Atrium', notes: 'Deliver before guest registration opens.' }],
   logistics: [{ item: 'Banquet chairs and registration tables', quantity: '180 chairs · 8 tables', schedule: '8 Aug 2026 · 1:00 PM–3:30 PM', location: 'Atrium', notes: 'Complete setup before vendor arrival.' }],
   soundLight: [{ item: 'Main-stage sound and lighting', quantity: '1 complete setup', schedule: '8 Aug 2026 · 2:00 PM–10:00 PM', location: 'Atrium stage', notes: 'Wireless microphones, digital mixer and stage wash.' }],
   photoVideo: [{ item: 'Photography and videography coverage', quantity: '2 photographers · 1 videographer', schedule: '8 Aug 2026 · 4:00 PM–10:00 PM', location: 'Atrium', notes: 'Cover performances, guests and awards presentation.' }],

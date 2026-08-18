@@ -1,0 +1,28 @@
+@if (showTasksTab() || showRequestsTab() || showClubRequestsTab()) {
+  <nav class="records-hub-tabs" aria-label="{{ title }} sections">
+    <a class="records-hub-tabs__tab" routerLink="proposals" routerLinkActive="records-hub-tabs__tab--active">
+      <span class="material-symbols-rounded" aria-hidden="true">description</span>
+      Proposals
+    </a>
+    @if (showTasksTab()) {
+      <a class="records-hub-tabs__tab" routerLink="tasks" routerLinkActive="records-hub-tabs__tab--active">
+        <span class="material-symbols-rounded" aria-hidden="true">task</span>
+        Tasks
+      </a>
+    }
+    @if (showRequestsTab()) {
+      <a class="records-hub-tabs__tab" routerLink="requests" routerLinkActive="records-hub-tabs__tab--active">
+        <span class="material-symbols-rounded" aria-hidden="true">assignment</span>
+        Requests
+      </a>
+    }
+    @if (showClubRequestsTab()) {
+      <a class="records-hub-tabs__tab" routerLink="club-requests" routerLinkActive="records-hub-tabs__tab--active">
+        <span class="material-symbols-rounded" aria-hidden="true">how_to_reg</span>
+        Club Requests
+      </a>
+    }
+  </nav>
+}
+
+<router-outlet />

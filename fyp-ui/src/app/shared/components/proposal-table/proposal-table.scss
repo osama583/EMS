@@ -53,6 +53,9 @@
 .proposal-table__index { width: 3.5rem; color: var(--apu-text-muted); text-align: center !important; }
 .proposal-table__person-cell { display: inline-flex; min-width: 0; align-items: center; gap: .7rem; font-weight: 700; overflow-wrap: anywhere; }
 .proposal-table__avatar { display: grid; width: 2.5rem; height: 2.5rem; flex: 0 0 2.5rem; place-items: center; border-radius: 50%; background: rgb(42 131 255 / 11%); color: var(--apu-blue-600); font-size: .78rem; font-weight: 800; }
+.proposal-table__thumb { width: 2.5rem; height: 2.5rem; flex: 0 0 2.5rem; border-radius: var(--radius-control); object-fit: cover; background: var(--apu-surface-muted); }
+.proposal-table__thumb--placeholder { display: grid; place-items: center; color: rgb(42 131 255 / 38%); background: linear-gradient(145deg, rgb(240 244 250), rgb(225 233 245)); }
+.proposal-table__thumb--placeholder .material-symbols-rounded { font-size: 1.15rem; }
 .proposal-table__actions { width: 8.5rem; text-align: center !important; }
 .proposal-table__action-group { display: inline-flex; align-items: center; justify-content: center; gap: .55rem; }
 .proposal-table__action { display: grid; width: 2.45rem; height: 2.45rem; place-items: center; border: 0; border-radius: 50%; background: transparent; cursor: pointer; transition: background var(--motion-control) var(--ease-standard), color var(--motion-control) var(--ease-standard), transform var(--motion-control) var(--ease-standard); }

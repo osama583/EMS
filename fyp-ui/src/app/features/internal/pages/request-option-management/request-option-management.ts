@@ -4,12 +4,13 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { managerOptionKinds } from '../../../../core/request-options/request-option.permissions';
-import { RequestOption, RequestOptionDraft, RequestOptionKind } from '../../../../core/request-options/request-option.models';
+import { ArchivedRequestOption, RequestOption, RequestOptionDraft, RequestOptionKind } from '../../../../core/request-options/request-option.models';
 import { RequestOptionService } from '../../../../core/request-options/request-option.service';
+import { DeletionPreview } from '../../../../shared/models/deletion.models';
 import { FormFieldComponent } from '../../../../shared/components/form-controls/form-field';
 import { SelectOption } from '../../../../shared/components/form-controls/form-controls.models';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
-import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog';
+import { DeleteConfirmDialogComponent } from '../../../../shared/components/delete-confirm-dialog/delete-confirm-dialog';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
 import { InternalFilterControlsComponent, InternalPageHeaderComponent, InternalResetButtonComponent, InternalSearchFieldComponent } from '../../../../shared/components/internal-data-page/internal-data-page-parts';
 import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalPageHeaderConfig, InternalRowActionEvent } from '../../../../shared/components/internal-data-page/internal-data-page.models';
@@ -33,7 +34,7 @@ interface ManagerField {
 const KIND_LABELS: Readonly<Record<RequestOptionKind, string>> = {
   logistics: 'Logistics', transportation: 'Transportation', photoVideo: 'Photographer / Videographer', soundLight: 'Sound & Light', fmb: 'My Menu',
   dietaryInformation: 'Dietary Information', servingUnit: 'Serving Unit',
-  campusTourStart: 'Campus Tour — Starting Points', waterLogo: 'Mineral Water with Logo', waterNormal: 'Mineral Water Normal',
+  campusTourStart: 'Campus Tour — Starting Points', campusTourType: 'Campus Tour — Types of Tour', waterNormal: 'Mineral Water',
   fundingMain: 'Funding — Main Items', fundingSub: 'Funding — Sub-items',
 };
 
@@ -45,7 +46,7 @@ const CAFETERIA_OPTION_KINDS: readonly RequestOptionKind[] = ['fmb', 'servingUni
   selector: 'app-request-option-management',
   imports: [
     InternalDataPageComponent, FormModalComponent, FormFieldComponent, SearchableDropdownComponent, StatusToggleComponent, FeedbackBannerComponent,
-    ConfirmDialogComponent, OptionCardGridComponent, OptionItemDetailsModalComponent, InternalPageHeaderComponent,
+    DeleteConfirmDialogComponent, OptionCardGridComponent, OptionItemDetailsModalComponent, InternalPageHeaderComponent,
     InternalSearchFieldComponent, InternalFilterControlsComponent, InternalResetButtonComponent, ImageUploadFieldComponent,
   ],
   templateUrl: './request-option-management.html',
@@ -59,7 +60,7 @@ export class RequestOptionManagementComponent {
   private readonly destroyRef = inject(DestroyRef);
   readonly cafeteriaPage = this.route.snapshot.data['optionPage'] === 'menu';
   private readonly explicitKind = this.route.snapshot.data['optionKind'] as RequestOptionKind | undefined;
-  private readonly managerKinds = managerOptionKinds(this.auth.user()!.role);
+  private readonly managerKinds = managerOptionKinds(this.auth.user()!);
   readonly permittedKinds: readonly RequestOptionKind[] = this.cafeteriaPage
     ? this.managerKinds.filter((kind) => kind === 'fmb')
     : this.explicitKind && this.managerKinds.includes(this.explicitKind)
@@ -86,10 +87,26 @@ export class RequestOptionManagementComponent {
   readonly imageError = signal('');
   readonly viewMode = signal<'table' | 'card'>('table');
   readonly deleteTarget = signal<RequestOption | null>(null);
+  readonly deletePreview = signal<DeletionPreview | null>(null);
+  readonly checkingDeletion = signal(false);
   readonly deleting = signal(false);
   readonly detailsTarget = signal<OptionCardViewModel | null>(null);
 
-  readonly currentOptions = computed(() => this.allOptions().filter((option) => option.kind === this.selectedKind()));
+  // Deleted view — a simple toggle rather than a third page mode, since this page already has a
+  // table/card toggle per kind; showing deleted options replaces the active list in place.
+  readonly showDeleted = signal(false);
+  readonly deletedOptions = signal<readonly ArchivedRequestOption[]>([]);
+  readonly deletedLoading = signal(false);
+  readonly restoringId = signal<string | null>(null);
+
+  // Cafeteria Manager only manages their OWN cafeteria's menu items (the 'cafeteria-manager'
+  // role, surfaced on the user as cafeteriaCode) — servingUnit/dietaryInformation stay
+  // global/shared so this filter only bites for kind === 'fmb'.
+  private readonly ownCafeteriaCode = this.auth.user()?.cafeteriaCode;
+  readonly currentOptions = computed(() => this.allOptions().filter((option) =>
+    option.kind === this.selectedKind()
+    && (option.kind !== 'fmb' || this.ownCafeteriaCode === undefined || option.cafeteriaCode === this.ownCafeteriaCode),
+  ));
   readonly filteredOptions = computed(() => {
     const search = this.search().trim().toLowerCase();
     return this.currentOptions().filter((option) =>
@@ -142,6 +159,18 @@ export class RequestOptionManagementComponent {
   readonly cardHeaderConfig = computed<InternalPageHeaderConfig>(() => ({
     title: this.config().header.title,
     description: this.config().header.description,
+  }));
+  readonly deletedConfig = computed<InternalDataPageConfig>(() => ({
+    ariaLabel: `Deleted ${KIND_LABELS[this.selectedKind()]} options`, paginationLabel: 'Deleted option pages', rowsPerPageLabel: 'Rows per page', mobileListLabel: 'Deleted option cards',
+    header: {
+      title: `Deleted ${KIND_LABELS[this.selectedKind()]}`,
+      description: 'Soft-deleted options are kept for 7 days before being permanently removed. Restore an option any time within that window.',
+      countLabel: `${this.currentDeletedOptions().length} deleted`,
+    },
+    search: { ariaLabel: '', placeholder: '' },
+    columns: [{ key: 'name', label: 'Option' }, { key: 'details', label: 'Deleted' }, { key: 'status', label: 'Permanent deletion' }, { key: 'actions', label: 'Actions', actions: true }],
+    actions: [{ key: 'restore', label: 'Restore', icon: 'restore_from_trash' }],
+    emptyTitle: 'No deleted options', emptyDescription: 'Options you delete will appear here for 7 days before being permanently removed.', pageSizeOptions: [5, 10, 25],
   }));
   readonly filters = computed(() => [
     ...(this.permittedKinds.length > 1 ? [{
@@ -196,17 +225,70 @@ export class RequestOptionManagementComponent {
     const option = this.allOptions().find((item) => item.id === id);
     if (option) this.detailsTarget.set(this.toCardViewModel(option));
   }
-  requestDelete(option: RequestOption): void { this.clearNotices(); this.deleteTarget.set(option); }
-  cancelDelete(): void { if (!this.deleting()) this.deleteTarget.set(null); }
-  confirmDelete(): void {
-    const option = this.deleteTarget();
-    if (!option) return;
-    this.deleting.set(true);
-    this.optionService.delete(option.id).pipe(finalize(() => this.deleting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.deleteTarget.set(null); this.successMessage.set(`${option.label} was deleted.`); },
-      error: () => this.errorMessage.set('The option could not be deleted. Please try again.'),
+  requestDelete(option: RequestOption): void {
+    this.clearNotices();
+    this.deleteTarget.set(option);
+    this.deletePreview.set(null);
+    this.checkingDeletion.set(true);
+    this.optionService.checkDeletion(option.id).pipe(finalize(() => this.checkingDeletion.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (preview) => this.deletePreview.set(preview),
+      error: () => this.errorMessage.set('Could not check whether this option can be deleted.'),
     });
   }
+  cancelDelete(): void { if (!this.deleting()) { this.deleteTarget.set(null); this.deletePreview.set(null); } }
+  confirmDelete(): void {
+    const option = this.deleteTarget();
+    const preview = this.deletePreview();
+    if (!option || !preview || !preview.canDelete) return;
+    this.deleting.set(true);
+    this.optionService.delete(option.id).pipe(finalize(() => this.deleting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.deleteTarget.set(null); this.deletePreview.set(null);
+        this.successMessage.set(`${option.label} was deleted. It can be restored within 7 days.`);
+      },
+      error: (err) => this.errorMessage.set(err?.error?.message || 'The option could not be deleted. Please try again.'),
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Deleted view
+  // ---------------------------------------------------------------------------
+  toggleDeletedView(): void {
+    this.showDeleted.update((value) => !value);
+    this.clearNotices();
+    if (this.showDeleted()) this.loadDeleted();
+  }
+  private loadDeleted(): void {
+    this.deletedLoading.set(true);
+    this.optionService.getDeleted().pipe(finalize(() => this.deletedLoading.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (options) => this.deletedOptions.set(options),
+      error: () => this.errorMessage.set('The deleted options could not be loaded.'),
+    });
+  }
+  readonly currentDeletedOptions = computed(() => this.deletedOptions().filter((option) => option.kind === this.selectedKind()));
+  readonly deletedRecords = computed<readonly InternalDataRecord[]>(() => this.currentDeletedOptions().map((option) => ({
+    id: option.id,
+    actionKeys: ['restore'],
+    cells: {
+      name: { primary: option.label, secondary: option.description },
+      details: { primary: `Deleted ${this.formatDate(option.deletedAt)}` },
+      status: { primary: option.daysRemaining > 0 ? `${option.daysRemaining} day${option.daysRemaining === 1 ? '' : 's'} left` : 'Due for permanent deletion', badge: true, tone: option.daysRemaining <= 1 ? 'warning' : 'neutral' },
+      actions: { primary: '' },
+    },
+    mobile: { eyebrow: 'Deleted', status: `${option.daysRemaining}d left`, title: option.label, details: [{ icon: 'schedule', text: `Deleted ${this.formatDate(option.deletedAt)}` }, { icon: 'delete_forever', text: `Permanently deleted ${this.formatDate(option.permanentDeletionAt)}` }] },
+  })));
+  handleDeletedAction(event: InternalRowActionEvent): void {
+    if (event.action.key === 'restore') this.restoreOption(String(event.record.id));
+  }
+  restoreOption(id: string): void {
+    this.clearNotices();
+    this.restoringId.set(id);
+    this.optionService.restore(id).pipe(finalize(() => this.restoringId.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.successMessage.set('Option restored.'); this.loadDeleted(); },
+      error: (err) => this.errorMessage.set(err?.error?.message || 'The option could not be restored.'),
+    });
+  }
+  private formatDate(iso: string): string { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
   closeDetails(): void { this.detailsTarget.set(null); }
   closeModal(): void { if (!this.saving()) this.modalOpen.set(false); }
   setDraft(key: string, value: string | boolean): void {
@@ -278,6 +360,7 @@ export class RequestOptionManagementComponent {
   private clearNotices(): void { this.successMessage.set(''); this.errorMessage.set(''); }
   private emptyDraft(kind: RequestOptionKind): Record<string, string | number | boolean> {
     const draft: Record<string, string | number | boolean> = { kind, label: '', description: '', active: true };
+    if (kind === 'fmb' && this.auth.user()?.cafeteriaCode !== undefined) draft['cafeteriaCode'] = this.auth.user()!.cafeteriaCode!;
     this.fieldsFor(kind).forEach((field) => { if (!(field.key in draft)) draft[field.key] = field.type === 'number' ? '' : ''; });
     return draft;
   }
@@ -286,9 +369,8 @@ export class RequestOptionManagementComponent {
     const specific: Readonly<Record<RequestOptionKind, readonly ManagerField[]>> = {
       logistics: [{ key: 'availableQuantity', label: 'Available Quantity', type: 'number', required: true, min: 0 }, { key: 'quantityUnit', label: 'Quantity Unit', type: 'text', required: true }],
       transportation: [{ key: 'passengerCapacity', label: 'Passenger Capacity', type: 'number', required: true, min: 1 }, { key: 'availableVehicles', label: 'Available Vehicle Count', type: 'number', required: true, min: 0 }, { key: 'instructions', label: 'Instructions', type: 'textarea' }],
-      photoVideo: [{ key: 'maximumPersonnel', label: 'Maximum Personnel / Availability', type: 'number', min: 1 }],
+      photoVideo: [],
       soundLight: [
-        { key: 'availableQuantity', label: 'Available Quantity', type: 'number', required: true, min: 0 },
         { key: 'setupRequirements', label: 'Technical Description / Setup Requirements', type: 'textarea', required: true },
       ],
       fmb: [
@@ -299,8 +381,13 @@ export class RequestOptionManagementComponent {
       dietaryInformation: [],
       servingUnit: [],
       campusTourStart: [{ key: 'meetingInstructions', label: 'Meeting Instructions', type: 'textarea' }, { key: 'maximumGroupSize', label: 'Maximum Group Size', type: 'number', min: 1 }],
-      waterLogo: [{ key: 'bottleCount', label: 'Number of Bottles', type: 'number', required: true, min: 0 }, { key: 'availableStock', label: 'Available Stock', type: 'number', required: true, min: 0 }, { key: 'brandingRequirement', label: 'Logo / Branding Requirement', type: 'textarea' }, { key: 'orderingInstructions', label: 'Lead Time / Ordering Instructions', type: 'textarea' }],
-      waterNormal: [{ key: 'bottleCount', label: 'Number of Bottles', type: 'number', required: true, min: 0 }, { key: 'availableStock', label: 'Available Stock', type: 'number', required: true, min: 0 }, { key: 'orderingInstructions', label: 'Ordering / Delivery Instructions', type: 'textarea' }],
+      campusTourType: [],
+      waterNormal: [
+        { key: 'bottleCount', label: 'Number of Bottles', type: 'number', required: true, min: 0 },
+        { key: 'availableStock', label: 'Available Stock', type: 'number', required: true, min: 0 },
+        { key: 'orderingInstructions', label: 'Ordering / Delivery Instructions', type: 'textarea' },
+        { key: 'brandingRequirement', label: 'Logo / Branding Requirement (if requested with logo)', type: 'textarea' },
+      ],
       fundingMain: [{ key: 'financeCode', label: 'Budget Category / Finance Code', type: 'text' }, { key: 'purchasingGuidance', label: 'Purchasing Guidance', type: 'textarea' }],
       fundingSub: [{ key: 'parentId', label: 'Parent Main Item', type: 'select', required: true, options: this.allOptions().filter((option) => option.kind === 'fundingMain').map((option) => ({ value: option.id, label: option.label })) }, { key: 'financeCode', label: 'Finance / Procurement Code', type: 'text' }, { key: 'purchasingNote', label: 'Default Unit / Purchasing Note', type: 'textarea' }],
     };
@@ -310,12 +397,13 @@ export class RequestOptionManagementComponent {
     switch (option.kind) {
       case 'logistics': return [`${option.availableQuantity} ${option.quantityUnit}${option.availableQuantity === 1 ? '' : 's'} available`, option.imageFileName ? 'Image added' : ''].filter(Boolean).join(' · ');
       case 'transportation': return [`${option.passengerCapacity} passengers`, `${option.availableVehicles} vehicle(s)`, option.imageFileName ? 'Image added' : ''].filter(Boolean).join(' · ');
-      case 'photoVideo': return option.maximumPersonnel ? `Maximum ${option.maximumPersonnel} personnel` : '';
-      case 'soundLight': return option.availableQuantity === undefined ? option.setupRequirements ?? '' : `${option.availableQuantity} available`;
+      case 'photoVideo': return option.description ?? '';
+      case 'soundLight': return option.setupRequirements ?? '';
       case 'fmb': return [this.optionLabel(option.servingUnitId), this.optionLabel(option.dietaryInformationId), option.orderingNotes, option.imageFileName ? 'Image added' : ''].filter(Boolean).join(' · ');
       case 'dietaryInformation': case 'servingUnit': return option.description ?? '';
       case 'campusTourStart': return [option.maximumGroupSize ? `Maximum ${option.maximumGroupSize}` : '', option.meetingInstructions].filter(Boolean).join(' · ');
-      case 'waterLogo': case 'waterNormal': return `${option.bottleCount || 'Custom'} bottles · ${option.availableStock} in stock`;
+      case 'campusTourType': return option.description ?? '';
+      case 'waterNormal': return [`${option.bottleCount || 'Custom'} bottles`, `${option.availableStock} in stock`, option.brandingRequirement ? 'Logo option available' : ''].filter(Boolean).join(' · ');
       case 'fundingMain': return [option.financeCode, option.purchasingGuidance].filter(Boolean).join(' · ');
       case 'fundingSub': return [this.allOptions().find((item) => item.id === option.parentId)?.label, option.financeCode].filter(Boolean).join(' · ');
     }

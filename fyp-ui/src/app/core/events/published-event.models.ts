@@ -1,9 +1,3 @@
-export const EVENT_CATEGORY_OPTIONS = [
-  'Academic & Career', 'Workshops & Training', 'Sports & Wellness', 'Culture & Community',
-  'Clubs & Societies', 'Entertainment & Social', 'Volunteering',
-] as const;
-
-export type EventCategory = typeof EVENT_CATEGORY_OPTIONS[number];
 export type EventVisibility = 'Public' | 'Private' | 'Club Only';
 export type RegistrationMode = 'Automatic' | 'Approval Required';
 export type RegistrationStatus = 'confirmed' | 'pending' | 'duplicate' | 'rejected';
@@ -32,10 +26,10 @@ export interface PublishedEvent {
   readonly shortIntroduction: string;
   readonly goals: string;
   readonly expectedBenefits: string;
-  readonly categories: readonly EventCategory[];
+  readonly categories: readonly string[];
   readonly eventVisibility: EventVisibility;
   readonly promotionMethod?: string;
-  readonly eventFormat: 'On Campus' | 'Online' | 'Hybrid' | 'Off Campus';
+  readonly eventFormat: string;
   readonly eventImage: EventImageAsset;
   readonly schoolDepartment: string;
   readonly audience: readonly string[];
@@ -44,17 +38,30 @@ export interface PublishedEvent {
   readonly registrationMode: RegistrationMode;
   readonly confirmedRegistrationCount: number;
   readonly pendingRegistrationCount: number;
+  readonly cost: number | null;
+  readonly bankAccountName: string | null;
+  readonly bankAccountNumber: string | null;
   readonly isFree: boolean;
 }
+
+export type PaymentStatus = 'not_required' | 'pending_review' | 'approved' | 'rejected';
 
 export interface EventRegistration {
   readonly id: string;
   readonly eventId: string;
   readonly email: string;
   readonly status: 'confirmed' | 'pending' | 'rejected';
+  readonly paymentProofUrl: string | null;
+  readonly paymentProofFileName: string | null;
+  readonly paymentStatus: PaymentStatus;
 }
 
 export interface RegistrationResult { readonly status: RegistrationStatus; readonly message: string; }
+
+/** Public events are visible to everyone; Private/Club Only events are APU-community-only. */
+export function isEventVisibleTo(visibility: EventVisibility, isAuthenticated: boolean): boolean {
+  return visibility === 'Public' || isAuthenticated;
+}
 
 export const EVENT_FIELD_MAPPING = {
   card: ['eventTitle', 'categories', 'schedule', 'confirmedRegistrationCount', 'eventImage'],

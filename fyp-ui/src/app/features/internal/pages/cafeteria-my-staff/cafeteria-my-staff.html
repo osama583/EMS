@@ -1,0 +1,28 @@
+<section class="cafeteria-my-staff">
+  <app-feedback-banner [message]="successMessage()" tone="success" />
+  <app-feedback-banner [message]="errorMessage()" tone="error" />
+
+  <app-internal-data-page
+    [config]="config()" [records]="records()" [filters]="[]" [searchValue]="search()" [loading]="loading()"
+    [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+    (searchChange)="setSearch($event)" (reset)="reset()"
+    (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+    (primaryAction)="openAdd()"
+  />
+</section>
+
+<app-form-modal [open]="modalOpen()" title="Request new staff" primaryLabel="Send Request" [loading]="submitting()" [disabled]="!selectedUserId()" (close)="closeModal()" (cancel)="closeModal()" (submit)="submitAdd()">
+  <div class="cafeteria-my-staff__form">
+    <app-searchable-dropdown
+      controlId="my-staff-user" label="User" placeholder="Search for a user…" [required]="true"
+      hint="Only users without an existing role are listed."
+      [options]="userOptions()" [value]="selectedUserId()" (valueChange)="selectUser($event)"
+    />
+  </div>
+</app-form-modal>
+
+<app-form-modal [open]="!!removeTarget()" title="Request staff removal" primaryLabel="Send Request" [danger]="true" [loading]="removing()" (close)="cancelRemove()" (cancel)="cancelRemove()" (submit)="confirmRemove()">
+  <div class="cafeteria-my-staff__form">
+    <p>A request to remove <strong>{{ removeTarget()?.displayName }}</strong> from your cafeteria will be sent to Cafeteria Admin for approval.</p>
+  </div>
+</app-form-modal>

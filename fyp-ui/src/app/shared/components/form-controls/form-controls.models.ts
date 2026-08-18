@@ -21,6 +21,10 @@ export interface EditableTableColumn {
   readonly parentKey?: string;
   readonly dependentOptions?: Readonly<Record<string, readonly SelectOption[]>>;
   readonly width?: string;
+  // Layout hint for modal/detail forms rendered as a 2-column grid (event-proposal's request
+  // editor) — 'full' spans both columns, omitted/'half' takes one. Purely a display hint, not
+  // read anywhere else (table columns, validation) so it's safe to leave unset by default.
+  readonly span?: 'half' | 'full';
 }
 
 export interface StaffOption extends SelectOption {

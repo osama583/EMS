@@ -16,35 +16,54 @@
           Card View
         </button>
       </div>
+      <button type="button" class="table-control" (click)="toggleDeletedView()">
+        <span class="material-symbols-rounded" aria-hidden="true">{{ showDeleted() ? 'list_alt' : 'delete' }}</span>
+        {{ showDeleted() ? 'Back to options' : 'Deleted' }}
+      </button>
       <button type="button" class="table-control table-control--primary option-management__add-desktop" (click)="openAdd()">
         <span class="material-symbols-rounded" aria-hidden="true">add</span>
         {{ config().header.primaryActionLabel }}
       </button>
     </div>
 
-    <section class="internal-table-workspace__controls option-management__controls">
-      <div workspaceControls class="shared-page-controls">
-        <app-internal-search-field
-          workspaceControlWide
-          [config]="{ ariaLabel: 'Search options', placeholder: 'Search option name or details' }"
-          [value]="search()"
-          (valueChange)="setSearch($event)"
-        />
-        <div workspaceControlRight class="shared-page-controls__right">
-          <app-internal-filter-controls [filters]="filters()" (filterChange)="setFilter($event)" />
-          <div class="shared-page-controls__actions">
-            <button type="button" class="table-control table-control--primary option-management__add-mobile" (click)="openAdd()">
-              <span class="material-symbols-rounded" aria-hidden="true">add</span>
-              {{ config().header.primaryActionLabel }}
-            </button>
-            <app-internal-reset-button (reset)="reset()" />
+    @if (!showDeleted()) {
+      <section class="internal-table-workspace__controls option-management__controls">
+        <div workspaceControls class="shared-page-controls">
+          <app-internal-search-field
+            workspaceControlWide
+            [config]="{ ariaLabel: 'Search options', placeholder: 'Search option name or details' }"
+            [value]="search()"
+            (valueChange)="setSearch($event)"
+          />
+          <div workspaceControlRight class="shared-page-controls__right">
+            <app-internal-filter-controls [filters]="filters()" (filterChange)="setFilter($event)" />
+            <div class="shared-page-controls__actions">
+              <button type="button" class="table-control table-control--primary option-management__add-mobile" (click)="openAdd()">
+                <span class="material-symbols-rounded" aria-hidden="true">add</span>
+                {{ config().header.primaryActionLabel }}
+              </button>
+              <app-internal-reset-button (reset)="reset()" />
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    }
+  } @else {
+    <div class="option-management__view-row">
+      <button type="button" class="table-control" (click)="toggleDeletedView()">
+        <span class="material-symbols-rounded" aria-hidden="true">{{ showDeleted() ? 'list_alt' : 'delete' }}</span>
+        {{ showDeleted() ? 'Back to options' : 'Deleted' }}
+      </button>
+    </div>
   }
 
-  @if (showCardToggle() && viewMode() === 'card') {
+  @if (showDeleted()) {
+    <app-internal-data-page
+      [config]="deletedConfig()" [records]="deletedRecords()" [filters]="[]" [searchValue]="''" [loading]="deletedLoading()"
+      [totalPages]="1" [page]="1" [pageSize]="50" [hideControls]="true"
+      (rowAction)="handleDeletedAction($event)"
+    />
+  } @else if (showCardToggle() && viewMode() === 'card') {
     <app-option-card-grid
       [items]="menuCardData()" [loading]="loading()"
       emptyTitle="No options found" emptyDescription="Add an option or change the search and status filters."
@@ -97,10 +116,9 @@
   </div>
 </app-form-modal>
 
-<app-confirm-dialog
-  [open]="!!deleteTarget()" title="Delete menu item" [danger]="true"
-  [message]="'Are you sure you want to delete \'' + (deleteTarget()?.label ?? '') + '\'? This cannot be undone.'"
-  confirmLabel="Delete" [loading]="deleting()"
+<app-delete-confirm-dialog
+  [open]="!!deleteTarget()" [entityKind]="kindLabel(selectedKind())" [entityLabel]="deleteTarget() ? '\'' + deleteTarget()!.label + '\'' : ''"
+  [checkingDependencies]="checkingDeletion()" [preview]="deletePreview()" [deleting]="deleting()"
   (confirm)="confirmDelete()" (cancel)="cancelDelete()"
 />
 

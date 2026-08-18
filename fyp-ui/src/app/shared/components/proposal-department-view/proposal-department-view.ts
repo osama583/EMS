@@ -3,10 +3,15 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize, forkJoin } from 'rxjs';
 import { AdminDirectoryService } from '../../../core/admin-directory/admin-directory.service';
 import { AuthService } from '../../../core/auth/auth.service';
-import { UserRole } from '../../../core/auth/auth.models';
-import { staffRoleForManager } from '../../../core/departments/department-workflow.config';
+import { AuthUser } from '../../../core/auth/auth.models';
+import { hasRole } from '../../../core/auth/role-access';
+import { CafeteriaService } from '../../../core/cafeterias/cafeteria.service';
+import { Cafeteria } from '../../../core/cafeterias/cafeteria.models';
+import { staffUnitCodeForManager } from '../../../core/departments/department-workflow.config';
 import { departmentsForRole, FmbSelection, ProposalReviewRecord } from '../../../core/proposals/proposal-review.models';
 import { ProposalWorkflowService } from '../../../core/proposals/proposal-workflow.service';
+import { RequestOptionService } from '../../../core/request-options/request-option.service';
+import { FoodRequestOption } from '../../../core/request-options/request-option.models';
 import { StaffTaskService } from '../../../core/staff-tasks/staff-task.service';
 import { EditableRow } from '../form-controls/form-controls.models';
 import { FormModalComponent } from '../form-modal/form-modal';
@@ -132,6 +137,46 @@ interface ReviewerComment {
             </app-proposal-section>
           }
 
+          <!-- Section: Create Cafeteria Orders (F&B only, on the fmb department) — pick a
+               cafeteria and menu item for each raw food/water request row, one order at a time,
+               until the requested quantity is covered. Each order then goes to that cafeteria's
+               own Cafeteria Manager for approval — F&B never approves its own order. -->
+          @if (isFmbCreateOrderView()) {
+            <app-proposal-section icon="restaurant" title="Cafeteria Orders" description="Pick a cafeteria and menu item to fulfill each request. Create as many orders per request as needed.">
+              <div class="prv-fmb-selections">
+                @for (row of requestRows(); track row['id']) {
+                  <div class="prv-fmb-selection">
+                    <div class="prv-fmb-selection__body">
+                      <div class="prv-fmb-selection__row">
+                        <span class="prv-fmb-selection__label">Requested</span>
+                        <strong>{{ row['item'] }} — {{ row['quantity'] }}</strong>
+                      </div>
+                      @if (ordersFor($any(row['id'])).length) {
+                        <div class="prv-fmb-selection__row">
+                          <span class="prv-fmb-selection__label">Orders placed</span>
+                          <span>
+                            @for (order of ordersFor($any(row['id'])); track order.id) {
+                              {{ order.cafeteriaName }} · {{ order.menuItemLabel }} × {{ order.quantity }} ({{ selectionStatusLabel(order.status) }})@if (!$last) {, }
+                            }
+                          </span>
+                        </div>
+                      }
+                    </div>
+                    <div class="prv-fmb-selection__actions">
+                      <button type="button" class="prv-btn prv-btn--approve" (click)="openCreateOrderModal(row)">
+                        <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">add_circle</span>
+                        <span class="prv-btn__label">Create Order</span>
+                      </button>
+                    </div>
+                  </div>
+                }
+                @if (!requestRows().length) {
+                  <p class="prv-fmb-selections__empty">No food or water requests on this proposal.</p>
+                }
+              </div>
+            </app-proposal-section>
+          }
+
         </div><!-- /prv-main -->
 
         <!-- RIGHT — Sticky Reviewer Panel -->
@@ -204,7 +249,7 @@ interface ReviewerComment {
           }
 
           <!-- Section: Assign Department Work -->
-          @if (!readOnly() && allowAssignment() && !isCafeteriaSelectionView() && staffRole(); as assignmentRole) {
+          @if (!readOnly() && allowAssignment() && !isCafeteriaSelectionView() && staffUnitCode(); as assignmentRole) {
             <div class="prv-panel-card">
               <div class="prv-panel-card__head">
                 <span class="prv-panel-card__icon material-symbols-rounded" aria-hidden="true">person_add</span>
@@ -369,6 +414,75 @@ interface ReviewerComment {
         </div>
       </div>
     </app-form-modal>
+
+    <!-- Create Order modal popup (F&B flow: pick cafeteria + menu item + quantity for one request row) -->
+    <app-form-modal
+      [open]="createOrderTarget() !== null"
+      title="Create cafeteria order"
+      primaryLabel="Create Order"
+      secondaryLabel="Cancel"
+      [loading]="creatingOrder()"
+      [disabled]="!createOrderValid()"
+      (close)="closeCreateOrderModal()"
+      (cancel)="closeCreateOrderModal()"
+      (submit)="confirmCreateOrder()"
+    >
+      <div class="prv-action-modal-body">
+        @if (createOrderTarget(); as row) {
+          <p class="prv-action-modal__info">
+            <span class="material-symbols-rounded" aria-hidden="true">restaurant</span>
+            Fulfilling: {{ row['item'] }} — {{ row['quantity'] }}
+          </p>
+        }
+        <app-searchable-dropdown
+          controlId="create-order-cafeteria"
+          label="Cafeteria"
+          placeholder="Select a cafeteria"
+          [required]="true"
+          [options]="cafeteriaSelectOptions()"
+          [value]="createOrderCafeteria()"
+          (valueChange)="selectCreateOrderCafeteria($any($event))"
+        />
+        <app-searchable-dropdown
+          controlId="create-order-menu-item"
+          label="Menu item"
+          placeholder="Select a menu item"
+          [required]="true"
+          [disabled]="!createOrderCafeteria()"
+          [options]="menuItemSelectOptions()"
+          [value]="createOrderMenuItemId()"
+          (valueChange)="selectCreateOrderMenuItem($any($event))"
+        />
+        <div class="prv-comment-area">
+          <label class="prv-comment-area__label" for="create-order-quantity">Quantity</label>
+          <input
+            id="create-order-quantity"
+            class="prv-comment-area__input"
+            type="number"
+            min="1"
+            [value]="createOrderQuantity()"
+            (input)="setCreateOrderQuantity($any($event.target).value)"
+          />
+        </div>
+        <div class="prv-comment-area">
+          <label class="prv-comment-area__label" for="create-order-notes">Notes (optional)</label>
+          <textarea
+            id="create-order-notes"
+            class="prv-comment-area__input"
+            rows="3"
+            placeholder="Delivery time, allergy notes, etc…"
+            [value]="createOrderNotes()"
+            (input)="setCreateOrderNotes($any($event.target).value)"
+          ></textarea>
+        </div>
+        @if (createOrderError()) {
+          <p class="prv-comment-area__error" role="alert">
+            <span class="material-symbols-rounded" aria-hidden="true">error</span>
+            {{ createOrderError() }}
+          </p>
+        }
+      </div>
+    </app-form-modal>
   `,
   styleUrl: './proposal-department-view.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -378,16 +492,21 @@ export class ProposalDepartmentViewComponent {
   private readonly auth = inject(AuthService);
   private readonly tasks = inject(StaffTaskService);
   private readonly workflow = inject(ProposalWorkflowService);
+  private readonly cafeterias = inject(CafeteriaService);
+  private readonly options = inject(RequestOptionService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly proposal = input<ProposalReviewRecord | null>(null);
-  readonly role = input.required<UserRole>();
+  // RBAC redesign: the department manager viewing this component is identified by their full
+  // AuthUser (roles[] holding head-of-department for a Service department, or head-of-department
+  // on food_beverage_services for F&B — there's no separate flat CafeteriaManager role any more).
+  readonly role = input.required<AuthUser>();
   readonly allowAssignment = input(true);
   readonly readOnly = input(false);
   readonly actionComplete = output<number>();
 
   readonly departments = computed(() => departmentsForRole(this.role()));
-  readonly staffRole = computed(() => staffRoleForManager(this.role()));
+  readonly staffUnitCode = computed(() => staffUnitCodeForManager(this.role()));
   readonly staffUsers = signal<readonly { email: string; displayName: string }[]>([]);
   readonly assigneeEmail = signal('');
   readonly assigning = signal(false);
@@ -410,20 +529,49 @@ export class ProposalDepartmentViewComponent {
   readonly selectionComment = signal('');
   readonly selectionCommentValidationError = signal(false);
 
-  // The Cafeteria Manager reviews F&B's fmb department task differently from every other
-  // manager: instead of one atomic approve/resubmit for the whole task, each cafeteria
-  // selection (request_fmb_selection row) has its own independent lifecycle. This flag
-  // switches the template from the shared department-wide panel to the per-selection list.
-  readonly isCafeteriaSelectionView = computed(() =>
-    this.role() === UserRole.CafeteriaManager && this.departments().includes('fmb'),
-  );
+  // Cafeteria Manager reviews the fmb selections routed to their OWN cafeteria differently from
+  // every other manager: instead of one atomic approve/resubmit for the whole department task,
+  // each cafeteria selection (request_fmb_selection row) has its own independent lifecycle. This
+  // flag switches the template from the shared department-wide panel to the per-selection list.
+  readonly isCafeteriaSelectionView = computed(() => hasRole(this.role(), 'cafeteria-manager'));
 
   readonly myCafeteriaSelections = computed<readonly FmbSelection[]>(() => {
-    const cafeteriaId = this.auth.user()?.cafeteriaId;
+    const cafeteriaCode = this.auth.user()?.cafeteriaCode;
     const selections = this.proposal()?.fmbSelections ?? [];
-    if (cafeteriaId === undefined) return [];
-    return selections.filter((selection) => selection.cafeteriaId === cafeteriaId);
+    if (cafeteriaCode === undefined) return [];
+    return selections.filter((selection) => selection.cafeteriaCode === cafeteriaCode);
   });
+
+  // F&B's head-of-department fans each raw food/water request out into one or more concrete
+  // cafeteria orders (createFmbSelection, one row per order) — a SEPARATE view from
+  // isCafeteriaSelectionView above: F&B creates orders, the owning Cafeteria Manager approves
+  // them. Both can be true for the SAME proposal (F&B creating a new order while earlier orders
+  // for other cafeterias sit in their managers' inboxes), but never for the same viewing user,
+  // since 'cafeteria-manager' and F&B's 'head-of-department' are different roles.
+  readonly isFmbCreateOrderView = computed(() =>
+    hasRole(this.role(), 'head-of-department', 'food_beverage_services') && this.departments().includes('fmb'),
+  );
+
+  readonly cafeteriaOptions = signal<readonly Cafeteria[]>([]);
+  readonly createOrderTarget = signal<EditableRow | null>(null);
+  readonly createOrderCafeteria = signal('');
+  readonly createOrderMenuItems = signal<readonly FoodRequestOption[]>([]);
+  readonly createOrderMenuItemId = signal('');
+  readonly createOrderQuantity = signal<number | ''>('');
+  readonly createOrderNotes = signal('');
+  readonly creatingOrder = signal(false);
+  readonly createOrderError = signal('');
+
+  readonly cafeteriaSelectOptions = computed(() => this.cafeteriaOptions().filter((c) => c.active).map((c) => ({ value: c.code, label: c.name })));
+  readonly menuItemSelectOptions = computed(() => this.createOrderMenuItems().map((item) => ({ value: item.id, label: item.label, description: item.description })));
+  readonly createOrderValid = computed(() => !!this.createOrderCafeteria() && !!this.createOrderMenuItemId() && Number(this.createOrderQuantity()) > 0);
+
+  // Existing selections for the request row currently being fulfilled — read-only for F&B (they
+  // don't approve their own orders), shown so F&B can see how much of the request is already
+  // covered before creating another order.
+  ordersFor(requestFmbId: number): readonly FmbSelection[] {
+    return (this.proposal()?.fmbSelections ?? []).filter((selection) => selection.requestFmbId === requestFmbId);
+  }
 
   readonly canAct = computed(() => {
     if (this.readOnly()) return false;
@@ -471,9 +619,13 @@ export class ProposalDepartmentViewComponent {
 
   constructor() {
     this.directory.users$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((users) => {
-      const role = this.staffRole();
-      this.staffUsers.set(role ? users.filter((user) => user.active && user.role === role).map(({ email, displayName }) => ({ email, displayName })) : []);
+      const unitCode = this.staffUnitCode();
+      // Staff of this department share the SAME unitCode as their head under the RBAC redesign
+      // — exclude head-of-department/head-of-school holders so the assignment dropdown still
+      // only offers actual frontline staff, matching the old role-filter's intent.
+      this.staffUsers.set(unitCode ? users.filter((user) => user.active && user.roles.some((r) => r.unitCode === unitCode && r.roleCode !== 'head-of-department' && r.roleCode !== 'head-of-school')).map(({ email, displayName }) => ({ email, displayName })) : []);
     });
+    this.cafeterias.list().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((cafeterias) => this.cafeteriaOptions.set(cafeterias));
   }
 
   onCommentInput(event: Event): void {
@@ -554,7 +706,7 @@ export class ProposalDepartmentViewComponent {
     if (!proposal) return;
     this.selectionActionPending.set(selection.id);
     this.actionMessage.set('');
-    this.workflow.approveFmbSelection(proposal.id, selection.id).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.workflow.approveFmbSelection(proposal.id, selection.id, this.auth.user()!.email).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.actionBannerKind.set('success'); this.actionMessage.set('Order approved and sent to Cafeteria Staff.'); this.actionComplete.emit(proposal.id); },
       error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not approve this order. Please try again.'); },
     });
@@ -589,23 +741,85 @@ export class ProposalDepartmentViewComponent {
     const proposal = this.proposal();
     if (!proposal) return;
     this.selectionActionPending.set(selection.id);
-    this.workflow.resubmitFmbSelection(proposal.id, selection.id, comment).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.workflow.resubmitFmbSelection(proposal.id, selection.id, this.auth.user()!.email, comment).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.actionBannerKind.set('info'); this.actionMessage.set('Sent back to F&B for this order only.'); this.selectionComment.set(''); this.actionComplete.emit(proposal.id); },
       error: () => { this.actionBannerKind.set('error'); this.actionMessage.set('Could not resubmit this order. Please try again.'); },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // F&B: create a cafeteria order (request_fmb_selection row) fulfilling a raw food/water
+  // request row. One row = one order; F&B repeats this per cafeteria/dish until the request's
+  // pax/quantity is covered — see createFmbSelection() in workflow.service.js.
+  // ---------------------------------------------------------------------------
+  openCreateOrderModal(row: EditableRow): void {
+    this.createOrderTarget.set(row);
+    this.createOrderCafeteria.set('');
+    this.createOrderMenuItems.set([]);
+    this.createOrderMenuItemId.set('');
+    this.createOrderQuantity.set('');
+    this.createOrderNotes.set('');
+    this.createOrderError.set('');
+  }
+
+  closeCreateOrderModal(): void {
+    if (!this.creatingOrder()) this.createOrderTarget.set(null);
+  }
+
+  selectCreateOrderCafeteria(value: string | readonly string[]): void {
+    const code = Array.isArray(value) ? value[0] ?? '' : value;
+    this.createOrderCafeteria.set(code);
+    this.createOrderMenuItemId.set('');
+    this.createOrderMenuItems.set([]);
+    if (!code) return;
+    this.options.watchByCafeteria(code).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((items) => {
+      this.createOrderMenuItems.set((items as readonly FoodRequestOption[]).filter((item) => item.active));
+    });
+  }
+
+  selectCreateOrderMenuItem(value: string | readonly string[]): void {
+    this.createOrderMenuItemId.set(Array.isArray(value) ? value[0] ?? '' : value);
+  }
+
+  setCreateOrderQuantity(value: string): void {
+    this.createOrderQuantity.set(value === '' ? '' : Number(value));
+  }
+
+  setCreateOrderNotes(value: string): void {
+    this.createOrderNotes.set(value);
+  }
+
+  confirmCreateOrder(): void {
+    const proposal = this.proposal();
+    const row = this.createOrderTarget();
+    const menuItem = this.createOrderMenuItems().find((item) => item.id === this.createOrderMenuItemId());
+    if (!proposal || !row || !menuItem || !this.createOrderValid()) return;
+    this.creatingOrder.set(true);
+    this.createOrderError.set('');
+    this.workflow.createFmbSelection(proposal.id, {
+      requestFmbId: Number(row['id']),
+      cafeteriaCode: this.createOrderCafeteria(),
+      fmbOptionId: menuItem.id,
+      menuItemLabel: menuItem.label,
+      quantity: Number(this.createOrderQuantity()),
+      notes: this.createOrderNotes().trim() || undefined,
+    }, this.auth.user()!.email).pipe(finalize(() => this.creatingOrder.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.createOrderTarget.set(null); this.actionBannerKind.set('success'); this.actionMessage.set('Order created and sent to the cafeteria manager for approval.'); this.actionComplete.emit(proposal.id); },
+      error: (err) => this.createOrderError.set(err?.error?.message || 'Could not create this order. Please try again.'),
     });
   }
 
   assignRequests(): void {
     const proposal = this.proposal();
     const assignedToEmail = this.assigneeEmail();
-    const role = this.staffRole();
+    const unitCode = this.staffUnitCode();
     const departments = this.departments();
-    if (!proposal || !assignedToEmail || !role) return;
+    if (!proposal || !assignedToEmail || !unitCode) return;
     const requests = proposal.requests.filter((request) => departments.includes(request.department));
     if (!requests.length) return;
     this.assigning.set(true);
     forkJoin(requests.map((request) => this.tasks.assign({
-      role, assignedToEmail, eventCode: proposal.proposalId, eventTitle: proposal.eventTitle,
+      role: unitCode, assignedToEmail, eventCode: proposal.proposalId, eventTitle: proposal.eventTitle,
       request: request.item, quantity: request.quantity, schedule: request.schedule, location: request.location,
       detailLabel: 'Department notes', detail: request.notes,
     }))).pipe(finalize(() => this.assigning.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({

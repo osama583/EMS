@@ -294,6 +294,28 @@
   color: #a62f2f;
 }
 
+.shared-data-cell__badge--clickable {
+  cursor: pointer;
+  font-family: inherit;
+  align-items: center;
+  gap: 0.3rem;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--apu-blue-700);
+    background: var(--apu-blue-700);
+    color: #fff;
+  }
+
+  &:focus-visible { outline: 2px solid var(--apu-blue-700); outline-offset: 2px; }
+}
+
+.shared-data-cell__badge-icon {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
 .shared-table-actions {
   display: inline-flex;
   gap: var(--space-1);

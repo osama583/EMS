@@ -33,23 +33,25 @@
             {{ item.active ? 'Active' : 'Inactive' }}
           </span>
 
-          <div class="menu-card__quick-actions">
-            <button type="button" class="menu-card__icon-btn" [attr.aria-label]="'Edit ' + item.label" title="Edit" (click)="edit.emit(item.id)">
-              <span class="material-symbols-rounded" aria-hidden="true">edit</span>
-            </button>
-            <button
-              type="button"
-              class="menu-card__icon-btn"
-              [attr.aria-label]="(item.active ? 'Deactivate ' : 'Activate ') + item.label"
-              [title]="item.active ? 'Deactivate' : 'Activate'"
-              (click)="toggleActive.emit(item.id)"
-            >
-              <span class="material-symbols-rounded" aria-hidden="true">power_settings_new</span>
-            </button>
-            <button type="button" class="menu-card__icon-btn menu-card__icon-btn--danger" [attr.aria-label]="'Delete ' + item.label" title="Delete" (click)="delete.emit(item.id)">
-              <span class="material-symbols-rounded" aria-hidden="true">delete</span>
-            </button>
-          </div>
+          @if (!readOnly()) {
+            <div class="menu-card__quick-actions">
+              <button type="button" class="menu-card__icon-btn" [attr.aria-label]="'Edit ' + item.label" title="Edit" (click)="edit.emit(item.id)">
+                <span class="material-symbols-rounded" aria-hidden="true">edit</span>
+              </button>
+              <button
+                type="button"
+                class="menu-card__icon-btn"
+                [attr.aria-label]="(item.active ? 'Deactivate ' : 'Activate ') + item.label"
+                [title]="item.active ? 'Deactivate' : 'Activate'"
+                (click)="toggleActive.emit(item.id)"
+              >
+                <span class="material-symbols-rounded" aria-hidden="true">power_settings_new</span>
+              </button>
+              <button type="button" class="menu-card__icon-btn menu-card__icon-btn--danger" [attr.aria-label]="'Delete ' + item.label" title="Delete" (click)="delete.emit(item.id)">
+                <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+              </button>
+            </div>
+          }
         </div>
 
         <div class="menu-card__body">

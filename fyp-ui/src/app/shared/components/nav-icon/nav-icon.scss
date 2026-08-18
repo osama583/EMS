@@ -1,0 +1,50 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+:host([class]) {
+  width: 100%;
+  height: 100%;
+}
+
+.nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.nav-icon--svg {
+  color: inherit;
+
+  // Uploaded SVGs often carry their own hardcoded colors — fill="#4285F4", inline
+  // style="fill:...", per-path colors from a multi-color icon export. Those inline
+  // attributes/styles win over an inherited `fill: currentColor` on just the root <svg>, so every
+  // descendant is forced to currentColor (!important) here — the whole icon renders as one solid
+  // color (the app's primary blue via NavIconComponent's usage sites) no matter what colors the
+  // file itself shipped with.
+  ::ng-deep svg,
+  ::ng-deep svg * {
+    fill: currentColor !important;
+    stroke: none !important;
+  }
+
+  // Icons drawn with stroke outlines rather than fills (e.g. exported from icon sets that default
+  // to stroke-based paths) still need to render in the same color — force stroke too, but only on
+  // elements that actually use one (a real fill="none" [stroke] path), so filled shapes don't grow
+  // an unwanted 1px outline.
+  ::ng-deep svg [stroke]:not([stroke="none"]) {
+    stroke: currentColor !important;
+  }
+
+  ::ng-deep svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+}

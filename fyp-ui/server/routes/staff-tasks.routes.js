@@ -5,20 +5,15 @@ const { WorkflowError } = workflow;
 
 const router = express.Router();
 
-// request_task.assigned_role is always set to the MANAGER role token (see workflow.service.js's
-// createDepartmentTasks -> roleForRequirement). But Angular sends the STAFF member's own role
-// (e.g. 'logistics-staff') both when a staff member lists their tasks (staff-tasks.ts, sends
-// auth.user().role) and when a manager assigns work (proposal-department-view.ts's
-// assignRequests(), sends staffRoleForManager(managerRole) — the STAFF role, not the manager's
-// own role, per department-workflow.config.ts). Map staff role -> manager role so both routes
-// below compare against assigned_role correctly.
-const STAFF_TO_MANAGER_ROLE = {
-  'logistics-staff': 'logistics-manager',
-  'student-services-member': 'student-services-manager',
-  'av-technician': 'av-manager',
-  'photography-staff': 'photography-manager',
-  'transport-staff': 'transport-manager',
-};
+// request_task.assigned_unit_code is set to the Service department's unit code for the 5
+// unit-routed requirement kinds (logistics/transportation/photoVideo/soundLight/campusTour — see
+// workflow.service.js's UNIT_CODE_FOR_REQUIREMENT). Angular sends the acting staff/manager's own
+// `unitCode` (looked up client-side from one of the user's unit-scoped role assignments) instead
+// of a role string, so this route compares assigned_unit_code directly against it.
+function unitCodeForUser(userId) {
+  const link = db.user_unit_roles.find((uur) => uur.user_id === userId && uur.unit_code);
+  return link ? link.unit_code : '';
+}
 
 // Maps a department requirement key (request_task.assigned_role space, per
 // workflow.service.js's createDepartmentTasks) onto the human labels used in the StaffTask
@@ -80,7 +75,10 @@ function projectDepartmentTask(task, assignedToEmail) {
   const details = departmentTaskDetails(task.request_id, requirement.requirement_name) || { request: requirement.requirement_name, quantity: undefined, schedule: '', location: '', detail: '' };
   return {
     id: String(task.request_task_id),
-    role: task.assigned_role,
+    // Kept as `role` on the wire for the Angular StaffTask shape's backward-compat field name,
+    // but the VALUE is now a unit_code (or, for the two flat-routed kinds, the flat role string
+    // 'cfo'/'fmb') rather than a manager role token — see assigned_unit_code/assigned_role above.
+    role: task.assigned_unit_code || task.assigned_role,
     assignedToEmail,
     eventCode: request.request_code,
     eventTitle: request.event_title,
@@ -113,7 +111,7 @@ function projectFmbSelection(selection, assignedToEmail) {
   if (!fmbRow) throw new WorkflowError('F&B request not found for this selection.', 404);
   const request = db.request.find((r) => r.request_id === fmbRow.request_id);
   if (!request) throw new WorkflowError('Proposal not found for this selection.', 404);
-  const cafeteria = db.cafeteria.find((c) => c.cafeteria_id === selection.cafeteria_id);
+  const cafeteria = db.unit.find((u) => u.code === selection.unit_code);
   return {
     id: `fmb-selection:${selection.request_fmb_selection_id}`,
     role: 'cafeteria-staff',
@@ -125,25 +123,25 @@ function projectFmbSelection(selection, assignedToEmail) {
     schedule: `${fmbRow.date} · ${fmbRow.start_time}-${fmbRow.end_time}`,
     location: fmbRow.location,
     detailLabel: 'Cafeteria',
-    detail: cafeteria ? cafeteria.name : '',
+    detail: cafeteria ? cafeteria.description : '',
     status: selection.status === 'approved' ? 'assigned' : selection.status === 'preparing' ? 'preparing' : selection.status === 'fulfilled' ? 'completed' : selection.status,
   };
 }
 
 router.get('/', async (req, res, next) => {
   try {
+    // `role` query param is retained on the wire for backward compat with the Angular caller's
+    // param name, but its VALUE is now the acting user's own unitCode for the 5 unit-routed
+    // kinds (or a flat role string for cfo/fmb/cafeteria-staff) — see the comment above.
     const { role, assignedToEmail } = req.query;
     const staffUser = db.users.find((u) => u.email === assignedToEmail);
     const tasks = [];
 
     if (staffUser) {
-      // `role` is the STAFF member's own role (e.g. 'logistics-staff'), but request_task rows
-      // are stamped with the MANAGER role (e.g. 'logistics-manager') — map before comparing.
-      const managerRole = STAFF_TO_MANAGER_ROLE[role] || role;
       const myAssignments = db.task_assignment.filter((a) => a.staff_user_id === staffUser.user_id);
       for (const assignment of myAssignments) {
         const task = db.request_task.find((t) => t.request_task_id === assignment.request_task_id);
-        if (task && task.assigned_role === managerRole) tasks.push(projectDepartmentTask(task, assignedToEmail));
+        if (task && (task.assigned_unit_code === role || task.assigned_role === role)) tasks.push(projectDepartmentTask(task, assignedToEmail));
       }
     }
 
@@ -157,12 +155,13 @@ router.get('/', async (req, res, next) => {
         }
       }
 
-      // Shared inbox: approved-but-unclaimed rows for any cafeteria this staff member is
-      // assigned to (via cafeteria_assignment).
-      const myCafeteriaIds = new Set(db.cafeteria_assignment.filter((a) => a.user_id === staffUser.user_id).map((a) => a.cafeteria_id));
+      // Shared inbox: approved-but-unclaimed rows for any cafeteria this staff member holds a
+      // 'cafeteria-staff' user_unit_roles row at (a Cafeteria is a Unit — see
+      // server/db.js's seedCafeteriaDomain()).
+      const myCafeteriaCodes = new Set(db.user_unit_roles.filter((uur) => uur.user_id === staffUser.user_id && uur.role_code === 'cafeteria-staff').map((uur) => uur.unit_code));
       for (const selection of db.request_fmb_selection) {
         if (selection.status !== 'approved') continue;
-        if (!myCafeteriaIds.has(selection.cafeteria_id)) continue;
+        if (!myCafeteriaCodes.has(selection.unit_code)) continue;
         tasks.push(projectFmbSelection(selection, ''));
       }
     }
@@ -173,25 +172,31 @@ router.get('/', async (req, res, next) => {
 
 // Angular's assignRequests() (proposal-department-view.ts) sends department-level context
 // (eventCode, request item label) rather than a request_task_id directly — look up the
-// matching request via request_code, then the department's request_task by assigned_role.
+// matching request via request_code, then the department's request_task by assigned_unit_code
+// (or assigned_role for the two flat-routed kinds).
 router.post('/assignments', async (req, res, next) => {
   try {
+    // `role` here is now the unit_code being assigned into (assignRequests() sends the
+    // manager's own unitCode, since staff being assigned share the SAME unit as their manager —
+    // there's no separate "staff role" to map anymore).
     const { role, assignedToEmail, eventCode } = req.body;
     const request = db.request.find((r) => r.request_code === eventCode);
     if (!request) throw new WorkflowError('Event not found for the given eventCode.', 400);
-    // `role` here is the STAFF role being assigned (assignRequests() sends
-    // staffRoleForManager(this.role()), not the manager's own role) — map to the manager role
-    // that request_task.assigned_role is actually stamped with before looking up the task.
-    const managerRoleForTask = STAFF_TO_MANAGER_ROLE[role] || role;
-    const task = db.request_task.find((t) => t.request_id === request.request_id && t.assigned_role === managerRoleForTask && t.stage_code === 'department_review');
+    const task = db.request_task.find((t) => t.request_id === request.request_id && (t.assigned_unit_code === role || t.assigned_role === role) && t.stage_code === 'department_review');
     if (!task) throw new WorkflowError('Department task not found for the given role.', 400);
     const staffUser = db.users.find((u) => u.email === assignedToEmail);
     if (!staffUser) throw new WorkflowError('Staff member not found for the given assignedToEmail.', 400);
 
-    const managerRoleFor = { logistics: 'logistics-manager', transportation: 'transport-manager', photoVideo: 'photography-manager', soundLight: 'av-manager', campusTour: 'student-services-manager', fmb: 'cafeteria-manager' };
-    const requirement = db.event_requirements.find((r) => r.requirement_id === task.requirement_id);
-    const managerRole = managerRoleFor[requirement.requirement_name];
-    const manager = db.users.find((u) => u.role === managerRole);
+    // Attribute the assignment to the head-of-department/head-of-school of the task's own unit
+    // (or, for fmb, the food_beverage_services unit's head-of-department — RBAC redesign retired
+    // the old flat 'cafeteria-manager' role, see workflow.service.js) so workflow_history's
+    // assigned_by_user_id is a sensible real user rather than always null.
+    let manager;
+    if (task.assigned_unit_code) {
+      manager = db.users.find((u) => db.user_unit_roles.some((uur) => uur.user_id === u.user_id && uur.unit_code === task.assigned_unit_code && (uur.role_code === 'head-of-department' || uur.role_code === 'head-of-school')));
+    } else if (task.assigned_role === 'fmb') {
+      manager = db.users.find((u) => db.user_unit_roles.some((uur) => uur.user_id === u.user_id && uur.unit_code === 'food_beverage_services' && uur.role_code === 'head-of-department'));
+    }
 
     workflow.assignStaffToTask(task.request_task_id, staffUser.user_id, manager ? manager.user_id : null);
     res.json(projectDepartmentTask(db.request_task.find((t) => t.request_task_id === task.request_task_id), assignedToEmail));

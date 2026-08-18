@@ -20,6 +20,7 @@ import { CharacterCounterComponent } from '../character-counter/character-counte
           [value]="value()"
           [rows]="rows()"
           [attr.maxlength]="characterLimit()"
+          [attr.minlength]="minLength()"
           [required]="required()"
           [readOnly]="readOnly()"
           [disabled]="disabled()"
@@ -95,6 +96,7 @@ export class FormFieldComponent {
   readonly min = input<number | string>('');
   readonly step = input<number | string>('');
   readonly maxLength = input(100);
+  readonly minLength = input<number | null>(null);
   readonly autocomplete = input('');
   readonly inputmode = input('');
   readonly options = input<readonly SelectOption[]>([]);
@@ -111,6 +113,8 @@ export class FormFieldComponent {
     const value = String(this.value() ?? '').trim();
     if (this.required() && !value) return `${this.label()} is required.`;
     if (this.type() === 'email' && value && !/^\S+@\S+\.\S+$/.test(value)) return `${this.label()} must be a valid email address.`;
+    const minLength = this.minLength();
+    if (minLength !== null && value.length > 0 && value.length < minLength) return `${this.label()} must be at least ${minLength} characters.`;
     return '';
   });
   hasCharacterLimit(): boolean { return !this.readOnly() && this.options().length === 0 && (this.type() === 'text' || this.type() === 'email' || this.type() === 'textarea'); }

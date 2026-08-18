@@ -14,7 +14,9 @@ import { ChangeDetectionStrategy, Component, ElementRef, ViewChild, input, outpu
 
       <div class="image-upload-field__body" [class.image-upload-field__body--has-preview]="!!imagePreview()">
         @if (imagePreview()) {
-          <img class="image-upload-field__preview" [src]="imagePreview()" [alt]="imageFileName() || label() || 'Uploaded image preview'" />
+          <div class="image-upload-field__placeholder image-upload-field__placeholder--preview">
+            <img class="image-upload-field__preview" [class.image-upload-field__preview--contain]="fit() === 'contain'" [src]="imagePreview()" [alt]="imageFileName() || label() || 'Uploaded image preview'" />
+          </div>
         } @else {
           <div class="image-upload-field__placeholder" aria-hidden="true">
             <span class="material-symbols-rounded">add_photo_alternate</span>
@@ -68,6 +70,7 @@ export class ImageUploadFieldComponent {
   readonly error = input('');
   readonly disabled = input(false);
   readonly accept = input('image/png,image/jpeg,image/webp');
+  readonly fit = input<'cover' | 'contain'>('cover');
 
   readonly fileSelect = output<File>();
   readonly remove = output<void>();

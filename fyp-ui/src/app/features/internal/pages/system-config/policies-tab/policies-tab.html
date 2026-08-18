@@ -1,0 +1,42 @@
+<div class="policies-tab">
+  <header class="policies-tab__header">
+    <div>
+      <h2>Approval Workflows & Policies</h2>
+      <p>Configure threshold values and cancellation policies for event applications.</p>
+    </div>
+    <button type="button" class="policies-tab__save-btn" [class.policies-tab__save-btn--saved]="policiesSaved()" [disabled]="saving()" (click)="savePolicies()">
+      <span class="material-symbols-rounded" aria-hidden="true">{{ policiesSaved() ? 'check' : 'save' }}</span>
+      {{ policiesSaved() ? 'Saved' : 'Save Changes' }}
+    </button>
+  </header>
+
+  @if (configLoading()) {
+    <app-loading-state variant="bars" label="Loading configuration…" [count]="2" />
+  } @else {
+    <div class="policies-tab__card">
+      <app-form-field
+        controlId="config-pax-threshold"
+        label="High Pax Threshold (Number of attendees)"
+        type="number"
+        min="1"
+        [value]="paxThreshold()"
+        (valueChange)="setPaxThreshold($event)"
+      />
+      <p class="policies-tab__note">
+        Events with a total expected pax <strong>greater than</strong> this threshold will require additional review by the F&B Reviewer and CFO before Department Review.
+      </p>
+
+      <app-form-field
+        controlId="config-cancellation-days"
+        label="Application Cancellation Deadline (Days before event date)"
+        type="number"
+        min="0"
+        [value]="cancellationDays()"
+        (valueChange)="setCancellationDays($event)"
+      />
+      <p class="policies-tab__note">
+        Submitters and designated co-owners are allowed to cancel an application up to <strong>{{ cancellationDays() }} days before</strong> the scheduled event date. After this deadline, the application remains read-only.
+      </p>
+    </div>
+  }
+</div>

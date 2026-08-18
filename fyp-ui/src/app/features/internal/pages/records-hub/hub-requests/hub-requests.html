@@ -1,0 +1,62 @@
+<app-internal-data-page
+  [config]="config()"
+  [records]="records()"
+  [filters]="[]"
+  [loading]="loading()"
+  (recordOpen)="openDetails($event)"
+/>
+
+@if (detailsTarget(); as row) {
+  <app-form-modal
+    [open]="true"
+    [title]="row.eventTitle"
+    [hidePrimary]="true"
+    secondaryLabel="Close"
+    (close)="closeDetails()"
+    (cancel)="closeDetails()"
+    (submit)="closeDetails()"
+  >
+    <article class="hub-request-details">
+      @if (row.shortIntroduction) {
+        <section>
+          <h3>Introduction</h3>
+          <p>{{ row.shortIntroduction }}</p>
+        </section>
+      }
+      @if (row.goals) {
+        <section>
+          <h3>Goals</h3>
+          <p>{{ row.goals }}</p>
+        </section>
+      }
+
+      @if (row.requestKind === 'fmb' || row.requestKind === 'waterNormal') {
+        @if (row.fmbSelections.length) {
+          <section>
+            <h3>Orders placed</h3>
+            <div class="hub-request-details__orders">
+              @for (order of row.fmbSelections; track order.id) {
+                <dl class="hub-request-details__order">
+                  <div><dt>Cafeteria</dt><dd>{{ order.cafeteriaName }}</dd></div>
+                  <div><dt>Menu item picked</dt><dd>{{ order.menuItemLabel }}</dd></div>
+                  <div><dt>Quantity</dt><dd>{{ order.quantity }}</dd></div>
+                  @if (order.notes) { <div><dt>Notes</dt><dd>{{ order.notes }}</dd></div> }
+                  <div><dt>Order status</dt><dd>{{ order.status }}</dd></div>
+                </dl>
+              }
+            </div>
+          </section>
+        } @else {
+          <p class="hub-request-details__empty">F&amp;B has not picked a menu item for this request yet.</p>
+        }
+      } @else {
+        <dl>
+          <div><dt>Item</dt><dd>{{ row.request.item }}</dd></div>
+          <div><dt>Quantity</dt><dd>{{ row.request.quantity }}</dd></div>
+          @if (row.request.notes) { <div><dt>Notes</dt><dd>{{ row.request.notes }}</dd></div> }
+          <div><dt>Order status</dt><dd>{{ row.confirmed ? 'Fulfilled' : 'Awaiting confirmation' }}</dd></div>
+        </dl>
+      }
+    </article>
+  </app-form-modal>
+}

@@ -23,6 +23,7 @@ function createComponent(): ComponentFixture<EventProposalComponent> {
     paxReviewerThreshold: 50,
     cancellationDaysLimit: 3,
     eventCategories: [],
+    eventFormats: ['On Campus', 'Online', 'Hybrid', 'Off Campus'],
   });
   return fixture;
 }

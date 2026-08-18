@@ -4,12 +4,10 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { SystemConfig, SystemConfigDraft } from './system-config.models';
-import { EVENT_CATEGORY_OPTIONS } from '../events/published-event.models';
 
 const DEFAULT_CONFIG: SystemConfig = {
   paxReviewerThreshold: 50,
   cancellationDaysLimit: 3,
-  eventCategories: [...EVENT_CATEGORY_OPTIONS],
 };
 
 @Injectable({ providedIn: 'root' })
@@ -22,7 +20,6 @@ export class SystemConfigService {
   readonly config = computed(() => this.state());
   readonly paxReviewerThreshold = computed(() => this.state().paxReviewerThreshold);
   readonly cancellationDaysLimit = computed(() => this.state().cancellationDaysLimit);
-  readonly eventCategories = computed(() => this.state().eventCategories);
   // True until the real GET resolves — components reading paxReviewerThreshold/etc. at
   // construction time (a plain signal snapshot, not a live subscription) should show a loading
   // state rather than briefly rendering DEFAULT_CONFIG as if it were the real saved config.

@@ -3,8 +3,8 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signa
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../../core/auth/auth.service';
-import { UserRole } from '../../../../core/auth/auth.models';
-import { DEPARTMENT_WORKFLOWS } from '../../../../core/departments/department-workflow.config';
+import { AuthUser } from '../../../../core/auth/auth.models';
+import { workflowForManager } from '../../../../core/departments/department-workflow.config';
 import { ProposalReviewRecord } from '../../../../core/proposals/proposal-review.models';
 import { proposalSectionForUser, userIsApplicantForProposal, userOwnsCurrentProposalAction } from '../../../../core/proposals/proposal-visibility';
 import { ProposalWorkflowService } from '../../../../core/proposals/proposal-workflow.service';
@@ -44,7 +44,9 @@ export class ProposalReviewPageComponent {
   readonly proposal = signal<ProposalReviewRecord | null>(this.stateProposal);
   readonly loading = signal(!this.stateProposal);
 
-  readonly role = computed<UserRole | null>(() => this.auth.user()?.role ?? null);
+  // RBAC redesign: proposal-department-view.ts takes the full AuthUser — the component derives
+  // its unit's workflow config from user.roles[] directly (see department-workflow.config.ts).
+  readonly currentUser = computed<AuthUser | null>(() => this.auth.user() ?? null);
   readonly readOnly = computed(() => {
     const proposal = this.proposal();
     if (!proposal) return true;
@@ -60,12 +62,14 @@ export class ProposalReviewPageComponent {
     return !!proposal && userIsApplicantForProposal(user, proposal) && userOwnsCurrentProposalAction(user, proposal);
   });
   readonly viewKind = computed<ViewKind>(() => {
-    const role = this.role();
+    const user = this.currentUser();
     const proposal = this.proposal();
-    const user = this.auth.user();
-    if (!role || !proposal) return null;
+    if (!user || !proposal) return null;
     if (userIsApplicantForProposal(user, proposal)) return 'applicant';
-    if (DEPARTMENT_WORKFLOWS.some((entry) => entry.managerRole === role)) return 'department';
+    // A department manager is a unit-scoped head-of-department/head-of-school, or the flat 'cfo'
+    // role — both are covered by passing the full AuthUser through, since workflowForManager's
+    // WorkflowIdentity union accepts either a role_code string or an AuthUser.
+    if (workflowForManager(user)) return 'department';
     return 'reviewer';
   });
 
@@ -85,7 +89,7 @@ export class ProposalReviewPageComponent {
   // land on Ongoing rather than staying in place, so the actor doesn't have to navigate back
   // manually to see it move out of their Inbox.
   handleActionComplete(_id: number): void {
-    void this.router.navigateByUrl('/app/proposals/pending');
+    void this.router.navigateByUrl('/app/ongoing/proposals');
   }
 
   goBack(): void {

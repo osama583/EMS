@@ -40,55 +40,55 @@
     >
       <div class="mobile-nav-panel__scroll">
         <div class="mobile-nav-panel__items">
-          @for (item of primaryItems(); track item.route) {
-            <a
-              class="mobile-nav-item"
-              routerLinkActive="mobile-nav-item--active"
-              [routerLinkActiveOptions]="{ exact: true }"
-              [routerLink]="item.route"
-              (click)="onNavigate()"
-            >
-              <span class="mobile-nav-item__icon material-symbols-rounded" aria-hidden="true">{{ item.icon }}</span>
-              <span class="mobile-nav-item__label">{{ item.label }}</span>
-              <span class="mobile-nav-item__chevron material-symbols-rounded" aria-hidden="true">chevron_right</span>
-            </a>
-          }
-
-          @for (section of sections(); track section.key) {
-            <div class="mobile-nav-group" [class.mobile-nav-group--active]="isGroupActive(section)">
-              <button
-                type="button"
-                class="mobile-nav-item mobile-nav-group__trigger"
-                [attr.aria-expanded]="isGroupOpen(section.key)"
-                [attr.aria-controls]="'mobile-submenu-' + section.key"
-                (click)="toggleGroup(section.key)"
+          @for (entry of navEntries(); track entry.kind === 'item' ? entry.item.route : entry.section.key) {
+            @if (entry.kind === 'item') {
+              <a
+                class="mobile-nav-item"
+                routerLinkActive="mobile-nav-item--active"
+                [routerLinkActiveOptions]="{ exact: true }"
+                [routerLink]="entry.item.route"
+                (click)="onNavigate()"
               >
-                <span class="mobile-nav-item__icon material-symbols-rounded" aria-hidden="true">{{ section.icon }}</span>
-                <span class="mobile-nav-item__label">{{ section.label }}</span>
-                <span class="mobile-nav-item__chevron mobile-nav-item__chevron--collapse material-symbols-rounded" aria-hidden="true">expand_more</span>
-              </button>
+                <app-nav-icon class="mobile-nav-item__icon" [icon]="entry.item.icon" />
+                <span class="mobile-nav-item__label">{{ entry.item.label }}</span>
+                <span class="mobile-nav-item__chevron material-symbols-rounded" aria-hidden="true">chevron_right</span>
+              </a>
+            } @else {
+              <div class="mobile-nav-group" [class.mobile-nav-group--active]="isGroupActive(entry.section)">
+                <button
+                  type="button"
+                  class="mobile-nav-item mobile-nav-group__trigger"
+                  [attr.aria-expanded]="isGroupOpen(entry.section.key)"
+                  [attr.aria-controls]="'mobile-submenu-' + entry.section.key"
+                  (click)="toggleGroup(entry.section.key)"
+                >
+                  <app-nav-icon class="mobile-nav-item__icon" [icon]="entry.section.icon" />
+                  <span class="mobile-nav-item__label">{{ entry.section.label }}</span>
+                  <span class="mobile-nav-item__chevron mobile-nav-item__chevron--collapse material-symbols-rounded" aria-hidden="true">expand_more</span>
+                </button>
 
-              <div
-                [id]="'mobile-submenu-' + section.key"
-                class="mobile-submenu"
-                [class.mobile-submenu--open]="isGroupOpen(section.key)"
-                [attr.aria-hidden]="!isGroupOpen(section.key)"
-              >
-                <div class="mobile-submenu__inner">
-                  @for (item of section.items; track item.route) {
-                    <a
-                      class="mobile-submenu__link"
-                      routerLinkActive="mobile-submenu__link--active"
-                      [routerLink]="item.route"
-                      (click)="onNavigate()"
-                    >
-                      <span class="material-symbols-rounded" aria-hidden="true">{{ item.icon }}</span>
-                      <span>{{ item.label }}</span>
-                    </a>
-                  }
+                <div
+                  [id]="'mobile-submenu-' + entry.section.key"
+                  class="mobile-submenu"
+                  [class.mobile-submenu--open]="isGroupOpen(entry.section.key)"
+                  [attr.aria-hidden]="!isGroupOpen(entry.section.key)"
+                >
+                  <div class="mobile-submenu__inner">
+                    @for (item of entry.section.items; track item.route) {
+                      <a
+                        class="mobile-submenu__link"
+                        routerLinkActive="mobile-submenu__link--active"
+                        [routerLink]="item.route"
+                        (click)="onNavigate()"
+                      >
+                        <app-nav-icon [icon]="item.icon" />
+                        <span>{{ item.label }}</span>
+                      </a>
+                    }
+                  </div>
                 </div>
               </div>
-            </div>
+            }
           }
         </div>
 
@@ -165,73 +165,67 @@
 
     <div class="internal-sidebar__main">
       <nav class="internal-nav" aria-label="Internal user menu">
-        @for (item of primaryItems(); track item.route) {
-          <a
-            class="internal-nav__item"
-            routerLinkActive="internal-nav__item--active"
-            [routerLinkActiveOptions]="{ exact: true }"
-            [routerLink]="item.route"
-            [attr.title]="item.label"
-            (click)="onNavigate()"
-          >
-            <span class="internal-nav__icon material-symbols-rounded" aria-hidden="true">
-              {{ item.icon }}
-            </span>
-            <span class="internal-nav__label">{{ item.label }}</span>
-          </a>
-        }
-
-        @for (section of sections(); track section.key) {
-          <div
-            class="internal-nav__group"
-            [class.internal-nav__group--active]="isGroupActive(section)"
-            [class.internal-nav__group--open]="isGroupOpen(section.key)"
-          >
-            <button
-              type="button"
-              class="internal-nav__item internal-nav__group-trigger"
-              [attr.aria-expanded]="isGroupOpen(section.key)"
-              [attr.aria-controls]="expanded() ? 'sidebar-submenu-' + section.key : null"
-              [attr.title]="section.label"
-              (click)="toggleGroup(section.key)"
+        @for (entry of navEntries(); track entry.kind === 'item' ? entry.item.route : entry.section.key) {
+          @if (entry.kind === 'item') {
+            <a
+              class="internal-nav__item"
+              routerLinkActive="internal-nav__item--active"
+              [routerLinkActiveOptions]="{ exact: true }"
+              [routerLink]="entry.item.route"
+              [attr.title]="entry.item.label"
+              (click)="onNavigate()"
             >
-              <span class="internal-nav__icon material-symbols-rounded" aria-hidden="true">
-                {{ section.icon }}
-              </span>
-              <span class="internal-nav__label">{{ section.label }}</span>
-              @if (expanded()) {
-                <span class="internal-nav__chevron material-symbols-rounded" aria-hidden="true">
-                  expand_more
-                </span>
-              }
-            </button>
-
-            @if (expanded()) {
-              <div
-                [id]="'sidebar-submenu-' + section.key"
-                class="sidebar-submenu"
-                [class.sidebar-submenu--open]="isGroupOpen(section.key)"
-                [attr.aria-hidden]="!isGroupOpen(section.key)"
-                [attr.inert]="!isGroupOpen(section.key) ? '' : null"
+              <app-nav-icon class="internal-nav__icon" [icon]="entry.item.icon" />
+              <span class="internal-nav__label">{{ entry.item.label }}</span>
+            </a>
+          } @else {
+            <div
+              class="internal-nav__group"
+              [class.internal-nav__group--active]="isGroupActive(entry.section)"
+              [class.internal-nav__group--open]="isGroupOpen(entry.section.key)"
+            >
+              <button
+                type="button"
+                class="internal-nav__item internal-nav__group-trigger"
+                [attr.aria-expanded]="isGroupOpen(entry.section.key)"
+                [attr.aria-controls]="expanded() ? 'sidebar-submenu-' + entry.section.key : null"
+                [attr.title]="entry.section.label"
+                (click)="toggleGroup(entry.section.key)"
               >
-                <div class="sidebar-submenu__inner">
-                  @for (item of section.items; track item.route) {
-                    <a
-                      routerLinkActive="sidebar-submenu__link--active"
-                      [routerLink]="item.route"
-                      [attr.title]="item.label"
-                      (click)="onNavigate()"
-                    >
-                      <span class="material-symbols-rounded" aria-hidden="true">
-                        {{ item.icon }}
-                      </span>
-                      <span>{{ item.label }}</span>
-                    </a>
-                  }
+                <app-nav-icon class="internal-nav__icon" [icon]="entry.section.icon" />
+                <span class="internal-nav__label">{{ entry.section.label }}</span>
+                @if (expanded()) {
+                  <span class="internal-nav__chevron material-symbols-rounded" aria-hidden="true">
+                    expand_more
+                  </span>
+                }
+              </button>
+
+              @if (expanded()) {
+                <div
+                  [id]="'sidebar-submenu-' + entry.section.key"
+                  class="sidebar-submenu"
+                  [class.sidebar-submenu--open]="isGroupOpen(entry.section.key)"
+                  [attr.aria-hidden]="!isGroupOpen(entry.section.key)"
+                  [attr.inert]="!isGroupOpen(entry.section.key) ? '' : null"
+                >
+                  <div class="sidebar-submenu__inner">
+                    @for (item of entry.section.items; track item.route) {
+                      <a
+                        routerLinkActive="sidebar-submenu__link--active"
+                        [routerLink]="item.route"
+                        [attr.title]="item.label"
+                        (click)="onNavigate()"
+                      >
+                        <app-nav-icon [icon]="item.icon" />
+                        <span>{{ item.label }}</span>
+                      </a>
+                    }
+                  </div>
                 </div>
-              </div>
-            }
-          </div>
+              }
+            </div>
+          }
         }
       </nav>
     </div>

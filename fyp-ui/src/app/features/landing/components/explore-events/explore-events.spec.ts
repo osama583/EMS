@@ -40,6 +40,9 @@ const MOCK_PUBLISHED_EVENTS: readonly PublishedEvent[] = MOCK_EVENT_FIXTURES.map
   registrationMode: 'Automatic',
   confirmedRegistrationCount: 10,
   pendingRegistrationCount: 0,
+  cost: fixture.isFree ? null : 25,
+  bankAccountName: null,
+  bankAccountNumber: null,
   isFree: fixture.isFree,
 }));
 
@@ -65,6 +68,7 @@ describe('ExploreEventsComponent', () => {
       paxReviewerThreshold: 50,
       cancellationDaysLimit: 3,
       eventCategories: [],
+      eventFormats: [],
     });
     fixture.detectChanges();
   });
@@ -100,10 +104,13 @@ describe('ExploreEventsComponent', () => {
       email: 'applicant@demo.apu.edu.my',
       displayName: 'Demo Applicant',
       username: 'applicant',
-      role: UserRole.Applicant,
+      role: 'student' as UserRole,
       accountType: 'internal',
-      roleLabel: 'Applicant',
+      roleLabel: 'Student — School of Computing',
       department: 'School of Computing',
+      functionLevel: 'student',
+      unitId: 'school_of_computing',
+      unitKind: 'school',
     });
     const saveButton = fixture.nativeElement.querySelector('.save-event') as HTMLButtonElement;
 
@@ -182,5 +189,76 @@ describe('ExploreEventsComponent', () => {
     expect(schoolGroup?.options).toEqual(component.schoolOptions());
     expect(schoolGroup?.options).toContain('School of Technology');
     expect(schoolGroup?.options).toContain('Student Affairs');
+  });
+});
+
+// Public events must be visible to every visitor; Private/Club Only events are APU-community
+// content and must only reach a signed-in user, both server- and client-side.
+const MIXED_VISIBILITY_EVENTS: readonly PublishedEvent[] = [
+  { ...MOCK_PUBLISHED_EVENTS[0], id: 'evt-public', eventTitle: 'Open Campus Fair', eventVisibility: 'Public' },
+  { ...MOCK_PUBLISHED_EVENTS[0], id: 'evt-private', eventTitle: 'Internal Staff Briefing', eventVisibility: 'Private' },
+  { ...MOCK_PUBLISHED_EVENTS[0], id: 'evt-club', eventTitle: 'Club Only Social', eventVisibility: 'Club Only' },
+];
+
+describe('ExploreEventsComponent visibility filtering', () => {
+  let fixture: ComponentFixture<ExploreEventsComponent>;
+  let httpMock: HttpTestingController;
+
+  afterEach(() => {
+    httpMock.verify();
+    fixture.destroy();
+    TestBed.resetTestingModule();
+  });
+
+  it('hides Private and Club Only events from a guest (not signed in)', () => {
+    localStorage.removeItem('apu-ems-auth-user');
+    TestBed.configureTestingModule({
+      imports: [ExploreEventsComponent],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    fixture = TestBed.createComponent(ExploreEventsComponent);
+    httpMock = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+    httpMock.expectOne(environment.eventsApiUrl).flush(MIXED_VISIBILITY_EVENTS);
+    httpMock.expectOne(environment.configApiUrl).flush({ paxReviewerThreshold: 50, cancellationDaysLimit: 3, eventCategories: [], eventFormats: [] });
+    fixture.detectChanges();
+
+    const titles = fixture.componentInstance.events().map((event) => event.title);
+    expect(titles).toEqual(['Open Campus Fair']);
+  });
+
+  it('shows Public, Private and Club Only events to a signed-in user', () => {
+    TestBed.configureTestingModule({
+      imports: [ExploreEventsComponent],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    TestBed.inject(AuthService).establishSession({
+      email: 'student@demo.apu.edu.my',
+      displayName: 'Demo Student',
+      username: 'student',
+      role: 'student' as UserRole,
+      accountType: 'internal',
+      roleLabel: 'Student — School of Computing',
+      department: 'School of Computing',
+      functionLevel: 'student',
+      unitId: 'school_of_computing',
+      unitKind: 'school',
+    });
+    fixture = TestBed.createComponent(ExploreEventsComponent);
+    httpMock = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+    httpMock.expectOne(environment.eventsApiUrl).flush(MIXED_VISIBILITY_EVENTS);
+    httpMock.expectOne(environment.configApiUrl).flush({ paxReviewerThreshold: 50, cancellationDaysLimit: 3, eventCategories: [], eventFormats: [] });
+    fixture.detectChanges();
+
+    const titles = fixture.componentInstance.events().map((event) => event.title);
+    expect(titles).toEqual(['Open Campus Fair', 'Internal Staff Briefing', 'Club Only Social']);
+
+    // Signed-in-only side effects that confirm all three (not just the Public one) were treated
+    // as visible: per-event "my registration" lookups plus the saved-events fetch.
+    httpMock.expectOne((req) => req.url === `${environment.eventsApiUrl}/evt-public/registrations/mine`).flush(null);
+    httpMock.expectOne((req) => req.url === `${environment.eventsApiUrl}/evt-private/registrations/mine`).flush(null);
+    httpMock.expectOne((req) => req.url === `${environment.eventsApiUrl}/evt-club/registrations/mine`).flush(null);
+    httpMock.expectOne((req) => req.url.startsWith(`${environment.eventEngagementApiUrl}/saved`)).flush({ items: [] });
   });
 });

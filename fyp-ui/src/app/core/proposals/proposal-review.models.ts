@@ -1,5 +1,5 @@
-import { UserRole } from '../auth/auth.models';
-import { DepartmentRequestKind, requestKindsForManager } from '../departments/department-workflow.config';
+import { AuthUser } from '../auth/auth.models';
+import { DepartmentRequestKind, requestKindsForManager, WorkflowIdentity } from '../departments/department-workflow.config';
 import { EventImageAsset, EventVisibility, RegistrationMode } from '../events/published-event.models';
 import { EditableRow } from '../../shared/components/form-controls/form-controls.models';
 import { ProposalWorkflowState } from './proposal-status.models';
@@ -20,7 +20,13 @@ export type FmbSelectionStatus = 'pending' | 'approved' | 'resubmitted' | 'prepa
 
 export interface FmbSelection {
   readonly id: number;
-  readonly cafeteriaId: number;
+  // The raw request_fmb row (applicant's original food/water ask) this selection fulfills —
+  // several selections can point at the same requestFmbId (F&B fans one request out across
+  // multiple cafeterias/orders until the requested pax is covered).
+  readonly requestFmbId: number;
+  // Cafeteria unit code (unit.code, CAFETERIA_UNIT_PREFIX-coded) — a Cafeteria is a Unit, see
+  // server/db.js's seedCafeteriaDomain().
+  readonly cafeteriaCode: string;
   readonly cafeteriaName: string;
   readonly menuItemLabel: string;
   readonly quantity: number;
@@ -57,9 +63,12 @@ export interface ProposalReviewRecord {
   readonly eventImage: EventImageAsset | null;
   readonly eventVisibility: EventVisibility;
   readonly eventCategories: readonly string[];
-  readonly eventFormat: 'On Campus' | 'Online' | 'Hybrid' | 'Off Campus';
+  readonly eventFormat: string;
   readonly registrationMode: RegistrationMode;
   readonly publicity: string;
+  readonly costAmount?: number | null;
+  readonly bankAccountName?: string | null;
+  readonly bankAccountNumber?: string | null;
   readonly selectedRequirements: readonly DepartmentRequestKind[];
   readonly externalPax: number;
   readonly fmbSelections?: readonly FmbSelection[];
@@ -67,6 +76,6 @@ export interface ProposalReviewRecord {
   readonly workflow: ProposalWorkflowState;
 }
 
-export function departmentsForRole(role: UserRole): readonly ProposalDepartmentKey[] {
-  return requestKindsForManager(role);
+export function departmentsForRole(identity: WorkflowIdentity): readonly ProposalDepartmentKey[] {
+  return requestKindsForManager(identity);
 }

@@ -21,6 +21,24 @@ describe('InternalLayoutComponent', () => {
       providers: [provideRouter([])],
     }).compileComponents();
 
+    // Unit + Level model: the layout's fallback (no session at all) is now a minimal Dashboard-
+    // only nav (see FALLBACK_NAVIGATION in role-navigation.ts) rather than accidentally
+    // inheriting whatever ROLE_NAVIGATION[UserRole.Applicant] happened to contain. These tests
+    // exercise the "My Proposals"/Events sidebar shape, so establish a real unit-scoped Student
+    // session up front (same nav shape the old Applicant fallback coincidentally provided).
+    TestBed.inject(AuthService).establishSession({
+      email: 'student@demo.apu.edu.my',
+      displayName: 'Demo Student',
+      username: 'student',
+      role: 'student' as UserRole,
+      accountType: 'internal',
+      roleLabel: 'Student — School of Computing',
+      department: 'School of Computing',
+      functionLevel: 'student',
+      unitId: 'school_of_computing',
+      unitKind: 'school',
+    });
+
     fixture = TestBed.createComponent(InternalLayoutComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();

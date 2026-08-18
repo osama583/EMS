@@ -12,11 +12,19 @@ import {
 } from '@angular/core';
 import { ExpandableSearchComponent } from '../../../../shared/components/expandable-search/expandable-search';
 import { FilterButtonComponent } from '../../../../shared/components/filter-button/filter-button';
+import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
+import {
+  ProposalEventSchedule,
+  PublishedEvent,
+  isEventVisibleTo,
+} from '../../../../core/events/published-event.models';
+import { PublishedEventService } from '../../../../core/events/published-event.service';
+import { AuthService } from '../../../../core/auth/auth.service';
 
 type CalendarView = 'month' | 'week' | 'agenda';
 
 interface CalendarEvent {
-  readonly id: number;
+  readonly id: string;
   readonly title: string;
   readonly date: Date;
   readonly time: string;
@@ -25,6 +33,20 @@ interface CalendarEvent {
   readonly categoryClass: string;
   readonly description: string;
 }
+
+// Only these seven map to a styled `.calendar-event--*` / `.legend-dot--*` class in
+// _event-calendar.scss; anything else (or a missing category) falls back to 'academic' — category
+// names are now admin-managed/open-ended (Event Categories catalog), not a fixed compile-time set,
+// so custom admin-added categories routinely hit that fallback.
+const CATEGORY_CLASS_BY_NAME: Record<string, string> = {
+  'Academic & Career': 'academic',
+  'Workshops & Training': 'workshop',
+  'Sports & Wellness': 'sports',
+  'Culture & Community': 'culture',
+  'Clubs & Societies': 'club',
+  'Entertainment & Social': 'social',
+  Volunteering: 'volunteer',
+};
 
 interface CalendarDay {
   readonly date: Date;
@@ -43,7 +65,7 @@ interface AgendaDay {
 
 @Component({
   selector: 'app-event-calendar',
-  imports: [DatePipe, ExpandableSearchComponent, FilterButtonComponent],
+  imports: [DatePipe, ExpandableSearchComponent, FilterButtonComponent, LoadingStateComponent],
   templateUrl: './event-calendar.html',
   styleUrl: './event-calendar.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -51,8 +73,9 @@ interface AgendaDay {
 export class EventCalendarComponent {
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly publishedEventService = inject(PublishedEventService);
+  private readonly auth = inject(AuthService);
   private readonly today = this.startOfDay(new Date());
-  private generatedEventId = 0;
 
   @ViewChild('modalCloseButton') private modalCloseButton?: ElementRef<HTMLButtonElement>;
   @ViewChild('calendarFilterClose') private filterCloseButton?: ElementRef<HTMLButtonElement>;
@@ -76,132 +99,16 @@ export class EventCalendarComponent {
   readonly selectedEvent = signal<CalendarEvent | null>(null);
   readonly selectedDay = signal<AgendaDay | null>(null);
 
-  readonly events: readonly CalendarEvent[] = [
-    this.createEvent(
-      0,
-      'Future Forward: Tech Expo',
-      '10:00 AM',
-      'APU Atrium',
-      'Workshops & Training',
-      'workshop',
-      'Meet the student innovators building what comes next through technology, design and creative experimentation.',
-    ),
-    this.createEvent(
-      1,
-      'Startup Pitch Night',
-      '6:30 PM',
-      'APU Atrium',
-      'Academic & Career',
-      'academic',
-      'Watch emerging founders pitch bold ideas and connect with mentors from across the APU community.',
-    ),
-    this.createEvent(
-      3,
-      'Career Connect Fair',
-      '10:00 AM',
-      'Level 3 Expo Hall',
-      'Academic & Career',
-      'academic',
-      'Meet employers, explore career paths and build meaningful professional connections.',
-    ),
-    this.createEvent(
-      3,
-      'Design Thinking Sprint',
-      '12:30 PM',
-      'Design Studio 2',
-      'Workshops & Training',
-      'workshop',
-      'Solve a real campus challenge through a fast, collaborative design-thinking workshop.',
-    ),
-    this.createEvent(
-      3,
-      'Societies Welcome Mixer',
-      '4:00 PM',
-      'Campus Plaza',
-      'Clubs & Societies',
-      'club',
-      'Meet student clubs, discover new interests and find a community that feels like yours.',
-    ),
-    this.createEvent(
-      3,
-      'Research Exchange Forum',
-      '6:00 PM',
-      'Auditorium 2',
-      'Academic & Career',
-      'academic',
-      'Share ideas with postgraduate researchers and hear short talks on work happening across APU.',
-    ),
-    this.createEvent(
-      5,
-      'Community Green Day',
-      '8:00 AM',
-      'Bukit Jalil Community Park',
-      'Volunteering',
-      'volunteer',
-      'Spend a morning creating greener shared spaces alongside students, staff and community partners.',
-    ),
-    this.createEvent(
-      7,
-      'AI Builders Workshop',
-      '2:00 PM',
-      'Innovation Lab',
-      'Workshops & Training',
-      'workshop',
-      'Build a practical AI prototype with guidance from student mentors and industry practitioners.',
-    ),
-    this.createEvent(
-      9,
-      'One World Cultural Night',
-      '6:30 PM',
-      'APU Auditorium',
-      'Culture & Community',
-      'culture',
-      'Celebrate the performances, flavours and traditions that make the APU community truly global.',
-    ),
-    this.createEvent(
-      12,
-      'APU Esports Showdown',
-      '12:00 PM',
-      'Level 4 Arena',
-      'Entertainment & Social',
-      'social',
-      'Cheer on campus teams in an energetic tournament welcoming players, fans and first-timers.',
-    ),
-    this.createEvent(
-      16,
-      'Campus After Dark',
-      '7:00 PM',
-      'Campus Plaza',
-      'Entertainment & Social',
-      'social',
-      'Experience live student music and an open-air campus evening designed for connection.',
-    ),
-    this.createEvent(
-      18,
-      'Global Alumni Conversation',
-      '5:30 PM',
-      'Online',
-      'Academic & Career',
-      'academic',
-      'Hear practical career lessons from APU graduates working across technology and business.',
-    ),
-    this.createEvent(
-      22,
-      'Wellness Run & Community Day',
-      '7:00 AM',
-      'APU Main Entrance',
-      'Sports & Wellness',
-      'sports',
-      'Start the day moving together, then stay for games, wellbeing activities and community time.',
-    ),
-  ];
+  readonly events = signal<readonly CalendarEvent[]>([]);
+  readonly loading = signal(true);
+  readonly loadError = signal('');
 
   readonly categoryOptions = computed(() =>
-    [...new Set(this.events.map((event) => event.category))].sort((a, b) => a.localeCompare(b)),
+    [...new Set(this.events().map((event) => event.category))].sort((a, b) => a.localeCompare(b)),
   );
   readonly appliedFilterCount = computed(() => this.appliedCategories().length);
   readonly draftResultCount = computed(
-    () => this.events.filter((event) => this.eventMatches(event, this.draftCategories())).length,
+    () => this.events().filter((event) => this.eventMatches(event, this.draftCategories())).length,
   );
 
   readonly monthDays = computed<readonly CalendarDay[]>(() => {
@@ -286,6 +193,58 @@ export class EventCalendarComponent {
       this.document.body.classList.remove('calendar-dialog-open');
       this.document.body.classList.remove('calendar-filter-open');
     });
+    this.loadPublishedEvents();
+  }
+
+  private loadPublishedEvents(): void {
+    this.publishedEventService.getPublishedEvents().subscribe({
+      next: (allEvents) => {
+        const isAuthenticated = this.auth.authenticated();
+        const visibleEvents = allEvents.filter((event) =>
+          isEventVisibleTo(event.eventVisibility, isAuthenticated),
+        );
+        this.events.set(visibleEvents.flatMap((event) => this.toCalendarEvents(event)));
+        this.loading.set(false);
+      },
+      error: () => {
+        this.loadError.set('Events could not be loaded.');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  // One PublishedEvent can have multiple schedule entries (multi-day/session events); the
+  // calendar shows one CalendarEvent per schedule entry so each date it occupies gets its own cell.
+  private toCalendarEvents(event: PublishedEvent): readonly CalendarEvent[] {
+    const category = event.categories[0];
+    return event.schedule
+      .filter((schedule) => schedule.date)
+      .map((schedule, index) => ({
+        id: `${event.id}-${index}`,
+        title: event.eventTitle,
+        date: this.parseDate(schedule.date),
+        time: this.timeRangeFor(schedule),
+        venue: schedule.location || 'To be confirmed',
+        category: category ?? 'Academic & Career',
+        categoryClass: category ? (CATEGORY_CLASS_BY_NAME[category] ?? 'academic') : 'academic',
+        description: event.shortIntroduction,
+      }));
+  }
+
+  private parseDate(isoDate: string): Date {
+    const [year, month, day] = isoDate.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  private timeRangeFor(schedule: ProposalEventSchedule): string {
+    return `${this.formatTime(schedule.start)} – ${this.formatTime(schedule.end)}`;
+  }
+
+  private formatTime(value: string): string {
+    const [hours = '0', minutes = '00'] = value.split(':');
+    const hour = Number(hours);
+    const suffix = hour >= 12 ? 'PM' : 'AM';
+    return `${hour % 12 || 12}:${minutes} ${suffix}`;
   }
 
   @HostListener('document:keydown.escape')
@@ -365,7 +324,7 @@ export class EventCalendarComponent {
     const key = this.dateKey(date);
     const query = this.searchTerm().trim().toLocaleLowerCase();
 
-    return this.events.filter((event) => {
+    return this.events().filter((event) => {
       return (
         this.dateKey(event.date) === key &&
         this.eventMatches(event, this.appliedCategories(), query)
@@ -435,32 +394,6 @@ export class EventCalendarComponent {
       isToday: this.dateKey(date) === this.dateKey(this.today),
       events: this.eventsForDate(date),
     };
-  }
-
-  private createEvent(
-    daysFromNow: number,
-    title: string,
-    time: string,
-    venue: string,
-    category: string,
-    categoryClass: string,
-    description: string,
-  ): CalendarEvent {
-    return {
-      id: this.nextEventId(),
-      title,
-      date: this.addDays(this.today, daysFromNow),
-      time,
-      venue,
-      category,
-      categoryClass,
-      description,
-    };
-  }
-
-  private nextEventId(): number {
-    this.generatedEventId += 1;
-    return this.generatedEventId;
   }
 
   private startOfMonth(date: Date): Date {

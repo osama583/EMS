@@ -13,7 +13,15 @@ function mapRegistrationStatus(status) {
 }
 
 function projectRegistration(row) {
-  return { id: String(row.event_registration_id), eventId: String(row.request_id), email: row.registrant_email, status: mapRegistrationStatus(row.status) };
+  return {
+    id: String(row.event_registration_id),
+    eventId: String(row.request_id),
+    email: row.registrant_email,
+    status: mapRegistrationStatus(row.status),
+    paymentProofUrl: row.payment_proof_url || null,
+    paymentProofFileName: row.payment_proof_file_name || null,
+    paymentStatus: row.payment_status || 'not_required',
+  };
 }
 
 function findPublishedRequest(id) {
@@ -80,7 +88,7 @@ router.get('/:id', async (req, res, next) => {
 router.post('/:id/register', async (req, res, next) => {
   try {
     const request = findPublishedRequest(req.params.id);
-    const { email } = req.body;
+    const { email, paymentProofUrl, paymentProofFileName } = req.body;
     const existing = db.event_registration.find((r) => r.request_id === request.request_id && r.registrant_email === email);
     if (existing) {
       return res.json({
@@ -89,15 +97,23 @@ router.post('/:id/register', async (req, res, next) => {
       });
     }
     const user = db.users.find((u) => u.email === email);
-    const status = request.registration_approval === 'Automatic' ? 'registered' : 'pending_approval';
+    const cost = request.cost_amount != null ? Number(request.cost_amount) : null;
+    const isPaidEvent = cost != null && cost > 0;
+    // Paid events always need human review of the payment proof, regardless of the event's
+    // registration_approval mode — same inbox that already handles manual registration review.
+    const status = isPaidEvent ? 'pending_approval' : (request.registration_approval === 'Automatic' ? 'registered' : 'pending_approval');
+    const paymentStatus = isPaidEvent ? 'pending_review' : 'not_required';
     db.event_registration.push({
       event_registration_id: nextId('event_registration'),
       request_id: request.request_id,
       user_id: user ? user.user_id : null,
-      registrant_name: user ? `${user.first_name} ${user.last_name}` : email,
+      registrant_name: user ? user.full_name : email,
       registrant_email: email,
       reason_for_attending: null,
       status,
+      payment_proof_url: paymentProofUrl || null,
+      payment_proof_file_name: paymentProofFileName || null,
+      payment_status: paymentStatus,
       registered_at: new Date().toISOString(),
     });
     res.json({
@@ -112,6 +128,9 @@ router.post('/registrations/:id/approve', async (req, res, next) => {
     const registration = db.event_registration.find((r) => r.event_registration_id === Number(req.params.id));
     if (!registration) throw new WorkflowError('Registration not found.', 404);
     registration.status = 'registered';
+    // Approving the registration approves the payment too — one combined action, no separate
+    // payment-review step. Leave 'not_required' untouched (free event, nothing to approve).
+    if (registration.payment_status === 'pending_review') registration.payment_status = 'approved';
     res.json(projectRegistration(registration));
   } catch (err) { next(err); }
 });
@@ -121,6 +140,7 @@ router.post('/registrations/:id/reject', async (req, res, next) => {
     const registration = db.event_registration.find((r) => r.event_registration_id === Number(req.params.id));
     if (!registration) throw new WorkflowError('Registration not found.', 404);
     registration.status = 'rejected';
+    if (registration.payment_status === 'pending_review') registration.payment_status = 'rejected';
     res.json(projectRegistration(registration));
   } catch (err) { next(err); }
 });

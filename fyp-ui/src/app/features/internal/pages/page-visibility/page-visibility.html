@@ -1,0 +1,191 @@
+<section class="page-visibility">
+  <app-feedback-banner [message]="successMessage()" tone="success" />
+  <app-feedback-banner [message]="errorMessage()" tone="error" />
+
+  <nav class="page-visibility__tabs" aria-label="Page Visibility sections">
+    <button type="button" class="page-visibility__tab" [class.page-visibility__tab--active]="activeTab() === 'pages'" (click)="setTab('pages')">
+      <span class="material-symbols-rounded" aria-hidden="true">list_alt</span>
+      Pages
+    </button>
+    <button type="button" class="page-visibility__tab" [class.page-visibility__tab--active]="activeTab() === 'permissions'" (click)="setTab('permissions')">
+      <span class="material-symbols-rounded" aria-hidden="true">admin_panel_settings</span>
+      Permissions
+    </button>
+    <button type="button" class="page-visibility__tab" [class.page-visibility__tab--active]="activeTab() === 'deleted'" (click)="setTab('deleted')">
+      <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+      Deleted
+    </button>
+  </nav>
+
+  @if (activeTab() === 'pages') {
+    <app-internal-data-page
+      [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+      (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
+      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+      (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit', icon: 'edit' }, record: $event })" (primaryAction)="openAdd()"
+      (cellClick)="handleCellClick($event)"
+    />
+  } @else if (activeTab() === 'permissions') {
+    <app-internal-data-page
+      [config]="permissionsConfig()" [records]="permissionRecords()" [filters]="permissionsFilters()" [searchValue]="permissionsSearch()" [loading]="loading()"
+      [totalPages]="permissionsTotalPages()" [page]="permissionsPage()" [pageSize]="permissionsPageSize()"
+      (searchChange)="setPermissionsSearch($event)" (filterChange)="setPermissionsFilter($event)" (reset)="resetPermissionsFilters()"
+      (pageChange)="setPermissionsPage($event)" (pageSizeChange)="setPermissionsPageSize($event)" (rowAction)="handlePermissionAction($event)"
+      (primaryAction)="openAddPermission()" (cellClick)="handlePermissionCellClick($event)"
+    />
+  } @else {
+    <app-internal-data-page
+      [config]="deletedConfig()" [records]="deletedRecords()" [filters]="[]" [searchValue]="''" [loading]="deletedLoading()"
+      [totalPages]="1" [page]="1" [pageSize]="50" [hideControls]="true"
+      (rowAction)="handleDeletedAction($event)"
+    />
+  }
+
+  <app-popover [open]="!!grantPopoverRecordId()" title="Grants access to" icon="share" (close)="closeGrantPopover()">
+    <ul class="page-visibility__popover-list">
+      @for (item of grantPopoverItems(); track item) { <li>{{ item }}</li> }
+    </ul>
+  </app-popover>
+</section>
+
+<app-form-modal [open]="modalOpen()" [title]="editingCode() ? 'Edit Page' : 'Add Page'" [primaryLabel]="editingCode() ? 'Save Changes' : 'Add Page'" [loading]="saving()" [disabled]="!formValid()" (close)="closeModal()" (cancel)="closeModal()" (submit)="save()">
+  <div class="page-visibility__form">
+
+    <div class="page-visibility__form-section">
+      <app-form-field controlId="page-label" label="Label" hint="What shows in the sidebar." [required]="true" [value]="draft().label" [error]="labelError()" (valueChange)="setLabel($event)" />
+
+      <label class="page-visibility__radio-group">
+        <span>Entry type</span>
+        <span class="page-visibility__radios">
+          <label><input type="radio" name="entryType" value="page" [checked]="entryType() === 'page'" (change)="setEntryType('page')" /> Page <small>Links to a route.</small></label>
+          <label><input type="radio" name="entryType" value="folder" [checked]="entryType() === 'folder'" (change)="setEntryType('folder')" /> Folder <small>Groups pages together.</small></label>
+        </span>
+      </label>
+
+      @if (entryType() === 'page') {
+        <app-searchable-dropdown controlId="page-parent" label="Parent folder" placeholder="No parent (top level)" [options]="folderOptions()" [value]="draft().parentPageCode" (valueChange)="setParentPageCode($any($event))" />
+      }
+    </div>
+
+    <div class="page-visibility__form-section">
+      <div class="page-visibility__icon-row">
+        <app-image-upload-field
+          controlId="page-icon"
+          label="Icon"
+          hint="SVG file only · auto-resized and recolored to match the sidebar"
+          emptyMessage="No icon selected"
+          accept="image/svg+xml,.svg"
+          fit="contain"
+          [imagePreview]="iconPreviewDataUrl()"
+          [imageFileName]="draft().iconFileName"
+          [error]="iconError()"
+          (fileSelect)="onIconFile($event)"
+          (remove)="removeIcon()"
+        />
+      </div>
+
+      @if (entryType() === 'page') {
+        <app-form-field controlId="page-route" label="Route" [readOnly]="true" [value]="derivedRoutePath() ?? ''" hint="Automatically generated from Page Code. Cannot be changed." />
+      }
+    </div>
+
+    <label class="page-visibility__checkbox">
+      <input type="checkbox" [checked]="draft().active" (change)="setActive($any($event.target).checked)" />
+      <span>Active <small>Inactive pages are hidden from every sidebar.</small></span>
+    </label>
+
+    @if (editingCode()) {
+      <p class="page-visibility__legacy-notice">
+        <span class="material-symbols-rounded" aria-hidden="true">info</span>
+        <span>Who can see this page is managed on the <strong>Permissions</strong> tab, not here.</span>
+      </p>
+    }
+  </div>
+</app-form-modal>
+
+<app-form-modal
+  [open]="grantModalOpen()" [title]="editingGrantId() ? 'Edit Permission' : 'Add Permission'" [primaryLabel]="editingGrantId() ? 'Save Changes' : 'Add permission'" [loading]="grantSaving()"
+  [disabled]="!newGrantValid()" (close)="closeGrantModal()" (cancel)="closeGrantModal()" (submit)="addGrant()"
+>
+  <div class="page-visibility__form">
+    <app-searchable-dropdown
+      controlId="grant-folder" label="Folder" [searchable]="false" [clearable]="false"
+      [options]="grantModalFolderOptions()" [value]="grantModalFolderCode()" (valueChange)="setGrantModalFolderCode($any($event))"
+    />
+    <app-searchable-dropdown
+      controlId="grant-page" label="Page" placeholder="Choose a page"
+      [options]="grantModalPageOptions()" [value]="grantModalPageCode()" (valueChange)="setGrantModalPageCode($any($event))"
+    />
+
+    <fieldset class="page-visibility__permission-picker">
+      <legend>Add a permission</legend>
+      @for (option of grantTypeOptions; track option.value) {
+        <label class="page-visibility__permission-option" [class.page-visibility__permission-option--selected]="newGrantType() === option.value">
+          <input type="radio" name="newGrantType" [value]="option.value" [checked]="newGrantType() === option.value" (change)="setNewGrantType(option.value)" />
+          <span>
+            <strong>{{ option.label }}</strong>
+            <small>{{ option.description }}</small>
+          </span>
+        </label>
+      }
+    </fieldset>
+
+    @if (newGrantType() === 'role') {
+      <div class="page-visibility__multi-field">
+        <app-searchable-dropdown
+          controlId="new-grant-role" label="Roles" placeholder="Choose one or more roles" [isMulti]="true"
+          [options]="newGrantRoleOptions()" [value]="newGrantRoleCodes()" (valueChange)="setNewGrantRoleCodes($any($event))"
+        />
+        <button type="button" class="page-visibility__select-all" (click)="selectAllGrantRoles()">Select all roles</button>
+      </div>
+    }
+    @if (newGrantType() === 'unit') {
+      <div class="page-visibility__multi-field">
+        <app-searchable-dropdown
+          controlId="new-grant-unit" label="Units" placeholder="Choose one or more units" [isMulti]="true"
+          [options]="newGrantUnitOptions()" [value]="newGrantUnitCodes()" (valueChange)="setNewGrantUnitCodes($any($event))"
+        />
+        <button type="button" class="page-visibility__select-all" (click)="selectAllGrantUnits()">Select all units</button>
+      </div>
+    }
+    @if (newGrantType() === 'unit_role') {
+      <div class="page-visibility__multi-field">
+        <app-searchable-dropdown
+          controlId="new-grant-unit-role-unit" label="Units" placeholder="Choose one or more units" [isMulti]="true"
+          [options]="newGrantUnitOptions()" [value]="newGrantUnitCodes()" (valueChange)="setNewGrantUnitCodes($any($event))"
+        />
+        <button type="button" class="page-visibility__select-all" (click)="selectAllGrantUnits()">Select all units</button>
+      </div>
+      <div class="page-visibility__multi-field">
+        <app-searchable-dropdown
+          controlId="new-grant-unit-role-role" label="Roles" placeholder="Choose one or more roles" [isMulti]="true"
+          [loading]="grantEligibleRolesLoading()" [disabled]="!newGrantUnitCodes().length"
+          [options]="newGrantRoleOptions()" [value]="newGrantRoleCodes()" (valueChange)="setNewGrantRoleCodes($any($event))"
+        />
+        @if (newGrantUnitCodes().length) { <button type="button" class="page-visibility__select-all" (click)="selectAllGrantRoles()">Select all eligible roles</button> }
+      </div>
+      @if (!newGrantUnitCodes().length) { <p class="page-visibility__muted">Choose at least one unit first to see its eligible roles.</p> }
+    }
+
+    @if (grantError()) { <p class="page-visibility__grant-error">{{ grantError() }}</p> }
+  </div>
+</app-form-modal>
+
+<app-delete-confirm-dialog
+  [open]="!!deleteTarget()" entityKind="Page" [entityLabel]="targetLabel()"
+  [checkingDependencies]="checkingDeletion()" [preview]="deletePreview()" [deleting]="deletingPage()"
+  (confirm)="confirmDeletePage()" (cancel)="cancelDeletePage()"
+/>
+
+<app-delete-confirm-dialog
+  [open]="!!deleteGrantTarget()" entityKind="Permission" [entityLabel]="deleteGrantTarget()?.label ?? ''"
+  [checkingDependencies]="false" [preview]="{ canDelete: true, blockingReasons: [], entityLabel: deleteGrantTarget()?.label ?? '' }" [deleting]="deletingGrant()"
+  (confirm)="confirmRemoveGrant()" (cancel)="cancelRemoveGrant()"
+/>
+
+<app-delete-confirm-dialog
+  [open]="!!purgeTargetCode()" [permanent]="true" entityKind="Page" [entityLabel]="purgeTargetLabel()"
+  [preview]="{ canDelete: true, blockingReasons: [], entityLabel: purgeTargetLabel() }" [deleting]="purgingPage()"
+  (confirm)="confirmPurgePage()" (cancel)="cancelPurgePage()"
+/>

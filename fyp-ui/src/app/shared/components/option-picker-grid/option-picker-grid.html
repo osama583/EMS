@@ -1,0 +1,38 @@
+@if (showSearch()) {
+  <app-expandable-search ariaLabel="Search items" placeholder="Search items…" [value]="search()" (valueChange)="search.set($event)" />
+}
+@if (!filteredOptions().length) {
+  <p class="option-picker-grid__empty" role="status">{{ emptyMessage() }}</p>
+} @else {
+  <div class="option-picker-grid" role="listbox" [attr.aria-label]="ariaLabel()">
+    @for (item of filteredOptions(); track item.id) {
+      <button
+        type="button"
+        class="option-picker-card"
+        role="option"
+        [attr.aria-selected]="item.id === value()"
+        [class.option-picker-card--selected]="item.id === value()"
+        (click)="select(item.id)"
+      >
+        <span class="option-picker-card__media">
+          @if (item.imageDataUrl && !failedImages()[item.id]) {
+            <img [src]="item.imageDataUrl" [alt]="item.imageFileName || item.label" loading="lazy" (error)="onImageError(item.id)" />
+          } @else {
+            <span class="option-picker-card__placeholder" aria-hidden="true">
+              <span class="material-symbols-rounded">inventory_2</span>
+            </span>
+          }
+          @if (item.id === value()) {
+            <span class="option-picker-card__check" aria-hidden="true">
+              <span class="material-symbols-rounded">check_circle</span>
+            </span>
+          }
+        </span>
+        <span class="option-picker-card__body">
+          <span class="option-picker-card__label">{{ item.label }}</span>
+          @if (item.contextText) { <span class="option-picker-card__context">{{ item.contextText }}</span> }
+        </span>
+      </button>
+    }
+  </div>
+}

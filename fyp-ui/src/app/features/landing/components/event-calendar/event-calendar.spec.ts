@@ -1,21 +1,83 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { environment } from '../../../../../environments/environment';
+import { PublishedEvent } from '../../../../core/events/published-event.models';
 import { EventCalendarComponent } from './event-calendar';
+
+// Mirrors the spread of the old hardcoded fixture (titles/categories/dates relative to today) so
+// this spec's pre-existing assertions (search matches, category filter, day overflow, event
+// dialog) still hold once the calendar is driven by a real HTTP-fetched `PublishedEvent[]`
+// instead of a literal array.
+function isoDate(daysFromNow: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + daysFromNow);
+  return date.toISOString().slice(0, 10);
+}
+
+const MOCK_EVENT_FIXTURES: readonly {
+  title: string;
+  daysFromNow: number;
+  start: string;
+  end: string;
+  venue: string;
+  category: PublishedEvent['categories'][number];
+}[] = [
+  { title: 'Future Forward: Tech Expo', daysFromNow: 0, start: '10:00', end: '11:30', venue: 'APU Atrium', category: 'Workshops & Training' },
+  { title: 'Startup Pitch Night', daysFromNow: 1, start: '18:30', end: '20:00', venue: 'APU Atrium', category: 'Academic & Career' },
+  { title: 'Career Connect Fair', daysFromNow: 3, start: '10:00', end: '15:00', venue: 'Level 3 Expo Hall', category: 'Academic & Career' },
+  { title: 'Design Thinking Sprint', daysFromNow: 3, start: '12:30', end: '14:00', venue: 'Design Studio 2', category: 'Workshops & Training' },
+  { title: 'Societies Welcome Mixer', daysFromNow: 3, start: '16:00', end: '18:00', venue: 'Campus Plaza', category: 'Clubs & Societies' },
+  { title: 'Research Exchange Forum', daysFromNow: 3, start: '18:00', end: '20:00', venue: 'Auditorium 2', category: 'Academic & Career' },
+  { title: 'Community Green Day', daysFromNow: 5, start: '08:00', end: '12:00', venue: 'Bukit Jalil Community Park', category: 'Volunteering' },
+];
+
+const MOCK_PUBLISHED_EVENTS: readonly PublishedEvent[] = MOCK_EVENT_FIXTURES.map((fixture, index) => ({
+  id: `evt-${index + 1}`,
+  eventTitle: fixture.title,
+  shortIntroduction: 'Mock introduction.',
+  goals: 'Mock goals.',
+  expectedBenefits: 'Mock benefits.',
+  categories: [fixture.category],
+  eventVisibility: 'Public',
+  eventFormat: 'On Campus',
+  eventImage: { url: '/assets/events/mock.jpg', fileName: 'mock.jpg', mimeType: 'image/jpeg', sizeBytes: 0, status: 'uploaded' },
+  schoolDepartment: 'Student Affairs',
+  audience: ['APU Community'],
+  schedule: [{ date: isoDate(fixture.daysFromNow), start: fixture.start, end: fixture.end, location: fixture.venue }],
+  totalExpectedPax: 100,
+  registrationMode: 'Automatic',
+  confirmedRegistrationCount: 10,
+  pendingRegistrationCount: 0,
+  cost: null,
+  bankAccountName: null,
+  bankAccountNumber: null,
+  isFree: true,
+}));
 
 describe('EventCalendarComponent', () => {
   let fixture: ComponentFixture<EventCalendarComponent>;
   let component: EventCalendarComponent;
+  let httpMock: HttpTestingController;
 
   beforeEach(async () => {
+    localStorage.removeItem('apu-ems-auth-user');
     await TestBed.configureTestingModule({
       imports: [EventCalendarComponent],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(EventCalendarComponent);
     component = fixture.componentInstance;
+    httpMock = TestBed.inject(HttpTestingController);
+    fixture.detectChanges();
+    httpMock.expectOne(environment.eventsApiUrl).flush(MOCK_PUBLISHED_EVENTS);
     fixture.detectChanges();
   });
 
   afterEach(() => {
+    httpMock.verify();
     fixture.destroy();
     TestBed.resetTestingModule();
     document.body.classList.remove('calendar-dialog-open');
@@ -108,17 +170,17 @@ describe('EventCalendarComponent', () => {
     expect(fixture.nativeElement.querySelector('.calendar-filter-dialog')).not.toBeNull();
     expect(document.body.classList.contains('calendar-filter-open')).toBe(true);
 
-    component.toggleDraftCategory('Culture & Community');
+    component.toggleDraftCategory('Volunteering');
     fixture.detectChanges();
     component.applyCalendarFilters();
     fixture.detectChanges();
 
-    expect(component.appliedCategories()).toEqual(['Culture & Community']);
+    expect(component.appliedCategories()).toEqual(['Volunteering']);
     expect(
       component
         .monthDays()
         .flatMap((day) => day.events)
-        .every((event) => event.category === 'Culture & Community'),
+        .every((event) => event.category === 'Volunteering'),
     ).toBe(true);
     expect(component.calendarFilterOpen()).toBe(false);
     expect(document.body.classList.contains('calendar-filter-open')).toBe(false);
@@ -137,7 +199,7 @@ describe('EventCalendarComponent', () => {
   });
 
   it('opens and closes the complete event-details popup', () => {
-    const event = component.events[0];
+    const event = component.events()[0];
 
     component.openEvent(event);
     fixture.detectChanges();

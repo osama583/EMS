@@ -12,6 +12,7 @@ export class OptionCardGridComponent {
   readonly loading = input(false);
   readonly emptyTitle = input('No items found');
   readonly emptyDescription = input('Add an item or change the search and status filters.');
+  readonly readOnly = input(false);
 
   readonly viewDetails = output<string>();
   readonly edit = output<string>();

@@ -19,7 +19,8 @@ const DRAFT_PROPOSALS: readonly ProposalReviewRecord[] = [
 function loginAsDraftOwner(): void {
   TestBed.inject(AuthService).establishSession({
     email: DRAFT_APPLICANT_EMAIL, displayName: 'Jordan Lee', username: 'jordan.lee',
-    role: UserRole.Staff, accountType: 'internal', roleLabel: 'Staff', department: 'Student Affairs',
+    role: 'staff' as UserRole, accountType: 'internal', roleLabel: 'Student Affairs Staff', department: 'Student Affairs',
+    functionLevel: 'staff', unitId: 'student_affairs', unitKind: 'service_department',
   });
 }
 
@@ -69,7 +70,8 @@ describe('RecordsPageComponent', () => {
   it('excludes drafts that belong to a different applicant', () => {
     TestBed.inject(AuthService).establishSession({
       email: 'someone.else@student.apu.edu.my', displayName: 'Someone Else', username: 'someone.else',
-      role: UserRole.Staff, accountType: 'internal', roleLabel: 'Staff', department: 'Student Affairs',
+      role: 'staff' as UserRole, accountType: 'internal', roleLabel: 'Student Affairs Staff', department: 'Student Affairs',
+      functionLevel: 'staff', unitId: 'student_affairs', unitKind: 'service_department',
     });
     const fixture = TestBed.createComponent(RecordsPageComponent);
     fixture.detectChanges();

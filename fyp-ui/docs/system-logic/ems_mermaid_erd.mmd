@@ -3,12 +3,12 @@ erDiagram
 
     USERS {
         int user_id PK
-        string first_name
-        string last_name
+        string full_name
+        string username UK
         string email UK
-        string phone_number
-        string role
+        string password
         int is_active
+        time archived_at
     }
 
     STAFF {
@@ -26,25 +26,102 @@ erDiagram
     UNIT {
         string code PK
         string description
-        int head_user_id FK
         int is_active
+        time archived_at
     }
 
-    UNIT_USERS {
-        int user_id PK,FK
+    ROLE {
+        string role_code PK
+        string role_name
+        string description
+        int is_protected
+        int is_active
+        time archived_at
+    }
+
+    ROLE_UNIT {
+        string role_code PK,FK
         string unit_code PK,FK
+    }
+
+    USER_UNIT_ROLES {
+        int user_unit_role_id PK
+        int user_id FK
+        string unit_code FK
+        string role_code FK
+        time assigned_at
+    }
+
+    NAV_PAGE {
+        string page_code PK
+        string label
+        string entry_type
+        text icon
+        string parent_page_code FK
+        int sort_order
+        string route_path
+        int is_active
+        time archived_at
+    }
+
+    NAV_PAGE_GRANTS {
+        int grant_id PK
+        string page_code FK
+        string grant_type
+        int is_active
+        time archived_at
+    }
+
+    NAV_PAGE_GRANT_ROLES {
+        int grant_id PK,FK
+        string role_code PK,FK
+    }
+
+    NAV_PAGE_GRANT_UNITS {
+        int grant_id PK,FK
+        string unit_code PK,FK
+    }
+
+    CLUB_CATEGORIES {
+        int club_category_id PK
+        string name UK
+        int active
+        time created_at
+        time archived_at
     }
 
     CLUBS {
         int club_id PK
         int user_id FK
         string club_name
+        string description
+        string image_url
+        int created_by_user_id FK
+        int active
+        time created_at
     }
 
-    STUDENT_CLUBS {
+    CLUB_CATEGORY_LINKS {
         int club_id PK,FK
-        int student_id PK,FK
+        int club_category_id PK,FK
+    }
+
+    CLUB_MEMBERS {
+        int club_id PK,FK
+        int user_id PK,FK
         date date_joined
+    }
+
+    CLUB_JOIN_REQUESTS {
+        int club_join_request_id PK
+        int club_id FK
+        int requester_user_id FK
+        string reason
+        string status
+        string comment
+        time created_at
+        time resolved_at
+        int resolved_by_user_id FK
     }
 
     CAFETERIA {
@@ -82,6 +159,7 @@ erDiagram
         int available_quantity
         string quantity_unit
         string item_image_url
+        time archived_at
     }
 
     TRANSPORTATION_OPTIONS {
@@ -94,6 +172,7 @@ erDiagram
         int available_vehicle_count
         string instructions
         string vehicle_image_url
+        time archived_at
     }
 
     MEDIA_OPTIONS {
@@ -102,7 +181,7 @@ erDiagram
         string label
         string description
         int active
-        int max_personnel
+        time archived_at
     }
 
     SOUND_LIGHT_OPTIONS {
@@ -111,8 +190,8 @@ erDiagram
         string label
         string description
         int active
-        int available_quantity
         string technical_description
+        time archived_at
     }
 
     DIETARY_INFORMATION_OPTIONS {
@@ -120,6 +199,7 @@ erDiagram
         string label
         string description
         int active
+        time archived_at
     }
 
     SERVING_UNIT_OPTIONS {
@@ -127,6 +207,7 @@ erDiagram
         string label
         string description
         int active
+        time archived_at
     }
 
     FMB_OPTIONS {
@@ -140,6 +221,7 @@ erDiagram
         int dietary_information_option_id FK
         string availability_ordering_notes
         string menu_image_url
+        time archived_at
     }
 
     CAMPUS_TOUR_START_OPTIONS {
@@ -150,18 +232,16 @@ erDiagram
         int active
         string meeting_instructions
         int max_group_size
+        time archived_at
     }
 
-    WATER_LOGO_OPTIONS {
-        int water_logo_option_id PK
+    CAMPUS_TOUR_TYPE_OPTIONS {
+        int campus_tour_type_option_id PK
         int requirement_id FK
         string label
         string description
         int active
-        int number_of_bottles
-        int available_stock
-        string logo_branding_requirement
-        string lead_time_ordering_instructions
+        time archived_at
     }
 
     WATER_NORMAL_OPTIONS {
@@ -173,6 +253,8 @@ erDiagram
         int number_of_bottles
         int available_stock
         string ordering_delivery_instructions
+        string logo_branding_requirement
+        time archived_at
     }
 
     FUNDING_MAIN_OPTIONS {
@@ -183,6 +265,7 @@ erDiagram
         int active
         string budget_category_finance_code
         string purchasing_guidance
+        time archived_at
     }
 
     FUNDING_SUB_OPTIONS {
@@ -193,6 +276,7 @@ erDiagram
         int active
         string finance_procurement_code
         string default_unit_purchasing_note
+        time archived_at
     }
 
     CONFIG {
@@ -318,32 +402,20 @@ erDiagram
         int request_campus_tour_id PK
         int request_id FK
         date date
-        time start_time
-        time end_time
-        string location
         int pax
         int start_point_option_id FK
         string start_point
+        int tour_type_option_id FK
+        string tour_type
         string notes
     }
 
-    REQUEST_MINERAL_WATER_LOGO {
-        int request_mineral_water_logo_id PK
+    REQUEST_MINERAL_WATER {
+        int request_mineral_water_id PK
         int request_id FK
         int option_id FK
         int quantity
-        date date
-        time start_time
-        time end_time
-        string location
-        string notes
-    }
-
-    REQUEST_MINERAL_WATER_NORMAL {
-        int request_mineral_water_normal_id PK
-        int request_id FK
-        int option_id FK
-        int quantity
+        int with_logo
         date date
         time start_time
         time end_time
@@ -449,6 +521,7 @@ erDiagram
         int requirement_id FK
         string stage_code
         int sequence_no
+        string assigned_unit_code FK
         string assigned_role
         string assignment_mode
         string status
@@ -483,12 +556,26 @@ erDiagram
     %% ===================== RELATIONSHIPS =====================
     USERS ||--o{ STAFF : "user_id"
     USERS ||--o{ STUDENT : "user_id"
-    USERS ||--o{ UNIT : "head_user_id"
-    USERS ||--o{ UNIT_USERS : "user_id"
-    UNIT ||--o{ UNIT_USERS : "unit_code"
+    USERS ||--o{ USER_UNIT_ROLES : "user_id"
+    UNIT ||--o{ USER_UNIT_ROLES : "unit_code"
+    ROLE ||--o{ USER_UNIT_ROLES : "role_code"
+    ROLE ||--o{ ROLE_UNIT : "role_code"
+    UNIT ||--o{ ROLE_UNIT : "unit_code"
+    NAV_PAGE ||--o{ NAV_PAGE : "parent_page_code"
+    NAV_PAGE ||--o{ NAV_PAGE_GRANTS : "page_code"
+    NAV_PAGE_GRANTS ||--o{ NAV_PAGE_GRANT_ROLES : "grant_id"
+    ROLE ||--o{ NAV_PAGE_GRANT_ROLES : "role_code"
+    NAV_PAGE_GRANTS ||--o{ NAV_PAGE_GRANT_UNITS : "grant_id"
+    UNIT ||--o{ NAV_PAGE_GRANT_UNITS : "unit_code"
     USERS ||--o{ CLUBS : "user_id"
-    CLUBS ||--o{ STUDENT_CLUBS : "club_id"
-    STUDENT ||--o{ STUDENT_CLUBS : "student_id"
+    USERS ||--o{ CLUBS : "created_by_user_id"
+    CLUBS ||--o{ CLUB_CATEGORY_LINKS : "club_id"
+    CLUB_CATEGORIES ||--o{ CLUB_CATEGORY_LINKS : "club_category_id"
+    CLUBS ||--o{ CLUB_MEMBERS : "club_id"
+    USERS ||--o{ CLUB_MEMBERS : "user_id"
+    CLUBS ||--o{ CLUB_JOIN_REQUESTS : "club_id"
+    USERS ||--o{ CLUB_JOIN_REQUESTS : "requester_user_id"
+    USERS ||--o{ CLUB_JOIN_REQUESTS : "resolved_by_user_id"
     CAFETERIA ||--o{ CAFETERIA_ASSIGNMENT : "cafeteria_id"
     USERS ||--o{ CAFETERIA_ASSIGNMENT : "user_id"
     USERS ||--o{ CAFETERIA_ASSIGNMENT : "assigned_by_user_id"
@@ -501,7 +588,6 @@ erDiagram
     SERVING_UNIT_OPTIONS ||--o{ FMB_OPTIONS : "serving_unit_option_id"
     DIETARY_INFORMATION_OPTIONS ||--o{ FMB_OPTIONS : "dietary_information_option_id"
     EVENT_REQUIREMENTS ||--o{ CAMPUS_TOUR_START_OPTIONS : "requirement_id"
-    EVENT_REQUIREMENTS ||--o{ WATER_LOGO_OPTIONS : "requirement_id"
     EVENT_REQUIREMENTS ||--o{ WATER_NORMAL_OPTIONS : "requirement_id"
     EVENT_REQUIREMENTS ||--o{ FUNDING_MAIN_OPTIONS : "requirement_id"
     FUNDING_MAIN_OPTIONS ||--o{ FUNDING_SUB_OPTIONS : "main_option_id"
@@ -526,10 +612,9 @@ erDiagram
     FMB_OPTIONS ||--o{ REQUEST_FMB_SELECTION : "fmb_option_id"
     REQUEST ||--o{ REQUEST_CAMPUS_TOUR : "request_id"
     CAMPUS_TOUR_START_OPTIONS ||--o{ REQUEST_CAMPUS_TOUR : "start_point_option_id"
-    REQUEST ||--o{ REQUEST_MINERAL_WATER_LOGO : "request_id"
-    WATER_LOGO_OPTIONS ||--o{ REQUEST_MINERAL_WATER_LOGO : "option_id"
-    REQUEST ||--o{ REQUEST_MINERAL_WATER_NORMAL : "request_id"
-    WATER_NORMAL_OPTIONS ||--o{ REQUEST_MINERAL_WATER_NORMAL : "option_id"
+    CAMPUS_TOUR_TYPE_OPTIONS ||--o{ REQUEST_CAMPUS_TOUR : "tour_type_option_id"
+    REQUEST ||--o{ REQUEST_MINERAL_WATER : "request_id"
+    WATER_NORMAL_OPTIONS ||--o{ REQUEST_MINERAL_WATER : "option_id"
     REQUEST ||--o{ REQUEST_FUNDING_PURCHASE : "request_id"
     FUNDING_MAIN_OPTIONS ||--o{ REQUEST_FUNDING_PURCHASE : "main_option_id"
     FUNDING_SUB_OPTIONS ||--o{ REQUEST_FUNDING_PURCHASE : "sub_option_id"
@@ -547,6 +632,7 @@ erDiagram
     USERS ||--o{ SAVED_EVENT : "user_id"
     REQUEST ||--o{ SAVED_EVENT : "request_id"
     REQUEST ||--o{ REQUEST_TASK : "request_id"
+    UNIT ||--o{ REQUEST_TASK : "assigned_unit_code"
     EVENT_REQUIREMENTS ||--o{ REQUEST_TASK : "requirement_id"
     USERS ||--o{ REQUEST_TASK : "resolved_by_user_id"
     REQUEST_TASK ||--o{ TASK_ASSIGNMENT : "request_task_id"

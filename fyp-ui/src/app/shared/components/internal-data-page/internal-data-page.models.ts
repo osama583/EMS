@@ -38,6 +38,13 @@ export interface InternalDataCell {
   readonly avatar?: string;
   readonly badge?: boolean;
   readonly tone?: InternalCellTone;
+  // Opt-in: renders the badge as a real button (hover/focus states, primary-color on hover) and
+  // emits cellClick instead of just being static text. Used by pages where a badge is itself the
+  // affordance to open more detail (e.g. Page Visibility's roles badge opening the roles list)
+  // rather than needing a separate row action button for the same thing.
+  readonly clickable?: boolean;
+  // Optional Material Symbol name shown to the left of a clickable badge's text (e.g. 'share').
+  readonly badgeIcon?: string;
 }
 
 export interface InternalMobileDetail {
@@ -71,6 +78,11 @@ export interface InternalRowAction {
 
 export interface InternalRowActionEvent {
   readonly action: InternalRowAction;
+  readonly record: InternalDataRecord;
+}
+
+export interface InternalCellClickEvent {
+  readonly columnKey: string;
   readonly record: InternalDataRecord;
 }
 

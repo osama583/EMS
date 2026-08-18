@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, input, output, signal } from '@angular/core';
 import { FormModalComponent } from '../form-modal/form-modal';
 import { FormFieldComponent } from '../form-controls/form-field';
 
@@ -15,7 +15,7 @@ import { FormFieldComponent } from '../form-controls/form-field';
       [primaryLabel]="confirmLabel()"
       [danger]="danger()"
       [loading]="loading()"
-      [disabled]="!comment().trim()"
+      [disabled]="!isValid()"
       (close)="cancel.emit()"
       (cancel)="cancel.emit()"
       (submit)="confirm.emit(comment().trim())"
@@ -27,6 +27,7 @@ import { FormFieldComponent } from '../form-controls/form-field';
         type="textarea"
         [required]="true"
         [maxLength]="600"
+        [minLength]="minLength()"
         [value]="comment()"
         (valueChange)="comment.set($event)"
       />
@@ -43,10 +44,17 @@ export class ProposalCommentDialogComponent {
   readonly confirmLabel = input('Confirm');
   readonly danger = input(false);
   readonly loading = input(false);
+  // Minimum trimmed-character count required before Confirm enables (beyond plain non-empty).
+  readonly minLength = input<number | null>(null);
   readonly confirm = output<string>();
   readonly cancel = output<void>();
 
   readonly comment = signal('');
+  readonly isValid = computed(() => {
+    const trimmed = this.comment().trim();
+    const minLength = this.minLength();
+    return trimmed.length > 0 && (minLength === null || trimmed.length >= minLength);
+  });
 
   constructor() {
     effect(() => { if (!this.open()) this.comment.set(''); });

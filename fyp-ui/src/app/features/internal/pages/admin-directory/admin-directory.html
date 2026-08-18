@@ -1,13 +1,53 @@
 <section class="admin-directory">
   <app-feedback-banner [message]="successMessage()" tone="success" />
   <app-feedback-banner [message]="errorMessage()" tone="error" />
-  <app-internal-data-page
-    [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
-    [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
-    (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
-    (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
-    (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit', icon: 'edit' }, record: $event })" (primaryAction)="openAdd()"
-  />
+
+  <nav class="admin-directory__tabs" aria-label="Sections">
+    <button type="button" class="admin-directory__tab" [class.admin-directory__tab--active]="tab() === 'active'" (click)="setTab('active')">
+      <span class="material-symbols-rounded" aria-hidden="true">list_alt</span>
+      {{ entity === 'users' ? 'Users' : 'Units' }}
+    </button>
+    @if (entity === 'users') {
+      <button type="button" class="admin-directory__tab" [class.admin-directory__tab--active]="tab() === 'assignments'" (click)="setTab('assignments')">
+        <span class="material-symbols-rounded" aria-hidden="true">assignment</span>
+        Assignments
+      </button>
+    }
+    <button type="button" class="admin-directory__tab" [class.admin-directory__tab--active]="tab() === 'deleted'" (click)="setTab('deleted')">
+      <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+      Deleted
+    </button>
+  </nav>
+
+  @if (tab() === 'active') {
+    <app-internal-data-page
+      [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+      (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
+      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+      (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit', icon: 'edit' }, record: $event })" (primaryAction)="openAdd()"
+      (cellClick)="handleUserCellClick($event)"
+    />
+  } @else if (tab() === 'assignments') {
+    <app-internal-data-page
+      [config]="assignmentsConfig()" [records]="assignmentRecordsView()" [filters]="[]" [searchValue]="assignmentSearch()" [loading]="loading()"
+      [totalPages]="assignmentTotalPages()" [page]="assignmentPage()" [pageSize]="assignmentPageSize()"
+      (searchChange)="setAssignmentSearch($event)" (pageChange)="setAssignmentPage($event)" (pageSizeChange)="setAssignmentPageSize($event)"
+      (rowAction)="handleAssignmentAction($event)" (primaryAction)="openAddAssignment()" (cellClick)="handleAssignmentCellClick($event)"
+    />
+  } @else {
+    <app-internal-data-page
+      [config]="deletedConfig()" [records]="deletedRecords()" [filters]="[]" [searchValue]="''" [loading]="deletedLoading()"
+      [totalPages]="1" [page]="1" [pageSize]="50" [hideControls]="true"
+      (rowAction)="handleDeletedAction($event)"
+    />
+  }
+
+  <app-popover [open]="!!relationshipPopoverUserId()" title="Grants access to" icon="share" (close)="closeRelationshipPopover()">
+    <ul class="admin-directory__popover-list">
+      @for (item of relationshipPopoverItems(); track item) { <li>{{ item }}</li> }
+    </ul>
+  </app-popover>
 </section>
 
 <app-form-modal [open]="modalOpen()" [title]="editingId() ? (entity === 'users' ? 'Edit User' : 'Edit Unit') : (entity === 'users' ? 'Add User' : 'Add Unit')" [primaryLabel]="editingId() ? 'Save Changes' : (entity === 'users' ? 'Add User' : 'Add Unit')" [loading]="saving()" [disabled]="!formValid()" (close)="closeModal()" (cancel)="closeModal()" (submit)="save()">
@@ -16,15 +56,105 @@
       <app-form-field controlId="admin-user-name" label="Full Name" [required]="true" [value]="value('displayName')" (valueChange)="setDraft('displayName', $event)" />
       <app-form-field controlId="admin-user-username" label="Username" [required]="true" [value]="value('username')" [error]="fieldError('username')" (valueChange)="setDraft('username', $event)" />
       <app-form-field controlId="admin-user-email" label="Email" type="email" [required]="true" [value]="value('email')" [error]="fieldError('email')" (valueChange)="setDraft('email', $event)" />
-      <app-searchable-dropdown controlId="admin-user-role" label="Role" [required]="true" [options]="roleOptions()" [value]="value('role')" (valueChange)="setDraft('role', $any($event))" />
-      <app-searchable-dropdown controlId="admin-user-unit" label="Unit" [required]="true" [options]="unitOptions()" [value]="value('unitId')" (valueChange)="setDraft('unitId', $any($event))" />
+      <p class="admin-directory__form-hint">Role and unit assignment is managed from the Assignments tab after saving.</p>
       <app-status-toggle [active]="$any(draft()['active'])" label="Active user" description="Inactive users remain listed but cannot access the internal application." (activeChange)="setDraft('active', $event)" />
     } @else {
       <app-form-field controlId="admin-unit-name" label="Unit Name" [required]="true" [value]="value('name')" [error]="fieldError('name')" (valueChange)="setDraft('name', $event)" />
-      <app-form-field controlId="admin-unit-code" label="Unit Code" [required]="true" [value]="value('code')" [error]="fieldError('code')" (valueChange)="setDraft('code', $event)" />
+      <app-form-field controlId="admin-unit-code" label="Unit Code" [required]="true" [readOnly]="true" [value]="derivedUnitCode()" hint="Automatically generated from Unit Name. Cannot be changed after creation." />
       <app-form-field controlId="admin-unit-description" label="Description" type="textarea" [value]="value('description')" [rows]="4" (valueChange)="setDraft('description', $event)" />
+      <app-searchable-dropdown
+        controlId="admin-unit-roles" label="Roles" placeholder="Choose one or more roles" [isMulti]="true"
+        [options]="roleOptions()" [value]="roleCodes()" (valueChange)="setDraft('roleCodes', $any($event))"
+        hint="A role already linked to another unit can still be selected here."
+      />
       <app-status-toggle [active]="$any(draft()['active'])" label="Active unit" description="Active units are available when assigning internal users." (activeChange)="setDraft('active', $event)" />
     }
   </div>
 </app-form-modal>
 
+<app-delete-confirm-dialog
+  [open]="!!deleteTarget()" [entityKind]="entityKindLabel()" [entityLabel]="targetLabel()"
+  [checkingDependencies]="checkingDeletion()" [preview]="deletePreview()" [deleting]="deleting()"
+  (confirm)="confirmDelete()" (cancel)="cancelDelete()"
+/>
+
+<app-delete-confirm-dialog
+  [open]="!!purgeTargetId()" [permanent]="true" [entityKind]="entityKindLabel()" [entityLabel]="purgeTargetLabel()"
+  [preview]="{ canDelete: true, blockingReasons: [], entityLabel: purgeTargetLabel() }" [deleting]="purging()"
+  (confirm)="confirmPurge()" (cancel)="cancelPurge()"
+/>
+
+@if (entity === 'users') {
+  <app-form-modal
+    [open]="assignmentModalOpen()" [title]="editingAssignmentUserId() ? 'Edit Assignments' : 'Add Assignment'"
+    [primaryLabel]="editingAssignmentUserId() ? 'Save Changes' : 'Add Assignment'"
+    [loading]="assigningRole()" [disabled]="!assignmentFormValid()"
+    (close)="closeAssignmentModal()" (cancel)="closeAssignmentModal()" (submit)="saveAssignment()"
+  >
+    <div class="admin-directory__form">
+      @if (editingAssignmentUserId()) {
+        <app-searchable-dropdown
+          controlId="assignment-edit-user" label="User" [readOnly]="true"
+          [options]="editingAssignmentUserOption()" [value]="addAssignmentUserId()" (valueChange)="selectAddAssignmentUser($event)"
+        />
+      } @else {
+        <app-searchable-dropdown
+          controlId="assignment-add-user" label="User" placeholder="Search for a user…" [required]="true"
+          hint="Only users without an existing unit assignment are listed."
+          [options]="assignableUserOptions()" [value]="addAssignmentUserId()" (valueChange)="selectAddAssignmentUser($event)"
+        />
+      }
+
+      <div class="assignment-draft-table" role="table" aria-label="Unit and role rows to assign">
+        <div class="assignment-draft-table__row assignment-draft-table__row--header" role="row">
+          <span role="columnheader">Unit</span>
+          <span role="columnheader">Role</span>
+          <span role="columnheader"></span>
+        </div>
+        @for (row of existingAssignmentRows(); track row.assignmentId) {
+          <div class="assignment-draft-table__row" role="row">
+            <span role="cell">{{ row.unitDescription || 'No Unit' }}</span>
+            <span role="cell">{{ row.roleName }}</span>
+            <span role="cell">
+              <button
+                type="button" class="assignment-draft-table__remove" aria-label="Remove assignment"
+                [disabled]="removingExistingAssignmentId() === row.assignmentId" (click)="removeExistingAssignment(row.assignmentId)"
+              >
+                <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+              </button>
+            </span>
+          </div>
+        }
+        @for (row of assignmentDraftRows(); track row.id) {
+          <div class="assignment-draft-table__row" role="row">
+            <span role="cell">
+              <app-searchable-dropdown
+                [controlId]="'assignment-draft-unit-' + row.id" placeholder="Select unit…" [clearable]="false"
+                [options]="addAssignmentUnitOptions()" [value]="row.unitCode" (valueChange)="selectDraftRowUnit(row.id, $event)"
+              />
+            </span>
+            <span role="cell">
+              <app-searchable-dropdown
+                [controlId]="'assignment-draft-role-' + row.id" placeholder="Select role…" [clearable]="false"
+                [disabled]="!row.unitCode" [loading]="row.roleOptionsLoading"
+                [options]="roleOptionsFor(row)" [value]="row.roleCode" (valueChange)="selectDraftRowRole(row.id, $event)"
+              />
+            </span>
+            <span role="cell">
+              <button
+                type="button" class="assignment-draft-table__remove" aria-label="Remove row"
+                [disabled]="editingAssignmentUserId() ? false : assignmentDraftRows().length <= 1" (click)="removeDraftRow(row.id)"
+              >
+                <span class="material-symbols-rounded" aria-hidden="true">close</span>
+              </button>
+            </span>
+          </div>
+        }
+        <button type="button" class="assignment-draft-table__add" (click)="addDraftRow()">
+          <span class="material-symbols-rounded" aria-hidden="true">add</span>
+          Add
+        </button>
+      </div>
+    </div>
+  </app-form-modal>
+}

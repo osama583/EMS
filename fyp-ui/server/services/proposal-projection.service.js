@@ -51,13 +51,12 @@ function editableRowsFromSchedule(requestId) {
 function departmentRequestsFor(requestId) {
   const rows = [];
   for (const l of db.request_logistics.filter((r) => r.request_id === requestId)) rows.push({ id: l.request_logistics_id, department: 'logistics', item: l.item, quantity: String(l.quantity), schedule: `${l.date} · ${l.start_time}-${l.end_time}`, location: l.location, notes: l.notes || '' });
-  for (const t of db.request_transportation.filter((r) => r.request_id === requestId)) rows.push({ id: t.request_transportation_id, department: 'transportation', item: t.type, quantity: `${t.requested_pax} pax`, schedule: `${t.date} · ${t.start_time}-${t.end_time}`, location: t.location, notes: t.notes || '' });
-  for (const p of db.request_photography_videography.filter((r) => r.request_id === requestId)) rows.push({ id: p.request_photography_videography_id, department: 'photoVideo', item: p.service, quantity: String(p.personnel_quantity), schedule: `${p.date} · ${p.start_time}-${p.end_time}`, location: p.location, notes: p.notes || '' });
+  for (const t of db.request_transportation.filter((r) => r.request_id === requestId)) rows.push({ id: t.request_transportation_id, department: 'transportation', item: t.type, quantity: `${t.requested_pax} pax`, schedule: `${t.date} · ${t.moving_time}`, location: `${t.pickup} → ${t.dropoff}`, notes: t.notes || '' });
+  for (const p of db.request_photography_videography.filter((r) => r.request_id === requestId)) rows.push({ id: p.request_photography_videography_id, department: 'photoVideo', item: p.service, quantity: '—', schedule: `${p.date} · ${p.start_time}-${p.end_time}`, location: p.location, notes: p.notes || '' });
   for (const s of db.request_sound_light.filter((r) => r.request_id === requestId)) rows.push({ id: s.request_sound_light_id, department: 'soundLight', item: s.item, quantity: '1', schedule: `${s.date} · ${s.start_time}-${s.end_time}`, location: s.location, notes: s.notes || '' });
-  for (const f of db.request_fmb.filter((r) => r.request_id === requestId)) rows.push({ id: f.request_fmb_id, department: 'fmb', item: f.food_type, quantity: `${f.pax} pax`, schedule: `${f.date} · ${f.start_time}-${f.end_time}`, location: f.location, notes: f.notes || '' });
-  for (const c of db.request_campus_tour.filter((r) => r.request_id === requestId)) rows.push({ id: c.request_campus_tour_id, department: 'campusTour', item: c.start_point, quantity: `${c.pax} pax`, schedule: `${c.date} · ${c.start_time}-${c.end_time}`, location: c.location, notes: c.notes || '' });
-  for (const w of db.request_mineral_water_logo.filter((r) => r.request_id === requestId)) rows.push({ id: w.request_mineral_water_logo_id, department: 'waterLogo', item: 'Mineral Water with Logo', quantity: `${w.quantity} bottles`, schedule: `${w.date} · ${w.start_time}-${w.end_time}`, location: w.location, notes: w.notes || '' });
-  for (const w of db.request_mineral_water_normal.filter((r) => r.request_id === requestId)) rows.push({ id: w.request_mineral_water_normal_id, department: 'waterNormal', item: 'Mineral Water Normal', quantity: `${w.quantity} bottles`, schedule: `${w.date} · ${w.start_time}-${w.end_time}`, location: w.location, notes: w.notes || '' });
+  for (const f of db.request_fmb.filter((r) => r.request_id === requestId)) rows.push({ id: f.request_fmb_id, department: 'fmb', item: f.food_type, quantity: `${f.pax} pax`, schedule: `${f.date} · ${f.serve_time}`, location: f.location, notes: f.notes || '' });
+  for (const c of db.request_campus_tour.filter((r) => r.request_id === requestId)) rows.push({ id: c.request_campus_tour_id, department: 'campusTour', item: `${c.start_point} · ${c.tour_type}`, quantity: `${c.pax} pax`, schedule: c.date, location: '', notes: c.notes || '' });
+  for (const w of db.request_mineral_water.filter((r) => r.request_id === requestId)) rows.push({ id: w.request_mineral_water_id, department: 'waterNormal', item: w.with_logo ? 'Mineral Water (with Logo)' : 'Mineral Water', quantity: `${w.quantity} bottles`, schedule: `${w.date} · ${w.start_time}-${w.end_time}`, location: w.location, notes: w.notes || '' });
   for (const f of db.request_funding_purchase.filter((r) => r.request_id === requestId)) rows.push({ id: f.request_funding_purchase_id, department: 'fundingPurchase', item: `${f.main_item} — ${f.sub_item}`, quantity: String(f.quantity), schedule: '', location: '', notes: f.notes || '' });
   return rows;
 }
@@ -67,11 +66,12 @@ function fmbSelectionsFor(requestId) {
   const selections = [];
   for (const fmbRow of fmbRows) {
     for (const selection of db.request_fmb_selection.filter((s) => s.request_fmb_id === fmbRow.request_fmb_id)) {
-      const cafeteria = db.cafeteria.find((c) => c.cafeteria_id === selection.cafeteria_id);
+      const cafeteria = db.unit.find((u) => u.code === selection.unit_code);
       selections.push({
         id: selection.request_fmb_selection_id,
-        cafeteriaId: selection.cafeteria_id,
-        cafeteriaName: cafeteria ? cafeteria.name : 'Unknown cafeteria',
+        requestFmbId: fmbRow.request_fmb_id,
+        cafeteriaCode: selection.unit_code,
+        cafeteriaName: cafeteria ? cafeteria.description : 'Unknown cafeteria',
         menuItemLabel: selection.menu_item_label,
         quantity: selection.quantity,
         notes: selection.notes || '',
@@ -87,7 +87,10 @@ function selectedRequirementsFor(requestId) {
 }
 
 function projectProposal(request) {
-  const categories = db.request_categories.filter((rc) => rc.request_id === request.request_id).map((rc) => db.event_category.find((c) => c.event_category_id === rc.category_id).name);
+  // category_name is frozen at proposal-save time — read the snapshot directly (also fixes a
+  // latent crash if a referenced category row were ever removed, since .find(...) could return
+  // undefined and .name would throw).
+  const categories = db.request_categories.filter((rc) => rc.request_id === request.request_id).map((rc) => rc.category_name);
   const applicantName = request.applicant_name;
   return {
     id: request.request_id,
@@ -115,8 +118,11 @@ function projectProposal(request) {
     eventImage: request.event_image,
     eventVisibility: request.event_visibility,
     eventCategories: categories,
-    eventFormat: request.event_format,
+    eventFormat: request.event_format_snapshot,
     registrationMode: request.registration_approval,
+    cost: request.cost_amount != null ? Number(request.cost_amount) : null,
+    bankAccountName: request.bank_account_name || null,
+    bankAccountNumber: request.bank_account_number || null,
     publicity: request.promotion_publicity_method || '',
     selectedRequirements: selectedRequirementsFor(request.request_id),
     externalPax: Math.round(request.total_pax * 0.1),

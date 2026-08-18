@@ -3,8 +3,36 @@
     <div class="proposal-title-banner">Event Proposal</div>
   </header>
 
-  @if (reviewerComment()) {
-    <app-feedback-banner tone="error" [message]="'Reviewer comment: ' + reviewerComment()" />
+  @if (reviewerComment(); as comment) {
+    <button type="button" class="comments-drawer-toggle" [class.comments-drawer-toggle--open]="commentsPanelOpen()" (click)="toggleCommentsPanel()">
+      <span class="material-symbols-rounded" aria-hidden="true">forum</span>
+      Reviewer comment
+      <span class="material-symbols-rounded comments-drawer-toggle__chevron" aria-hidden="true">{{ commentsPanelOpen() ? 'chevron_right' : 'chevron_left' }}</span>
+    </button>
+    <aside class="comments-drawer" [class.comments-drawer--open]="commentsPanelOpen()" aria-label="Reviewer comments">
+      <header class="comments-drawer__header">
+        <span class="material-symbols-rounded" aria-hidden="true">forum</span>
+        <div>
+          <h3>Reviewer Comments</h3>
+          <p class="comments-drawer__subtitle">Comments left by reviewers in this chain.</p>
+        </div>
+        <button type="button" class="comments-drawer__close" (click)="toggleCommentsPanel()" aria-label="Collapse reviewer comments panel">
+          <span class="material-symbols-rounded" aria-hidden="true">close</span>
+        </button>
+      </header>
+      <ul class="comments-drawer__list">
+        <li class="comments-drawer__entry">
+          <div class="comments-drawer__avatar" aria-hidden="true">{{ comment.initials }}</div>
+          <div class="comments-drawer__entry-body">
+            <div class="comments-drawer__entry-meta">
+              <strong>{{ comment.reviewer }}</strong>
+              <span class="comments-drawer__entry-stage">{{ comment.stage }}</span>
+            </div>
+            <p class="comments-drawer__entry-text">{{ comment.text }}</p>
+          </div>
+        </li>
+      </ul>
+    </aside>
   }
 
   <app-step-indicator [currentStep]="currentStep() + 1" [steps]="steps" [stepStatuses]="stepStatuses()" [submitAttempted]="submitAttempted()" [guidanceVisible]="validationGuidanceVisible()" [guidanceVersion]="validationGuidanceVersion()" (stepClick)="goToStep($event - 1)" (missingFieldClick)="goToMissingField($event)" />
@@ -45,9 +73,9 @@
             (submit)="confirmAddCoOwner()"
           >
             <div class="co-requester-modal-form">
-              <app-searchable-dropdown controlId="co-owner-staff" label="Staff Name" placeholder="Select a staff member" [required]="true" [options]="staff" [value]="coOwnerStaff()" [error]="coOwnerFormError()" (valueChange)="coOwnerStaff.set($any($event)); coOwnerFormError.set('')" />
+              <app-searchable-dropdown controlId="co-owner-staff" label="Staff Name" placeholder="Select a staff member" [required]="true" [options]="coOwnerStaffOptions()" [value]="coOwnerStaff()" [error]="coOwnerFormError()" (valueChange)="coOwnerStaff.set($any($event)); coOwnerFormError.set('')" />
               <app-form-field controlId="co-owner-email" label="Email" [value]="selectedCoOwner()?.email ?? ''" [readOnly]="true" />
-              <app-form-field controlId="co-owner-role" label="Role" [value]="selectedCoOwner()?.role ?? ''" [readOnly]="true" />
+              <app-form-field class="proposal-grid--full" controlId="co-owner-role" label="Role" [value]="selectedCoOwner()?.role ?? ''" [readOnly]="true" />
             </div>
           </app-form-modal>
         </section>
@@ -94,9 +122,13 @@
             <section class="proposal-request-table">
               <header class="proposal-request-table__header">
                 <div><h3 [id]="'request-' + definition.key + '-title'">{{ definition.label }}</h3><p>Complete the service details required by the reviewing department.</p></div>
-                <button [id]="'request-' + definition.key + '-add'" type="button" class="table-control table-control--primary" [disabled]="requestRows()[definition.key].length >= 20" (click)="openRequestEditor(definition)"><span class="material-symbols-rounded" aria-hidden="true">add</span>Add request</button>
+                <button [id]="'request-' + definition.key + '-add'" type="button" class="table-control table-control--primary" [disabled]="requestRows()[definition.key].length >= 20" (click)="openRequestEditor(definition)"><span class="material-symbols-rounded" aria-hidden="true">add</span>Add {{ definition.label }} Request</button>
               </header>
-              <app-proposal-table [tableId]="'request-' + definition.key" [columns]="proposalColumns(definition.columns)" [rows]="requestRows()[definition.key]" [emptyMessage]="'No ' + definition.label + ' requests have been added yet.'" (edit)="editRequestRow(definition, $event)" (deleteRow)="removeRequestRow(definition.key, $event)" />
+              @if (definition.key === 'logistics') {
+                <app-proposal-table [tableId]="'request-' + definition.key" [columns]="proposalColumns(definition.columns)" [rows]="logisticsRowsWithImages()" imageKey="item" [emptyMessage]="'No ' + definition.label + ' requests have been added yet.'" (edit)="editRequestRow(definition, $event)" (deleteRow)="removeRequestRow(definition.key, $event)" />
+              } @else {
+                <app-proposal-table [tableId]="'request-' + definition.key" [columns]="proposalColumns(definition.columns)" [rows]="requestRows()[definition.key]" [emptyMessage]="'No ' + definition.label + ' requests have been added yet.'" (edit)="editRequestRow(definition, $event)" (deleteRow)="removeRequestRow(definition.key, $event)" />
+              }
               @if (requestError(definition.key)) { <app-validation-message [controlId]="'request-' + definition.key" [message]="requestError(definition.key)" /> }
             </section>
           }
@@ -110,50 +142,92 @@
             (cancel)="closeRequestModal()"
             (submit)="saveRequestRow()"
           >
-            <div class="co-requester-modal-form">
+            <div class="request-editor-form">
               @for (column of requestModalDefinition()?.columns ?? []; track column.key) {
-                @if (column.type === 'select') {
-                  <app-searchable-dropdown
-                    [controlId]="'request-editor-' + column.key"
-                    [label]="column.label"
-                    [placeholder]="requestFieldPlaceholder(column)"
-                    [required]="!!column.required"
-                    [disabled]="requestFieldDisabled(column)"
-                    [loading]="requestFieldLoading(column)"
-                    [error]="requestFieldError(column)"
-                    [options]="requestFieldOptions(column)"
-                    [value]="requestDraftValue(column.key).toString()"
-                    (valueChange)="setRequestDraftValue(column.key, $any($event))"
-                  />
-                  @if (requestModalDefinition()?.key === 'logistics' && column.key === 'item' && logisticsAvailableQuantity() !== null) {
-                    <p class="request-field-context"><span class="material-symbols-rounded" aria-hidden="true">inventory_2</span>{{ logisticsAvailableQuantity() }} {{ logisticsQuantityUnit() }}{{ logisticsAvailableQuantity() === 1 ? '' : 's' }} available</p>
-                  }
-                  @if (requestModalDefinition()?.key === 'transportation' && column.key === 'type' && transportationCapacity() !== null) {
-                    <p class="request-field-context"><span class="material-symbols-rounded" aria-hidden="true">airline_seat_recline_normal</span>Passenger capacity: {{ transportationCapacity() }}</p>
-                  }
-                  @if (requestOptionContext(column)) {
-                    <p class="request-field-context"><span class="material-symbols-rounded" aria-hidden="true">info</span>{{ requestOptionContext(column) }}</p>
-                  }
+                @if (requestModalDefinition()?.key === 'logistics' && column.key === 'item') {
+                  <div class="request-editor-form__field request-editor-form__field--full">
+                    <div class="option-picker-card" [class.option-picker-card--open]="logisticsPickerExpanded()">
+                      <button type="button" class="option-picker-card__summary" (click)="toggleLogisticsPicker()">
+                        <span class="option-picker-card__summary-media">
+                          @if (logisticsSelectedOption()?.imageDataUrl) {
+                            <img [src]="logisticsSelectedOption()!.imageDataUrl" [alt]="logisticsSelectedOption()!.label" />
+                          } @else {
+                            <span class="material-symbols-rounded" aria-hidden="true">inventory_2</span>
+                          }
+                        </span>
+                        <span class="option-picker-card__summary-body">
+                          <span class="option-picker-card__summary-label">Item / Need</span>
+                          <span class="option-picker-card__summary-value">{{ logisticsSelectedOption()?.label ?? 'Choose an item' }}</span>
+                        </span>
+                        <span class="material-symbols-rounded option-picker-card__summary-chevron" aria-hidden="true">{{ logisticsPickerExpanded() ? 'expand_less' : 'expand_more' }}</span>
+                      </button>
+                      @if (logisticsPickerExpanded()) {
+                        <div class="option-picker-card__panel">
+                          <app-option-picker-grid
+                            ariaLabel="Choose a Logistics item"
+                            emptyMessage="No active Logistics items are available."
+                            [options]="logisticsPickerOptions()"
+                            [value]="requestDraftValue(column.key).toString()"
+                            (valueChange)="selectLogisticsItem($event)"
+                          />
+                        </div>
+                      }
+                    </div>
+                    @if (requestFieldError(column)) { <app-validation-message controlId="request-editor-item" [message]="requestFieldError(column)" /> }
+                  </div>
+                } @else if (column.type === 'select') {
+                  <div class="request-editor-form__field" [class.request-editor-form__field--full]="column.span !== 'half'">
+                    <app-searchable-dropdown
+                      [controlId]="'request-editor-' + column.key"
+                      [label]="column.label"
+                      [placeholder]="requestFieldPlaceholder(column)"
+                      [required]="!!column.required"
+                      [disabled]="requestFieldDisabled(column)"
+                      [loading]="requestFieldLoading(column)"
+                      [error]="requestFieldError(column)"
+                      [options]="requestFieldOptions(column)"
+                      [value]="requestDraftValue(column.key).toString()"
+                      (valueChange)="setRequestDraftValue(column.key, $any($event))"
+                    />
+                    @if (requestModalDefinition()?.key === 'transportation' && column.key === 'type' && transportationCapacity() !== null) {
+                      <p class="request-field-context"><span class="material-symbols-rounded" aria-hidden="true">airline_seat_recline_normal</span>Passenger capacity: {{ transportationCapacity() }}</p>
+                    }
+                    @if (requestOptionContext(column)) {
+                      <p class="request-field-context"><span class="material-symbols-rounded" aria-hidden="true">info</span>{{ requestOptionContext(column) }}</p>
+                    }
+                  </div>
                 } @else {
-                  <app-form-field
-                    [controlId]="'request-editor-' + column.key"
-                    [label]="column.label"
-                    [type]="requestFieldType(column)"
-                    [required]="!!column.required"
-                    [readOnly]="column.type === 'readonly'"
-                    [min]="column.min ?? ''"
-                    [step]="column.step ?? ''"
-                    [value]="requestDraftValue(column.key)"
-                    [error]="requestFieldError(column)"
-                    (valueChange)="setRequestDraftValue(column.key, $event)"
-                  />
-                  @if (requestModalDefinition()?.key === 'logistics' && column.key === 'quantity' && logisticsAvailableQuantity() !== null) {
-                    <p class="request-quantity-indicator" [class.request-quantity-indicator--warning]="logisticsExceedsAvailability()" role="status">
-                      @if (logisticsExceedsAvailability()) { <span class="material-symbols-rounded" aria-hidden="true">warning</span> }
-                      <strong>{{ logisticsRequestedQuantity() }} / {{ logisticsAvailableQuantity() }}</strong>
-                      <span>{{ logisticsExceedsAvailability() ? 'Requested quantity exceeds current availability.' : 'Requested / available' }}</span>
-                    </p>
-                  }
+                  <div class="request-editor-form__field" [class.request-editor-form__field--full]="column.span !== 'half'">
+                    <app-form-field
+                      [controlId]="'request-editor-' + column.key"
+                      [label]="column.label"
+                      [type]="requestFieldType(column)"
+                      [required]="!!column.required"
+                      [readOnly]="column.type === 'readonly'"
+                      [min]="requestFieldMin(column)"
+                      [step]="column.step ?? ''"
+                      [value]="requestDraftValue(column.key)"
+                      [error]="requestFieldError(column)"
+                      (valueChange)="setRequestDraftValue(column.key, $event)"
+                    />
+                    @if (requestModalDefinition()?.key === 'logistics' && column.key === 'quantity') {
+                      @if (logisticsAvailabilityLoading()) {
+                        <app-loading-state variant="spinner" label="Checking availability…" />
+                      } @else if (logisticsRemainingQuantity() !== null) {
+                        <p class="request-quantity-indicator" [class.request-quantity-indicator--warning]="logisticsExceedsRemaining()" role="status">
+                          @if (logisticsExceedsRemaining()) { <span class="material-symbols-rounded" aria-hidden="true">warning</span> }
+                          <strong>{{ logisticsRequestedQuantity() }} / {{ logisticsRemainingQuantity() }}</strong>
+                          <span>{{ logisticsExceedsRemaining() ? logisticsNextAvailableMessage() : 'Requested / available for this date and time window' }}</span>
+                        </p>
+                      } @else if (logisticsAvailabilityError() && logisticsAvailableQuantity() !== null) {
+                        <p class="request-quantity-indicator" [class.request-quantity-indicator--warning]="logisticsExceedsAvailability()" role="status">
+                          @if (logisticsExceedsAvailability()) { <span class="material-symbols-rounded" aria-hidden="true">warning</span> }
+                          <strong>{{ logisticsRequestedQuantity() }} / {{ logisticsAvailableQuantity() }}</strong>
+                          <span>Availability check unavailable — showing total stock. {{ logisticsExceedsAvailability() ? 'Requested quantity exceeds total availability.' : 'Requested / available' }}</span>
+                        </p>
+                      }
+                    }
+                  </div>
                 }
               }
             </div>
@@ -165,19 +239,44 @@
     @if (currentStep() === 4) {
       <section class="proposal-step" aria-labelledby="details-step-title">
         <header><span class="material-symbols-rounded">article</span><div><h2 id="details-step-title">Detailed Event Info</h2></div></header>
-        <section class="proposal-card"><div class="proposal-card__title"><h3>Event Narrative</h3><p>Explain the event’s purpose and expected impact.</p></div><div class="proposal-grid">
-          <app-form-field controlId="short-intro" label="Short Introduction" type="textarea" [required]="true" [value]="shortIntro()" [error]="error('shortIntro')" (valueChange)="setShortIntro($event)" />
-          <app-form-field controlId="goals" label="Goals & Objectives" type="textarea" [required]="true" [value]="goals()" [error]="error('goals')" (valueChange)="setGoals($event)" />
-          <app-form-field controlId="benefits" label="Expected Benefits" type="textarea" [required]="true" [value]="benefits()" [error]="error('benefits')" (valueChange)="setBenefits($event)" />
-          @if (eventVisibility() === 'Public') {
-            <app-searchable-dropdown controlId="event-categories" label="Event Categories" placeholder="Select one or two categories" [required]="true" [isMulti]="true" [maxSelections]="2" [options]="categoryOptions()" [value]="eventCategories()" [error]="error('eventCategories')" (valueChange)="setEventCategories($event)" />
-          }
-          <app-searchable-dropdown controlId="event-visibility" label="Event Visibility" [required]="true" [searchable]="false" [options]="visibilityOptions" [value]="eventVisibility()" [error]="error('eventVisibility')" (valueChange)="setEventVisibility($event)" />
-          <app-searchable-dropdown controlId="event-format" label="Event Format" [required]="true" [searchable]="false" [options]="formatOptions" [value]="eventFormat()" (valueChange)="setEventFormat($event)" />
-          <app-searchable-dropdown controlId="registration-mode" label="Registration Approval" [required]="true" [searchable]="false" [options]="registrationModeOptions" [value]="registrationMode()" (valueChange)="setRegistrationMode($event)" />
-          <app-event-image-upload [value]="eventImage()" (valueChange)="eventImage.set($event)" />
-          @if (isPublic()) { <app-form-field controlId="publicity" label="Promotion / Publicity Method" type="textarea" placeholder="How will people be informed or invited?" [required]="true" [value]="publicity()" [error]="error('publicity')" (valueChange)="setPublicity($event)" /> }
-        </div></section>
+        <section class="proposal-card">
+          <div class="proposal-card__title"><h3>Event Purpose & Summary</h3><p>Explain the event’s purpose and expected impact.</p></div>
+          <div class="proposal-grid">
+            <app-form-field class="proposal-grid--full" controlId="short-intro" label="Short Introduction" type="textarea" [required]="true" [value]="shortIntro()" [error]="error('shortIntro')" (valueChange)="setShortIntro($event)" />
+            <app-form-field class="proposal-grid--full" controlId="goals" label="Goals & Objectives" type="textarea" [required]="true" [value]="goals()" [error]="error('goals')" (valueChange)="setGoals($event)" />
+            <app-form-field class="proposal-grid--full" controlId="benefits" label="Expected Benefits" type="textarea" [required]="true" [value]="benefits()" [error]="error('benefits')" (valueChange)="setBenefits($event)" />
+          </div>
+        </section>
+        <section class="proposal-card">
+          <div class="proposal-card__title"><h3>Event Settings</h3><p>Control who can see this event and how people register.</p></div>
+          <div class="proposal-grid">
+            @if (eventVisibility() === 'Public') {
+              <app-searchable-dropdown controlId="event-categories" label="Event Categories" placeholder="Select one or two categories" [required]="true" [isMulti]="true" [maxSelections]="2" [options]="categoryOptions()" [value]="eventCategories()" [error]="error('eventCategories')" (valueChange)="setEventCategories($event)" />
+            }
+            <app-searchable-dropdown controlId="event-visibility" label="Event Visibility" [required]="true" [searchable]="false" [options]="visibilityOptions" [value]="eventVisibility()" [error]="error('eventVisibility')" (valueChange)="setEventVisibility($event)" />
+            <app-searchable-dropdown controlId="event-format" label="Event Format" [required]="true" [searchable]="false" [options]="formatOptions()" [value]="eventFormat()" (valueChange)="setEventFormat($event)" />
+            <app-searchable-dropdown controlId="registration-mode" label="Registration Approval" [required]="true" [searchable]="false" [options]="registrationModeOptions" [value]="registrationMode()" (valueChange)="setRegistrationMode($event)" />
+          </div>
+        </section>
+        @if (showCostFields()) {
+          <section class="proposal-card">
+            <div class="proposal-card__title"><h3>Cost & Payment</h3><p>Only needed if attendees pay to register.</p></div>
+            <div class="proposal-grid">
+              <app-form-field controlId="event-cost" label="Cost (RM)" type="number" min="0" placeholder="Leave blank if free" [required]="false" [value]="cost() ?? ''" [error]="error('cost')" (valueChange)="setCost($event)" />
+              @if (requiresPayment()) {
+                <app-form-field controlId="event-bank-account-name" label="Bank Account Name" [required]="true" [value]="bankAccountName()" [error]="error('bankAccountName')" (valueChange)="setBankAccountName($event)" />
+                <app-form-field controlId="event-bank-account-number" label="Bank Account Number" [required]="true" [value]="bankAccountNumber()" [error]="error('bankAccountNumber')" (valueChange)="setBankAccountNumber($event)" />
+              }
+            </div>
+          </section>
+        }
+        <section class="proposal-card">
+          <div class="proposal-card__title"><h3>Event Media & Promotion</h3><p>Image and how people will hear about the event.</p></div>
+          <div class="proposal-grid">
+            <app-event-image-upload class="proposal-grid--full" [value]="eventImage()" (valueChange)="eventImage.set($event)" />
+            @if (isPublic()) { <app-form-field class="proposal-grid--full" controlId="publicity" label="Promotion / Publicity Method" type="textarea" placeholder="How will people be informed or invited?" [required]="true" [value]="publicity()" [error]="error('publicity')" (valueChange)="setPublicity($event)" /> }
+          </div>
+        </section>
         @if (agendaRequired()) { <section class="proposal-request-table"><header class="proposal-request-table__header"><div><h3 id="agenda-title">Brief Agenda</h3><p>Required because {{ agendaReasons().join(', ') }}.</p></div><button id="agenda-add" type="button" class="table-control table-control--primary" [disabled]="isTableAtLimit('agenda')" (click)="openTableEditor('agenda')"><span class="material-symbols-rounded">add</span>Add row</button></header><app-proposal-table tableId="agenda" [columns]="proposalColumns(agendaColumns)" [rows]="agenda()" (edit)="editTableRow('agenda', $event)" (deleteRow)="removeRow('agenda', $event)" />@if (error('agenda')) { <app-validation-message controlId="agenda" [message]="error('agenda')" /> }</section> }
         @if (discussionRequired()) { <section class="proposal-request-table"><header class="proposal-request-table__header"><div><h3 id="discussions-title">Discussion Topics</h3><p>Required for this small external or VIP/partner discussion.</p></div><button id="discussions-add" type="button" class="table-control table-control--primary" [disabled]="isTableAtLimit('discussions')" (click)="openTableEditor('discussions')"><span class="material-symbols-rounded">add</span>Add row</button></header><app-proposal-table tableId="discussions" [columns]="proposalColumns(discussionColumns)" [rows]="discussions()" (edit)="editTableRow('discussions', $event)" (deleteRow)="removeRow('discussions', $event)" />@if (error('discussions')) { <app-validation-message controlId="discussions" [message]="error('discussions')" /> }</section> }
       </section>
@@ -211,10 +310,17 @@
       </div>
       <span class="proposal-actions__step" aria-live="polite">Step {{ currentStep() + 1 }} of {{ steps.length }}</span>
       <div class="proposal-actions__right">
-        <button type="button" class="table-control proposal-actions__button proposal-actions__button--draft" [disabled]="savingDraft()" (click)="saveDraft()">
-          <span class="material-symbols-rounded" aria-hidden="true">download</span>
-          {{ savingDraft() ? 'Saving…' : 'Save as Draft' }}
-        </button>
+        @if (resubmitProposalId() !== null) {
+          <button type="button" class="table-control proposal-actions__button proposal-actions__button--draft" [disabled]="savingDraft()" (click)="saveEdits()">
+            <span class="material-symbols-rounded" aria-hidden="true">save</span>
+            {{ savingDraft() ? 'Saving…' : 'Save' }}
+          </button>
+        } @else {
+          <button type="button" class="table-control proposal-actions__button proposal-actions__button--draft" [disabled]="savingDraft()" (click)="saveDraft()">
+            <span class="material-symbols-rounded" aria-hidden="true">download</span>
+            {{ savingDraft() ? 'Saving…' : 'Save as Draft' }}
+          </button>
+        }
         @if (currentStep() < steps.length - 1) {
           <button type="button" class="table-control table-control--primary proposal-actions__button" (click)="next()">
             Next
@@ -244,12 +350,15 @@
   <div class="co-requester-modal-form">
     @for (column of tableEditorColumns(); track column.key) {
       @if (column.type === 'staff') {
-        <app-searchable-dropdown [controlId]="'table-editor-' + column.key" [label]="column.label" placeholder="Select a staff member" [required]="!!column.required" [options]="staff" [value]="tableDraftValue(column.key).toString()" (valueChange)="setTableDraftValue(column.key, $any($event))" />
+        <app-searchable-dropdown [class.proposal-grid--full]="column.span === 'full'" [controlId]="'table-editor-' + column.key" [label]="column.label" placeholder="Select a staff member" [required]="!!column.required" [options]="tableStaffOptions(column)" [value]="tableDraftValue(column.key).toString()" (valueChange)="setTableDraftValue(column.key, $any($event))" />
       } @else if (column.type === 'select') {
-        <app-searchable-dropdown [controlId]="'table-editor-' + column.key" [label]="column.label" placeholder="Select an option" [required]="!!column.required" [options]="tableFieldOptions(column)" [value]="tableDraftValue(column.key).toString()" (valueChange)="setTableDraftValue(column.key, $any($event))" />
+        <app-searchable-dropdown [class.proposal-grid--full]="column.span === 'full'" [controlId]="'table-editor-' + column.key" [label]="column.label" placeholder="Select an option" [required]="!!column.required" [options]="tableFieldOptions(column)" [value]="tableDraftValue(column.key).toString()" (valueChange)="setTableDraftValue(column.key, $any($event))" />
       } @else {
-        <app-form-field [controlId]="'table-editor-' + column.key" [label]="column.label" [type]="tableFieldType(column)" [required]="!!column.required" [readOnly]="column.type === 'readonly'" [min]="column.min ?? ''" [step]="column.step ?? ''" [value]="tableDraftValue(column.key)" (valueChange)="setTableDraftValue(column.key, $event)" />
+        <app-form-field [class.proposal-grid--full]="column.span === 'full'" [controlId]="'table-editor-' + column.key" [label]="column.label" [type]="tableFieldType(column)" [required]="!!column.required" [readOnly]="column.type === 'readonly'" [min]="tableFieldMin(column)" [step]="column.step ?? ''" [value]="tableDraftValue(column.key)" [error]="tableFieldError(column)" (valueChange)="setTableDraftValue(column.key, $event)" />
       }
+    }
+    @if (tableLongSessionWarning()) {
+      <p class="request-field-context"><span class="material-symbols-rounded" aria-hidden="true">info</span>{{ tableLongSessionWarning() }}</p>
     }
   </div>
 </app-form-modal>

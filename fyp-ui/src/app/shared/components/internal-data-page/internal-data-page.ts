@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { InternalTableWorkspaceComponent } from '../internal-table-workspace/internal-table-workspace';
 import {
+  InternalCellClickEvent,
   InternalDataPageConfig,
   InternalDataRecord,
   InternalFilterChange,
@@ -52,6 +53,7 @@ export class InternalDataPageComponent {
   readonly rowAction = output<InternalRowActionEvent>();
   readonly recordOpen = output<InternalDataRecord>();
   readonly primaryAction = output<void>();
+  readonly cellClick = output<InternalCellClickEvent>();
 
   readonly shouldShowClear = computed(() => {
     if (this.records().length > 0) return false;

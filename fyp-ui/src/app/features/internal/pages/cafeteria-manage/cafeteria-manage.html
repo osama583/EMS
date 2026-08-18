@@ -1,0 +1,50 @@
+<section class="cafeteria-manage">
+  <app-feedback-banner [message]="successMessage()" tone="success" />
+  <app-feedback-banner [message]="errorMessage()" tone="error" />
+
+  <nav class="cafeteria-manage__tabs" aria-label="Sections">
+    <button type="button" class="cafeteria-manage__tab" [class.cafeteria-manage__tab--active]="tab() === 'active'" (click)="setTab('active')">
+      <span class="material-symbols-rounded" aria-hidden="true">list_alt</span>
+      Cafeterias
+    </button>
+    <button type="button" class="cafeteria-manage__tab" [class.cafeteria-manage__tab--active]="tab() === 'deleted'" (click)="setTab('deleted')">
+      <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+      Deleted
+    </button>
+  </nav>
+
+  @if (tab() === 'active') {
+    <app-internal-data-page
+      [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+      (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
+      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+      (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit', icon: 'edit' }, record: $event })" (primaryAction)="openAdd()"
+    />
+  } @else {
+    <app-internal-data-page
+      [config]="deletedConfig()" [records]="deletedRecords()" [filters]="[]" [searchValue]="''" [loading]="deletedLoading()"
+      [totalPages]="1" [page]="1" [pageSize]="50" [hideControls]="true"
+      (rowAction)="handleDeletedAction($event)"
+    />
+  }
+</section>
+
+<app-form-modal [open]="modalOpen()" [title]="editingCode() ? 'Edit Cafeteria' : 'Add Cafeteria'" [primaryLabel]="editingCode() ? 'Save Changes' : 'Add Cafeteria'" [loading]="saving()" [disabled]="!formValid()" (close)="closeModal()" (cancel)="closeModal()" (submit)="save()">
+  <div class="cafeteria-manage__form">
+    <app-form-field controlId="cafeteria-name" label="Cafeteria Name" [required]="true" [value]="draft().name" (valueChange)="setName($event)" />
+    <app-status-toggle [active]="draft().active" label="Active cafeteria" description="Inactive cafeterias are hidden from staff assignment and menu pickers." (activeChange)="setActive($event)" />
+  </div>
+</app-form-modal>
+
+<app-delete-confirm-dialog
+  [open]="!!deleteTarget()" entityKind="Cafeteria" [entityLabel]="targetLabel()"
+  [deleting]="deleting()"
+  (confirm)="confirmDelete()" (cancel)="cancelDelete()"
+/>
+
+<app-delete-confirm-dialog
+  [open]="!!purgeTargetCode()" [permanent]="true" entityKind="Cafeteria" [entityLabel]="purgeTargetLabel()"
+  [preview]="{ canDelete: true, blockingReasons: [], entityLabel: purgeTargetLabel() }" [deleting]="purging()"
+  (confirm)="confirmPurge()" (cancel)="cancelPurge()"
+/>

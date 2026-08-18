@@ -53,14 +53,17 @@ export class HowItWorksComponent implements AfterViewInit {
   private reducedMotionQuery?: MediaQueryList;
   private resizeObserver?: ResizeObserver;
   private rebuildPathOnNextFrame = false;
-  private pathPoints: readonly ProcessPathPoint[] = [];
-  private pathLengths: readonly number[] = [];
 
   @ViewChild('timeline') private timeline?: ElementRef<HTMLElement>;
+  @ViewChild('routePath') private routePathRef?: ElementRef<SVGPathElement>;
 
   readonly timelineProgress = signal(0);
   readonly processPath = signal('');
   readonly processViewBox = signal('0 0 1 1');
+  readonly pathTotalLength = signal(1);
+  readonly pathDashOffset = computed(
+    () => this.pathTotalLength() * (1 - this.timelineProgress() / 100),
+  );
   readonly pathMarkers = signal<readonly ProcessPathMarker[]>([]);
   readonly trackerPosition = signal<ProcessPathPosition>({ x: 0, y: 0, angle: 0 });
   readonly trackerTransform = computed(() => {
@@ -274,50 +277,21 @@ export class HowItWorksComponent implements AfterViewInit {
       1,
       timeline.scrollHeight || timeline.getBoundingClientRect().height || bands.at(-1)!.bottom,
     );
-    const points: ProcessPathPoint[] = [];
     let path = '';
 
     const format = (value: number): string => value.toFixed(2);
     const moveTo = (point: ProcessPathPoint): void => {
       path = `M ${format(point.x)} ${format(point.y)}`;
-      points.push(point);
     };
     const lineTo = (point: ProcessPathPoint): void => {
-      const previous = points.at(-1);
-      if (previous && previous.x === point.x && previous.y === point.y) {
-        return;
-      }
-
       path += ` L ${format(point.x)} ${format(point.y)}`;
-      points.push(point);
     };
     const curveTo = (
       controlOne: ProcessPathPoint,
       controlTwo: ProcessPathPoint,
       end: ProcessPathPoint,
     ): void => {
-      const start = points.at(-1);
-      if (!start) {
-        return;
-      }
-
       path += ` C ${format(controlOne.x)} ${format(controlOne.y)} ${format(controlTwo.x)} ${format(controlTwo.y)} ${format(end.x)} ${format(end.y)}`;
-      for (let sample = 1; sample <= 28; sample += 1) {
-        const t = sample / 28;
-        const inverse = 1 - t;
-        points.push({
-          x:
-            inverse ** 3 * start.x +
-            3 * inverse ** 2 * t * controlOne.x +
-            3 * inverse * t ** 2 * controlTwo.x +
-            t ** 3 * end.x,
-          y:
-            inverse ** 3 * start.y +
-            3 * inverse ** 2 * t * controlOne.y +
-            3 * inverse * t ** 2 * controlTwo.y +
-            t ** 3 * end.y,
-        });
-      }
     };
 
     if (isCompact) {
@@ -352,27 +326,28 @@ export class HowItWorksComponent implements AfterViewInit {
       });
     }
 
-    this.pathPoints = points;
-    this.pathLengths = points.reduce<number[]>((lengths, point, index) => {
-      if (index === 0) {
-        lengths.push(0);
-        return lengths;
-      }
-
-      const previous = points[index - 1];
-      lengths.push(lengths[index - 1] + Math.hypot(point.x - previous.x, point.y - previous.y));
-      return lengths;
-    }, []);
-
     this.processPath.set(path);
     this.processViewBox.set(`0 0 ${format(width)} ${format(pathHeight)}`);
-    this.pathMarkers.set(
-      Array.from({ length: this.steps.length * 2 }, (_, index) => {
-        const progress = (index + 1) / (this.steps.length * 2 + 1);
-        return { ...this.positionAtProgress(progress), progress };
-      }),
-    );
-    this.updateTrackerPosition(this.timelineProgress() / 100);
+
+    // Read the native geometry back from the rendered <path> so the fill
+    // (stroke-dasharray/dashoffset) and the tracker (getPointAtLength) walk
+    // the exact same browser-computed arc length — they can't drift apart.
+    view.requestAnimationFrame(() => {
+      const pathEl = this.routePathRef?.nativeElement;
+      if (!pathEl) {
+        return;
+      }
+
+      const totalLength = pathEl.getTotalLength();
+      this.pathTotalLength.set(Math.max(1, totalLength));
+      this.pathMarkers.set(
+        Array.from({ length: this.steps.length * 2 }, (_, index) => {
+          const progress = (index + 1) / (this.steps.length * 2 + 1);
+          return { ...this.positionAtProgress(progress), progress };
+        }),
+      );
+      this.updateTrackerPosition(this.timelineProgress() / 100);
+    });
   }
 
   private updateTrackerPosition(progress: number): void {
@@ -380,27 +355,28 @@ export class HowItWorksComponent implements AfterViewInit {
   }
 
   private positionAtProgress(progress: number): ProcessPathPosition {
-    if (this.pathPoints.length < 2 || this.pathLengths.length < 2) {
+    const pathEl = this.routePathRef?.nativeElement;
+    if (!pathEl) {
       return { x: 0, y: 0, angle: 0 };
     }
 
-    const totalLength = this.pathLengths.at(-1) ?? 0;
-    const targetLength = Math.max(0, Math.min(1, progress)) * totalLength;
-    let index = this.pathLengths.findIndex((length) => length >= targetLength);
-    if (index <= 0) {
-      index = 1;
+    const totalLength = pathEl.getTotalLength();
+    if (totalLength <= 0) {
+      return { x: 0, y: 0, angle: 0 };
     }
 
-    const start = this.pathPoints[index - 1];
-    const end = this.pathPoints[index];
-    const segmentStart = this.pathLengths[index - 1];
-    const segmentLength = Math.max(this.pathLengths[index] - segmentStart, Number.EPSILON);
-    const amount = (targetLength - segmentStart) / segmentLength;
+    const clamped = Math.max(0, Math.min(1, progress));
+    const targetLength = clamped * totalLength;
+    const point = pathEl.getPointAtLength(targetLength);
+
+    // Sample a point slightly behind to derive the tangent angle at this position.
+    const lookBehind = Math.max(0, targetLength - 1);
+    const behind = pathEl.getPointAtLength(lookBehind);
 
     return {
-      x: start.x + (end.x - start.x) * amount,
-      y: start.y + (end.y - start.y) * amount,
-      angle: (Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI,
+      x: point.x,
+      y: point.y,
+      angle: (Math.atan2(point.y - behind.y, point.x - behind.x) * 180) / Math.PI,
     };
   }
 }

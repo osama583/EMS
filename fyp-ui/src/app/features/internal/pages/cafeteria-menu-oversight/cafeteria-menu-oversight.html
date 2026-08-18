@@ -1,0 +1,54 @@
+<section class="cafeteria-menu-oversight">
+  <app-internal-page-header [config]="headerConfig()" />
+
+  <section class="internal-table-workspace__controls cafeteria-menu-oversight__controls">
+    <div workspaceControls class="shared-page-controls">
+      <app-internal-search-field
+        workspaceControlWide
+        [config]="{ ariaLabel: 'Search menu items', placeholder: 'Search menu item name or details' }"
+        [value]="search()"
+        (valueChange)="setSearch($event)"
+      />
+      <div workspaceControlRight class="shared-page-controls__right">
+        <app-internal-reset-button (reset)="reset()" />
+      </div>
+    </div>
+  </section>
+
+  <div class="cafeteria-menu-oversight__layout">
+    <nav class="cafeteria-menu-oversight__list" aria-label="Cafeterias">
+      @if (cafeteriasLoading()) {
+        <app-loading-state variant="bars" label="Loading cafeterias…" />
+      } @else {
+        @for (cafeteria of cafeterias(); track cafeteria.id) {
+          <button
+            type="button" class="cafeteria-menu-oversight__list-item"
+            [class.cafeteria-menu-oversight__list-item--active]="selectedCafeteriaId() === cafeteria.id"
+            (click)="selectCafeteria(cafeteria.id)"
+          >
+            <span class="cafeteria-menu-oversight__list-item-label">{{ cafeteria.name }}</span>
+            <span class="cafeteria-menu-oversight__list-item-count">{{ menuCountFor(cafeteria.id) }}</span>
+          </button>
+        } @empty {
+          <p class="cafeteria-menu-oversight__list-empty">No cafeterias yet.</p>
+        }
+      }
+    </nav>
+
+    <div class="cafeteria-menu-oversight__content">
+      @if (menuLoading()) {
+        <app-loading-state variant="grid" label="Loading menu…" [count]="6" />
+      } @else {
+        <app-option-card-grid
+          [items]="cardData()"
+          [readOnly]="true"
+          emptyTitle="No menu items found"
+          [emptyDescription]="selectedCafeteriaName() ? (selectedCafeteriaName() + ' has not added any menu items yet.') : 'Select a cafeteria to view its menu.'"
+          (viewDetails)="viewDetails($event)"
+        />
+      }
+    </div>
+  </div>
+
+  <app-option-item-details-modal [open]="detailsTarget() !== null" [item]="detailsTarget()" (close)="closeDetails()" />
+</section>

@@ -160,7 +160,7 @@
   </div>
 </section>
 
-<app-event-details-modal [open]="!!selectedPublishedEvent()" [event]="selectedPublishedEvent()" (close)="closeEvent()" />
+<app-event-details-modal [open]="!!selectedPublishedEvent()" [event]="selectedPublishedEvent()" (close)="closeEvent()" (registered)="onModalRegistered($event)" />
 
 @if (filterOpen()) {
   <div class="filter-overlay" role="presentation" (click)="closeFilters()">

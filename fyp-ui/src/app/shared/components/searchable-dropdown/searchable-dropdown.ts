@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, HostListener, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, computed, inject, input, output, signal } from '@angular/core';
 import { SelectOption } from '../form-controls/form-controls.models';
 import { ValidationMessageComponent } from '../validation-message/validation-message';
 
@@ -19,7 +19,11 @@ import { ValidationMessageComponent } from '../validation-message/validation-mes
         <span class="material-symbols-rounded" aria-hidden="true">{{ loading() ? 'progress_activity' : 'expand_more' }}</span>
       </button>
       @if (open()) {
-        <section class="dropdown-panel" role="listbox" [attr.aria-multiselectable]="isMulti()">
+        <section
+          class="dropdown-panel" role="listbox" [attr.aria-multiselectable]="isMulti()"
+          [class.dropdown-panel--floating]="panelPosition() !== null"
+          [style.top.px]="panelPosition()?.top ?? null" [style.left.px]="panelPosition()?.left ?? null" [style.width.px]="panelPosition()?.width ?? null"
+        >
           @if (searchable()) { <label class="search-container"><span class="material-symbols-rounded">search</span><input type="search" aria-label="Search options" placeholder="Search options" [value]="query()" (input)="setQuery($event)" /></label> }
           <div class="options-list">
             @for (option of filteredOptions(); track option.value) {
@@ -38,6 +42,7 @@ import { ValidationMessageComponent } from '../validation-message/validation-mes
 })
 export class SearchableDropdownComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly destroyRef = inject(DestroyRef);
   readonly label = input(''); readonly required = input(false); readonly placeholder = input('Select an option'); readonly controlId = input('');
   readonly isMulti = input(false); readonly searchable = input(true); readonly maxSelections = input<number | null>(null);
   readonly loading = input(false); readonly disabled = input(false); readonly readOnly = input(false); readonly clearable = input(true); readonly errorLabel = input('');
@@ -47,6 +52,13 @@ export class SearchableDropdownComponent {
   readonly touched = signal(false);
   private readonly submitted = signal(false);
   private readonly resetForSession = signal(false);
+  // Floating-panel coordinates (viewport-relative), recomputed whenever the panel opens or the
+  // page scrolls/resizes underneath it. Rendering the panel with position:fixed at these
+  // coordinates — instead of position:absolute relative to this component — lets it escape any
+  // ancestor's overflow:hidden/auto clipping (e.g. a scrollable modal body), which otherwise cuts
+  // the options list off behind the modal footer. null until measured (first open, before the
+  // panel exists in the DOM to measure against).
+  readonly panelPosition = signal<{ top: number; left: number; width: number } | null>(null);
   readonly filteredOptions = computed(() => { const query = this.query().trim().toLowerCase(); return query ? this.options().filter((option) => `${option.label} ${option.description ?? ''}`.toLowerCase().includes(query)) : this.options(); });
   readonly selectedOptions = computed(() => { const values = Array.isArray(this.value()) ? this.value() as readonly string[] : [this.value() as string]; return this.options().filter((option) => values.includes(option.value)); });
   readonly displayError = computed(() => {
@@ -57,8 +69,34 @@ export class SearchableDropdownComponent {
   });
   @HostListener('document:pointerdown', ['$event']) closeOutside(event: Event): void { if (!this.host.nativeElement.contains(event.target as Node)) this.close(); }
   @HostListener('keydown', ['$event']) keyboard(event: KeyboardEvent): void { if (event.key === 'Escape') this.close(); if ((event.key === 'Enter' || event.key === ' ') && !this.open() && event.target === this.host.nativeElement) this.toggle(); }
-  toggle(): void { if (!this.disabled() && !this.readOnly() && !this.loading()) this.open.update((value) => !value); }
-  close(): void { this.open.set(false); this.query.set(''); }
+  @HostListener('window:resize') onWindowResize(): void { if (this.open()) this.measurePanelPosition(); }
+
+  constructor() {
+    // Scroll events don't bubble, so a plain (bubbling) listener never sees a modal body or any
+    // other ancestor scrolling underneath the trigger — capture-phase is required to catch those
+    // and keep the floating panel's position in sync instead of drifting away from the trigger.
+    const onScroll = (event: Event) => {
+      if (!this.open()) return;
+      const panel = this.host.nativeElement.querySelector('.dropdown-panel');
+      if (panel && event.target instanceof Node && panel.contains(event.target)) return;
+      this.measurePanelPosition();
+    };
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    this.destroyRef.onDestroy(() => document.removeEventListener('scroll', onScroll, { capture: true }));
+  }
+
+  toggle(): void {
+    if (this.disabled() || this.readOnly() || this.loading()) return;
+    this.open.update((value) => !value);
+    if (this.open()) this.measurePanelPosition();
+  }
+  close(): void { this.open.set(false); this.query.set(''); this.panelPosition.set(null); }
+  private measurePanelPosition(): void {
+    const trigger = this.host.nativeElement.querySelector('.dropdown-trigger');
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    this.panelPosition.set({ top: rect.bottom + 6, left: rect.left, width: rect.width });
+  }
   setQuery(event: Event): void { const value = (event.target as HTMLInputElement).value; this.query.set(value); this.searchChange.emit(value); }
   isSelected(value: string): boolean { return this.selectedOptions().some((option) => option.value === value); }
   select(value: string): void { if (this.isMulti()) { const current = Array.isArray(this.value()) ? [...this.value() as readonly string[]] : []; const next = current.includes(value) ? current.filter((item) => item !== value) : this.maxSelections() !== null && current.length >= this.maxSelections()! ? current : [...current, value]; this.valueChange.emit(next); } else { this.valueChange.emit(value); this.close(); } }

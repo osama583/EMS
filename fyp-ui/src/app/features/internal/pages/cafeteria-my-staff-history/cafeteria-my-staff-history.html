@@ -1,0 +1,8 @@
+<section class="cafeteria-my-staff-history">
+  <app-internal-data-page
+    [config]="config()" [records]="records()" [filters]="[]" [searchValue]="search()" [loading]="loading()"
+    [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+    (searchChange)="setSearch($event)" (reset)="reset()"
+    (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)"
+  />
+</section>

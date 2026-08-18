@@ -13,12 +13,12 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import { AuthNavigationSection } from '../../../core/auth/auth.models';
-import { UserRole } from '../../../core/auth/auth.models';
-import { ROLE_NAVIGATION } from '../../../core/auth/role-navigation';
+import { FALLBACK_NAVIGATION } from '../../../core/auth/role-navigation';
+import { NavIconComponent } from '../../../shared/components/nav-icon/nav-icon';
 
 @Component({
   selector: 'app-internal-layout',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, NavIconComponent],
   templateUrl: './internal-layout.html',
   styleUrl: './internal-layout.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -50,9 +50,16 @@ export class InternalLayoutComponent {
   readonly mobileNavOpen = computed(() => this.manuallyExpanded());
   readonly currentUserName = computed(() => this.auth.user()?.displayName ?? '');
 
-  readonly navigation = computed(() => this.auth.navigation() ?? ROLE_NAVIGATION[UserRole.Applicant]);
-  readonly primaryItems = computed(() => this.navigation().primary);
-  readonly sections = computed(() => this.navigation().sections);
+  // No more UserRole to default to for a not-yet-resolved/unauthenticated session — the shared
+  // FALLBACK_NAVIGATION stands in until the real one loads (same constant navigationFor() itself
+  // falls back to in role-navigation.ts for an unresolvable AuthUser).
+  readonly navigation = computed(() => this.auth.navigation() ?? FALLBACK_NAVIGATION);
+  // Single ordered list — folders and standalone pages interleaved in their real sort order
+  // (oldest first, newest last) — rendered by the templates as one sidebar list instead of two
+  // separate item/section blocks (which used to always show every standalone page above every
+  // folder, regardless of when each was added).
+  readonly navEntries = computed(() => this.navigation().entries);
+  readonly sections = computed(() => this.navEntries().flatMap((entry) => (entry.kind === 'section' ? [entry.section] : [])));
   readonly defaultRoute = computed(() => this.navigation().defaultRoute);
   readonly selectedChildPage = computed(() => {
     const currentRoute = this.activeRoute();
@@ -71,7 +78,9 @@ export class InternalLayoutComponent {
       return child ? [section.label, child.label] : [section.label];
     }
 
-    const primaryItem = this.primaryItems().find((item) => currentRoute.startsWith(item.route));
+    const primaryItem = this.navEntries()
+      .flatMap((entry) => (entry.kind === 'item' ? [entry.item] : []))
+      .find((item) => currentRoute.startsWith(item.route));
     if (primaryItem) {
       return [primaryItem.label];
     }

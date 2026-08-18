@@ -15,6 +15,8 @@ function assertInit() {
   }
 }
 
+const { isHeadOfUnit } = require('./user-access.service');
+
 class WorkflowError extends Error {
   constructor(message, status = 400) {
     super(message);
@@ -28,13 +30,46 @@ function findRequest(requestId) {
   return request;
 }
 
+// Unit + Level model: request_task no longer stores a flat role string for the 5 Service
+// department-routed requirement kinds (logistics/transportation/photoVideo/soundLight/
+// campusTour) — it stores `assigned_unit_code` instead (see ems_database_schema.sql's comment
+// above CREATE TABLE request_task). `assigned_role` is now reserved for exactly the two
+// non-unit-scoped kinds: 'cfo' (fundingPurchase) and 'fmb' (fmb — F&B is unit-scoped as a
+// Service department for USER identity purposes, but its request_task routing keeps the legacy
+// flat 'fmb' assigned_role token since createFmbSelection()/the cafeteria fan-out downstream
+// keys off it, not a unit lookup — kept exactly as before, out of scope to change here).
+const UNIT_CODE_FOR_REQUIREMENT = {
+  logistics: 'logistics_and_facilities',
+  transportation: 'transport_services',
+  photoVideo: 'photography_services',
+  soundLight: 'a_v_services',
+  campusTour: 'student_services',
+};
+const FLAT_ROLE_FOR_REQUIREMENT = {
+  fundingPurchase: 'cfo',
+  fmb: 'fmb',
+};
+// F&B's own unit — used by the fmb_review gate below (F&B is unit-scoped: role/function_level
+// 'manager' on the 'food_beverage_services' Service department unit) even though its
+// request_task routing above still uses the legacy flat 'fmb' assigned_role token.
+const FMB_UNIT_CODE = 'food_beverage_services';
+
+// True if `userId` holds head-of-school or head-of-department on `unitCode` — replaces the old
+// function_level==='manager' check. RBAC redesign: see user-access.service.js's isHeadOfUnit().
+function isManagerOfUnit(userId, unitCode) {
+  return isHeadOfUnit(userId, unitCode);
+}
+
 function isHosHodOfUnit(userId, request) {
   const applicant = db.users.find((u) => u.user_id === request.applicant_user_id);
   if (!applicant) return false;
-  const applicantUnit = db.unit_users.find((uu) => uu.user_id === applicant.user_id);
-  if (!applicantUnit) return false;
-  const unit = db.unit.find((u) => u.code === applicantUnit.unit_code);
-  return !!unit && unit.head_user_id === Number(userId);
+  // Applicant may hold several unit roles; self-review applies to ANY unit where they're also
+  // its head-of-school (school units only — a head-of-department applicant self-reviewing is a
+  // different, F&B-specific case handled directly in submitProposal() below).
+  const applicantUnitCodes = db.user_unit_roles
+    .filter((uur) => uur.user_id === applicant.user_id && uur.unit_code)
+    .map((uur) => uur.unit_code);
+  return applicantUnitCodes.some((unitCode) => isHeadOfUnit(userId, unitCode) && db.unit.find((u) => u.code === unitCode) && require('./role-eligibility.service').isSchoolUnit(unitCode));
 }
 
 function isApplicantSelf(requestId, userId) {
@@ -52,16 +87,16 @@ function authorizeAction(requestId, actorUser, action) {
   const status = request.status;
 
   if (action === 'hos_hod_review' && status === 'hos_hod_review') {
-    if (actorUser.role !== 'hos-hod') throw new WorkflowError('Only HOS/HOD can act at this stage.', 403);
     if (!isHosHodOfUnit(actorUser.user_id, request)) throw new WorkflowError('You are not the HOS/HOD for this applicant\'s unit.', 403);
     return;
   }
   if (action === 'fmb_review' && status === 'fmb_review') {
-    if (actorUser.role !== 'fmb') throw new WorkflowError('Only F&B can act at this stage.', 403);
+    if (!isManagerOfUnit(actorUser.user_id, FMB_UNIT_CODE)) throw new WorkflowError('Only F&B can act at this stage.', 403);
     return;
   }
   if (action === 'cfo_review' && status === 'cfo_review') {
-    if (actorUser.role !== 'cfo') throw new WorkflowError('Only CFO can act at this stage.', 403);
+    const { hasRole } = require('./user-access.service');
+    if (!hasRole(actorUser.user_id, 'cfo')) throw new WorkflowError('Only CFO can act at this stage.', 403);
     return;
   }
   if (action === 'cancel') {
@@ -84,6 +119,16 @@ function highPaxThreshold() {
   const config = db.config.find((c) => c.code === 'HIGH_PAX_THRESHOLD');
   if (!config) throw new WorkflowError('HIGH_PAX_THRESHOLD config not found.', 404);
   return config.number;
+}
+
+// workflow_history.actor_role is a display string only (not used for any authorization check —
+// authorizeAction() above is the actual gate). Picks the actor's first held role_code, or a
+// fixed literal for the well-known synthetic actors ('system', 'applicant', 'staff',
+// 'cafeteria_staff') that already get passed directly by several call sites below.
+function primaryRoleCodeFor(userId) {
+  const { rolesFor } = require('./user-access.service');
+  const roles = rolesFor(userId);
+  return roles.length > 0 ? roles[0].roleCode : 'unknown';
 }
 
 function recordHistory(requestId, requestTaskId, requirementId, action, actorUserId, actorRole, comment, previousStatus, newStatus) {
@@ -110,12 +155,13 @@ function submitProposal(requestId) {
   const applicant = db.users.find((u) => u.user_id === request.applicant_user_id);
   const previousStatus = request.status;
 
+  const { hasRole } = require('./user-access.service');
   let nextStatus;
   if (isHosHodOfUnit(applicant.user_id, request)) {
     // Self-review: skip hos_hod_review entirely, go straight to the F&B/CFO check.
     nextStatus = request.total_pax > highPaxThreshold() ? 'fmb_review' : 'department_review';
-  } else if (applicant.role === 'cfo' || applicant.role === 'fmb') {
-    // CFO/F&B applying for themselves: skip ALL higher approval.
+  } else if (hasRole(applicant.user_id, 'cfo') || isManagerOfUnit(applicant.user_id, FMB_UNIT_CODE)) {
+    // CFO/F&B manager applying for themselves: skip ALL higher approval.
     nextStatus = 'department_review';
   } else {
     nextStatus = 'hos_hod_review';
@@ -125,7 +171,7 @@ function submitProposal(requestId) {
   request.submitted_at = new Date().toISOString();
   request.updated_at = new Date().toISOString();
   if (nextStatus === 'department_review') createDepartmentTasks(request.request_id);
-  recordHistory(request.request_id, null, null, 'submit', applicant.user_id, applicant.role, null, previousStatus, nextStatus);
+  recordHistory(request.request_id, null, null, 'submit', applicant.user_id, primaryRoleCodeFor(applicant.user_id), null, previousStatus, nextStatus);
   return request;
 }
 
@@ -151,7 +197,7 @@ function approveReviewerStage(requestId, actorUserId) {
   request.status = nextStatus;
   request.updated_at = new Date().toISOString();
   if (nextStatus === 'department_review') createDepartmentTasks(request.request_id);
-  recordHistory(request.request_id, null, null, 'approve', actorUserId, actor.role, null, previousStatus, nextStatus);
+  recordHistory(request.request_id, null, null, 'approve', actorUserId, primaryRoleCodeFor(actorUserId), null, previousStatus, nextStatus);
   return request;
 }
 
@@ -164,7 +210,7 @@ function rejectReviewerStage(requestId, actorUserId, reason) {
   }
   request.status = 'completed_rejected';
   request.updated_at = new Date().toISOString();
-  recordHistory(request.request_id, null, null, 'reject', actorUserId, actor.role, reason, previousStatus, 'completed_rejected');
+  recordHistory(request.request_id, null, null, 'reject', actorUserId, primaryRoleCodeFor(actorUserId), reason, previousStatus, 'completed_rejected');
   return request;
 }
 
@@ -180,41 +226,23 @@ function resubmitReviewerStage(requestId, actorUserId, comment) {
   request.status = 'resubmission_required';
   request.reviewer_comment = comment;
   request.updated_at = new Date().toISOString();
-  recordHistory(request.request_id, null, null, 'resubmit', actorUserId, actor.role, comment, previousStatus, 'resubmission_required');
+  recordHistory(request.request_id, null, null, 'resubmit', actorUserId, primaryRoleCodeFor(actorUserId), comment, previousStatus, 'resubmission_required');
   return request;
 }
 
-// Fields a legitimate applicant-resubmit may touch: proposal content columns from the
-// `request` table (see cloud/system_logic/ems_database_schema.sql). Explicitly excludes
-// identity/workflow-control columns (request_id, applicant_user_id, status, resume_stage,
-// reviewer_comment, timestamps, cancellation fields) so a caller can't smuggle those through.
-const APPLICANT_RESUBMIT_ALLOWED_FIELDS = [
-  'applicant_name',
-  'applicant_email',
-  'applicant_department_or_school',
-  'event_title',
-  'short_introduction',
-  'goals_objectives',
-  'expected_benefits',
-  'event_visibility',
-  'event_format',
-  'registration_approval',
-  'promotion_publicity_method',
-  'event_image',
-  'total_pax',
-  'max_pax',
-];
-
-function applicantResubmit(requestId, updates) {
+// Applicant resubmits a proposal a reviewer sent back (status='resubmission_required'). `payload`
+// is the event-proposal form's FULL submission shape (same as createProposal()/saveDraft()/
+// saveRequestContent() take) — every scalar field and every request_* child table is replaced
+// from what the applicant edited, not just the 5-field allowlist this used to shallow-patch, so
+// edits to the schedule/co-owners/requests/etc. actually survive a resubmit. Persisting is
+// delegated entirely to saveRequestContent(); this function's own job is only the stage
+// transition (resume at whichever stage sent it back, clear resume_stage/reviewer_comment).
+function applicantResubmit(requestId, payload) {
   const request = findRequest(requestId);
   if (request.status !== 'resubmission_required') {
     throw new WorkflowError(`Cannot resubmit from status ${request.status}.`, 400);
   }
-  if (updates) {
-    for (const field of APPLICANT_RESUBMIT_ALLOWED_FIELDS) {
-      if (Object.prototype.hasOwnProperty.call(updates, field)) request[field] = updates[field];
-    }
-  }
+  if (payload) saveRequestContent(requestId, payload);
   const resumeStatus = request.resume_stage || 'hos_hod_review';
   const previousStatus = request.status;
   request.status = resumeStatus;
@@ -222,6 +250,28 @@ function applicantResubmit(requestId, updates) {
   request.reviewer_comment = null;
   request.updated_at = new Date().toISOString();
   recordHistory(request.request_id, null, null, 'applicant-resubmit', request.applicant_user_id, 'applicant', null, previousStatus, resumeStatus);
+  return request;
+}
+
+// Generic "persist this request's content, touch nothing else" primitive — replaces the
+// `request` row's own scalar fields and every request_* child table from `payload`, exactly
+// like createProposal()/saveDraft() do, but never assigns request.status, resume_stage, or
+// reviewer_comment. Deliberately has no opinion on which statuses may call it — that's an
+// authorization/workflow decision for the caller (route handler), not this function. Meant to
+// be the one shared "save in place" primitive for every "keep editing without changing where
+// this sits in the workflow" case — e.g. an applicant editing a resubmission-required proposal
+// (the current caller — see the /:id/save-edits route) — and, later, anything with the same
+// shape (a reviewer drafting a comment without committing to approve/reject/resubmit, etc.),
+// rather than each such case growing its own narrow save function like applicantResubmit()'s
+// hardcoded 5-field allowlist did.
+function saveRequestContent(requestId, payload) {
+  const request = findRequest(requestId);
+  const applicant = db.users.find((u) => u.user_id === request.applicant_user_id);
+  if (!applicant) throw new WorkflowError('Applicant not found for this proposal.', 400);
+  clearRequestChildRows(request.request_id);
+  applyRequestScalarFields(request, payload, applicant);
+  buildRequestChildRows(request, payload);
+  recordHistory(request.request_id, null, null, 'save-content', applicant.user_id, primaryRoleCodeFor(applicant.user_id), null, request.status, request.status);
   return request;
 }
 
@@ -233,8 +283,8 @@ const REQUEST_CHILD_TABLES = [
   'request_categories', 'application_requirements', 'event_schedule', 'co_owners', 'organizers',
   'important_people', 'general_guest', 'brief_agenda', 'request_discussion_topics',
   'request_logistics', 'request_transportation', 'request_photography_videography',
-  'request_sound_light', 'request_fmb', 'request_campus_tour', 'request_mineral_water_logo',
-  'request_mineral_water_normal', 'request_funding_purchase',
+  'request_sound_light', 'request_fmb', 'request_campus_tour', 'request_mineral_water',
+  'request_funding_purchase',
 ];
 function clearRequestChildRows(requestId) {
   for (const table of REQUEST_CHILD_TABLES) {
@@ -247,9 +297,13 @@ function clearRequestChildRows(requestId) {
 // onto an already-created `request` row. Shared by createProposal() (submits immediately) and
 // saveDraft() (stays in status='draft').
 function buildRequestChildRows(request, payload) {
-  for (const categoryName of payload.eventCategories || []) {
-    const category = db.event_category.find((c) => c.name === categoryName);
-    if (category) db.request_categories.push({ request_id: request.request_id, category_id: category.event_category_id });
+  // payload.eventCategories now carries event_category_id values (the Angular picker's `value` is
+  // the catalog id, not the name — see event-proposal.ts's categoryOptions). The by-name fallback
+  // below is a compatibility net for any in-flight draft saved under the old name-based payload
+  // shape before this change shipped; it can be removed once no such drafts remain.
+  for (const categoryRef of payload.eventCategories || []) {
+    const category = db.event_category.find((c) => c.event_category_id === Number(categoryRef)) || db.event_category.find((c) => c.name === categoryRef);
+    if (category) db.request_categories.push({ request_id: request.request_id, category_id: category.event_category_id, category_name: category.name });
   }
 
   for (const requirementKey of payload.selectedRequirements || []) {
@@ -287,25 +341,22 @@ function buildRequestChildRows(request, payload) {
     db.request_logistics.push({ request_logistics_id: nextId('request_logistics'), request_id: request.request_id, option_id: row.item || null, item: row.item, quantity: Number(row.quantity) || 0, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
   }
   for (const row of requestRows.transportation || []) {
-    db.request_transportation.push({ request_transportation_id: nextId('request_transportation'), request_id: request.request_id, option_id: row.type || null, type: row.type, requested_pax: Number(row.requestedPax) || 0, pickup: row.pickup, dropoff: row.dropoff, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
+    db.request_transportation.push({ request_transportation_id: nextId('request_transportation'), request_id: request.request_id, option_id: row.type || null, type: row.type, requested_pax: Number(row.requestedPax) || 0, pickup: row.pickup, dropoff: row.dropoff, date: row.date, moving_time: row.start, notes: row.notes || null });
   }
   for (const row of requestRows.photoVideo || []) {
-    db.request_photography_videography.push({ request_photography_videography_id: nextId('request_photography_videography'), request_id: request.request_id, option_id: row.service || null, service: row.service, personnel_quantity: Number(row.personnelQuantity) || 0, date: row.date, start_time: row.start, end_time: row.end, location: row.location, coverage: row.coverage, notes: row.notes || null });
+    db.request_photography_videography.push({ request_photography_videography_id: nextId('request_photography_videography'), request_id: request.request_id, option_id: row.service || null, service: row.service, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
   }
   for (const row of requestRows.soundLight || []) {
     db.request_sound_light.push({ request_sound_light_id: nextId('request_sound_light'), request_id: request.request_id, option_id: row.item || null, item: row.item, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
   }
   for (const row of requestRows.fmb || []) {
-    db.request_fmb.push({ request_fmb_id: nextId('request_fmb'), request_id: request.request_id, option_id: row.foodType || null, food_type: row.foodType, pax: Number(row.quantity) || 0, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
+    db.request_fmb.push({ request_fmb_id: nextId('request_fmb'), request_id: request.request_id, option_id: row.foodType || null, food_type: row.foodType, pax: Number(row.quantity) || 0, date: row.date, serve_time: row.start, location: row.location, notes: row.notes || null });
   }
   for (const row of requestRows.campusTour || []) {
-    db.request_campus_tour.push({ request_campus_tour_id: nextId('request_campus_tour'), request_id: request.request_id, date: row.date, start_time: row.start, end_time: row.end, location: row.location, pax: Number(row.pax) || 0, start_point_option_id: row.startPoint || null, start_point: row.startPoint, notes: row.notes || null });
-  }
-  for (const row of requestRows.waterLogo || []) {
-    db.request_mineral_water_logo.push({ request_mineral_water_logo_id: nextId('request_mineral_water_logo'), request_id: request.request_id, option_id: row.quantity || null, quantity: Number(row.quantity) || 0, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
+    db.request_campus_tour.push({ request_campus_tour_id: nextId('request_campus_tour'), request_id: request.request_id, date: row.date, pax: Number(row.pax) || 0, start_point_option_id: row.startPoint || null, start_point: row.startPoint, tour_type_option_id: row.tourType || null, tour_type: row.tourType, notes: row.notes || null });
   }
   for (const row of requestRows.waterNormal || []) {
-    db.request_mineral_water_normal.push({ request_mineral_water_normal_id: nextId('request_mineral_water_normal'), request_id: request.request_id, option_id: row.quantity || null, quantity: Number(row.quantity) || 0, date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
+    db.request_mineral_water.push({ request_mineral_water_id: nextId('request_mineral_water'), request_id: request.request_id, option_id: row.quantity || null, quantity: Number(row.quantity) || 0, with_logo: row.withLogo === 'Yes', date: row.date, start_time: row.start, end_time: row.end, location: row.location, notes: row.notes || null });
   }
   for (const row of requestRows.fundingPurchase || []) {
     db.request_funding_purchase.push({ request_funding_purchase_id: nextId('request_funding_purchase'), request_id: request.request_id, main_option_id: row.mainItem || null, main_item: row.mainItem, sub_option_id: row.subItem || null, sub_item: row.subItem, quantity: Number(row.quantity) || 0, unit_price_rm: Number(row.unit) || 0, notes: row.notes || null });
@@ -313,7 +364,7 @@ function buildRequestChildRows(request, payload) {
 }
 
 function applyRequestScalarFields(request, payload, applicant) {
-  request.applicant_name = `${applicant.first_name} ${applicant.last_name}`;
+  request.applicant_name = applicant.full_name;
   request.applicant_email = applicant.email;
   request.applicant_department_or_school = payload.applicantDepartment || '';
   request.event_title = payload.eventTitle || '';
@@ -321,12 +372,21 @@ function applyRequestScalarFields(request, payload, applicant) {
   request.goals_objectives = payload.goals || '';
   request.expected_benefits = payload.benefits || '';
   request.event_visibility = payload.eventVisibility || 'Private';
-  request.event_format = payload.eventFormat || 'On Campus';
+  // payload.eventFormat now carries an event_format_id (the picker's `value`) — resolve to the
+  // catalog row and freeze its name as the snapshot. Same by-name compatibility fallback as
+  // buildRequestChildRows() above, for in-flight drafts saved before this change shipped.
+  const format = db.event_format.find((f) => f.event_format_id === Number(payload.eventFormat)) || db.event_format.find((f) => f.name === payload.eventFormat);
+  request.event_format_id = format ? format.event_format_id : null;
+  request.event_format_snapshot = format ? format.name : (payload.eventFormat || 'On Campus');
   request.registration_approval = payload.registrationMode || 'Automatic';
   request.promotion_publicity_method = payload.publicity || null;
   request.event_image = payload.eventImage || null;
   request.total_pax = Number(payload.totalPax) || 0;
   request.max_pax = payload.maxPax != null ? Number(payload.maxPax) : null;
+  // null (not 0) means "not entered" — distinct from an explicit free event.
+  request.cost_amount = payload.costAmount != null ? Number(payload.costAmount) : null;
+  request.bank_account_name = payload.bankAccountName || null;
+  request.bank_account_number = payload.bankAccountNumber || null;
   request.updated_at = new Date().toISOString();
 }
 
@@ -352,8 +412,9 @@ function createProposal(payload, draftRequestId) {
       applicant_user_id: applicant.user_id,
       applicant_name: '', applicant_email: '', applicant_department_or_school: '',
       event_title: '', short_introduction: '', goals_objectives: '', expected_benefits: '',
-      event_visibility: '', event_format: '', registration_approval: '',
+      event_visibility: '', event_format_id: null, event_format_snapshot: '', registration_approval: '',
       promotion_publicity_method: null, event_image: null, total_pax: 0, max_pax: null,
+      cost_amount: null, bank_account_name: null, bank_account_number: null,
       status: 'draft',
       submitted_at: null,
       cancelled_at: null,
@@ -369,7 +430,7 @@ function createProposal(payload, draftRequestId) {
   applyRequestScalarFields(request, payload, applicant);
   buildRequestChildRows(request, payload);
 
-  recordHistory(request.request_id, null, null, 'create', applicant.user_id, applicant.role, null, null, 'draft');
+  recordHistory(request.request_id, null, null, 'create', applicant.user_id, primaryRoleCodeFor(applicant.user_id), null, null, 'draft');
   return submitProposal(request.request_id);
 }
 
@@ -394,8 +455,9 @@ function saveDraft(payload, draftRequestId) {
       applicant_user_id: applicant.user_id,
       applicant_name: '', applicant_email: '', applicant_department_or_school: '',
       event_title: '', short_introduction: '', goals_objectives: '', expected_benefits: '',
-      event_visibility: '', event_format: '', registration_approval: '',
+      event_visibility: '', event_format_id: null, event_format_snapshot: '', registration_approval: '',
       promotion_publicity_method: null, event_image: null, total_pax: 0, max_pax: null,
+      cost_amount: null, bank_account_name: null, bank_account_number: null,
       status: 'draft',
       submitted_at: null,
       cancelled_at: null,
@@ -410,7 +472,7 @@ function saveDraft(payload, draftRequestId) {
 
   applyRequestScalarFields(request, payload, applicant);
   buildRequestChildRows(request, payload);
-  recordHistory(request.request_id, null, null, draftRequestId ? 'draft-update' : 'draft-create', applicant.user_id, applicant.role, null, 'draft', 'draft');
+  recordHistory(request.request_id, null, null, draftRequestId ? 'draft-update' : 'draft-create', applicant.user_id, primaryRoleCodeFor(applicant.user_id), null, 'draft', 'draft');
   return request;
 }
 
@@ -436,13 +498,14 @@ function cancelProposal(requestId, actorUserId) {
   request.cancelled_at = new Date().toISOString();
   request.cancelled_by_user_id = Number(actorUserId);
   request.updated_at = new Date().toISOString();
-  recordHistory(request.request_id, null, null, 'cancel', actorUserId, actor.role, null, previousStatus, 'cancelled');
+  recordHistory(request.request_id, null, null, 'cancel', actorUserId, primaryRoleCodeFor(actorUserId), null, previousStatus, 'cancelled');
   return request;
 }
 
 // Called once, the moment a request enters department_review. Creates one request_task per
-// DISTINCT requirement the applicant selected, EXCEPT waterLogo/waterNormal — those attach to
-// the SAME task as fmb (Phase 1's correction: F&B reviews food + water together, one task).
+// DISTINCT requirement the applicant selected, EXCEPT waterNormal (mineral water, with-logo
+// or not, is a single applicant-facing request now) — those attach to the SAME task as fmb
+// (Phase 1's correction: F&B reviews food + water together, one task).
 function createDepartmentTasks(requestId) {
   const applicationRequirements = db.application_requirements.filter((ar) => ar.request_id === Number(requestId));
   const requirementNames = applicationRequirements.map((ar) => {
@@ -451,32 +514,28 @@ function createDepartmentTasks(requestId) {
     return requirement.requirement_name;
   });
 
-  const roleForRequirement = {
-    logistics: 'logistics-manager',
-    transportation: 'transport-manager',
-    photoVideo: 'photography-manager',
-    soundLight: 'av-manager',
-    campusTour: 'student-services-manager',
-    fundingPurchase: 'cfo',
-    fmb: 'fmb',
-  };
-
   // Water rows never get their own task row — they're folded into 'fmb'. If the applicant
   // selected water but NOT fmb explicitly (the Angular form always includes fmb whenever water
   // is picked, per Task 2.5's corrected requirement checklist merge — but defend against it
   // anyway), still create exactly one 'fmb' task.
-  const distinctTaskRequirements = [...new Set(requirementNames.map((name) => (name === 'waterLogo' || name === 'waterNormal') ? 'fmb' : name))];
+  const distinctTaskRequirements = [...new Set(requirementNames.map((name) => (name === 'waterNormal') ? 'fmb' : name))];
 
   for (const requirementName of distinctTaskRequirements) {
     const requirement = db.event_requirements.find((r) => r.requirement_name === requirementName);
     if (!requirement) throw new WorkflowError('Event requirement not found.', 404);
+    // Mutually exclusive per chk_request_task_assignment: the 5 Service department-routed
+    // kinds get assigned_unit_code (assigned_role stays null); the 2 flat-routed kinds
+    // (fundingPurchase -> cfo, fmb -> fmb) get assigned_role (assigned_unit_code stays null).
+    const assignedUnitCode = UNIT_CODE_FOR_REQUIREMENT[requirementName] || null;
+    const assignedRole = FLAT_ROLE_FOR_REQUIREMENT[requirementName] || null;
     db.request_task.push({
       request_task_id: nextId('request_task'),
       request_id: Number(requestId),
       requirement_id: requirement.requirement_id,
       stage_code: 'department_review',
       sequence_no: 1,
-      assigned_role: roleForRequirement[requirementName],
+      assigned_unit_code: assignedUnitCode,
+      assigned_role: assignedRole,
       assignment_mode: requirementName === 'fmb' ? 'shared_pool' : 'assigned',
       // NOTE: 'shared_pool' here describes the OVERALL fmb task's eventual staff-fulfilment
       // step conceptually, but the actual shared-pool mechanism (Task 3.4 Step 5) operates at
@@ -520,7 +579,7 @@ function approveDepartmentTask(requestId, requirementKey, actorUserId) {
   task.status = 'approved';
   task.resolved_at = new Date().toISOString();
   task.resolved_by_user_id = Number(actorUserId);
-  recordHistory(requestId, task.request_task_id, task.requirement_id, 'approve', actorUserId, actor.role, null, previousStatus, 'approved');
+  recordHistory(requestId, task.request_task_id, task.requirement_id, 'approve', actorUserId, primaryRoleCodeFor(actorUserId), null, previousStatus, 'approved');
 
   // fmb is special: 'approve' here means F&B approved the FOOD+WATER REQUEST overall and is
   // about to create selection rows (a separate call — see the routes layer, which calls
@@ -536,7 +595,7 @@ function resubmitDepartmentTask(requestId, requirementKey, actorUserId, comment)
   const previousStatus = task.status;
   task.status = 'resubmitted';
   task.comment = comment;
-  recordHistory(requestId, task.request_task_id, task.requirement_id, 'resubmit', actorUserId, actor.role, comment, previousStatus, 'resubmitted');
+  recordHistory(requestId, task.request_task_id, task.requirement_id, 'resubmit', actorUserId, primaryRoleCodeFor(actorUserId), comment, previousStatus, 'resubmitted');
   // Per the design spec's "parallel independence": this does NOT touch request.status or any
   // sibling request_task row. The applicant sees this specific department's resubmission in
   // their inbox (a query concern for the routes layer, not this function) while every other
@@ -573,11 +632,11 @@ function updateTaskStatus(requestTaskId, status) {
   return task;
 }
 
-function createFmbSelection(requestFmbId, cafeteriaId, fmbOptionId, menuItemLabel, quantity, notes) {
+function createFmbSelection(requestFmbId, cafeteriaUnitCode, fmbOptionId, menuItemLabel, quantity, notes) {
   const selection = {
     request_fmb_selection_id: nextId('request_fmb_selection'),
     request_fmb_id: Number(requestFmbId),
-    cafeteria_id: Number(cafeteriaId),
+    unit_code: cafeteriaUnitCode,
     fmb_option_id: Number(fmbOptionId),
     menu_item_label: menuItemLabel,
     quantity: Number(quantity),
@@ -613,7 +672,7 @@ function approveFmbSelection(selectionId, actorUserId) {
   const actor = db.users.find((u) => u.user_id === Number(actorUserId));
   const previousStatus = selection.status;
   selection.status = 'approved';
-  recordHistory(requestIdForFmbSelection(selectionId), null, null, 'approve-selection', actorUserId, actor.role, null, previousStatus, 'approved');
+  recordHistory(requestIdForFmbSelection(selectionId), null, null, 'approve-selection', actorUserId, primaryRoleCodeFor(actorUserId), null, previousStatus, 'approved');
   checkFmbTaskResolved(selectionId);
   return selection;
 }
@@ -626,12 +685,12 @@ function resubmitFmbSelection(selectionId, actorUserId) {
   const actor = db.users.find((u) => u.user_id === Number(actorUserId));
   const previousStatus = selection.status;
   selection.status = 'resubmitted';
-  recordHistory(requestIdForFmbSelection(selectionId), null, null, 'resubmit-selection', actorUserId, actor.role, null, previousStatus, 'resubmitted');
+  recordHistory(requestIdForFmbSelection(selectionId), null, null, 'resubmit-selection', actorUserId, primaryRoleCodeFor(actorUserId), null, previousStatus, 'resubmitted');
   return selection;
 }
 
 // F&B edits a resubmitted row — dish, quantity, and/or cafeteria — then it goes straight back
-// to whichever Cafeteria Manager now owns it (same one if cafeteria_id is unchanged, a
+// to whichever Cafeteria Manager now owns it (same one if the cafeteria is unchanged, a
 // different one if F&B switched it). No separate "re-approve" step: saving the edit IS the
 // re-send, per the design spec.
 function editFmbSelection(selectionId, updates, actorUserId) {
@@ -640,17 +699,17 @@ function editFmbSelection(selectionId, updates, actorUserId) {
   const previousStatus = selection.status;
   if (updates.cancel) {
     selection.status = 'cancelled';
-    recordHistory(requestIdForFmbSelection(selectionId), null, null, 'cancel-selection', actorUserId, actor.role, null, previousStatus, 'cancelled');
+    recordHistory(requestIdForFmbSelection(selectionId), null, null, 'cancel-selection', actorUserId, primaryRoleCodeFor(actorUserId), null, previousStatus, 'cancelled');
     checkFmbTaskResolved(selectionId);
     return selection;
   }
-  if (updates.cafeteriaId !== undefined) selection.cafeteria_id = Number(updates.cafeteriaId);
+  if (updates.cafeteriaCode !== undefined) selection.unit_code = updates.cafeteriaCode;
   if (updates.fmbOptionId !== undefined) selection.fmb_option_id = Number(updates.fmbOptionId);
   if (updates.menuItemLabel !== undefined) selection.menu_item_label = updates.menuItemLabel;
   if (updates.quantity !== undefined) selection.quantity = Number(updates.quantity);
   if (updates.notes !== undefined) selection.notes = updates.notes;
   selection.status = 'pending';
-  recordHistory(requestIdForFmbSelection(selectionId), null, null, 'edit-selection', actorUserId, actor.role, null, previousStatus, 'pending');
+  recordHistory(requestIdForFmbSelection(selectionId), null, null, 'edit-selection', actorUserId, primaryRoleCodeFor(actorUserId), null, previousStatus, 'pending');
   return selection;
 }
 
@@ -714,10 +773,15 @@ module.exports = {
   WorkflowError,
   findRequest,
   isHosHodOfUnit,
+  isManagerOfUnit,
+  UNIT_CODE_FOR_REQUIREMENT,
+  FLAT_ROLE_FOR_REQUIREMENT,
+  FMB_UNIT_CODE,
   authorizeAction,
   submitProposal,
   createProposal,
   saveDraft,
+  saveRequestContent,
   deleteDraft,
   approveReviewerStage,
   rejectReviewerStage,

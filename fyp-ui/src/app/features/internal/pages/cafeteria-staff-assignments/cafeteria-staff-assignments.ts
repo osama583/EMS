@@ -1,0 +1,263 @@
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { combineLatest, finalize } from 'rxjs';
+import { AuthService } from '../../../../core/auth/auth.service';
+import { CafeteriaService } from '../../../../core/cafeterias/cafeteria.service';
+import { AssignableCafeteriaUser, Cafeteria, CafeteriaAssignment, CafeteriaStaffRoleCode } from '../../../../core/cafeterias/cafeteria.models';
+import { CafeteriaStaffRequest } from '../../../../core/cafeterias/cafeteria-staff-request.models';
+import { CafeteriaStaffRequestService } from '../../../../core/cafeterias/cafeteria-staff-request.service';
+import { FeedbackBannerComponent } from '../../../../shared/components/feedback-banner/feedback-banner';
+import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
+import { DeleteConfirmDialogComponent } from '../../../../shared/components/delete-confirm-dialog/delete-confirm-dialog';
+import { SearchableDropdownComponent } from '../../../../shared/components/searchable-dropdown/searchable-dropdown';
+import { SelectOption } from '../../../../shared/components/form-controls/form-controls.models';
+import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
+import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent } from '../../../../shared/components/internal-data-page/internal-data-page.models';
+
+const REQUEST_ACTION_LABELS: Record<CafeteriaStaffRequest['action'], string> = { add: 'Add staff', edit: 'Edit staff', remove: 'Remove staff' };
+
+const ROLE_OPTIONS: readonly SelectOption[] = [
+  { value: 'cafeteria-manager', label: 'Cafeteria Manager' },
+  { value: 'cafeteria-staff', label: 'Cafeteria Staff' },
+];
+
+// Cafeteria Admin's dedicated user-assignment screen: pick a user, a cafeteria, and a role
+// (Cafeteria Manager or Cafeteria Staff) — writes a real user_unit_roles row via
+// CafeteriaService, the same mechanism the System Admin Assignments tab uses for every other
+// role. Only users holding NO role yet are offered (see cafeterias.routes.js's
+// GET /assignable-users) — this page never lists a user's other roles/units, matching "the data
+// or user in cafeteria should not be showing even to the admin system" (System Admin's own
+// Users/Assignments screens are unaffected — a separate, general-purpose view over the same rows).
+@Component({
+  selector: 'app-cafeteria-staff-assignments',
+  imports: [InternalDataPageComponent, FormModalComponent, FeedbackBannerComponent, DeleteConfirmDialogComponent, SearchableDropdownComponent],
+  templateUrl: './cafeteria-staff-assignments.html',
+  styleUrl: './cafeteria-staff-assignments.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class CafeteriaStaffAssignmentsComponent {
+  private readonly service = inject(CafeteriaService);
+  private readonly auth = inject(AuthService);
+  private readonly staffRequests = inject(CafeteriaStaffRequestService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  // Pending My Staff requests (see cafeteria-my-staff.ts) awaiting this Cafeteria Admin's
+  // approve/reject — a flat oversight role, so every cafeteria's requests show here, not just one.
+  readonly pendingRequests = signal<readonly CafeteriaStaffRequest[]>([]);
+  readonly requestActionPending = signal<string | null>(null);
+  readonly rejectTarget = signal<CafeteriaStaffRequest | null>(null);
+  readonly rejectComment = signal('');
+  readonly rejecting = signal(false);
+
+  readonly assignments = signal<readonly CafeteriaAssignment[]>([]);
+  readonly cafeterias = signal<readonly Cafeteria[]>([]);
+  readonly assignableUsers = signal<readonly AssignableCafeteriaUser[]>([]);
+  readonly loading = signal(true);
+  readonly search = signal('');
+  readonly roleFilter = signal('all');
+  readonly page = signal(1);
+  readonly pageSize = signal(10);
+
+  readonly modalOpen = signal(false);
+  readonly saving = signal(false);
+  // Set only when editing an existing assignment — save() then PUTs the edited cafeteria/role
+  // onto this assignment instead of POSTing a new one. The user is locked in edit mode (see
+  // CafeteriaAssignmentDraft's comment — reassigning to a different user is remove + add).
+  readonly editingAssignmentId = signal<string | null>(null);
+  readonly selectedUserId = signal('');
+  readonly selectedUserLabel = signal('');
+  readonly selectedCafeteriaCode = signal('');
+  readonly selectedRoleCode = signal<CafeteriaStaffRoleCode | ''>('');
+  readonly successMessage = signal('');
+  readonly errorMessage = signal('');
+
+  readonly deleteTarget = signal<CafeteriaAssignment | null>(null);
+  readonly deleting = signal(false);
+
+  readonly userOptions = computed<readonly SelectOption[]>(() => this.assignableUsers().map((u) => ({ value: u.id, label: u.displayName, description: u.email })));
+  readonly cafeteriaOptions = computed<readonly SelectOption[]>(() => this.cafeterias().filter((c) => c.active).map((c) => ({ value: c.code, label: c.name })));
+  readonly roleOptions = ROLE_OPTIONS;
+  readonly formValid = computed(() => !!this.selectedUserId() && !!this.selectedCafeteriaCode() && !!this.selectedRoleCode() && !this.managerConflict());
+  // A cafeteria may have at most one Cafeteria Manager — checked against every OTHER assignment
+  // (excluding the one currently being edited, so re-saving a manager row onto the same
+  // cafeteria isn't blocked by its own existing row). Mirrors the server-side guard in
+  // cafeterias.routes.js exactly; this is a fast client-side check, the server still enforces it.
+  readonly managerConflict = computed<CafeteriaAssignment | null>(() => {
+    if (this.selectedRoleCode() !== 'cafeteria-manager' || !this.selectedCafeteriaCode()) return null;
+    return this.assignments().find((a) =>
+      a.assignmentId !== this.editingAssignmentId()
+      && a.cafeteriaCode === this.selectedCafeteriaCode()
+      && a.roleCode === 'cafeteria-manager',
+    ) ?? null;
+  });
+
+  readonly filteredAssignments = computed(() => {
+    const search = this.search().trim().toLowerCase();
+    return this.assignments().filter((a) =>
+      (this.roleFilter() === 'all' || a.roleCode === this.roleFilter())
+      && (!search || `${a.displayName} ${a.email} ${a.cafeteriaName}`.toLowerCase().includes(search)),
+    );
+  });
+  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filteredAssignments().length / this.pageSize())));
+  readonly records = computed<readonly InternalDataRecord[]>(() => this.assignmentRecords());
+  readonly config = computed<InternalDataPageConfig>(() => ({
+    ariaLabel: 'Cafeteria staff assignments', paginationLabel: 'Assignment pages', rowsPerPageLabel: 'Assignments per page', mobileListLabel: 'Assignment cards',
+    header: {
+      title: 'Staff Assignments',
+      description: 'Assign a Cafeteria Manager or Cafeteria Staff member to a specific cafeteria.',
+      countLabel: `${this.filteredAssignments().length} assignment${this.filteredAssignments().length === 1 ? '' : 's'}`,
+      primaryActionLabel: 'Add assignment',
+    },
+    search: { ariaLabel: 'Search assignments', placeholder: 'Search name, email, or cafeteria' },
+    columns: [
+      { key: 'user', label: 'User' },
+      { key: 'role', label: 'Role' },
+      { key: 'cafeteria', label: 'Cafeteria' },
+      { key: 'actions', label: 'Actions', actions: true },
+    ],
+    actions: [
+      { key: 'edit', label: 'Edit assignment', icon: 'edit' },
+      { key: 'remove', label: 'Remove assignment', icon: 'delete' },
+    ],
+    emptyTitle: 'No assignments found', emptyDescription: 'Add an assignment or change the current search.', pageSizeOptions: [5, 10, 25],
+  }));
+  readonly filters = computed(() => [
+    { key: 'role', ariaLabel: 'Filter by role', value: this.roleFilter(), options: [{ value: 'all', label: 'All roles' }, ...ROLE_OPTIONS] },
+  ]);
+
+  constructor() {
+    combineLatest([this.service.assignments$, this.service.cafeterias$]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: ([assignments, cafeterias]) => { this.assignments.set(assignments); this.cafeterias.set(cafeterias); this.loading.set(false); },
+      error: () => { this.errorMessage.set('The staff assignments could not be loaded.'); this.loading.set(false); },
+    });
+    this.staffRequests.inbox$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((requests) => this.pendingRequests.set(requests));
+  }
+
+  requestActionLabel(action: CafeteriaStaffRequest['action']): string { return REQUEST_ACTION_LABELS[action]; }
+  rejectActionVerb(): string {
+    const action = this.rejectTarget()?.action;
+    return action === 'remove' ? 'remove this staff member' : action === 'edit' ? 'edit this staff member' : 'add this staff member';
+  }
+
+  approveRequest(request: CafeteriaStaffRequest): void {
+    this.clearMessages();
+    this.requestActionPending.set(request.id);
+    this.staffRequests.approve(request.id, this.auth.user()!.id!).pipe(finalize(() => this.requestActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.successMessage.set(`${REQUEST_ACTION_LABELS[request.action]} request approved.`); this.service.refresh(); },
+      error: (err) => this.errorMessage.set(err?.error?.message || 'The request could not be approved. Please try again.'),
+    });
+  }
+
+  openRejectModal(request: CafeteriaStaffRequest): void {
+    this.clearMessages();
+    this.rejectTarget.set(request);
+    this.rejectComment.set('');
+  }
+  cancelReject(): void { if (!this.rejecting()) this.rejectTarget.set(null); }
+  confirmReject(): void {
+    const target = this.rejectTarget();
+    if (!target) return;
+    this.rejecting.set(true);
+    this.staffRequests.reject(target.id, this.auth.user()!.id!, this.rejectComment().trim()).pipe(finalize(() => this.rejecting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.rejectTarget.set(null); this.successMessage.set(`${REQUEST_ACTION_LABELS[target.action]} request rejected.`); },
+      error: (err) => { this.rejectTarget.set(null); this.errorMessage.set(err?.error?.message || 'The request could not be rejected. Please try again.'); },
+    });
+  }
+
+  setSearch(value: string): void { this.search.set(value); this.page.set(1); }
+  setFilter(change: InternalFilterChange): void {
+    if (change.key === 'role') this.roleFilter.set(change.value);
+    this.page.set(1);
+  }
+  reset(): void { this.search.set(''); this.roleFilter.set('all'); this.page.set(1); }
+  setPage(value: number): void { this.page.set(Math.max(1, Math.min(value, this.totalPages()))); }
+  setPageSize(value: number): void { this.pageSize.set(value); this.page.set(1); }
+
+  openAdd(): void {
+    this.clearMessages();
+    this.editingAssignmentId.set(null);
+    this.selectedUserId.set(''); this.selectedUserLabel.set(''); this.selectedCafeteriaCode.set(''); this.selectedRoleCode.set('');
+    this.loadAssignableUsers();
+    this.modalOpen.set(true);
+  }
+  openEdit(assignment: CafeteriaAssignment): void {
+    this.clearMessages();
+    this.editingAssignmentId.set(assignment.assignmentId);
+    this.selectedUserId.set(assignment.userId);
+    this.selectedUserLabel.set(assignment.displayName);
+    this.selectedCafeteriaCode.set(assignment.cafeteriaCode);
+    this.selectedRoleCode.set(assignment.roleCode);
+    this.modalOpen.set(true);
+  }
+  closeModal(): void { if (!this.saving()) this.modalOpen.set(false); }
+  selectUser(value: string | readonly string[]): void { this.selectedUserId.set(Array.isArray(value) ? value[0] ?? '' : value); }
+  selectCafeteria(value: string | readonly string[]): void { this.selectedCafeteriaCode.set(Array.isArray(value) ? value[0] ?? '' : value); }
+  selectRole(value: string | readonly string[]): void { this.selectedRoleCode.set((Array.isArray(value) ? value[0] ?? '' : value) as CafeteriaStaffRoleCode | ''); }
+
+  // The editing user, locked into a single-option dropdown (same read-only-picker convention as
+  // Admin Directory's Edit Assignment modal) — reassigning to a different user is remove + add.
+  readonly editingUserOption = computed<readonly SelectOption[]>(() => {
+    const id = this.selectedUserId();
+    return id && this.editingAssignmentId() ? [{ value: id, label: this.selectedUserLabel() }] : [];
+  });
+
+  save(): void {
+    if (!this.formValid()) return;
+    this.saving.set(true); this.clearMessages();
+    const editingId = this.editingAssignmentId();
+    const request = editingId
+      ? this.service.updateAssignment(editingId, { cafeteriaCode: this.selectedCafeteriaCode(), roleCode: this.selectedRoleCode() as CafeteriaStaffRoleCode })
+      : this.service.assign(this.selectedUserId(), this.selectedCafeteriaCode(), this.selectedRoleCode());
+    request.pipe(finalize(() => this.saving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.modalOpen.set(false); this.successMessage.set(editingId ? 'Assignment updated.' : 'Assignment added.'); },
+      error: (err) => this.errorMessage.set(err?.error?.message || `The assignment could not be ${editingId ? 'updated' : 'added'}.`),
+    });
+  }
+
+  handleAction(event: InternalRowActionEvent): void {
+    const assignment = this.assignments().find((a) => a.assignmentId === event.record.id);
+    if (!assignment) return;
+    if (event.action.key === 'edit') { this.openEdit(assignment); return; }
+    this.requestRemove(assignment);
+  }
+  targetLabel(): string {
+    const target = this.deleteTarget();
+    return target ? `"${target.displayName} · ${target.cafeteriaName}"` : '';
+  }
+  requestRemove(assignment: CafeteriaAssignment): void {
+    this.clearMessages();
+    this.deleteTarget.set(assignment);
+  }
+  cancelRemove(): void { if (!this.deleting()) this.deleteTarget.set(null); }
+  confirmRemove(): void {
+    const target = this.deleteTarget();
+    if (!target) return;
+    this.deleting.set(true);
+    this.service.removeAssignment(target.assignmentId).pipe(finalize(() => this.deleting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.deleteTarget.set(null); this.successMessage.set('Assignment removed.'); },
+      error: (err) => { this.deleteTarget.set(null); this.errorMessage.set(err?.error?.message || 'The assignment could not be removed.'); },
+    });
+  }
+
+  private loadAssignableUsers(): void {
+    this.service.getAssignableUsers().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (users) => this.assignableUsers.set(users),
+      error: () => this.errorMessage.set('Assignable users could not be loaded.'),
+    });
+  }
+  private clearMessages(): void { this.successMessage.set(''); this.errorMessage.set(''); }
+  private pageSlice<T>(records: readonly T[]): readonly T[] { return records.slice((this.page() - 1) * this.pageSize(), this.page() * this.pageSize()); }
+  private assignmentRecords(): readonly InternalDataRecord[] {
+    return this.pageSlice(this.filteredAssignments()).map((a) => ({
+      id: a.assignmentId,
+      actionKeys: ['edit', 'remove'],
+      cells: {
+        user: { primary: a.displayName, secondary: a.email },
+        role: { primary: a.roleLabel, badge: true, tone: a.roleCode === 'cafeteria-manager' ? 'blue' : 'neutral' },
+        cafeteria: { primary: a.cafeteriaName },
+        actions: { primary: '' },
+      },
+      mobile: { eyebrow: a.roleLabel, status: '', title: a.displayName, identity: a.email, details: [{ icon: 'storefront', text: a.cafeteriaName }] },
+    }));
+  }
+}

@@ -239,13 +239,13 @@
 
 .internal-nav__icon {
   display: grid;
-  flex: 0 0 2.1rem;
-  width: 2.1rem;
-  height: 2.1rem;
+  flex: 0 0 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
   place-items: center;
   border-radius: 0.72rem;
   color: var(--apu-blue-700);
-  font-size: 1.28rem;
+  font-size: 1.1rem;
   transition:
     background var(--motion-control) var(--ease-standard),
     color var(--motion-control) var(--ease-standard),
@@ -343,7 +343,8 @@
     color var(--motion-control) var(--ease-standard);
 }
 
-.sidebar-submenu a .material-symbols-rounded {
+.sidebar-submenu a .material-symbols-rounded,
+.sidebar-submenu a .nav-icon {
   flex: 0 0 auto;
   color: var(--apu-blue-700);
   font-size: 1rem;
@@ -454,9 +455,9 @@
   position: relative;
   z-index: 1;
   display: grid;
-  width: 3.1rem;
-  height: 3.1rem;
-  flex: 0 0 3.1rem;
+  width: 1.86rem;
+  height: 1.86rem;
+  flex: 0 0 1.86rem;
   margin: 0;
   place-items: center;
   transform: none;

@@ -1,0 +1,93 @@
+<section class="club-page">
+  <app-feedback-banner [message]="errorMessage()" tone="error" />
+
+  <app-internal-page-header [config]="cardHeaderConfig()" />
+
+  <div class="club-page__view-row">
+    <div class="club-page__view-toggle" role="group" aria-label="Choose view">
+      <button type="button" [class.active]="viewMode() === 'card'" (click)="setViewMode('card')">
+        <span class="material-symbols-rounded" aria-hidden="true">grid_view</span>
+        Card View
+      </button>
+      <button type="button" [class.active]="viewMode() === 'table'" (click)="setViewMode('table')">
+        <span class="material-symbols-rounded" aria-hidden="true">table_rows</span>
+        Table
+      </button>
+    </div>
+  </div>
+
+  <section class="internal-table-workspace__controls club-page__controls">
+    <div workspaceControls class="shared-page-controls">
+      <app-internal-search-field
+        workspaceControlWide
+        [config]="{ ariaLabel: 'Search clubs', placeholder: 'Search club name or description' }"
+        [value]="search()"
+        (valueChange)="setSearch($event)"
+      />
+      <div workspaceControlRight class="shared-page-controls__right">
+        <app-internal-filter-controls [filters]="filters()" (filterChange)="setFilter($event)" />
+        <div class="shared-page-controls__actions">
+          <app-internal-reset-button (reset)="reset()" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  @if (viewMode() === 'card') {
+    @if (loading()) {
+      <div class="club-page__grid-loading" role="status" aria-label="Loading clubs">
+        @for (line of [1, 2, 3]; track line) { <span></span> }
+      </div>
+    } @else if (visibleClubs().length === 0) {
+      <div class="club-page__empty">
+        <span class="material-symbols-rounded" aria-hidden="true">schedule</span>
+        <h2>No pending requests</h2>
+        <p>You have no clubs awaiting a decision right now.</p>
+      </div>
+    } @else {
+      <ul class="club-page__grid">
+        @for (club of visibleClubs(); track club.id) {
+          <li class="club-page__card">
+            <div class="club-page__image">
+              @if (club.imageUrl) {
+                <img [src]="club.imageUrl" [alt]="club.name" />
+              } @else {
+                <span class="material-symbols-rounded" aria-hidden="true">groups</span>
+              }
+            </div>
+            <div class="club-page__body">
+              <h2>{{ club.name }}</h2>
+              @if (club.categories.length) {
+                <div class="club-page__category-chips">
+                  @for (category of club.categories; track category.id) {
+                    <span class="club-page__category-chip">{{ category.name }}</span>
+                  }
+                </div>
+              }
+              <p>{{ club.description || 'No description provided.' }}</p>
+              <div class="club-page__meta">
+                <span class="material-symbols-rounded" aria-hidden="true">how_to_reg</span>
+                {{ club.president?.displayName ?? 'Unassigned' }}
+              </div>
+            </div>
+            <div class="club-page__footer">
+              <span class="club-page__status club-page__status--pending">
+                <span class="material-symbols-rounded" aria-hidden="true">schedule</span>
+                Request pending
+              </span>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <app-internal-data-page
+      [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+      [hideHeader]="true"
+      [hideControls]="true"
+      (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
+      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)"
+    />
+  }
+</section>

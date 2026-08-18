@@ -1,10 +1,10 @@
-import { UserRole } from '../auth/auth.models';
+import { AuthUser } from '../auth/auth.models';
+import { hasRole, unitCodesFor } from '../auth/role-access';
 import { RequestOptionKind } from '../request-options/request-option.models';
 
 export type DepartmentRequestKind =
   | 'logistics'
   | 'campusTour'
-  | 'waterLogo'
   | 'waterNormal'
   | 'soundLight'
   | 'photoVideo'
@@ -12,40 +12,105 @@ export type DepartmentRequestKind =
   | 'fmb'
   | 'fundingPurchase';
 
-export interface DepartmentWorkflowConfig {
-  readonly managerRole: UserRole;
-  readonly staffRole?: UserRole;
+// RBAC redesign: every department workflow except CFO is keyed by `unitCode`. A unit's
+// manager/staff levels are the head-of-department/staff role_codes — there's no
+// `managerRole`/`staffRole` field any more. Unit codes below MUST match server/db.js's seeded
+// unit codes exactly (see services/unit-code.js's lowercase_with_underscores derivation). F&B
+// now owns BOTH the fmb/waterNormal request review AND My Menu/Serving Units (the old separate
+// 'cafeteria-manager' role was retired — see docs/superpowers/specs/
+// 2026-08-13-rbac-role-unit-redesign-design.md — F&B's head-of-department does the whole job).
+export interface UnitDepartmentWorkflowConfig {
+  readonly unitCode: string;
   readonly requestKinds: readonly DepartmentRequestKind[];
   readonly optionKinds: readonly RequestOptionKind[];
   readonly assignmentRequired: boolean;
 }
 
-export const DEPARTMENT_WORKFLOWS: readonly DepartmentWorkflowConfig[] = [
-  { managerRole: UserRole.LogisticsManager, staffRole: UserRole.LogisticsStaff, requestKinds: ['logistics'], optionKinds: ['logistics'], assignmentRequired: true },
-  { managerRole: UserRole.StudentServicesManager, staffRole: UserRole.StudentServicesMember, requestKinds: ['campusTour'], optionKinds: ['campusTourStart'], assignmentRequired: true },
-  { managerRole: UserRole.Fmb, requestKinds: ['fmb', 'waterLogo', 'waterNormal'], optionKinds: ['fmb', 'servingUnit', 'dietaryInformation', 'waterLogo', 'waterNormal'], assignmentRequired: false },
-  { managerRole: UserRole.AvManager, staffRole: UserRole.AvTechnician, requestKinds: ['soundLight'], optionKinds: ['soundLight'], assignmentRequired: true },
-  { managerRole: UserRole.PhotographyManager, staffRole: UserRole.PhotographyStaff, requestKinds: ['photoVideo'], optionKinds: ['photoVideo'], assignmentRequired: true },
-  { managerRole: UserRole.TransportManager, staffRole: UserRole.TransportStaff, requestKinds: ['transportation'], optionKinds: ['transportation'], assignmentRequired: true },
-  { managerRole: UserRole.Cfo, requestKinds: ['fundingPurchase'], optionKinds: ['fundingMain', 'fundingSub'], assignmentRequired: false },
+// CFO is the one department workflow that stays flat-role-routed (not unit-scoped) — see
+// server/services/workflow.service.js's FLAT_ROLE_FOR_REQUIREMENT.
+export interface FlatDepartmentWorkflowConfig {
+  readonly roleCode: 'cfo';
+  readonly requestKinds: readonly DepartmentRequestKind[];
+  readonly optionKinds: readonly RequestOptionKind[];
+  readonly assignmentRequired: boolean;
+}
+
+export const UNIT_DEPARTMENT_WORKFLOWS: readonly UnitDepartmentWorkflowConfig[] = [
+  { unitCode: 'logistics_and_facilities', requestKinds: ['logistics'], optionKinds: ['logistics'], assignmentRequired: true },
+  { unitCode: 'student_services', requestKinds: ['campusTour'], optionKinds: ['campusTourStart', 'campusTourType'], assignmentRequired: true },
+  { unitCode: 'food_beverage_services', requestKinds: ['fmb', 'waterNormal'], optionKinds: ['fmb', 'dietaryInformation', 'servingUnit', 'waterNormal'], assignmentRequired: false },
+  { unitCode: 'a_v_services', requestKinds: ['soundLight'], optionKinds: ['soundLight'], assignmentRequired: true },
+  { unitCode: 'photography_services', requestKinds: ['photoVideo'], optionKinds: ['photoVideo'], assignmentRequired: true },
+  { unitCode: 'transport_services', requestKinds: ['transportation'], optionKinds: ['transportation'], assignmentRequired: true },
 ];
 
-export function workflowForManager(role: UserRole): DepartmentWorkflowConfig | undefined {
-  return DEPARTMENT_WORKFLOWS.find((workflow) => workflow.managerRole === role);
+export const FLAT_DEPARTMENT_WORKFLOWS: readonly FlatDepartmentWorkflowConfig[] = [
+  { roleCode: 'cfo', requestKinds: ['fundingPurchase'], optionKinds: ['fundingMain', 'fundingSub'], assignmentRequired: false },
+];
+
+// Accepts either a bare role_code string ('cfo') or a full AuthUser — every caller below
+// normalizes to whichever shape applies. `manager` here means "the workflow's owning identity"
+// (a Service department's head-of-department, or the CFO flat role), not a literal level marker.
+export type WorkflowIdentity = string | AuthUser;
+
+function isFlatRoleCode(identity: WorkflowIdentity): identity is string {
+  return typeof identity === 'string';
 }
 
-export function optionKindsForManager(role: UserRole): readonly RequestOptionKind[] {
-  return workflowForManager(role)?.optionKinds ?? [];
+export function workflowForManager(identity: WorkflowIdentity): UnitDepartmentWorkflowConfig | FlatDepartmentWorkflowConfig | undefined {
+  if (isFlatRoleCode(identity)) {
+    return FLAT_DEPARTMENT_WORKFLOWS.find((workflow) => workflow.roleCode === identity);
+  }
+  if (hasRole(identity, 'cfo')) {
+    return FLAT_DEPARTMENT_WORKFLOWS.find((workflow) => workflow.roleCode === 'cfo');
+  }
+  // Cafeteria Manager manages their OWN cafeteria's My Menu (fmb options only) — it is NOT a
+  // head-of-department/head-of-school, so it needs its own branch here rather than falling into
+  // the headedUnit lookup below. requestKinds stays empty: My Menu is option-management, not
+  // request-review (the F&B->Cafeteria-Manager food-selection approval flow is a separate,
+  // per-selection concern handled through proposal-visibility.ts, not this config).
+  const cafeteriaRole = identity.roles.find((r) => r.roleCode === 'cafeteria-manager' && r.unitCode);
+  if (cafeteriaRole) return { unitCode: cafeteriaRole.unitCode!, requestKinds: [], optionKinds: ['fmb'], assignmentRequired: false };
+  const headedUnit = identity.roles.find((r) => (r.roleCode === 'head-of-department' || r.roleCode === 'head-of-school') && r.unitCode)?.unitCode;
+  if (!headedUnit) return undefined;
+  return UNIT_DEPARTMENT_WORKFLOWS.find((workflow) => workflow.unitCode === headedUnit);
 }
 
-export function requestKindsForManager(role: UserRole): readonly DepartmentRequestKind[] {
-  return workflowForManager(role)?.requestKinds ?? [];
+export function optionKindsForManager(identity: WorkflowIdentity): readonly RequestOptionKind[] {
+  return workflowForManager(identity)?.optionKinds ?? [];
 }
 
-export function staffRoleForManager(role: UserRole): UserRole | undefined {
-  return workflowForManager(role)?.staffRole;
+export function requestKindsForManager(identity: WorkflowIdentity): readonly DepartmentRequestKind[] {
+  return workflowForManager(identity)?.requestKinds ?? [];
 }
 
-export function requestKindsForRole(role: UserRole): readonly DepartmentRequestKind[] {
-  return DEPARTMENT_WORKFLOWS.find((workflow) => workflow.managerRole === role || workflow.staffRole === role)?.requestKinds ?? [];
+// A unit's staff members share the SAME unitCode as their head — callers that need "the staff
+// role string for this manager" just need the manager's own unitCode.
+export function staffUnitCodeForManager(identity: WorkflowIdentity): string | undefined {
+  const workflow = workflowForManager(identity);
+  return workflow && 'unitCode' in workflow ? workflow.unitCode : undefined;
+}
+
+// Looks up requestKinds for either a manager OR a staff-level identity of the same unit/flat
+// role — since UnitDepartmentWorkflowConfig no longer distinguishes manager vs staff (both
+// levels share the same unitCode -> same requestKinds), this collapses to the same lookup as
+// requestKindsForManager for unit-scoped identities, plus the flat 'cfo' lookup.
+// 'cafeteria-staff' resolves via the food_beverage_services unit's requestKinds directly (its
+// real work is FmbSelection claiming, not requestKinds-scoped view, but the fallback is harmless).
+export function requestKindsForRole(identity: WorkflowIdentity): readonly DepartmentRequestKind[] {
+  if (isFlatRoleCode(identity)) {
+    if (identity === 'cafeteria-staff') return UNIT_DEPARTMENT_WORKFLOWS.find((w) => w.unitCode === 'food_beverage_services')?.requestKinds ?? [];
+    return FLAT_DEPARTMENT_WORKFLOWS.find((workflow) => workflow.roleCode === identity)?.requestKinds ?? [];
+  }
+  if (hasRole(identity, 'cfo')) return FLAT_DEPARTMENT_WORKFLOWS.find((workflow) => workflow.roleCode === 'cfo')?.requestKinds ?? [];
+  if (hasRole(identity, 'cafeteria-staff')) return UNIT_DEPARTMENT_WORKFLOWS.find((w) => w.unitCode === 'food_beverage_services')?.requestKinds ?? [];
+  // Cafeteria Manager owns the per-selection fmb approval/resubmit action for their own cafeteria
+  // (see workflow.service.js's approveFmbSelection/resubmitFmbSelection and
+  // proposal-visibility.ts's cafeteria-manager wiring) — 'fmb' here just needs to be non-empty so
+  // userIsRelatedToProposal()'s routedKinds gate doesn't exclude them; the real per-selection
+  // ownership check happens in proposal-visibility.ts, not here.
+  if (hasRole(identity, 'cafeteria-manager')) return ['fmb'];
+  const unitCode = unitCodesFor(identity)[0];
+  if (!unitCode) return [];
+  return UNIT_DEPARTMENT_WORKFLOWS.find((workflow) => workflow.unitCode === unitCode)?.requestKinds ?? [];
 }

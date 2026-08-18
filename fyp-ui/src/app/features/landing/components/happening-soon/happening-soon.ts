@@ -9,11 +9,13 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { PublishedEvent, ProposalEventSchedule } from '../../../../core/events/published-event.models';
+import { PublishedEvent, ProposalEventSchedule, RegistrationResult, isEventVisibleTo } from '../../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../../core/events/published-event.service';
+import { AuthService } from '../../../../core/auth/auth.service';
 import { EventDetailsModalComponent } from '../../../../shared/components/event-details-modal/event-details-modal';
 import { CtaLinkComponent } from '../../../../shared/components/cta-link/cta-link';
 import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 
 interface EventDate {
   readonly iso: string;
@@ -73,6 +75,8 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly publishedEventService = inject(PublishedEventService);
+  private readonly auth = inject(AuthService);
+  private readonly toast = inject(ToastService);
   private autoTimer?: ReturnType<typeof setTimeout>;
   private transitionTimers: ReturnType<typeof setTimeout>[] = [];
   private observer?: IntersectionObserver;
@@ -138,6 +142,15 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
   registrationCount(id: string): number { return this.publishedEventsById().get(id)?.confirmedRegistrationCount ?? 0; }
   openEvent(): void { this.selectedPublishedEvent.set(this.publishedEventsById().get(this.activeEvent().id) ?? null); }
   closeEvent(): void { this.selectedPublishedEvent.set(null); }
+  onModalRegistered(result: RegistrationResult): void {
+    const eventTitle = this.selectedPublishedEvent()?.eventTitle ?? 'the event';
+    this.closeEvent();
+    if (result.status === 'rejected' || result.status === 'duplicate') {
+      this.toast.error('Registration not completed', result.message);
+    } else {
+      this.toast.success(`You're registered for ${eventTitle}`, result.status === 'pending' ? 'Your registration is pending approval.' : undefined);
+    }
+  }
 
   constructor() {
     this.loadPublishedEvents();
@@ -145,7 +158,9 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
 
   private loadPublishedEvents(): void {
     this.publishedEventService.getPublishedEvents().subscribe({
-      next: (events) => {
+      next: (allEvents) => {
+        const isAuthenticated = this.auth.authenticated();
+        const events = allEvents.filter((event) => isEventVisibleTo(event.eventVisibility, isAuthenticated));
         this.publishedEventsById.set(new Map(events.map((event) => [event.id, event])));
         const upcoming = this.selectHappeningSoon(events);
         this.events.set(upcoming);

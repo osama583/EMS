@@ -13,10 +13,13 @@ const APPLICANT_USER: AuthUser = {
   email: 'applicant@demo.apu.edu.my',
   displayName: 'Demo Applicant',
   username: 'applicant',
-  role: UserRole.Applicant,
+  role: 'student' as UserRole,
   accountType: 'internal',
-  roleLabel: 'Applicant',
+  roleLabel: 'Student — School of Computing',
   department: 'School of Computing',
+  functionLevel: 'student',
+  unitId: 'school_of_computing',
+  unitKind: 'school',
 };
 
 function loginViaMock(auth: AuthService, httpMock: HttpTestingController): void {
@@ -90,7 +93,7 @@ describe('event engagement mock services', () => {
 
     expect(restored.authenticated()).toBe(true);
     expect(restored.isInternalUser()).toBe(true);
-    expect(restored.user()?.role).toBe(UserRole.Applicant);
+    expect(restored.user()?.functionLevel).toBe('student');
     expect(restored.defaultRoute()).toBe('/app/dashboard');
   });
 

@@ -202,6 +202,48 @@
   overflow-wrap: anywhere;
 }
 
+.event-details__payment {
+  display: grid;
+  gap: .6rem;
+  padding: 1rem 1.1rem 1.05rem;
+  border: 1px solid #d8e1ec;
+  border-radius: 16px;
+  background-color: #f4f7fb;
+}
+
+.event-details__payment h3 {
+  margin: 0;
+  color: var(--apu-blue-700);
+  font-size: .8rem;
+  letter-spacing: .025em;
+  text-transform: uppercase;
+}
+
+.event-details__payment dl {
+  grid-template-columns: 1fr;
+  gap: .35rem;
+}
+
+.event-details__payment dl > div {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.event-details__payment p {
+  margin: 0;
+  color: var(--apu-text-muted);
+  font-size: .88rem;
+  line-height: 1.5;
+}
+
+.event-details__payment-proof {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .9rem;
+}
+
 .event-details__summary-card:hover,
 .event-details__introduction:hover,
 .event-details dl > div:hover {

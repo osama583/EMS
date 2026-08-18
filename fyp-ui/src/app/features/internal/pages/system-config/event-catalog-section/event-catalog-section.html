@@ -1,0 +1,56 @@
+<section class="event-catalog-section">
+  <app-feedback-banner [message]="successMessage()" tone="success" />
+  <app-feedback-banner [message]="errorMessage()" tone="error" />
+
+  <nav class="event-catalog-section__tabs" aria-label="{{ entityLabelPlural() }} sections">
+    <button type="button" class="event-catalog-section__tab" [class.event-catalog-section__tab--active]="activeTab() === 'active'" (click)="setTab('active')">
+      <span class="material-symbols-rounded" aria-hidden="true">list_alt</span>
+      {{ entityLabelPlural() }}
+    </button>
+    <button type="button" class="event-catalog-section__tab" [class.event-catalog-section__tab--active]="activeTab() === 'deleted'" (click)="setTab('deleted')">
+      <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+      Deleted
+    </button>
+  </nav>
+
+  @if (activeTab() === 'active') {
+    <app-internal-data-page
+      [config]="config()" [records]="records()" [filters]="[]" [searchValue]="search()" [loading]="loading()"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+      (searchChange)="setSearch($event)" (reset)="resetSearch()"
+      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+      (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit', icon: 'edit' }, record: $event })" (primaryAction)="openAdd()"
+    />
+  } @else {
+    <app-internal-data-page
+      [config]="deletedConfig()" [records]="deletedRecords()" [filters]="[]" [searchValue]="''" [loading]="deletedLoading()"
+      [totalPages]="1" [page]="1" [pageSize]="50" [hideControls]="true"
+      (rowAction)="handleDeletedAction($event)"
+    />
+  }
+</section>
+
+<app-form-modal [open]="modalOpen()" [title]="editingId() ? 'Edit ' + entityLabel() : 'Add ' + entityLabel()" [primaryLabel]="editingId() ? 'Save Changes' : 'Add ' + entityLabel()" [loading]="saving()" [disabled]="!formValid()" (close)="closeModal()" (cancel)="closeModal()" (submit)="save()">
+  <div class="event-catalog-section__form">
+    <app-form-field controlId="catalog-name" label="Name" hint="Shown in the proposal form and public event filters." [required]="true" [value]="draft().name" [error]="nameError()" (valueChange)="setDraftName($event)" />
+
+    <app-form-field controlId="catalog-code" label="Code" [readOnly]="true" [value]="derivedCode()" hint="Automatically generated from Name. Cannot be changed." />
+
+    <label class="event-catalog-section__checkbox">
+      <input type="checkbox" [checked]="draft().active" (change)="setDraftActive($any($event.target).checked)" />
+      <span>Active <small>Inactive {{ entityLabelPlural().toLowerCase() }} are hidden from the proposal form and public filters.</small></span>
+    </label>
+  </div>
+</app-form-modal>
+
+<app-delete-confirm-dialog
+  [open]="!!deleteTarget()" [entityKind]="entityLabel()" [entityLabel]="targetLabel()"
+  [checkingDependencies]="checkingDeletion()" [preview]="deletePreview()" [deleting]="deleting()"
+  (confirm)="confirmDelete()" (cancel)="cancelDelete()"
+/>
+
+<app-delete-confirm-dialog
+  [open]="!!purgeTargetId()" [permanent]="true" [entityKind]="entityLabel()" [entityLabel]="purgeTargetLabel()"
+  [preview]="{ canDelete: true, blockingReasons: [], entityLabel: purgeTargetLabel() }" [deleting]="purging()"
+  (confirm)="confirmPurge()" (cancel)="cancelPurge()"
+/>

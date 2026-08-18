@@ -1,0 +1,96 @@
+:host {
+  position: fixed;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.app-toast-host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(23rem, calc(100vw - 2 * var(--space-4)));
+}
+
+.app-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--apu-white, #fff);
+  box-shadow: var(--shadow-card);
+  pointer-events: auto;
+  animation: app-toast-in 0.22s ease-out;
+}
+
+@keyframes app-toast-in {
+  from { opacity: 0; transform: translateY(-0.5rem) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.app-toast__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+}
+.app-toast__icon .material-symbols-rounded { font-size: 1.25rem; }
+
+.app-toast[data-tone='success'] .app-toast__icon { background: rgb(22 163 74 / 14%); color: #16a34a; }
+.app-toast[data-tone='warning'] .app-toast__icon { background: rgb(217 119 6 / 14%); color: #d97706; }
+.app-toast[data-tone='error'] .app-toast__icon { background: rgb(220 38 38 / 14%); color: #dc2626; }
+.app-toast[data-tone='info'] .app-toast__icon { background: rgb(37 99 235 / 14%); color: #2563eb; }
+
+.app-toast__body { flex: 1; min-width: 0; }
+.app-toast__title {
+  display: block;
+  color: var(--apu-navy-950, #0f2647);
+  font-size: .92rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.app-toast__message {
+  margin: .15rem 0 0;
+  color: var(--apu-text-muted, #64748b);
+  font-size: .85rem;
+  line-height: 1.45;
+}
+.app-toast__action {
+  margin-top: .3rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--apu-blue-600, #2a83ff);
+  font-size: .85rem;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.app-toast__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin: -0.15rem -0.15rem 0 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--apu-text-muted, #64748b);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.app-toast__close:hover { background: rgb(15 38 71 / 6%); color: var(--apu-navy-950, #0f2647); }
+.app-toast__close .material-symbols-rounded { font-size: 1.05rem; }
+
+@media (max-width: 30rem) {
+  :host { top: var(--space-3); right: var(--space-3); left: var(--space-3); }
+  .app-toast-host { width: 100%; }
+}

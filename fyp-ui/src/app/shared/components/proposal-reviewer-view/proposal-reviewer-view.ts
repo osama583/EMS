@@ -1,10 +1,9 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
-import { UserRole } from '../../../core/auth/auth.models';
 import { DepartmentRequestKind } from '../../../core/departments/department-workflow.config';
 import { ProposalReviewRecord } from '../../../core/proposals/proposal-review.models';
-import { ProposalStage, stageLabel } from '../../../core/proposals/proposal-status.models';
+import { ProposalStage, ReviewerCommentEntry, reviewerCommentEntry, stageLabel } from '../../../core/proposals/proposal-status.models';
 import { ProposalWorkflowService } from '../../../core/proposals/proposal-workflow.service';
 import { EditableRow } from '../form-controls/form-controls.models';
 import { FormModalComponent } from '../form-modal/form-modal';
@@ -30,29 +29,15 @@ interface TimelineStep {
   readonly done: boolean;
 }
 
-interface ReviewerComment {
-  readonly stage: string;
-  readonly reviewer: string;
-  readonly initials: string;
-  readonly text: string;
-}
-
 const REQUIREMENT_LABELS: Readonly<Record<DepartmentRequestKind, string>> = {
   logistics: 'Logistics',
   campusTour: 'Campus Tour',
-  waterLogo: 'Mineral Water (with Logo)',
-  waterNormal: 'Mineral Water (Normal)',
+  waterNormal: 'Mineral Water',
   soundLight: 'Sound & Light',
   photoVideo: 'Photography / Videography',
   transportation: 'Transportation',
   fmb: 'Food & Beverage',
   fundingPurchase: 'Funding / Purchase',
-};
-
-const ROLE_LABELS: Partial<Record<UserRole, string>> = {
-  [UserRole.HosHod]: 'HOS/HOD',
-  [UserRole.Fmb]: 'F&B',
-  [UserRole.Cfo]: 'CFO',
 };
 
 const STAGE_ORDER: readonly ProposalStage[] = [
@@ -97,7 +82,9 @@ export class ProposalReviewerViewComponent {
   private readonly configService = inject(SystemConfigService);
 
   readonly proposal = input<ProposalReviewRecord | null>(null);
-  readonly role = input.required<UserRole>();
+  // Unit + Level model: approve/reject/resubmit no longer need a `role` input at all — the
+  // acting reviewer is identified server-side by their own email (see proposal-workflow.
+  // repository.ts's reviewerEmail param), which this component already has via AuthService.
   readonly readOnly = input(false);
   readonly actionComplete = output<number>();
 
@@ -230,17 +217,11 @@ export class ProposalReviewerViewComponent {
   });
 
   /** Comments left by reviewers visible to all */
-  readonly reviewerComments = computed<readonly ReviewerComment[]>(() => {
+  readonly reviewerComments = computed<readonly ReviewerCommentEntry[]>(() => {
     const proposal = this.proposal();
-    if (!proposal?.workflow.reviewerComment) return [];
-    const roleLabel = ROLE_LABELS[proposal.workflow.rejectedBy as UserRole] ?? 'Reviewer';
-    const initials = roleLabel.split(/[\s\/&]+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
-    return [{
-      stage: stageLabel(proposal.workflow.stage),
-      reviewer: roleLabel,
-      initials,
-      text: proposal.workflow.reviewerComment,
-    }];
+    if (!proposal) return [];
+    const entry = reviewerCommentEntry(proposal.workflow);
+    return entry ? [entry] : [];
   });
 
   readonly coOwnerColumns: readonly ProposalTableColumn[] = [
@@ -325,7 +306,7 @@ export class ProposalReviewerViewComponent {
     if (!proposal) return;
     this.approving.set(true);
     this.actionMessage.set('');
-    this.workflow.approveAsReviewer(proposal.id, this.role()).pipe(
+    this.workflow.approveAsReviewer(proposal.id, this.auth.user()?.email ?? '').pipe(
       finalize(() => this.approving.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
@@ -373,7 +354,7 @@ export class ProposalReviewerViewComponent {
     const proposal = this.proposal();
     if (!proposal) return;
     this.rejecting.set(true);
-    this.workflow.rejectAsReviewer(proposal.id, this.role(), reason).pipe(
+    this.workflow.rejectAsReviewer(proposal.id, this.auth.user()?.email ?? '', reason).pipe(
       finalize(() => this.rejecting.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
@@ -386,7 +367,7 @@ export class ProposalReviewerViewComponent {
     const proposal = this.proposal();
     if (!proposal) return;
     this.resubmitting.set(true);
-    this.workflow.resubmitAsReviewer(proposal.id, this.role(), comment).pipe(
+    this.workflow.resubmitAsReviewer(proposal.id, this.auth.user()?.email ?? '', comment).pipe(
       finalize(() => this.resubmitting.set(false)),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({

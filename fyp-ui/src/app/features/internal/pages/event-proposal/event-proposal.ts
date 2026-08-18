@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, OnDestroy, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, OnDestroy, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription, finalize } from 'rxjs';
@@ -8,22 +8,25 @@ import { SearchableDropdownComponent } from '../../../../shared/components/searc
 import { MissingFieldItem, StepIndicatorComponent, StepStatus } from '../../../../shared/components/step-indicator/step-indicator';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
 import { EventImageUploadComponent } from '../../../../shared/components/event-image-upload/event-image-upload';
-import { FeedbackBannerComponent } from '../../../../shared/components/feedback-banner/feedback-banner';
 import { ProposalTableComponent, ProposalTableColumn } from '../../../../shared/components/proposal-table/proposal-table';
 import { ValidationMessageComponent } from '../../../../shared/components/validation-message/validation-message';
 import { EditableRow, EditableTableColumn, SelectOption, StaffOption, FormControlType } from '../../../../shared/components/form-controls/form-controls.models';
 import { RequestOption, RequestOptionKind } from '../../../../core/request-options/request-option.models';
 import { RequestOptionService } from '../../../../core/request-options/request-option.service';
+import { LogisticsAvailabilityService } from '../../../../core/request-options/logistics-availability.service';
+import { LogisticsAvailability } from '../../../../core/request-options/logistics-availability.models';
 import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
+import { OptionPickerGridComponent } from '../../../../shared/components/option-picker-grid/option-picker-grid';
+import { OptionPickerItem } from '../../../../shared/components/option-picker-grid/option-picker-grid.models';
 import { AuthService } from '../../../../core/auth/auth.service';
-import { UserRole } from '../../../../core/auth/auth.models';
-import { EVENT_CATEGORY_OPTIONS, EventImageAsset, EventVisibility, RegistrationMode } from '../../../../core/events/published-event.models';
+import { EventImageAsset, EventVisibility, RegistrationMode } from '../../../../core/events/published-event.models';
 import { ProposalWorkflowService } from '../../../../core/proposals/proposal-workflow.service';
 import { ProposalReviewRecord } from '../../../../core/proposals/proposal-review.models';
+import { ReviewerCommentEntry, reviewerCommentEntry } from '../../../../core/proposals/proposal-status.models';
 
-import { SystemConfigService } from '../../../../core/config/system-config.service';
+import { EventCategoryService, EventFormatService } from '../../../../core/event-catalog/event-catalog.service';
 
-type RequirementKey = 'logistics' | 'transportation' | 'photoVideo' | 'soundLight' | 'fmb' | 'campusTour' | 'waterLogo' | 'waterNormal' | 'fundingPurchase';
+type RequirementKey = 'logistics' | 'transportation' | 'photoVideo' | 'soundLight' | 'fmb' | 'campusTour' | 'waterNormal' | 'fundingPurchase';
 type RowCollection = 'coOwners' | 'schedule' | 'organizers' | 'importantPeople' | 'guests' | 'agenda' | 'discussions';
 type TableEditorCollection = Exclude<RowCollection, 'coOwners'>;
 
@@ -37,7 +40,7 @@ const options = (...labels: string[]): readonly SelectOption[] => labels.map(opt
 
 @Component({
   selector: 'app-event-proposal',
-  imports: [FormFieldComponent, SearchableDropdownComponent, ProposalTableComponent, ValidationMessageComponent, StepIndicatorComponent, FormModalComponent, EventImageUploadComponent, FeedbackBannerComponent, LoadingStateComponent],
+  imports: [FormFieldComponent, SearchableDropdownComponent, ProposalTableComponent, ValidationMessageComponent, StepIndicatorComponent, FormModalComponent, EventImageUploadComponent, LoadingStateComponent, OptionPickerGridComponent],
   templateUrl: './event-proposal.html',
   styleUrl: './event-proposal.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -50,19 +53,27 @@ export class EventProposalComponent implements OnDestroy {
   private readonly workflow = inject(ProposalWorkflowService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly optionService = inject(RequestOptionService);
+  private readonly availabilityService = inject(LogisticsAvailabilityService);
   private readonly applicant = this.auth.user();
   private readonly requestOptionCatalog = signal<readonly RequestOption[]>([]);
   readonly requestCatalogLoading = signal(true);
   private readonly requestOptionSubscription: Subscription = this.optionService.watchActiveCatalog().subscribe({ next: (options) => { this.requestOptionCatalog.set(options); this.requestCatalogLoading.set(false); }, error: () => this.requestCatalogLoading.set(false) });
   private validationGuidanceTimer: ReturnType<typeof setTimeout> | undefined;
   private requestOptionsTimer: ReturnType<typeof setTimeout> | undefined;
+  private logisticsAvailabilityTimer: ReturnType<typeof setTimeout> | undefined;
+  private logisticsAvailabilitySubscription: Subscription | undefined;
+  private logisticsAvailabilityRequestToken = 0;
+  readonly logisticsAvailability = signal<LogisticsAvailability | null>(null);
+  readonly logisticsAvailabilityLoading = signal(false);
+  readonly logisticsAvailabilityError = signal(false);
   private nextRowId = 100;
   readonly currentStep = signal(0);
   readonly status = signal<'Draft' | 'Draft saved' | 'Submitted'>('Draft');
   readonly resubmitProposalId = signal<number | null>(null);
   readonly draftRequestId = signal<number | null>(null);
   readonly savingDraft = signal(false);
-  readonly reviewerComment = signal('');
+  readonly reviewerComment = signal<ReviewerCommentEntry | null>(null);
+  readonly commentsPanelOpen = signal(true);
   readonly resubmitting = signal(false);
   readonly errors = signal<Readonly<Record<string, string>>>({});
   readonly previewOpen = signal(false);
@@ -88,30 +99,47 @@ export class EventProposalComponent implements OnDestroy {
   readonly goals = signal('');
   readonly benefits = signal('');
   readonly isPublic = signal(false);
+  // Holds catalog ids (the picker's `value`), not display names — see categoryOptions/
+  // formatOptions below, which source from the id-backed Event Categories/Formats catalog.
   readonly eventCategories = signal<readonly string[]>([]);
   readonly eventVisibility = signal<EventVisibility>('Private');
-  readonly eventFormat = signal<'On Campus' | 'Online' | 'Hybrid' | 'Off Campus'>('On Campus');
+  readonly eventFormat = signal<string>('');
   readonly eventImage = signal<EventImageAsset | null>(null);
   readonly registrationMode = signal<RegistrationMode>('Automatic');
   readonly publicity = signal('');
+  readonly cost = signal<number | null>(null);
+  readonly bankAccountName = signal('');
+  readonly bankAccountNumber = signal('');
   readonly selectedRequirements = signal<readonly string[]>([]);
   readonly requestModalOpen = signal(false);
   readonly requestModalDefinition = signal<RequestDefinition | null>(null);
   readonly requestEditingIndex = signal<number | null>(null);
   readonly requestDraft = signal<EditableRow>({});
   readonly requestOptionsLoading = signal(false);
+  // Logistics' Item / Need picker is a collapsed card by default (a large always-open image
+  // grid was pushing the rest of the form down the page) — expands in place on click, and
+  // auto-collapses again once a selection is made.
+  readonly logisticsPickerExpanded = signal(false);
   readonly tableModalOpen = signal(false);
   readonly tableEditorCollection = signal<TableEditorCollection | null>(null);
   readonly tableEditingIndex = signal<number | null>(null);
   readonly tableDraft = signal<EditableRow>({});
 
   readonly departments = options('School of Computing', 'School of Technology', 'School of Business', 'School of Marketing and Management', 'School of Media, Arts and Design', 'Student Affairs', 'Facilities Management', 'Other');
-  private readonly configService = inject(SystemConfigService);
+  private readonly eventCategoryService = inject(EventCategoryService);
+  private readonly eventFormatService = inject(EventFormatService);
+  // ACTIVE-only options — an archived category/format must not be offered on a new proposal, even
+  // though already-submitted proposals keep showing their frozen snapshot label regardless.
   readonly categoryOptions = computed<readonly SelectOption[]>(() =>
-    this.configService.eventCategories().map((label) => ({ value: label, label }))
+    this.eventCategoryService.activeEntries().map((entry) => ({ value: entry.id, label: entry.name }))
   );
-  readonly visibilityOptions: readonly SelectOption[] = (this.applicant?.role === UserRole.ClubPresident ? ['Public', 'Private', 'Club Only'] : ['Public', 'Private']).map((label) => ({ value: label, label }));
-  readonly formatOptions = options('On Campus', 'Online', 'Hybrid', 'Off Campus');
+  // Club Only visibility is gated on being the President of at least one club — a data fact
+  // (AuthUser.presidentOfClubIds, sourced from the clubs table), not a role check.
+  private readonly isClubPresident = Boolean(this.applicant?.presidentOfClubIds?.length);
+  readonly visibilityOptions: readonly SelectOption[] = (this.isClubPresident ? ['Public', 'Private', 'Club Only'] : ['Public', 'Private']).map((label) => ({ value: label, label }));
+  readonly formatOptions = computed<readonly SelectOption[]>(() =>
+    this.eventFormatService.activeEntries().map((entry) => ({ value: entry.id, label: entry.name }))
+  );
   readonly registrationModeOptions = options('Automatic', 'Approval Required');
   readonly staff: readonly StaffOption[] = [
     { value: 'Aisha Rahman', label: 'Aisha Rahman', email: 'aisha.rahman@apu.edu.my', role: 'Senior Lecturer', description: 'School of Computing' },
@@ -134,10 +162,40 @@ export class EventProposalComponent implements OnDestroy {
   readonly agenda = signal<readonly EditableRow[]>([]);
   readonly discussions = signal<readonly EditableRow[]>([]);
   readonly requestRows = signal<Readonly<Record<RequirementKey, readonly EditableRow[]>>>({
-    logistics: [], transportation: [], photoVideo: [], soundLight: [], fmb: [], campusTour: [], waterLogo: [], waterNormal: [], fundingPurchase: [],
+    logistics: [], transportation: [], photoVideo: [], soundLight: [], fmb: [], campusTour: [], waterNormal: [], fundingPurchase: [],
   });
 
+  // record.eventCategories/eventFormat carry the frozen SNAPSHOT NAMEs (proposal-projection.
+  // service.js reads request_categories.category_name / request.event_format_snapshot, not ids)
+  // — the picker's `value` is a catalog id, so these need resolving back to the catalog's CURRENT
+  // id before the picker can highlight the right option. Held here (rather than resolved once,
+  // inline in prefillFromRecord) because the catalogs load asynchronously and may still be loading
+  // when the proposal record itself arrives — the effect() below re-resolves once both are ready.
+  private readonly pendingCategoryNames = signal<readonly string[] | null>(null);
+  private readonly pendingFormatName = signal<string | null>(null);
+
   constructor() {
+    effect(() => {
+      const names = this.pendingCategoryNames();
+      if (names === null || this.eventCategoryService.loading()) return;
+      const idsByName = new Map(this.eventCategoryService.entries().map((entry) => [entry.name, entry.id]));
+      this.eventCategories.set(names.map((name) => idsByName.get(name)).filter((id): id is string => !!id));
+    });
+    effect(() => {
+      const name = this.pendingFormatName();
+      if (name === null || this.eventFormatService.loading()) return;
+      const formatEntry = this.eventFormatService.entries().find((entry) => entry.name === name);
+      this.eventFormat.set(formatEntry ? formatEntry.id : '');
+    });
+    // Brand-new proposal (nothing pending to prefill) — default to the first active format once
+    // the catalog loads, mirroring the old hardcoded 'On Campus' default's intent without assuming
+    // any specific format still exists/is active.
+    effect(() => {
+      if (this.pendingFormatName() !== null || this.eventFormat() || this.eventFormatService.loading()) return;
+      const first = this.eventFormatService.activeEntries()[0];
+      if (first) this.eventFormat.set(first.id);
+    });
+
     const proposalId = Number(this.route.snapshot.queryParamMap.get('proposalId'));
     if (Number.isFinite(proposalId) && proposalId > 0) {
       this.workflow.getById(proposalId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((record) => {
@@ -156,15 +214,20 @@ export class EventProposalComponent implements OnDestroy {
   // Loads a proposal a reviewer sent back with a comment so the applicant can see what needs to
   // change and edit in place, rather than starting a fresh submission from scratch.
   private prefillFromRecord(record: ProposalReviewRecord): void {
-    this.reviewerComment.set(record.workflow.reviewerComment ?? '');
+    const entry = reviewerCommentEntry(record.workflow);
+    this.reviewerComment.set(entry);
+    this.commentsPanelOpen.set(Boolean(entry));
     this.eventTitle.set(record.eventTitle);
     this.shortIntro.set(record.shortIntroduction);
     this.goals.set(record.goals);
     this.benefits.set(record.benefits);
     this.publicity.set(record.publicity);
-    this.eventCategories.set(record.eventCategories);
+    this.cost.set(record.costAmount ?? null);
+    this.bankAccountName.set(record.bankAccountName ?? '');
+    this.bankAccountNumber.set(record.bankAccountNumber ?? '');
+    this.pendingCategoryNames.set(record.eventCategories);
+    this.pendingFormatName.set(record.eventFormat);
     this.eventVisibility.set(record.eventVisibility);
-    this.eventFormat.set(record.eventFormat);
     this.eventImage.set(record.eventImage);
     this.registrationMode.set(record.registrationMode);
     this.coOwners.set(record.coOwners);
@@ -176,7 +239,7 @@ export class EventProposalComponent implements OnDestroy {
     this.discussions.set(record.discussions);
     this.selectedRequirements.set(record.selectedRequirements);
     this.requestRows.set({
-      logistics: [], transportation: [], photoVideo: [], soundLight: [], fmb: [], campusTour: [], waterLogo: [], waterNormal: [], fundingPurchase: [],
+      logistics: [], transportation: [], photoVideo: [], soundLight: [], fmb: [], campusTour: [], waterNormal: [], fundingPurchase: [],
       ...Object.fromEntries(
         record.selectedRequirements.map((key) => [key, record.requests.filter((request) => request.department === key).map((request) => ({ ...request }))]),
       ),
@@ -193,26 +256,39 @@ export class EventProposalComponent implements OnDestroy {
     { key: 'date', label: 'Date', type: 'date', required: true }, { key: 'start', label: 'Start Time', type: 'time', required: true }, { key: 'end', label: 'End Time', type: 'time', required: true }, { key: 'location', label: 'Location', type: 'text', required: true },
   ];
   readonly organizerColumns: readonly EditableTableColumn[] = [
-    { key: 'name', label: 'Name', type: 'staff', required: true }, { key: 'email', label: 'Email', type: 'readonly' }, { key: 'role', label: 'Role', type: 'readonly' }, { key: 'notes', label: 'Responsibility / Notes', type: 'text' },
+    { key: 'name', label: 'Name', type: 'staff', required: true }, { key: 'email', label: 'Email', type: 'readonly' }, { key: 'role', label: 'Role', type: 'readonly', span: 'full' }, { key: 'notes', label: 'Responsibility / Notes', type: 'text', span: 'full' },
   ];
   readonly importantColumns: readonly EditableTableColumn[] = [
     { key: 'name', label: 'Name', type: 'text' }, { key: 'type', label: 'Type', type: 'select', options: options('VIP', 'Speaker', 'Partner', 'Important Guest') }, { key: 'organization', label: 'Organization', type: 'text' }, { key: 'designation', label: 'Designation', type: 'text' },
   ];
   readonly guestColumns: readonly EditableTableColumn[] = [
-    { key: 'guestType', label: 'Guest Type', type: 'select', options: options('Students', 'APU Staff', 'External Guests', 'Parents / Guardians', 'Industry Partners', 'Alumni', 'Others') }, { key: 'count', label: 'Count', type: 'number', min: 0, step: 1 }, { key: 'notes', label: 'Notes', type: 'text' },
+    { key: 'guestType', label: 'Guest Type', type: 'select', options: options('Students', 'APU Staff', 'External Guests', 'Parents / Guardians', 'Industry Partners', 'Alumni', 'Others') }, { key: 'count', label: 'Count', type: 'number', min: 0, step: 1 }, { key: 'notes', label: 'Notes', type: 'text', span: 'full' },
   ];
   readonly agendaColumns: readonly EditableTableColumn[] = [
-    { key: 'time', label: 'Time', type: 'time', required: true }, { key: 'activity', label: 'Activity', type: 'text', required: true }, { key: 'location', label: 'Location', type: 'text', required: true }, { key: 'pic', label: 'PIC', type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'text' },
+    { key: 'time', label: 'Time', type: 'time', required: true }, { key: 'activity', label: 'Activity', type: 'text', required: true }, { key: 'location', label: 'Location', type: 'text', required: true }, { key: 'pic', label: 'PIC', type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'text', span: 'full' },
   ];
-  readonly discussionColumns: readonly EditableTableColumn[] = [{ key: 'topic', label: 'Discussion Topic', type: 'text', required: true }];
+  readonly discussionColumns: readonly EditableTableColumn[] = [{ key: 'topic', label: 'Discussion Topic', type: 'text', required: true, span: 'full' }];
 
   get requirements(): readonly RequestDefinition[] { this.requestOptionCatalog(); return this.buildRequirementDefinitions(); }
 
   readonly importantPeopleCount = computed(() => this.importantPeople().filter((row) => this.rowHasValue(row, ['name', 'type'])).length);
   readonly totalPax = computed(() => this.guests().reduce((sum, row) => sum + this.nonNegative(row['count']), 0) + this.importantPeopleCount());
   readonly externalPax = computed(() => this.guests().reduce((sum, row) => ['External Guests', 'Parents / Guardians', 'Industry Partners', 'Alumni', 'Others'].includes(String(row['guestType'])) ? sum + this.nonNegative(row['count']) : sum, 0));
-  readonly selectedCoOwner = computed(() => this.staff.find((person) => person.label === this.coOwnerStaff()));
+  readonly selectedCoOwner = computed(() => this.coOwnerStaffOptions().find((person) => person.label === this.coOwnerStaff()));
   readonly coOwnerFormValid = computed(() => Boolean(this.selectedCoOwner()));
+  // Excludes the applicant (self) and staff already added as a co-owner in another row —
+  // the row currently being edited is exempted so its own existing selection still appears.
+  readonly coOwnerStaffOptions = computed<readonly StaffOption[]>(() => {
+    const applicantEmail = this.email().trim().toLowerCase();
+    const editingIndex = this.editingCoOwnerIndex();
+    const takenEmails = new Set(
+      this.coOwners()
+        .filter((_, index) => index !== editingIndex)
+        .map((row) => String(row['email'] ?? '').trim().toLowerCase())
+        .filter(Boolean)
+    );
+    return this.staff.filter((person) => person.email.trim().toLowerCase() !== applicantEmail && !takenEmails.has(person.email.trim().toLowerCase()));
+  });
   readonly hasSpeaker = computed(() => this.importantPeople().some((row) => row['type'] === 'Speaker'));
   readonly agendaReasons = computed(() => {
     const reasons: string[] = [];
@@ -229,6 +305,10 @@ export class EventProposalComponent implements OnDestroy {
   readonly agendaRequired = computed(() => this.agendaReasons().length > 0);
   readonly discussionRequired = computed(() => !this.hasSpeaker() && this.totalPax() < 20 && (this.importantPeople().some((row) => Boolean(row['organization'])) || this.importantPeople().some((row) => ['VIP', 'Partner'].includes(String(row['type'])))));
   readonly totalCost = computed(() => this.requestRows().fundingPurchase.reduce((sum, row) => sum + this.nonNegative(row['quantity']) * this.nonNegative(row['unit']), 0));
+  readonly showCostFields = computed(() => this.eventVisibility() !== 'Private');
+  // Bank details are only meaningful once the event actually charges attendees — an empty or
+  // zero Cost means "free", so there's nothing to collect payment for.
+  readonly requiresPayment = computed(() => this.cost() !== null && this.cost()! > 0);
   readonly selectedDefinitions = computed(() => this.requirements.filter((item) => this.selectedRequirements().includes(item.key)));
   readonly stepHasError = computed(() => this.steps.map((_, index) => Object.keys(this.errors()).some((key) => key.startsWith(`${index}.`))));
   readonly stepStatuses = computed<readonly StepStatus[]>(() => this.steps.map((step, index) => {
@@ -282,6 +362,7 @@ export class EventProposalComponent implements OnDestroy {
         title: 'Event Requirements', icon: 'checklist', items: [
           ...(requestedServices ? [this.reviewItem('Departments / Services', requestedServices, true)] : []),
           ...(this.totalCost() > 0 ? [this.reviewItem('Total Expected Cost', this.currency(this.totalCost()))] : []),
+          ...(this.showCostFields() && this.cost() !== null ? [this.reviewItem('Event Cost', this.cost()! > 0 ? this.currency(this.cost()!) : 'Free')] : []),
           ...(agenda.length ? [this.reviewItem('Agenda', agenda.map((row) => `${row['time']} · ${row['activity']} · ${row['location']}`).join('\n'), true)] : []),
           ...(discussions.length ? [this.reviewItem('Discussion Topics', discussions.map((row) => String(row['topic'])).join(', '), true)] : []),
         ],
@@ -312,10 +393,24 @@ export class EventProposalComponent implements OnDestroy {
   setGoals(value: string): void { this.goals.set(value); this.clearFieldError('goals', Boolean(value.trim())); }
   setBenefits(value: string): void { this.benefits.set(value); this.clearFieldError('benefits', Boolean(value.trim())); }
   setEventCategories(value: string | readonly string[]): void { const values = (Array.isArray(value) ? value : [value]).slice(0, 2); this.eventCategories.set(values); this.clearFieldError('eventCategories', values.length > 0); }
-  setEventVisibility(value: string | readonly string[]): void { const next = (Array.isArray(value) ? value[0] : value) as EventVisibility; if (next === 'Club Only' && this.applicant?.role !== UserRole.ClubPresident) return; this.eventVisibility.set(next); this.isPublic.set(next === 'Public'); if (next !== 'Public') { this.publicity.set(''); this.eventCategories.set([]); this.clearFieldError('eventCategories', true); } this.clearFieldError('eventVisibility', Boolean(next)); }
-  setEventFormat(value: string | readonly string[]): void { this.eventFormat.set((Array.isArray(value) ? value[0] : value) as 'On Campus' | 'Online' | 'Hybrid' | 'Off Campus'); }
+  setEventVisibility(value: string | readonly string[]): void { const next = (Array.isArray(value) ? value[0] : value) as EventVisibility; if (next === 'Club Only' && !this.isClubPresident) return; this.eventVisibility.set(next); this.isPublic.set(next === 'Public'); if (next !== 'Public') { this.publicity.set(''); this.eventCategories.set([]); this.clearFieldError('eventCategories', true); } this.clearFieldError('eventVisibility', Boolean(next)); }
+  setEventFormat(value: string | readonly string[]): void { this.eventFormat.set(Array.isArray(value) ? value[0] : value); }
   setRegistrationMode(value: string | readonly string[]): void { this.registrationMode.set((Array.isArray(value) ? value[0] : value) as RegistrationMode); }
   setPublicity(value: string): void { this.publicity.set(value); this.clearFieldError('publicity', Boolean(value.trim())); }
+  setCost(value: string | number): void {
+    const text = String(value).trim();
+    const parsed = text === '' ? null : Number(text);
+    this.cost.set(parsed !== null && Number.isFinite(parsed) ? parsed : null);
+    this.clearFieldError('cost', text === '' || (Number.isFinite(parsed) && Number(parsed) >= 0));
+    if (!this.requiresPayment()) {
+      this.bankAccountName.set('');
+      this.bankAccountNumber.set('');
+      this.clearFieldError('bankAccountName', true);
+      this.clearFieldError('bankAccountNumber', true);
+    }
+  }
+  setBankAccountName(value: string): void { this.bankAccountName.set(value); this.clearFieldError('bankAccountName', Boolean(value.trim())); }
+  setBankAccountNumber(value: string): void { this.bankAccountNumber.set(value); this.clearFieldError('bankAccountNumber', Boolean(value.trim())); }
   setRows(collection: RowCollection, rows: readonly EditableRow[]): void {
     const normalized = this.normalizeRows(collection, rows);
     (this[collection] as unknown as { set(value: readonly EditableRow[]): void }).set(normalized);
@@ -376,6 +471,16 @@ export class EventProposalComponent implements OnDestroy {
   proposalColumns(columns: readonly EditableTableColumn[]): readonly ProposalTableColumn[] {
     return columns.map((column) => ({ key: column.key, label: column.label, width: column.width ?? '12rem' }));
   }
+  // Resolves each Logistics row's option id (stored as the OPTION ID, e.g. "logistics:3", not
+  // the image URL — see saveRequestRow()) to its imageDataUrl, added as a synthetic itemImageUrl
+  // field the read-only table's imageKey="item" input reads via `${imageKey}ImageUrl`. Keeps
+  // ProposalTableComponent dumb/presentational — it never sees the option catalog.
+  logisticsRowsWithImages(): readonly EditableRow[] {
+    return this.requestRows().logistics.map((row) => {
+      const option = this.optionService.find(this.requestOptionCatalog(), row['item']);
+      return option?.kind === 'logistics' && option.imageDataUrl ? { ...row, itemImageUrl: option.imageDataUrl } : row;
+    });
+  }
   tableRows(collection: TableEditorCollection): readonly EditableRow[] {
     return (this[collection] as unknown as () => readonly EditableRow[])();
   }
@@ -399,14 +504,52 @@ export class EventProposalComponent implements OnDestroy {
     const column = collection ? this.tableColumns(collection).find((item) => item.key === key) : undefined;
     const draft: Record<string, string | number> = { ...this.tableDraft(), [key]: column?.type === 'number' ? (value === '' ? '' : Number(value)) : value };
     if (column?.type === 'staff') {
-      const person = this.staff.find((item) => item.value === value);
+      const person = this.tableStaffOptions(column).find((item) => item.value === value);
       if (person) { draft['name'] = person.label; draft['email'] = person.email; draft['role'] = person.role; }
     }
     this.tableDraft.set(draft);
   }
+  tableFieldMin(column: EditableTableColumn): string { return column.type === 'date' && this.tableEditorCollection() === 'schedule' ? this.todayIso() : String(column.min ?? ''); }
+  // Staff options for a `staff`-type table column, excluding anyone already picked in another row
+  // of the same collection (e.g. Organizer / PIC) — the row currently being edited is exempted so
+  // its own existing selection still appears. Mirrors coOwnerStaffOptions' dedupe logic.
+  tableStaffOptions(column: EditableTableColumn): readonly StaffOption[] {
+    const collection = this.tableEditorCollection();
+    if (!collection || column.type !== 'staff') return this.staff;
+    const editingIndex = this.tableEditingIndex();
+    const takenEmails = new Set(
+      this.tableRows(collection)
+        .filter((_, index) => index !== editingIndex)
+        .map((row) => String(row['email'] ?? '').trim().toLowerCase())
+        .filter(Boolean)
+    );
+    return this.staff.filter((person) => !takenEmails.has(person.email.trim().toLowerCase()));
+  }
+  tableFieldError(column: EditableTableColumn): string {
+    const collection = this.tableEditorCollection();
+    const raw = this.tableDraft()[column.key];
+    if (raw === '' || raw === undefined || raw === null) return '';
+    if (collection === 'schedule') {
+      if (column.key === 'date' && this.isPastDate(String(raw))) return 'Date cannot be in the past.';
+      if (column.key === 'end' && !this.isTimeAfter(String(this.tableDraft()['start'] ?? ''), String(raw))) return 'End Time must be after Start Time.';
+      if (column.key === 'location' && String(raw).trim().length < 2) return 'Location must be at least 2 characters.';
+    }
+    return '';
+  }
+  // Non-blocking hint (not a tableFieldError) — a long session is allowed, just flagged since
+  // it also drives the Brief Agenda requirement on step 4 (see agendaReasons()).
+  tableLongSessionWarning(): string {
+    if (this.tableEditorCollection() !== 'schedule') return '';
+    const draft = this.tableDraft();
+    return this.durationMinutes(String(draft['start'] ?? ''), String(draft['end'] ?? '')) > 120
+      ? 'This session is longer than two hours — a Brief Agenda will be required on step 4.'
+      : '';
+  }
   tableFormValid(): boolean {
     const collection = this.tableEditorCollection();
-    return !!collection && this.tableColumns(collection).filter((column) => column.required).every((column) => String(this.tableDraft()[column.key] ?? '').trim() !== '');
+    return !!collection
+      && this.tableColumns(collection).filter((column) => column.required).every((column) => String(this.tableDraft()[column.key] ?? '').trim() !== '')
+      && this.tableColumns(collection).every((column) => !this.tableFieldError(column));
   }
   saveTableRow(): void {
     const collection = this.tableEditorCollection();
@@ -427,16 +570,20 @@ export class EventProposalComponent implements OnDestroy {
     this.requestEditingIndex.set(null);
     this.requestDraft.set(this.requestScheduleDefaults(definition.key));
     this.requestModalOpen.set(true);
+    this.logisticsPickerExpanded.set(false);
+    if (definition.key === 'logistics') this.scheduleLogisticsAvailabilityCheck();
   }
   editRequestRow(definition: RequestDefinition, index: number): void {
     const row = this.requestRows()[definition.key][index];
     this.requestModalDefinition.set(definition); this.requestEditingIndex.set(index); this.requestDraft.set({ ...row }); this.requestModalOpen.set(true);
+    this.logisticsPickerExpanded.set(false);
     definition.columns.forEach((column) => {
       const kind = this.optionKindForField(definition.key, column.key);
       const value = String(row[column.key] ?? '');
       if (!kind || !value || this.optionService.find(this.requestOptionCatalog(), value)) return;
       this.requestOptionSubscription.add(this.optionService.getById(value).subscribe({ next: (option) => this.requestOptionCatalog.update((options) => options.some((item) => item.id === option.id) ? options : [...options, option]), error: () => undefined }));
     });
+    if (definition.key === 'logistics') this.scheduleLogisticsAvailabilityCheck();
   }
   closeRequestModal(): void {
     this.requestOptionsLoading.set(false);
@@ -444,6 +591,18 @@ export class EventProposalComponent implements OnDestroy {
     this.requestModalDefinition.set(null);
     this.requestEditingIndex.set(null);
     this.requestDraft.set({});
+    this.logisticsPickerExpanded.set(false);
+    this.resetLogisticsAvailability();
+  }
+  toggleLogisticsPicker(): void { this.logisticsPickerExpanded.update((value) => !value); }
+  selectLogisticsItem(value: string): void {
+    this.setRequestDraftValue('item', value);
+    this.logisticsPickerExpanded.set(false);
+  }
+  logisticsSelectedOption(): OptionPickerItem | null {
+    const value = String(this.requestDraft()['item'] ?? '');
+    if (!value) return null;
+    return this.logisticsPickerOptions().find((option) => option.id === value) ?? null;
   }
   requestModalTitle(): string { const definition = this.requestModalDefinition(); return definition ? `Add ${definition.label} request` : 'Add request'; }
   requestDraftValue(key: string): string | number { return this.requestDraft()[key] ?? ''; }
@@ -462,6 +621,7 @@ export class EventProposalComponent implements OnDestroy {
       this.requestOptionsTimer = setTimeout(() => this.requestOptionsLoading.set(false), 160);
     }
     this.requestDraft.set(draft);
+    if (definition?.key === 'logistics' && ['date', 'start', 'end', 'item', 'quantity'].includes(key)) this.scheduleLogisticsAvailabilityCheck();
   }
   requestFieldType(column: EditableTableColumn): FormControlType { return column.type === 'select' || column.type === 'staff' || column.type === 'readonly' ? 'text' : column.type; }
   requestFieldOptions(column: EditableTableColumn): readonly SelectOption[] {
@@ -484,6 +644,11 @@ export class EventProposalComponent implements OnDestroy {
       || (column.key === 'subItem' && definition?.key === 'fundingPurchase' && this.requestOptionsLoading());
   }
   requestFieldPlaceholder(column: EditableTableColumn): string { return this.requestFieldDisabled(column) ? 'Select a main item first' : 'Select an option'; }
+  requestFieldMin(column: EditableTableColumn): string {
+    if (column.type !== 'date') return String(column.min ?? '');
+    const window = this.scheduleDateWindow();
+    return window ? window.min : this.todayIso();
+  }
   requestFieldError(column: EditableTableColumn): string {
     const definition = this.requestModalDefinition();
     const raw = this.requestDraft()[column.key];
@@ -493,13 +658,20 @@ export class EventProposalComponent implements OnDestroy {
       if (!Number.isInteger(value) || value <= 0) return 'Requested Pax must be a positive whole number.';
       if (this.totalPax() > 0 && value > this.totalPax()) return `Requested Pax cannot exceed Total Expected Pax (${this.totalPax()}).`;
     }
-    if (definition?.key === 'photoVideo' && column.key === 'personnelQuantity' && (!Number.isInteger(value) || value <= 0)) {
-      return 'Number of Personnel Required must be a positive whole number.';
-    }
     if (definition?.key === 'fundingPurchase' && column.key === 'subItem') {
       const mainItem = this.optionService.find(this.requestOptionCatalog(), this.requestDraft()['mainItem']);
       if (!this.requestFieldOptions(column).some((item) => item.value === String(raw))) return `Sub-item must belong to ${mainItem?.label || 'the selected main item'}.`;
     }
+    if (column.type === 'date' && this.isPastDate(String(raw))) return 'Date cannot be in the past.';
+    if (column.type === 'date') {
+      const window = this.scheduleDateWindow();
+      if (window && (String(raw) < window.min || String(raw) > window.max)) {
+        return `Date must be between ${window.min} and ${window.max} (up to 2 days before the event for preparation).`;
+      }
+    }
+    if (column.key === 'end' && !this.isTimeAfter(String(this.requestDraft()['start'] ?? ''), String(raw))) return 'End Time must be after Start Time.';
+    if (column.type === 'number' && (!Number.isFinite(value) || value <= 0)) return `${column.label} must be greater than 0.`;
+    if (column.type === 'text' && !column.readOnly && String(raw).trim() === '') return `${column.label} cannot be blank.`;
     return '';
   }
   logisticsAvailableQuantity(): number | null {
@@ -513,6 +685,65 @@ export class EventProposalComponent implements OnDestroy {
     return option?.kind === 'logistics' ? option.quantityUnit : '';
   }
   logisticsExceedsAvailability(): boolean { const available = this.logisticsAvailableQuantity(); return available !== null && this.logisticsRequestedQuantity() > available; }
+  // Dynamic, window-aware remaining quantity from the availability endpoint — falls back to the
+  // static availableQuantity total (and thus to logisticsExceedsAvailability()'s behavior) when
+  // the check hasn't completed yet or the network call failed, so the form never blocks on it.
+  logisticsRemainingQuantity(): number | null {
+    const availability = this.logisticsAvailability();
+    return availability ? availability.remainingQuantity : null;
+  }
+  logisticsExceedsRemaining(): boolean {
+    const remaining = this.logisticsRemainingQuantity();
+    if (remaining === null) return this.logisticsExceedsAvailability();
+    return this.logisticsRequestedQuantity() > remaining;
+  }
+  logisticsNextAvailableMessage(): string {
+    const availability = this.logisticsAvailability();
+    if (!availability || !this.logisticsExceedsRemaining()) return '';
+    const unit = this.logisticsQuantityUnit();
+    const unitSuffix = this.logisticsRequestedQuantity() === 1 ? '' : 's';
+    if (availability.nextAvailableAt) {
+      return `Only ${availability.remainingQuantity} ${unit}${availability.remainingQuantity === 1 ? '' : 's'} available for this window. ${this.logisticsRequestedQuantity()} ${unit}${unitSuffix} will be available from ${availability.nextAvailableAt} onward.`;
+    }
+    return `Only ${availability.remainingQuantity} ${unit}${availability.remainingQuantity === 1 ? '' : 's'} available for this window — not enough frees up for ${this.logisticsRequestedQuantity()} ${unit}${unitSuffix} on this date.`;
+  }
+  private logisticsPickerContext(option: RequestOption): string {
+    return option.kind === 'logistics' ? `${option.availableQuantity} ${option.quantityUnit}${option.availableQuantity === 1 ? '' : 's'} available` : '';
+  }
+  logisticsPickerOptions(): readonly OptionPickerItem[] {
+    return this.requestOptionCatalog()
+      .filter((option): option is Extract<RequestOption, { kind: 'logistics' }> => option.kind === 'logistics' && option.active)
+      .map((option) => ({ id: option.id, label: option.label, description: option.description, imageDataUrl: option.imageDataUrl, imageFileName: option.imageFileName, contextText: this.logisticsPickerContext(option) }));
+  }
+  private resetLogisticsAvailability(): void {
+    if (this.logisticsAvailabilityTimer) clearTimeout(this.logisticsAvailabilityTimer);
+    this.logisticsAvailabilitySubscription?.unsubscribe();
+    this.logisticsAvailability.set(null);
+    this.logisticsAvailabilityLoading.set(false);
+    this.logisticsAvailabilityError.set(false);
+  }
+  private scheduleLogisticsAvailabilityCheck(): void {
+    if (this.logisticsAvailabilityTimer) clearTimeout(this.logisticsAvailabilityTimer);
+    this.logisticsAvailabilityTimer = setTimeout(() => this.runLogisticsAvailabilityCheck(), 350);
+  }
+  private runLogisticsAvailabilityCheck(): void {
+    const draft = this.requestDraft();
+    const date = String(draft['date'] ?? '');
+    const start = String(draft['start'] ?? '');
+    const end = String(draft['end'] ?? '');
+    const option = this.optionService.find(this.requestOptionCatalog(), draft['item']);
+    if (!date || !start || !end || option?.kind !== 'logistics') { this.logisticsAvailability.set(null); return; }
+    const numericId = option.id.split(':')[1];
+    const quantity = this.logisticsRequestedQuantity();
+    const token = ++this.logisticsAvailabilityRequestToken;
+    this.logisticsAvailabilitySubscription?.unsubscribe();
+    this.logisticsAvailabilityLoading.set(true);
+    this.logisticsAvailabilityError.set(false);
+    this.logisticsAvailabilitySubscription = this.availabilityService.check(numericId, date, start, end, quantity || undefined).subscribe({
+      next: (result) => { if (token !== this.logisticsAvailabilityRequestToken) return; this.logisticsAvailability.set(result); this.logisticsAvailabilityLoading.set(false); },
+      error: () => { if (token !== this.logisticsAvailabilityRequestToken) return; this.logisticsAvailability.set(null); this.logisticsAvailabilityLoading.set(false); this.logisticsAvailabilityError.set(true); },
+    });
+  }
   transportationCapacity(): number | null {
     if (this.requestModalDefinition()?.key !== 'transportation') return null;
     const option = this.optionService.find(this.requestOptionCatalog(), this.requestDraft()['type']);
@@ -525,12 +756,13 @@ export class EventProposalComponent implements OnDestroy {
     const option = kind ? this.optionService.find(this.requestOptionCatalog(), this.requestDraft()[column.key]) : undefined;
     if (!option || option.kind === 'logistics' || option.kind === 'transportation' || option.kind === 'fundingMain' || option.kind === 'fundingSub') return '';
     switch (option.kind) {
-      case 'photoVideo': return [option.maximumPersonnel ? `Maximum personnel available: ${option.maximumPersonnel}` : '', option.description].filter(Boolean).join(' · ');
-      case 'soundLight': return [option.availableQuantity !== undefined ? `${option.availableQuantity} available` : '', option.setupRequirements ?? option.description].filter(Boolean).join(' · ');
-      case 'fmb': return [option.servingUnitId ? `Serving unit: ${this.requestOptionLabel(option.servingUnitId)}` : '', option.dietaryInformationId ? `Dietary information: ${this.requestOptionLabel(option.dietaryInformationId)}` : '', option.orderingNotes].filter(Boolean).join(' · ');
+      case 'photoVideo': return option.description ?? '';
+      case 'soundLight': return option.setupRequirements ?? option.description ?? '';
+      case 'fmb': return option.orderingNotes ?? '';
       case 'dietaryInformation': case 'servingUnit': return option.description ?? '';
       case 'campusTourStart': return [option.maximumGroupSize ? `Maximum group size: ${option.maximumGroupSize}` : '', option.meetingInstructions].filter(Boolean).join(' · ');
-      case 'waterLogo': case 'waterNormal': return [`${option.bottleCount || 'Custom'} bottles`, `${option.availableStock} in stock`, option.brandingRequirement, option.orderingInstructions].filter(Boolean).join(' · ');
+      case 'campusTourType': return option.description ?? '';
+      case 'waterNormal': return [`${option.bottleCount || 'Custom'} bottles`, `${option.availableStock} in stock`, option.brandingRequirement, option.orderingInstructions].filter(Boolean).join(' · ');
     }
   }
   requestFormValid(): boolean {
@@ -600,6 +832,23 @@ export class EventProposalComponent implements OnDestroy {
       error: () => this.showToast('The draft could not be saved. Please try again.'),
     });
   }
+
+  toggleCommentsPanel(): void { this.commentsPanelOpen.update((open) => !open); }
+
+  // "Save" for a proposal a reviewer sent back — persists every edited field without submitting
+  // it back into the workflow: the proposal stays in the applicant's Inbox at
+  // resumption_required, and the reviewer's comment is left in place so it's still visible next
+  // time this form is opened. Distinct from saveDraft(), which targets brand-new/'Draft' status
+  // proposals and would fail server-side on a resubmission_required one.
+  saveEdits(): void {
+    const proposalId = this.resubmitProposalId();
+    if (proposalId === null) return;
+    this.savingDraft.set(true);
+    this.workflow.saveEdits(proposalId, this.buildSubmissionPayload()).pipe(finalize(() => this.savingDraft.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => this.showToast('Changes saved. This proposal stays in your Inbox until you resubmit it.'),
+      error: () => this.showToast('Your changes could not be saved. Please try again.'),
+    });
+  }
   openPreview(): void { this.previewOpen.set(true); }
   closePreview(): void { this.previewOpen.set(false); }
   closeValidationModal(): void {
@@ -626,6 +875,9 @@ export class EventProposalComponent implements OnDestroy {
       eventFormat: this.eventFormat(),
       registrationMode: this.registrationMode(),
       publicity: this.publicity(),
+      costAmount: this.cost(),
+      bankAccountName: this.bankAccountName().trim() || null,
+      bankAccountNumber: this.bankAccountNumber().trim() || null,
       eventImage: this.eventImage(),
       eventCategories: this.eventCategories(),
       selectedRequirements: this.selectedRequirements(),
@@ -655,17 +907,11 @@ export class EventProposalComponent implements OnDestroy {
     const proposalId = this.resubmitProposalId();
     if (proposalId !== null) {
       this.resubmitting.set(true);
-      this.workflow.resubmitFromApplicant(proposalId, {
-        eventTitle: this.eventTitle(),
-        shortIntroduction: this.shortIntro(),
-        goals: this.goals(),
-        benefits: this.benefits(),
-        totalPax: this.totalPax(),
-      }).pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      this.workflow.resubmitFromApplicant(proposalId, this.buildSubmissionPayload()).pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
         next: () => {
-          this.status.set('Submitted'); this.previewOpen.set(false); this.reviewerComment.set('');
+          this.status.set('Submitted'); this.previewOpen.set(false); this.reviewerComment.set(null);
           this.showToast('Proposal resubmitted — it resumes at the stage that sent it back.');
-          void this.router.navigateByUrl('/app/proposals/pending');
+          void this.router.navigateByUrl('/app/ongoing/proposals');
         },
         error: () => this.showToast('The proposal could not be resubmitted. Please try again.'),
       });
@@ -677,7 +923,7 @@ export class EventProposalComponent implements OnDestroy {
       next: () => {
         this.status.set('Submitted'); this.previewOpen.set(false);
         this.showToast('Proposal submitted successfully.');
-        void this.router.navigateByUrl('/app/proposals/pending');
+        void this.router.navigateByUrl('/app/ongoing/proposals');
       },
       error: () => this.showToast('The proposal could not be submitted. Please try again.'),
     });
@@ -715,6 +961,11 @@ export class EventProposalComponent implements OnDestroy {
       if (!this.goals().trim()) add('goals', 'Goals & Objectives is required.');
       if (!this.benefits().trim()) add('benefits', 'Expected Benefits is required.');
       if (this.isPublic() && !this.publicity().trim()) add('publicity', 'Promotion / Publicity Method is required.');
+      if (this.cost() !== null && this.cost()! < 0) add('cost', 'Cost must be zero or greater.');
+      if (this.requiresPayment()) {
+        if (!this.bankAccountName().trim()) add('bankAccountName', 'Bank Account Name is required.');
+        if (!this.bankAccountNumber().trim()) add('bankAccountNumber', 'Bank Account Number is required.');
+      }
       if (this.agendaRequired()) this.validateRows(next, step, 'agenda', this.agenda(), ['time', 'activity', 'location', 'pic']);
       if (this.discussionRequired()) this.validateRows(next, step, 'discussions', this.discussions(), ['topic']);
     }
@@ -735,9 +986,17 @@ export class EventProposalComponent implements OnDestroy {
       if (!Number.isInteger(value) || value <= 0) errors[`${step}.request.${key}.${index}.requestedPax`] = 'Requested Pax must be a positive whole number.';
       else if (this.totalPax() > 0 && value > this.totalPax()) errors[`${step}.request.${key}.${index}.requestedPax`] = `Requested Pax cannot exceed Total Expected Pax (${this.totalPax()}).`;
     });
-    if (key === 'photoVideo') rows.forEach((row, index) => {
-      const value = Number(row['personnelQuantity']);
-      if (!Number.isInteger(value) || value <= 0) errors[`${step}.request.${key}.${index}.personnelQuantity`] = 'Number of Personnel Required must be a positive whole number.';
+    // Final-submit safety net against the option's static total, since the dynamic
+    // window-aware remaining figure (logisticsRemainingQuantity()) only exists live for
+    // whichever row is currently open in the modal — requestFieldError() blocks that case
+    // before a row can even be added/saved. This catches the simpler "impossible regardless of
+    // timing" case for rows already in the table.
+    if (key === 'logistics') rows.forEach((row, index) => {
+      const option = this.optionService.find(this.requestOptionCatalog(), row['item']);
+      const quantity = Number(row['quantity']);
+      if (option?.kind === 'logistics' && quantity > option.availableQuantity) {
+        errors[`${step}.request.${key}.${index}.quantity`] = `Requested quantity exceeds the ${option.availableQuantity} ${option.quantityUnit}${option.availableQuantity === 1 ? '' : 's'} available in total.`;
+      }
     });
     if (key === 'fundingPurchase') rows.forEach((row, index) => {
       const option = this.optionService.find(this.requestOptionCatalog(), row['subItem']);
@@ -801,6 +1060,20 @@ export class EventProposalComponent implements OnDestroy {
   private rowHasAnyValue(row: EditableRow): boolean { return Object.entries(row).some(([key, value]) => key !== 'id' && String(value ?? '').trim() !== '' && value !== 0); }
   private completedRows(rows: readonly EditableRow[], keys: readonly string[]): readonly EditableRow[] { return rows.filter((row) => keys.every((key) => String(row[key] ?? '').trim())); }
   private durationMinutes(start: string, end: string): number { if (!start || !end) return 0; const toMinutes = (time: string) => { const [hour, minute] = time.split(':').map(Number); return hour * 60 + minute; }; let result = toMinutes(end) - toMinutes(start); if (result < 0) result += 1440; return result; }
+  private todayIso(): string { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; }
+  private isPastDate(date: string): boolean { return !!date && date < this.todayIso(); }
+  private isTimeAfter(start: string, end: string): boolean { return !start || !end || end > start; }
+  // Earliest/latest dates across the Event Schedule rows — request items (logistics, food,
+  // transportation, etc.) are allowed from up to 2 days before the first session, for setup/prep,
+  // through the last session's date.
+  private scheduleDateWindow(): { min: string; max: string } | null {
+    const dates = this.completedRows(this.schedule(), ['date']).map((row) => String(row['date'])).sort();
+    if (!dates.length) return null;
+    const earliest = new Date(dates[0]);
+    earliest.setDate(earliest.getDate() - 2);
+    const min = `${earliest.getFullYear()}-${String(earliest.getMonth() + 1).padStart(2, '0')}-${String(earliest.getDate()).padStart(2, '0')}`;
+    return { min, max: dates[dates.length - 1] };
+  }
   private currency(value: number): string { return new Intl.NumberFormat('en-MY', { style: 'currency', currency: 'MYR' }).format(value); }
   private focusFirstInvalid(): void { (this.document.querySelector('[aria-invalid="true"], .is-invalid, .shared-editable-table--invalid button') as HTMLElement | null)?.focus(); }
   private navigateToTableError(field: MissingFieldItem): void {
@@ -843,10 +1116,12 @@ export class EventProposalComponent implements OnDestroy {
   ngOnDestroy(): void {
     if (this.validationGuidanceTimer) clearTimeout(this.validationGuidanceTimer);
     if (this.requestOptionsTimer) clearTimeout(this.requestOptionsTimer);
+    if (this.logisticsAvailabilityTimer) clearTimeout(this.logisticsAvailabilityTimer);
+    this.logisticsAvailabilitySubscription?.unsubscribe();
     this.requestOptionSubscription.unsubscribe();
   }
   private missingField(key: string, fallback: string): MissingFieldItem {
-    const labels: Record<string, string> = { applicantName: 'Applicant Name', department: 'School / Department', email: 'Email', coOwners: 'Co-requesters', eventTitle: 'Event Title', schedule: 'Event Schedule', organizers: 'Organizer / PIC', requirements: 'Required for Event', shortIntro: 'Short Introduction', goals: 'Goals & Objectives', benefits: 'Expected Benefits', publicity: 'Promotion / Publicity Method', agenda: 'Brief Agenda', discussions: 'Discussion Topics' };
+    const labels: Record<string, string> = { applicantName: 'Applicant Name', department: 'School / Department', email: 'Email', coOwners: 'Co-requesters', eventTitle: 'Event Title', schedule: 'Event Schedule', organizers: 'Organizer / PIC', requirements: 'Required for Event', shortIntro: 'Short Introduction', goals: 'Goals & Objectives', benefits: 'Expected Benefits', publicity: 'Promotion / Publicity Method', agenda: 'Brief Agenda', discussions: 'Discussion Topics', bankAccountName: 'Bank Account Name', bankAccountNumber: 'Bank Account Number' };
     const parts = key.split('.');
     const root = parts[0];
     const requestDefinition = root === 'request' ? this.requirements.find((item) => item.key === parts[1]) : undefined;
@@ -857,7 +1132,7 @@ export class EventProposalComponent implements OnDestroy {
     const tableColumns: Record<string, readonly EditableTableColumn[]> = { coOwners: this.coOwnerColumns, schedule: this.scheduleColumns, organizers: this.organizerColumns, guests: this.guestColumns, agenda: this.agendaColumns, discussions: this.discussionColumns };
     const column = (requestDefinition?.columns ?? tableColumns[root] ?? []).find((item) => item.key === columnKey);
     const tableLabel = labels[root] ?? requestDefinition?.label ?? fallback;
-    const directTargetMap: Record<string, string> = { applicantName: 'applicant-name', department: 'department', email: 'applicant-email', eventTitle: 'event-title', requirements: 'requirements-selection', shortIntro: 'short-intro', goals: 'goals', benefits: 'benefits', publicity: 'publicity' };
+    const directTargetMap: Record<string, string> = { applicantName: 'applicant-name', department: 'department', email: 'applicant-email', eventTitle: 'event-title', requirements: 'requirements-selection', shortIntro: 'short-intro', goals: 'goals', benefits: 'benefits', publicity: 'publicity', bankAccountName: 'event-bank-account-name', bankAccountNumber: 'event-bank-account-number' };
     const isTable = root === 'request' || root === 'coOwners' || root in tableColumns;
     const parsedRowIndex = rowIndex !== undefined && /^\d+$/.test(rowIndex) ? Number(rowIndex) : undefined;
     return {
@@ -870,22 +1145,70 @@ export class EventProposalComponent implements OnDestroy {
     return fields.filter((field, index) => fields.findIndex((candidate) => candidate.label === field.label && candidate.target === field.target && candidate.table?.rowIndex === field.table?.rowIndex && candidate.table?.fieldKey === field.table?.fieldKey) === index);
   }
 
+  // A 'half' column only looks right when it has another 'half' beside it in the 2-column
+  // request-editor grid — a 'half' that lands alone on its row (an odd-length run, or a 'full'
+  // column resets pairing) would otherwise leave dead space next to it, so promote it to 'full'.
+  // A single left-to-right scan: consecutive 'half' columns pair up two at a time; any 'full'
+  // column resets pairing for the run that follows it.
+  private fillDanglingHalves(columns: readonly EditableTableColumn[]): readonly EditableTableColumn[] {
+    const result: EditableTableColumn[] = [];
+    let pending: EditableTableColumn | null = null;
+    for (const column of columns) {
+      if (column.span !== 'half') {
+        if (pending) { result.push({ ...pending, span: 'full' }); pending = null; }
+        result.push(column);
+        continue;
+      }
+      if (pending) { result.push(pending, column); pending = null; } else { pending = column; }
+    }
+    if (pending) result.push({ ...pending, span: 'full' });
+    return result;
+  }
   private buildRequirementDefinitions(): readonly RequestDefinition[] {
-    const date = { key: 'date', label: 'Date', type: 'date', required: true } as const;
-    const start = { key: 'start', label: 'Start Time', type: 'time', required: true } as const;
-    const end = { key: 'end', label: 'End Time', type: 'time', required: true } as const;
-    const location = { key: 'location', label: 'Location', type: 'text', required: true } as const;
-    const notes = { key: 'notes', label: 'Notes', type: 'text' } as const;
-    return [
-      { key: 'logistics', label: 'Logistics', columns: [{ key: 'item', label: 'Item / Need', type: 'select', required: true, options: this.activeSelectOptions('logistics') }, { key: 'quantity', label: 'Requested Quantity', type: 'number', min: 0, step: 1, required: true }, date, start, end, location, notes] },
-      { key: 'transportation', label: 'Transportation', columns: [{ key: 'type', label: 'Transportation Type', type: 'select', required: true, options: this.activeSelectOptions('transportation') }, { key: 'requestedPax', label: 'Requested Pax', type: 'number', min: 1, step: 1, required: true }, { key: 'pickup', label: 'Pickup', type: 'text', required: true }, { key: 'dropoff', label: 'Drop-off', type: 'text', required: true }, date, start, end, location, notes] },
-      { key: 'photoVideo', label: 'Photographer / Videographer', columns: [{ key: 'service', label: 'Service', type: 'select', required: true, options: this.activeSelectOptions('photoVideo') }, { key: 'personnelQuantity', label: 'Number of Personnel Required', type: 'number', min: 1, step: 1, required: true }, date, start, end, location, { key: 'coverage', label: 'Coverage', type: 'text', required: true }, notes] },
-      { key: 'soundLight', label: 'Sound & Light', columns: [{ key: 'item', label: 'Item / Service', type: 'select', required: true, options: this.activeSelectOptions('soundLight') }, date, start, end, location, notes] },
-      { key: 'fmb', label: 'F&B', columns: [{ key: 'foodType', label: 'Food Type', type: 'select', required: true, options: this.activeSelectOptions('fmb') }, { key: 'quantity', label: 'Pax / Quantity', type: 'number', min: 0, required: true }, date, start, end, location, notes] },
-      { key: 'campusTour', label: 'Campus Tour', columns: [date, start, end, location, { key: 'pax', label: 'Pax', type: 'number', min: 0, required: true }, { key: 'startPoint', label: 'Starting Point', type: 'select', required: true, options: this.activeSelectOptions('campusTourStart') }, notes] },
-      ...(['waterLogo', 'waterNormal'] as const).map((key) => ({ key, label: key === 'waterLogo' ? 'Mineral Water with Logo' : 'Mineral Water Normal', columns: [{ key: 'quantity', label: 'Quantity', type: 'select' as const, required: true, options: this.activeSelectOptions(key) }, date, start, end, location, notes] })),
-      { key: 'fundingPurchase', label: 'Funding / Purchase Requirement', columns: [{ key: 'mainItem', label: 'Main Item', type: 'select', required: true, options: this.activeSelectOptions('fundingMain') }, { key: 'subItem', label: 'Sub-item', type: 'select', required: true, parentKey: 'mainItem' }, { key: 'quantity', label: 'Quantity', type: 'number', min: 0, required: true }, { key: 'unit', label: 'Unit RM', type: 'number', min: 0, step: 0.01, required: true }, notes] },
+    const date = { key: 'date', label: 'Date', type: 'date', required: true, span: 'half' } as const;
+    const start = { key: 'start', label: 'Start Time', type: 'time', required: true, span: 'half' } as const;
+    const end = { key: 'end', label: 'End Time', type: 'time', required: true, span: 'half' } as const;
+    const location = { key: 'location', label: 'Location', type: 'text', required: true, span: 'full' } as const;
+    const notes = { key: 'notes', label: 'Notes', type: 'text', span: 'full' } as const;
+    const definitions: readonly RequestDefinition[] = [
+      // Required scheduling/quantity fields first (paired 2-up), then the Item / Need picker
+      // as its own full-width card (rendered specially, see event-proposal.html), then Notes.
+      {
+        key: 'logistics', label: 'Logistics', columns: [
+          { ...date }, { ...start },
+          { ...end }, { key: 'quantity', label: 'Requested Quantity', type: 'number', min: 0, step: 1, required: true, span: 'half' },
+          { ...location },
+          { key: 'item', label: 'Item / Need', type: 'select', required: true, options: this.activeSelectOptions('logistics'), span: 'full' },
+          { ...notes },
+        ],
+      },
+      // Type first (what), then Requested Pax (how many), then Date/Moving Time (when) paired,
+      // then Pickup/Drop-off (where) paired, then Notes.
+      {
+        key: 'transportation', label: 'Transportation', columns: [
+          { key: 'type', label: 'Transportation Type', type: 'select', required: true, options: this.activeSelectOptions('transportation'), span: 'full' },
+          { key: 'requestedPax', label: 'Requested Pax', type: 'number', min: 1, step: 1, required: true, span: 'full' },
+          { ...date }, { key: 'start', label: 'Moving Time', type: 'time', required: true, span: 'half' },
+          { key: 'pickup', label: 'Pickup Point', type: 'text', required: true, span: 'half' }, { key: 'dropoff', label: 'Drop-off Point', type: 'text', required: true, span: 'half' },
+          { ...notes },
+        ],
+      },
+      { key: 'photoVideo', label: 'Photographer / Videographer', columns: [{ key: 'service', label: 'Service', type: 'select', required: true, options: this.activeSelectOptions('photoVideo'), span: 'full' }, { ...date }, { ...start }, { ...end }, { ...location, span: 'half' }, { ...notes }] },
+      { key: 'soundLight', label: 'Sound & Light', columns: [{ key: 'item', label: 'Item / Service', type: 'select', required: true, options: this.activeSelectOptions('soundLight'), span: 'full' }, { ...date }, { ...start }, { ...end }, { ...location, span: 'half' }, { ...notes }] },
+      { key: 'fmb', label: 'Food Request', columns: [{ key: 'foodType', label: 'Food Type', type: 'select', required: true, options: this.activeSelectOptions('fmb'), span: 'full' }, { key: 'quantity', label: 'Pax / Quantity', type: 'number', min: 0, required: true, span: 'half' }, { ...date }, { key: 'start', label: 'Serve Time', type: 'time', required: true, span: 'half' }, { ...location }, { ...notes }] },
+      // Starting Point + Type of Tour (both "what/where") paired, then Date/Pax paired, then Notes.
+      {
+        key: 'campusTour', label: 'Campus Tour', columns: [
+          { key: 'startPoint', label: 'Starting Point', type: 'select', required: true, options: this.activeSelectOptions('campusTourStart'), span: 'half' },
+          { key: 'tourType', label: 'Type of Tour', type: 'select', required: true, options: this.activeSelectOptions('campusTourType'), span: 'half' },
+          { ...date }, { key: 'pax', label: 'Pax', type: 'number', min: 0, required: true, span: 'half' },
+          { ...notes },
+        ],
+      },
+      { key: 'waterNormal', label: 'Mineral Water', columns: [{ key: 'quantity', label: 'Quantity', type: 'select', required: true, options: this.activeSelectOptions('waterNormal'), span: 'half' }, { key: 'withLogo', label: 'With Logo?', type: 'select', required: true, options: options('No', 'Yes'), span: 'half' }, { ...date }, { ...start }, { ...end }, { ...location, span: 'half' }, { ...notes }] },
+      { key: 'fundingPurchase', label: 'Funding / Purchase Requirement', columns: [{ key: 'mainItem', label: 'Main Item', type: 'select', required: true, options: this.activeSelectOptions('fundingMain'), span: 'half' }, { key: 'subItem', label: 'Sub-item', type: 'select', required: true, parentKey: 'mainItem', span: 'half' }, { key: 'quantity', label: 'Quantity', type: 'number', min: 0, required: true, span: 'half' }, { key: 'unit', label: 'Unit RM', type: 'number', min: 0, step: 0.01, required: true, span: 'half' }, { ...notes }] },
     ];
+    return definitions.map((definition) => ({ ...definition, columns: this.fillDanglingHalves(definition.columns) }));
   }
   private activeSelectOptions(kind: RequestOptionKind): readonly SelectOption[] { return this.optionService.toSelectOptions(this.requestOptionCatalog().filter((option) => option.kind === kind && option.active)); }
   private requestOptionLabel(id: string): string { return this.requestOptionCatalog().find((option) => option.id === id)?.label ?? id; }
@@ -896,7 +1219,8 @@ export class EventProposalComponent implements OnDestroy {
     if (key === 'soundLight' && columnKey === 'item') return 'soundLight';
     if (key === 'fmb' && columnKey === 'foodType') return 'fmb';
     if (key === 'campusTour' && columnKey === 'startPoint') return 'campusTourStart';
-    if ((key === 'waterLogo' || key === 'waterNormal') && columnKey === 'quantity') return key;
+    if (key === 'campusTour' && columnKey === 'tourType') return 'campusTourType';
+    if (key === 'waterNormal' && columnKey === 'quantity') return 'waterNormal';
     if (key === 'fundingPurchase' && columnKey === 'mainItem') return 'fundingMain';
     if (key === 'fundingPurchase' && columnKey === 'subItem') return 'fundingSub';
     return null;

@@ -38,34 +38,56 @@ easily to MySQL 8+.
 
 ---
 
-## 2. Roles
+## 2. Roles — Unit + Level model
 
-21 roles total. All can explore/register/save public events regardless of
-role; only the ones marked **Applicant** can submit a new proposal.
+Identity for anyone affiliated with an organizational **Unit** (a School or a
+Service department) is **not** a flat role string. It's two independent
+fields: which **Unit** they belong to (`unit_users`) and their
+**Function Level** within it (`function_level`: `manager` / `staff` /
+`student`). This replaces the old per-department flat roles
+(`logistics-manager`, `hos-hod`, `lecturer`, `applicant`, generic `staff`,
+etc.) — a person's unit and level can't drift out of sync because they're
+never encoded in one combined string. Only a handful of roles that don't
+represent unit membership stay flat (see the second table below);
+`cafeteria_manager`/`cafeteria_staff` already used the equivalent
+`cafeteria_assignment`-scoped pattern before this model existed and are
+unaffected.
+
+All can explore/register/save public events regardless of role/level; every
+unit-scoped level can submit a proposal, same as before.
+
+### Unit kinds and their levels
+
+| Unit kind | `manager` level | `staff` level | `student` level |
+|---|---|---|---|
+| **School** (academic, e.g. School of Computing) | HOS/HOD — reviews proposals from students/lecturers under their school; approve/reject/resubmit. Cannot review their own submission. | Lecturer — submits proposals, same capabilities as Student. | Student — submits proposals; explores/registers/saves events. |
+| **Service department** (Logistics, Transport, Photography/Videography, Sound & Light (A/V), Student Services, F&B) | Reviews that department's requests, approves + assigns to available staff, or resubmits with comment. Manages that department's dropdown option catalog. | Views and handles assigned department tasks + history only. | — (Service departments have no `student` level) |
+| **Cafeteria** (unaffected — uses `cafeteria_assignment`, not `unit_users`) | Cafeteria Manager — manages "My Menu"/Serving Units for assigned cafeteria(s); receives F&B's food selection and routes it to Cafeteria Staff. | Cafeteria Staff — shared inbox; first to claim a fulfilment task owns it. | — |
+
+F&B is a Service department unit like the others (adds a `staff` level that
+didn't exist before this model) — its `manager` level keeps F&B's extra
+duties: reviews high-pax applications first (sequentially before CFO),
+reviews F&B/Cafeteria requirement requests (food AND Mineral Water together
+as one task), picks a cafeteria + menu item(s) to fulfil them (can split
+across multiple cafeterias), and manages the Mineral Water/Dietary
+Information dropdowns.
+
+### Roles that stay flat (not unit-scoped)
 
 | Role | Applicant? | What they do |
 |---|---|---|
-| Student | Yes | Submits proposals; explores/registers/saves events |
-| Staff | Yes | Same as Student |
-| HOS/HOD | Yes | Reviews proposals from students/staff under their school (HOS) or department (HOD); approve/reject/resubmit. Cannot review their own submission — see workflow exception below. |
 | CFO | Yes | Reviews high-pax applications (pax > `HIGH_PAX_THRESHOLD`), sequentially AFTER F&B has approved — not concurrently. Self-applications skip straight to department review. |
-| F&B | Yes | One merged role (previously split into "F&B Reviewer" and "FMB Manager" in an earlier draft — that split was a mistake). Three duties: (1) reviews high-pax applications first, sequentially before CFO; (2) reviews F&B/Cafeteria requirement requests (food AND Mineral Water together as one task), picks a cafeteria + specific menu item(s) to fulfil them, can split one request across multiple cafeterias; (3) manages the Mineral Water (Logo/Normal) and Dietary Information dropdowns. Self-applications skip straight to department review. |
-| Student Services Manager | Yes | Manages the Campus Tour Starting Points dropdown; reviews Campus Tour department-review requests, approves + assigns Student Services Member staff, or resubmits with comment. |
-| Student Services Member | No | Views and handles assigned Campus Tour tasks + history only. |
-| Club President | Yes | Same applicant capabilities as Student/Staff, representing a student club/society. |
-| External User | No | Public/guest account — can explore, register for, and save public events, but cannot submit proposals. |
-| Logistics Manager | Yes | Reviews Logistics requests, approves + assigns to available staff, or resubmits with comment. Manages the Logistics Items dropdown. |
-| Logistics Staff | No | Views and handles assigned tasks + history only |
-| Transportation Manager | Yes | Same pattern as Logistics Manager, for Transportation. Manages Transportation Types dropdown. |
-| Transportation Staff | No | Views and handles assigned tasks + history only |
-| Photography/Videography Manager | Yes | Same pattern, for Photography/Videography. Manages Photography Services dropdown. |
-| Photography/Videography Staff | No | Views and handles assigned tasks + history only |
-| Sound & Light Manager | Yes | Same pattern, for Sound & Light. Manages Sound & Light dropdown. |
-| Sound & Light Staff | No | Views and handles assigned tasks + history only |
 | Cafeteria Admin | No | Adds/manages cafeterias; assigns which users are Cafeteria Manager or Cafeteria Staff for each cafeteria. Org-management role, not a reviewer. |
-| Cafeteria Manager | No | Manages one or more specific cafeterias (assigned by Cafeteria Admin). Manages "My Menu" for their cafeteria(s), plus Serving Units. Receives F&B's food selection and routes it toward Cafeteria Staff fulfilment. |
-| Cafeteria Staff | No | Works from a **shared inbox** — an F&B fulfilment task is visible to every staff member assigned to that cafeteria; whoever claims it first owns it, and it moves into their own ongoing/history and out of everyone else's inbox. |
-| System Admin | No | Manages Units (create/deactivate), Users (create/deactivate), and system Config (pax threshold, cancellation deadline, max event categories). |
+| Cafeteria Manager | No | See Cafeteria row above — kept flat, uses `cafeteria_assignment`. |
+| Cafeteria Staff | No | See Cafeteria row above — kept flat, uses `cafeteria_assignment`. |
+| External User | No | Public/guest account — can explore, register for, and save public events, but cannot submit proposals. |
+| System Admin | No | Manages Units (create/deactivate, set Unit Kind), Users (create/deactivate, assign Unit + Function Level), and system Config (pax threshold, cancellation deadline, max event categories). |
+
+Club President and Club Admin are **not** roles or levels — they're data
+facts derived from the `clubs`/`club_admins` tables (see the Clubs section
+below). A club president's `function_level` stays `student` or `staff`
+(Lecturer); a club admin's identity is whatever their real unit-scoped
+account already is (typically Service department `staff`).
 
 ---
 
@@ -221,20 +243,21 @@ and a short (≤100 character) reason for attending.
 
 **Step 3 — Required for Event**
 - Checklist: Logistics, Transportation, Photographer/Videographer, Sound &
-  Light, F&B, Campus Tour, Mineral Water (Logo), Mineral Water (Normal),
-  Funding/Purchase
+  Light, F&B (Food Request), Campus Tour, Mineral Water, Funding/Purchase
+  (Mineral Water with/without logo is one checklist item and one request
+  table now — see Step 4)
 
 **Step 4 — Request Details** (one table per requirement checked in Step 3)
 
 | Requirement | Fields |
 |---|---|
-| Logistics | Item/Need (select), Quantity, Date, Start, End, Location, Notes |
-| Transportation | Type (select), Requested Pax, Pickup, Drop-off, Date, Start, End, Location, Notes |
-| Photographer/Videographer | Service (select), Personnel Quantity, Date, Start, End, Location, Coverage, Notes |
+| Logistics | Date, Start, End, Item/Need (select, image picker), Requested Quantity, Location, Notes — live availability check against other approved bookings for the same item/date/time (+15min buffer) |
+| Transportation | Transportation Type (select), Requested Pax, Pickup Point, Drop-off Point, Date, Moving Time, Notes |
+| Photographer/Videographer | Service (select), Date, Start, End, Location, Notes |
 | Sound & Light | Item/Service (select), Date, Start, End, Location, Notes |
-| F&B | Food Type (select), Pax, Date, Start, End, Location, Notes |
-| Campus Tour | Date, Start, End, Location, Pax, Starting Point (select), Notes |
-| Mineral Water (Logo/Normal) | Quantity (select), Date, Start, End, Location, Notes |
+| Food Request (F&B) | Food Type (select), Pax/Quantity, Date, Serve Time, Location, Notes |
+| Campus Tour | Date, Pax, Starting Point (select), Type of Tour (select), Notes |
+| Mineral Water | Quantity (select), With Logo? (select: No/Yes), Date, Start, End, Location, Notes |
 | Funding/Purchase | Main Item (select), Sub-item (select, depends on Main Item), Quantity, Unit RM, Notes |
 
 **Step 5 — Detailed Event Info**
@@ -276,14 +299,14 @@ Every option shares: **label** (required), **description**, **active**.
 |---|---|---|
 | Logistics Manager | Logistics Items | Available Quantity, Quantity Unit, Item Image |
 | Transportation Manager | Transportation Types | Passenger Capacity, Available Vehicle Count, Instructions, Vehicle Image |
-| Photography Manager | Photography Services | Maximum Personnel/Availability |
-| AV Manager | Sound & Light | Available Quantity, Technical Description/Setup Requirements |
+| Photography Manager | Photography Services | none beyond common fields (Manager decides personnel count when reviewing) |
+| AV Manager | Sound & Light | Technical Description/Setup Requirements (no availability shown to applicants — Manager decides quantity when reviewing) |
 | Cafeteria Manager | My Menu | Serving Unit (FK), Availability/Ordering Notes, Dietary Information (FK), Menu Image |
 | Cafeteria Manager | Dietary Information | none beyond common fields |
 | Cafeteria Manager | Serving Units | none beyond common fields |
 | Student Services Manager | Campus Tour Starting Points | Meeting Instructions, Maximum Group Size |
-| F&B | Mineral Water (Logo) | Number of Bottles, Available Stock, Logo/Branding Requirement, Lead Time/Ordering Instructions |
-| F&B | Mineral Water (Normal) | Number of Bottles, Available Stock, Ordering/Delivery Instructions |
+| Student Services Manager | Campus Tour Types | none beyond common fields |
+| F&B | Mineral Water | Number of Bottles, Available Stock, Ordering/Delivery Instructions, Logo/Branding Requirement (optional, shown when relevant) — one merged catalog; water_logo_options no longer exists, applicants toggle With Logo? on their single Mineral Water request instead of picking a separate table |
 | F&B | Dietary Information | shared with Cafeteria Manager, no extra fields |
 | CFO | Funding Main Items | Budget Category/Finance Code, Purchasing Guidance |
 | CFO | Funding Sub-items | Parent Main Item (FK, required), Finance/Procurement Code, Default Unit/Purchasing Note |
@@ -314,14 +337,14 @@ Every option shares: **label** (required), **description**, **active**.
 ### Manager-Configured Options
 - **logistics_options**: logistics_option_id, requirement_id, label, description, active, available_quantity, quantity_unit, item_image_url
 - **transportation_options**: transportation_option_id, requirement_id, label, description, active, passenger_capacity, available_vehicle_count, instructions, vehicle_image_url
-- **media_options**: media_option_id, requirement_id, label, description, active, max_personnel
-- **sound_light_options**: sound_light_option_id, requirement_id, label, description, active, available_quantity, technical_description
+- **media_options**: media_option_id, requirement_id, label, description, active
+- **sound_light_options**: sound_light_option_id, requirement_id, label, description, active, technical_description
 - **dietary_information_options**: dietary_information_option_id, label, description, active
 - **serving_unit_options**: serving_unit_option_id, label, description, active
 - **fmb_options**: fmb_option_id, requirement_id, cafeteria_id, label, description, active, serving_unit_option_id, dietary_information_option_id, availability_ordering_notes, menu_image_url
 - **campus_tour_start_options**: campus_tour_start_option_id, requirement_id, label, description, active, meeting_instructions, max_group_size
-- **water_logo_options**: water_logo_option_id, requirement_id, label, description, active, number_of_bottles, available_stock, logo_branding_requirement, lead_time_ordering_instructions
-- **water_normal_options**: water_normal_option_id, requirement_id, label, description, active, number_of_bottles, available_stock, ordering_delivery_instructions
+- **campus_tour_type_options**: campus_tour_type_option_id, requirement_id, label, description, active
+- **water_normal_options**: water_normal_option_id, requirement_id, label, description, active, number_of_bottles, available_stock, ordering_delivery_instructions, logo_branding_requirement (merged catalog — water_logo_options no longer exists)
 - **funding_main_options**: funding_main_option_id, requirement_id, label, description, active, budget_category_finance_code, purchasing_guidance
 - **funding_sub_options**: funding_sub_option_id, main_option_id, label, description, active, finance_procurement_code, default_unit_purchasing_note
 
@@ -335,14 +358,13 @@ Every option shares: **label** (required), **description**, **active**.
 
 ### Request-Specific Department Data (snapshots)
 - **request_logistics**: request_logistics_id, request_id, option_id, item, quantity, date, start_time, end_time, location, notes
-- **request_transportation**: request_transportation_id, request_id, option_id, type, requested_pax, pickup, dropoff, date, start_time, end_time, location, notes
-- **request_photography_videography**: request_photography_videography_id, request_id, option_id, service, personnel_quantity, date, start_time, end_time, location, coverage, notes
+- **request_transportation**: request_transportation_id, request_id, option_id, type, requested_pax, pickup, dropoff, date, moving_time, notes
+- **request_photography_videography**: request_photography_videography_id, request_id, option_id, service, date, start_time, end_time, location, notes
 - **request_sound_light**: request_sound_light_id, request_id, option_id, item, date, start_time, end_time, location, notes
-- **request_fmb**: request_fmb_id, request_id, option_id, food_type, pax, date, start_time, end_time, location, notes
+- **request_fmb**: request_fmb_id, request_id, option_id, food_type, pax, date, serve_time, location, notes
 - **request_fmb_selection**: request_fmb_selection_id, request_fmb_id, cafeteria_id, fmb_option_id, menu_item_label, quantity, status, notes
-- **request_campus_tour**: request_campus_tour_id, request_id, date, start_time, end_time, location, pax, start_point_option_id, start_point, notes
-- **request_mineral_water_logo**: request_mineral_water_logo_id, request_id, option_id, quantity, date, start_time, end_time, location, notes
-- **request_mineral_water_normal**: request_mineral_water_normal_id, request_id, option_id, quantity, date, start_time, end_time, location, notes
+- **request_campus_tour**: request_campus_tour_id, request_id, date, pax, start_point_option_id, start_point, tour_type_option_id, tour_type, notes
+- **request_mineral_water**: request_mineral_water_id, request_id, option_id, quantity, with_logo, date, start_time, end_time, location, notes
 - **request_funding_purchase**: request_funding_purchase_id, request_id, main_option_id, main_item, sub_option_id, sub_item, quantity, unit_price_rm, notes
 
 ### Request Support Tables

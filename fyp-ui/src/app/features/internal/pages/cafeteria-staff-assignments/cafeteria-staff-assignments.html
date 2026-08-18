@@ -1,0 +1,78 @@
+<section class="cafeteria-staff-assignments">
+  <app-feedback-banner [message]="successMessage()" tone="success" />
+  <app-feedback-banner [message]="errorMessage()" tone="error" />
+
+  @if (pendingRequests().length) {
+    <div class="cafeteria-staff-assignments__requests">
+      <h3 class="cafeteria-staff-assignments__requests-title">Staff Requests ({{ pendingRequests().length }})</h3>
+      <p class="cafeteria-staff-assignments__requests-subtitle">Pending My Staff requests from Cafeteria Managers.</p>
+      <ul class="cafeteria-staff-assignments__requests-list">
+        @for (request of pendingRequests(); track request.id) {
+          <li class="cafeteria-staff-assignments__request">
+            <div class="cafeteria-staff-assignments__request-body">
+              <strong>{{ requestActionLabel(request.action) }}</strong>
+              <span>{{ request.displayName }} ({{ request.email }}) · {{ request.cafeteriaName }}</span>
+              <span class="cafeteria-staff-assignments__request-by">Requested by {{ request.requestedByName }}</span>
+            </div>
+            <div class="cafeteria-staff-assignments__request-actions">
+              <button type="button" class="table-control table-control--primary" [disabled]="requestActionPending() === request.id" (click)="approveRequest(request)">Approve</button>
+              <button type="button" class="table-control table-control--danger" [disabled]="requestActionPending() === request.id" (click)="openRejectModal(request)">Reject</button>
+            </div>
+          </li>
+        }
+      </ul>
+    </div>
+  }
+
+  <app-internal-data-page
+    [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
+    [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+    (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
+    (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+    (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit', icon: 'edit' }, record: $event })" (primaryAction)="openAdd()"
+  />
+</section>
+
+<app-form-modal [open]="modalOpen()" [title]="editingAssignmentId() ? 'Edit Assignment' : 'Add Assignment'" [primaryLabel]="editingAssignmentId() ? 'Save Changes' : 'Add Assignment'" [loading]="saving()" [disabled]="!formValid()" (close)="closeModal()" (cancel)="closeModal()" (submit)="save()">
+  <div class="cafeteria-staff-assignments__form">
+    @if (editingAssignmentId()) {
+      <app-searchable-dropdown
+        controlId="assignment-user" label="User" [readOnly]="true"
+        [options]="editingUserOption()" [value]="selectedUserId()"
+      />
+    } @else {
+      <app-searchable-dropdown
+        controlId="assignment-user" label="User" placeholder="Search for a user…" [required]="true"
+        hint="Only users without an existing role are listed."
+        [options]="userOptions()" [value]="selectedUserId()" (valueChange)="selectUser($event)"
+      />
+    }
+    <app-searchable-dropdown
+      controlId="assignment-cafeteria" label="Cafeteria" placeholder="Select a cafeteria…" [required]="true" [clearable]="false"
+      [options]="cafeteriaOptions()" [value]="selectedCafeteriaCode()" (valueChange)="selectCafeteria($event)"
+    />
+    <app-searchable-dropdown
+      controlId="assignment-role" label="Role" placeholder="Select a role…" [required]="true" [clearable]="false"
+      [options]="roleOptions" [value]="selectedRoleCode()" (valueChange)="selectRole($event)"
+    />
+    @if (managerConflict(); as conflict) {
+      <p class="cafeteria-staff-assignments__conflict">
+        {{ conflict.cafeteriaName }} already has a Cafeteria Manager ({{ conflict.displayName }}). Remove that assignment first.
+      </p>
+    }
+  </div>
+</app-form-modal>
+
+<app-delete-confirm-dialog
+  [open]="!!deleteTarget()" entityKind="Assignment" [entityLabel]="targetLabel()"
+  [deleting]="deleting()"
+  (confirm)="confirmRemove()" (cancel)="cancelRemove()"
+/>
+
+<app-form-modal [open]="!!rejectTarget()" title="Reject staff request" primaryLabel="Reject" [danger]="true" [loading]="rejecting()" (close)="cancelReject()" (cancel)="cancelReject()" (submit)="confirmReject()">
+  <div class="cafeteria-staff-assignments__form">
+    <p>Reject the request to {{ rejectActionVerb() }} for {{ rejectTarget()?.displayName }}?</p>
+    <label class="cafeteria-staff-assignments__reject-label" for="reject-comment">Comment (optional)</label>
+    <textarea id="reject-comment" rows="3" [value]="rejectComment()" (input)="rejectComment.set($any($event.target).value)"></textarea>
+  </div>
+</app-form-modal>

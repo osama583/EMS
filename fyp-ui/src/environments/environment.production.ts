@@ -1,5 +1,3 @@
-import type { MockAuthRecord } from '../app/core/auth/mock-users';
-
 export const environment = {
   production: true,
   enableMockAuth: false,
@@ -16,7 +14,9 @@ export const environment = {
   useMockProposalWorkflow: false,
   proposalWorkflowApiUrl: '/api/proposal-workflow',
   configApiUrl: '/api/config',
+  eventCatalogApiUrl: '/api/event-catalog',
+  cafeteriasApiUrl: '/api/cafeterias',
   useMockImageUpload: false,
   imageUploadApiUrl: '/api/uploads',
-  mockUsers: [] as readonly MockAuthRecord[],
+  clubsApiUrl: '/api',
 } as const;

@@ -42,6 +42,7 @@
       [records]="records()"
       [actions]="config().actions"
       (actionSelect)="rowAction.emit($event)"
+      (cellClick)="cellClick.emit($event)"
     />
   }
 

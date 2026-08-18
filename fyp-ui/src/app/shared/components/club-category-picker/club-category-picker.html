@@ -1,0 +1,18 @@
+<app-form-modal
+  [open]="open()" title="Change Club Categories"
+  primaryLabel="Save Categories" [loading]="saving()" [disabled]="!isValid()"
+  (close)="close.emit()" (cancel)="close.emit()" (submit)="save()"
+>
+  <div class="club-category-picker">
+    @if (errorMessage()) { <p class="club-category-picker__error">{{ errorMessage() }}</p> }
+    <app-searchable-dropdown
+      controlId="club-category-picker" label="Categories" [required]="true"
+      placeholder="Select 1 to 3 categories"
+      hint="Choose between {{ minSelections }} and {{ maxSelections }} categories for this club."
+      [isMulti]="true" [maxSelections]="maxSelections"
+      [loading]="loading()"
+      [options]="categoryOptions()" [value]="selectedIds()"
+      (valueChange)="setSelectedIds($any($event))"
+    />
+  </div>
+</app-form-modal>

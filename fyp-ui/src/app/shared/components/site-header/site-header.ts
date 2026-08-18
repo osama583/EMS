@@ -14,7 +14,7 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/auth/auth.service';
-import { UserRole } from '../../../core/auth/auth.models';
+import { isExternalUser } from '../../../core/auth/role-access';
 import { roleCanUseSavedEvents } from '../../../core/auth/role-navigation';
 import { CtaLinkComponent } from '../cta-link/cta-link';
 
@@ -139,7 +139,7 @@ export class SiteHeaderComponent implements AfterViewInit {
   savedEventsHref(): string {
     const user = this.auth.user();
     if (!user) return '/my-events/saved';
-    return user.role === UserRole.ExternalUser ? '/my-events/saved' : '/app/events/my-events/saved';
+    return isExternalUser(user) ? '/my-events/saved' : '/app/events/my-events/saved';
   }
 
   openSavedEvents(event: Event): void {
@@ -150,7 +150,7 @@ export class SiteHeaderComponent implements AfterViewInit {
       void this.router.navigate(['/login'], { queryParams: { returnUrl: '/my-events/saved' } });
       return;
     }
-    if (!roleCanUseSavedEvents(user.role)) event.preventDefault();
+    if (!roleCanUseSavedEvents(user)) event.preventDefault();
     this.closeMenu();
   }
 

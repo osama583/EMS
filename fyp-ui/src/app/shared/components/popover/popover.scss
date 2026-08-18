@@ -1,0 +1,84 @@
+:host { display: contents; }
+
+.shared-popover__backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--space-4);
+  place-items: center;
+  overscroll-behavior: contain;
+  background: rgb(3 19 39 / 45%);
+  box-sizing: border-box;
+}
+
+.shared-popover {
+  display: grid;
+  width: min(22rem, 100%);
+  max-height: min(28rem, calc(100dvh - 2rem));
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid rgb(15 35 60 / 9%);
+  border-radius: var(--radius-container);
+  background: var(--apu-white);
+  box-shadow: var(--shadow-overlay);
+  box-sizing: border-box;
+}
+
+.shared-popover__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--apu-border);
+  box-sizing: border-box;
+
+  > .material-symbols-rounded:first-child { color: var(--apu-blue-600); font-size: 1.1rem; flex: none; }
+}
+
+.shared-popover__title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--apu-navy-950);
+}
+
+.shared-popover__close {
+  margin-left: auto;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--apu-text-muted);
+  cursor: pointer;
+  transition: background var(--motion-control) var(--ease-standard), color var(--motion-control) var(--ease-standard);
+
+  .material-symbols-rounded { font-size: 1.1rem; }
+  &:hover, &:focus-visible { outline: 0; background: var(--apu-surface-muted); color: var(--apu-blue-700); }
+}
+
+.shared-popover__body {
+  min-height: 0;
+  padding: var(--space-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  box-sizing: border-box;
+}
+
+@media (max-width: 48rem) {
+  .shared-popover__backdrop { padding: 0.5rem; }
+  .shared-popover {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 1rem);
+    border-radius: 1rem;
+  }
+  .shared-popover__header { padding: 0.75rem 1rem; }
+  .shared-popover__body { padding: 0.5rem; }
+}

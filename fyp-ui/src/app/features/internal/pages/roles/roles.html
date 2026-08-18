@@ -1,0 +1,70 @@
+<section class="roles-page">
+  <app-feedback-banner [message]="successMessage()" tone="success" />
+  <app-feedback-banner [message]="errorMessage()" tone="error" />
+
+  <nav class="roles-page__tabs" aria-label="Sections">
+    <button type="button" class="roles-page__tab" [class.roles-page__tab--active]="tab() === 'active'" (click)="setTab('active')">
+      <span class="material-symbols-rounded" aria-hidden="true">list_alt</span>
+      Roles
+    </button>
+    <button type="button" class="roles-page__tab" [class.roles-page__tab--active]="tab() === 'deleted'" (click)="setTab('deleted')">
+      <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+      Deleted
+    </button>
+  </nav>
+
+  @if (tab() === 'active') {
+    <app-internal-data-page
+      [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+      (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
+      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+      (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit', icon: 'edit' }, record: $event })" (primaryAction)="openAdd()"
+    />
+  } @else {
+    <app-internal-data-page
+      [config]="deletedConfig()" [records]="deletedRecords()" [filters]="[]" [searchValue]="''" [loading]="deletedLoading()"
+      [totalPages]="1" [page]="1" [pageSize]="50" [hideControls]="true"
+      (rowAction)="handleDeletedAction($event)"
+    />
+  }
+</section>
+
+<app-form-modal [open]="modalOpen()" [title]="editingCode() ? 'Edit Role' : 'Add Role'" [primaryLabel]="editingCode() ? 'Save Changes' : 'Add Role'" [loading]="saving()" [disabled]="!formValid()" (close)="closeModal()" (cancel)="closeModal()" (submit)="save()">
+  <div class="roles-page__form">
+    <app-form-field controlId="role-name" label="Role Name" [required]="true" [value]="value('roleName')" [error]="fieldError('roleName')" (valueChange)="setDraft('roleName', $event)" />
+    @if (!editingCode()) {
+      <app-form-field controlId="role-code" label="Role Code" [readOnly]="true" [value]="derivedRoleCode()" hint="Automatically generated from Role Name. Cannot be changed after creation." />
+    }
+    <app-form-field controlId="role-description" label="Description" type="textarea" [value]="value('description')" [rows]="3" (valueChange)="setDraft('description', $event)" />
+
+    @if (editingProtected()) {
+      <p class="roles-page__form-hint">This is a protected system role — its Unit associations cannot be changed.</p>
+      <app-searchable-dropdown
+        controlId="role-units" label="Units" [options]="unitOptions()" [isMulti]="true"
+        [value]="unitCodes()" [readOnly]="true" [clearable]="false"
+        hint="No Unit selected means this role is a Flat Role."
+      />
+    } @else {
+      <app-searchable-dropdown
+        controlId="role-units" label="Units" placeholder="No Unit (Flat Role)" [isMulti]="true"
+        [options]="unitOptions()" [value]="unitCodes()" (valueChange)="setDraft('unitCodes', $any($event))"
+        hint="Select one or more Units, or leave empty for a Flat Role."
+      />
+    }
+
+    <app-status-toggle [active]="$any(draft()['active'])" label="Active role" description="Inactive roles cannot be newly assigned to users." (activeChange)="setDraft('active', $event)" />
+  </div>
+</app-form-modal>
+
+<app-delete-confirm-dialog
+  [open]="!!deleteTarget()" entityKind="Role" [entityLabel]="targetLabel()"
+  [checkingDependencies]="checkingDeletion()" [preview]="deletePreview()" [deleting]="deleting()"
+  (confirm)="confirmDelete()" (cancel)="cancelDelete()"
+/>
+
+<app-delete-confirm-dialog
+  [open]="!!purgeTargetCode()" [permanent]="true" entityKind="Role" [entityLabel]="purgeTargetLabel()"
+  [preview]="{ canDelete: true, blockingReasons: [], entityLabel: purgeTargetLabel() }" [deleting]="purging()"
+  (confirm)="confirmPurge()" (cancel)="cancelPurge()"
+/>

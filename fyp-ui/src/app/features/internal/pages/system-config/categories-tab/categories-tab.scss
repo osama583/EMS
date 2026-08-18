@@ -1,0 +1,5 @@
+:host { display: block; padding: 2rem; max-width: 64rem; margin: 0 auto; box-sizing: border-box; }
+
+@media (max-width: 48rem) {
+  :host { padding: 1rem; }
+}

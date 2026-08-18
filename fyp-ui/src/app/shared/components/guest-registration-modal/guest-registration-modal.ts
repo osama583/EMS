@@ -188,7 +188,7 @@ export class GuestRegistrationModalComponent {
     const eventId = this.flow.pendingEventId();
     const requestedUrl = this.flow.returnUrl();
     this.savedEvents.refresh();
-    if (eventId && roleCanUseSavedEvents(user.role)) this.savedEvents.saveEvent(user.email, eventId).subscribe();
+    if (eventId && roleCanUseSavedEvents(user)) this.savedEvents.saveEvent(user.email, eventId).subscribe();
     this.flow.close();
     this.reset();
     const destination = user.accountType === 'internal'

@@ -29,7 +29,10 @@ app.use('/api/proposal-workflow', require('./routes/proposal-workflow.routes'));
 app.use('/api/events', require('./routes/events.routes'));
 app.use('/api/event-engagement', require('./routes/event-engagement.routes'));
 app.use('/api/config', require('./routes/config.routes'));
+app.use('/api/event-catalog', require('./routes/event-catalog.routes'));
+app.use('/api/cafeterias', require('./routes/cafeterias.routes'));
 app.use('/api/uploads', require('./routes/uploads.routes'));
+app.use('/api', require('./routes/clubs.routes'));
 
 app.use((err, _req, res, _next) => {
   console.error(err);

@@ -13,11 +13,12 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
-import { EventCategory, ProposalEventSchedule, PublishedEvent, RegistrationStatus } from '../../../../core/events/published-event.models';
-import { SystemConfigService } from '../../../../core/config/system-config.service';
+import { ProposalEventSchedule, PublishedEvent, RegistrationResult, RegistrationStatus, isEventVisibleTo } from '../../../../core/events/published-event.models';
+import { EventCategoryService, EventFormatService } from '../../../../core/event-catalog/event-catalog.service';
 import { PublishedEventService } from '../../../../core/events/published-event.service';
 import { EventFavouriteService } from '../../../../core/events/event-favourite.service';
 import { AuthService } from '../../../../core/auth/auth.service';
+import { isSchoolStudentOrLecturer } from '../../../../core/auth/role-access';
 import { GuestRegistrationFlowService } from '../../../../core/auth/external-registration.service';
 import { EventCardComponent } from '../../../../shared/components/event-card/event-card';
 import { EventDetailsModalComponent } from '../../../../shared/components/event-details-modal/event-details-modal';
@@ -25,12 +26,12 @@ import { InternalPaginationComponent } from '../../../../shared/components/inter
 import { ExpandableSearchComponent } from '../../../../shared/components/expandable-search/expandable-search';
 import { FilterButtonComponent } from '../../../../shared/components/filter-button/filter-button';
 import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
+import { ToastService } from '../../../../shared/components/toast/toast.service';
 
 type FilterKey =
   | 'visibility'
   | 'category'
   | 'school'
-  | 'audience'
   | 'format'
   | 'date'
   | 'time'
@@ -50,7 +51,6 @@ interface ExploreEvent {
   readonly category: string;
   readonly visibility: string;
   readonly school: string;
-  readonly audience: readonly string[];
   readonly format: string;
   readonly timePeriod: string;
   readonly registration: string;
@@ -95,9 +95,11 @@ export class ExploreEventsComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
-  private readonly configService = inject(SystemConfigService);
+  private readonly eventCategoryService = inject(EventCategoryService);
+  private readonly eventFormatService = inject(EventFormatService);
   private readonly guestFlow = inject(GuestRegistrationFlowService);
   private readonly publishedEventService = inject(PublishedEventService);
+  private readonly toast = inject(ToastService);
   readonly favourites = inject(EventFavouriteService);
   readonly variant = input<'public' | 'internal'>('public');
   readonly registeringEventId = signal<string | null>(null);
@@ -132,20 +134,56 @@ export class ExploreEventsComponent {
   openEvent(id: string): void { this.selectedPublishedEvent.set(this.publishedEventsById().get(id) ?? null); }
   closeEvent(): void { this.selectedPublishedEvent.set(null); }
 
+  // Handles registration completed via the details modal's own form (paid events, or explicit
+  // email confirmation) — mirrors registerForEvent()'s quick-register toast/refresh/close
+  // behavior below so both entry points give the same confirmation UX.
+  onModalRegistered(result: RegistrationResult): void {
+    const eventTitle = this.selectedPublishedEvent()?.eventTitle ?? 'the event';
+    this.loadRegistrationStatuses([...this.publishedEventsById().values()]);
+    this.closeEvent();
+    if (result.status === 'rejected' || result.status === 'duplicate') {
+      this.toast.error('Registration not completed', result.message);
+    } else {
+      this.toast.success(`You're registered for ${eventTitle}`, result.status === 'pending' ? 'Your registration is pending approval.' : undefined);
+    }
+  }
+
   readonly schoolOptions = computed(() =>
     [...new Set(this.events().map((event) => event.school))].sort((a, b) => a.localeCompare(b)),
   );
 
+  // Only Students and Lecturers can ever be part of a club (as a member or as President — see
+  // AuthUser.presidentOfClubIds, a data fact, not a role) — every other internal role has no
+  // path to club participation, so offering the "Club Only" filter to them would be misleading
+  // UI, not just a functional gap. RBAC redesign: 'student'/'lecturer' are now literal role_codes
+  // (same eligibility rule as club-identity.service.js's isEligibleForClub() server-side).
+  private readonly canSeeClubOnlyFilter = computed(() => {
+    const user = this.auth.user();
+    if (!user) return false;
+    return isSchoolStudentOrLecturer(user);
+  });
+
   readonly filterGroups = computed<readonly FilterGroup[]>(() => [
-    {
-      key: 'visibility',
-      label: 'Event Visibility',
-      options: ['Public — Everyone', 'Internal — APU Community'],
-    },
+    // Guests must never be offered a filter implying they could see Private/Club Only events —
+    // the loaded event list already excludes those per `isEventVisibleTo`, but showing the option
+    // on the public landing page would still be misleading UI. "Club Only" itself is further
+    // restricted to Students and Club Presidents — only they can ever be club members, so no
+    // other internal role (staff, lecturer, HOS/HOD, etc.) can be part of a club at all.
+    ...(this.variant() === 'internal'
+      ? [
+          {
+            key: 'visibility' as const,
+            label: 'Event Visibility',
+            options: this.canSeeClubOnlyFilter()
+              ? ['Public', 'Private', 'Club Only']
+              : ['Public', 'Private'],
+          },
+        ]
+      : []),
     {
       key: 'category',
       label: 'Category',
-      options: this.configService.eventCategories(),
+      options: this.eventCategoryService.activeEntries().map((c) => c.name),
       wide: true,
     },
     {
@@ -155,23 +193,9 @@ export class ExploreEventsComponent {
       wide: true,
     },
     {
-      key: 'audience',
-      label: 'Audience',
-      options: [
-        'All APU Community',
-        'Undergraduate Students',
-        'Postgraduate Students',
-        'Staff',
-        'Alumni',
-        'New Students',
-        'International Students',
-      ],
-      wide: true,
-    },
-    {
       key: 'format',
       label: 'Event Format',
-      options: ['On Campus', 'Online', 'Hybrid', 'Off Campus'],
+      options: this.eventFormatService.activeEntries().map((f) => f.name),
     },
     {
       key: 'date',
@@ -187,7 +211,7 @@ export class ExploreEventsComponent {
     {
       key: 'registration',
       label: 'Registration',
-      options: ['Registration Open', 'Waitlist Available', 'No Registration Required'],
+      options: ['No Registration Required', 'Registration Required'],
     },
     {
       key: 'cost',
@@ -236,7 +260,9 @@ export class ExploreEventsComponent {
 
   private loadPublishedEvents(): void {
     this.publishedEventService.getPublishedEvents().subscribe({
-      next: (events) => {
+      next: (allEvents) => {
+        const isAuthenticated = this.auth.authenticated();
+        const events = allEvents.filter((event) => isEventVisibleTo(event.eventVisibility, isAuthenticated));
         this.publishedEventsById.set(new Map(events.map((event) => [event.id, event])));
         this.events.set(events.map((event) => this.toExploreEvent(event)));
         this.loading.set(false);
@@ -259,9 +285,8 @@ export class ExploreEventsComponent {
       id: event.id,
       title: event.eventTitle,
       category: this.firstCategory(event.categories),
-      visibility: this.visibilityLabel(event.eventVisibility),
+      visibility: event.eventVisibility,
       school: event.schoolDepartment,
-      audience: event.audience,
       format: event.eventFormat,
       timePeriod: this.timePeriodFor(schedule),
       registration: this.registrationLabel(event),
@@ -274,22 +299,13 @@ export class ExploreEventsComponent {
     };
   }
 
-  private firstCategory(categories: readonly EventCategory[]): string {
+  private firstCategory(categories: readonly string[]): string {
     return categories[0] ?? '';
-  }
-
-  // Filter UI's 'visibility' option strings ('Public — Everyone' / 'Internal — APU Community')
-  // predate the real `EventVisibility` union ('Public'/'Private'/'Club Only') — map the two real
-  // non-Public values onto the existing 'Internal' display bucket rather than widening the filter
-  // UI, since only Public/Private/Club Only proposals ever reach a published event in this plan's
-  // seed data and the filter option set itself is out of this task's "no template changes" scope.
-  private visibilityLabel(visibility: PublishedEvent['eventVisibility']): string {
-    return visibility === 'Public' ? 'Public — Everyone' : 'Internal — APU Community';
   }
 
   private registrationLabel(event: PublishedEvent): string {
     if (event.registrationMode !== 'Automatic' && event.registrationMode !== 'Approval Required') return 'No Registration Required';
-    return 'Registration Open';
+    return 'Registration Required';
   }
 
   private timePeriodFor(schedule: ProposalEventSchedule | undefined): string {
@@ -459,12 +475,26 @@ export class ExploreEventsComponent {
     }
     if (this.registeringEventId()) return;
     this.registeringEventId.set(eventId);
+    const eventTitle = this.publishedEventsById().get(eventId)?.eventTitle ?? 'the event';
     this.publishedEventService.registerForEvent(eventId, user.email).subscribe({
-      next: () => {
+      next: (result) => {
         this.registeringEventId.set(null);
+        // Refreshing registration statuses is what actually drops this event out of
+        // matchingEvents (see getMatchingEvents' registrations.get(event.id) check) — the modal
+        // close below is separate, since registration can also happen from the quick-register
+        // button on a card with no modal open at all.
         this.loadRegistrationStatuses([...this.publishedEventsById().values()]);
+        if (this.selectedPublishedEvent()?.id === eventId) this.closeEvent();
+        if (result.status === 'rejected' || result.status === 'duplicate') {
+          this.toast.error('Registration not completed', result.message);
+        } else {
+          this.toast.success(`You're registered for ${eventTitle}`, result.status === 'pending' ? 'Your registration is pending approval.' : undefined);
+        }
       },
-      error: () => this.registeringEventId.set(null),
+      error: () => {
+        this.registeringEventId.set(null);
+        this.toast.error('Registration failed', 'Please try again.');
+      },
     });
   }
 
@@ -474,8 +504,15 @@ export class ExploreEventsComponent {
     customTo: string,
   ): readonly ExploreEvent[] {
     const query = this.searchTerm().trim().toLocaleLowerCase();
+    const registrations = this.registrationStatusByEventId();
 
     return this.events().filter((event) => {
+      // Once a user has a confirmed or pending registration for an event, it drops out of
+      // Explore Events permanently (not just as a one-off post-register removal) — they can
+      // still manage it from My Events. Guests and users with no registration status for this
+      // event are unaffected.
+      const status = registrations.get(event.id);
+      if (status === 'confirmed' || status === 'pending') return false;
       const searchable = [
         event.title,
         event.category,
@@ -491,7 +528,6 @@ export class ExploreEventsComponent {
         this.matches(filters.visibility, event.visibility) &&
         this.matches(filters.category, event.category) &&
         this.matches(filters.school, event.school) &&
-        this.matchesAny(filters.audience, event.audience) &&
         this.matches(filters.format, event.format) &&
         this.matchesDate(event, filters.date, customFrom, customTo) &&
         this.matches(filters.time, event.timePeriod) &&
@@ -503,10 +539,6 @@ export class ExploreEventsComponent {
 
   private matches(selected: readonly string[], value: string): boolean {
     return selected.length === 0 || selected.includes(value);
-  }
-
-  private matchesAny(selected: readonly string[], values: readonly string[]): boolean {
-    return selected.length === 0 || selected.some((value) => values.includes(value));
   }
 
   private matchesDate(
@@ -547,7 +579,6 @@ export class ExploreEventsComponent {
       visibility: [],
       category: [],
       school: [],
-      audience: [],
       format: [],
       date: [],
       time: [],
@@ -561,7 +592,6 @@ export class ExploreEventsComponent {
       visibility: [...filters.visibility],
       category: [...filters.category],
       school: [...filters.school],
-      audience: [...filters.audience],
       format: [...filters.format],
       date: [...filters.date],
       time: [...filters.time],

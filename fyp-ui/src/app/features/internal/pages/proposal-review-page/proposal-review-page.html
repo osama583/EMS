@@ -38,11 +38,11 @@
         Resubmit application
       </button>
     }
-    <app-proposal-reviewer-view [proposal]="proposal()" [role]="role()!" [readOnly]="readOnly()" (actionComplete)="handleActionComplete($event)" />
+    <app-proposal-reviewer-view [proposal]="proposal()" [readOnly]="readOnly()" (actionComplete)="handleActionComplete($event)" />
   } @else if (viewKind() === 'reviewer') {
-    <app-proposal-reviewer-view [proposal]="proposal()" [role]="role()!" [readOnly]="readOnly()" (actionComplete)="handleActionComplete($event)" />
+    <app-proposal-reviewer-view [proposal]="proposal()" [readOnly]="readOnly()" (actionComplete)="handleActionComplete($event)" />
   } @else if (viewKind() === 'department') {
-    <app-proposal-department-view [proposal]="proposal()" [role]="role()!" [readOnly]="readOnly()" [allowAssignment]="allowAssignment" (actionComplete)="handleActionComplete($event)" />
+    <app-proposal-department-view [proposal]="proposal()" [role]="currentUser()!" [readOnly]="readOnly()" [allowAssignment]="allowAssignment" (actionComplete)="handleActionComplete($event)" />
   } @else {
     <div class="proposal-review-page__state" role="status">
       <span class="material-symbols-rounded" aria-hidden="true">block</span>

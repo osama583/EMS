@@ -1,0 +1,30 @@
+<app-feedback-banner [message]="errorMessage()" tone="error" />
+
+@if (loading()) {
+  <app-loading-state label="Loading join requests…" />
+} @else if (requests().length === 0) {
+  <p class="hub-club-requests__empty">No pending club join requests.</p>
+} @else {
+  <ul class="hub-club-requests__list">
+    @for (request of requests(); track request.id) {
+      <li class="hub-club-requests__row">
+        <div class="hub-club-requests__info">
+          <strong>{{ request.requester.displayName }}</strong>
+          <span>{{ request.requester.email }} · wants to join {{ request.clubName }}</span>
+          @if (request.reason) { <p class="hub-club-requests__comment">"{{ request.reason }}"</p> }
+        </div>
+        <div class="hub-club-requests__actions">
+          <button type="button" class="table-control table-control--primary" [disabled]="processingId() === request.id" (click)="approve(request)">Approve</button>
+          <button type="button" class="table-control table-control--danger" [disabled]="processingId() === request.id" (click)="openReject(request)">Reject</button>
+        </div>
+      </li>
+    }
+  </ul>
+}
+
+<app-proposal-comment-dialog
+  [open]="!!rejectTarget()" title="Reject Join Request" label="Reason for rejection" confirmLabel="Reject" [danger]="true" [loading]="rejecting()"
+  [message]="rejectTarget() ? ('Tell ' + rejectTarget()!.requester.displayName + ' why this request is being rejected. They will see this reason.') : ''"
+  [minLength]="rejectionCommentMinLength"
+  (cancel)="closeReject()" (confirm)="confirmReject($event)"
+/>

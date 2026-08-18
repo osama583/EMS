@@ -1,12 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { forkJoin, map, of, switchMap } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
-import { PublishedEvent, RegistrationStatus } from '../../../core/events/published-event.models';
+import { PublishedEvent, RegistrationResult, RegistrationStatus } from '../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../core/events/published-event.service';
 import { SavedEventsService } from '../../../core/events/saved-events.service';
 import { EventCardComponent } from '../../../shared/components/event-card/event-card';
 import { EventDetailsModalComponent } from '../../../shared/components/event-details-modal/event-details-modal';
 import { InternalPageStateComponent } from '../../../shared/components/internal-data-page/internal-data-page-parts';
+import { ToastService } from '../../../shared/components/toast/toast.service';
 
 export type MyEventsTabMode = 'saved' | 'registered' | 'history';
 
@@ -25,6 +26,7 @@ export class MyEventsTabComponent {
   private readonly auth = inject(AuthService);
   private readonly savedEvents = inject(SavedEventsService);
   private readonly eventService = inject(PublishedEventService);
+  private readonly toast = inject(ToastService);
 
   readonly mode = input.required<MyEventsTabMode>();
 
@@ -98,9 +100,32 @@ export class MyEventsTabComponent {
     const user = this.auth.user();
     if (!user || this.registeringEventId()) return;
     this.registeringEventId.set(eventId);
+    const eventTitle = this.entries().find((entry) => entry.event.id === eventId)?.event.eventTitle ?? 'the event';
     this.eventService.registerForEvent(eventId, user.email).subscribe({
-      next: () => { this.registeringEventId.set(null); this.load(); },
-      error: () => this.registeringEventId.set(null),
+      next: (result) => {
+        this.registeringEventId.set(null);
+        this.load();
+        if (result.status === 'rejected' || result.status === 'duplicate') {
+          this.toast.error('Registration not completed', result.message);
+        } else {
+          this.toast.success(`You're registered for ${eventTitle}`, result.status === 'pending' ? 'Your registration is pending approval.' : undefined);
+        }
+      },
+      error: () => {
+        this.registeringEventId.set(null);
+        this.toast.error('Registration failed', 'Please try again.');
+      },
     });
+  }
+
+  onModalRegistered(result: RegistrationResult): void {
+    const eventTitle = this.selectedEvent()?.eventTitle ?? 'the event';
+    this.selectedEvent.set(null);
+    this.load();
+    if (result.status === 'rejected' || result.status === 'duplicate') {
+      this.toast.error('Registration not completed', result.message);
+    } else {
+      this.toast.success(`You're registered for ${eventTitle}`, result.status === 'pending' ? 'Your registration is pending approval.' : undefined);
+    }
   }
 }

@@ -1,5 +1,3 @@
-import { MOCK_AUTH_USERS } from '../app/core/auth/mock-users';
-
 export const environment = {
   production: false,
   enableMockAuth: true,
@@ -11,7 +9,9 @@ export const environment = {
   eventEngagementApiUrl: '/api/event-engagement',
   proposalWorkflowApiUrl: '/api/proposal-workflow',
   configApiUrl: '/api/config',
+  eventCatalogApiUrl: '/api/event-catalog',
+  cafeteriasApiUrl: '/api/cafeterias',
   imageUploadApiUrl: '/api/uploads',
-  mockUsers: MOCK_AUTH_USERS,
+  clubsApiUrl: '/api',
   useMockImageUpload: true,
 } as const;

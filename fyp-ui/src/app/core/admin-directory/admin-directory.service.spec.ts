@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { UserRole } from '../auth/auth.models';
+import { AuthUser, UserRole } from '../auth/auth.models';
 import { roleCanAccess } from '../auth/role-navigation';
 import { AdminUnitRecord, AdminUserRecord } from './admin-directory.models';
 import { AdminDirectoryService } from './admin-directory.service';
@@ -17,7 +17,7 @@ const SEED_USERS: readonly AdminUserRecord[] = [
 ];
 
 const SEED_UNITS: readonly AdminUnitRecord[] = [
-  { id: 'unit-cafeteria-services', name: 'Cafeteria Services', code: 'CS', description: 'Cafeteria Services unit.', active: true },
+  { id: 'unit-cafeteria-services', name: 'Cafeteria Services', code: 'CS', description: 'Cafeteria Services unit.', active: true, roleCodes: [] },
 ];
 
 describe('AdminDirectoryService', () => {
@@ -59,7 +59,7 @@ describe('AdminDirectoryService', () => {
     }));
     const createdRecord: AdminUnitRecord = {
       id: 'unit-student-experience', name: 'Student Experience', code: 'SE',
-      description: 'Student experience operations.', active: true,
+      description: 'Student experience operations.', active: true, roleCodes: [],
     };
     httpMock.expectOne(`${environment.adminDirectoryApiUrl}/units`).flush(createdRecord);
     const created = await createdPromise;
@@ -73,10 +73,19 @@ describe('AdminDirectoryService', () => {
   });
 
   it('keeps directory routes restricted to System Admin', () => {
-    expect(roleCanAccess(UserRole.SystemAdmin, '/app/users')).toBe(true);
-    expect(roleCanAccess(UserRole.SystemAdmin, '/app/units')).toBe(true);
-    expect(roleCanAccess(UserRole.CafeteriaAdmin, '/app/users')).toBe(false);
-    expect(roleCanAccess(UserRole.Applicant, '/app/users')).toBe(false);
-    expect(roleCanAccess(UserRole.CafeteriaManager, '/app/units')).toBe(false);
+    const asUser = (role: UserRole): AuthUser => ({
+      email: `${role}@demo.apu.edu.my`, displayName: role, username: role, role,
+      accountType: 'internal', roleLabel: role, department: '',
+    });
+    const unitScopedStudent: AuthUser = {
+      email: 'student@demo.apu.edu.my', displayName: 'Student', username: 'student', role: 'student' as UserRole,
+      accountType: 'internal', roleLabel: 'Student — School of Computing', department: 'School of Computing',
+      functionLevel: 'student', unitId: 'school_of_computing', unitKind: 'school',
+    };
+    expect(roleCanAccess(asUser(UserRole.SystemAdmin), '/app/users')).toBe(true);
+    expect(roleCanAccess(asUser(UserRole.SystemAdmin), '/app/units')).toBe(true);
+    expect(roleCanAccess(asUser(UserRole.CafeteriaAdmin), '/app/users')).toBe(false);
+    expect(roleCanAccess(unitScopedStudent, '/app/users')).toBe(false);
+    expect(roleCanAccess(asUser(UserRole.CafeteriaManager), '/app/units')).toBe(false);
   });
 });

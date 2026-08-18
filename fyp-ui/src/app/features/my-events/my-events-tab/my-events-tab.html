@@ -21,4 +21,4 @@
   </section>
 }
 
-<app-event-details-modal [open]="!!selectedEvent()" [event]="selectedEvent()" (close)="selectedEvent.set(null)" />
+<app-event-details-modal [open]="!!selectedEvent()" [event]="selectedEvent()" (close)="selectedEvent.set(null)" (registered)="onModalRegistered($event)" />

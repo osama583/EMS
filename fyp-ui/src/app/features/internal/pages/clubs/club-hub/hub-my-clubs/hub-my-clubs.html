@@ -1,0 +1,115 @@
+<section class="club-page">
+  <app-feedback-banner [message]="errorMessage()" tone="error" />
+
+  <app-internal-page-header [config]="headerConfig()" />
+
+  <div class="club-page__view-row">
+    <div class="club-page__view-toggle" role="group" aria-label="Choose view">
+      <button type="button" [class.active]="viewMode() === 'card'" (click)="setViewMode('card')">
+        <span class="material-symbols-rounded" aria-hidden="true">grid_view</span>
+        Card View
+      </button>
+      <button type="button" [class.active]="viewMode() === 'table'" (click)="setViewMode('table')">
+        <span class="material-symbols-rounded" aria-hidden="true">table_rows</span>
+        Table
+      </button>
+    </div>
+  </div>
+
+  <section class="internal-table-workspace__controls club-page__controls">
+    <div workspaceControls class="shared-page-controls">
+      <app-internal-search-field
+        workspaceControlWide
+        [config]="{ ariaLabel: 'Search clubs', placeholder: 'Search club name' }"
+        [value]="search()"
+        (valueChange)="setSearch($event)"
+      />
+      <div workspaceControlRight class="shared-page-controls__right">
+        <div class="shared-page-controls__actions">
+          <app-internal-reset-button (reset)="reset()" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  @if (viewMode() === 'card') {
+    @if (loading()) {
+      <div class="club-page__grid-loading" role="status" aria-label="Loading clubs">
+        @for (line of [1, 2, 3]; track line) { <span></span> }
+      </div>
+    } @else if (myClubs().length === 0) {
+      <div class="club-page__empty">
+        <span class="material-symbols-rounded" aria-hidden="true">groups</span>
+        <h2>You haven't joined a club yet</h2>
+        <p>Head over to Discover Clubs to find one that fits your interests.</p>
+      </div>
+    } @else {
+      <ul class="club-page__grid">
+        @for (club of myClubs(); track club.id) {
+          <li class="club-page__card">
+            <div class="club-page__image">
+              @if (club.imageUrl) {
+                <img [src]="club.imageUrl" [alt]="club.name" />
+              } @else {
+                <span class="material-symbols-rounded" aria-hidden="true">groups</span>
+              }
+            </div>
+            <div class="club-page__body">
+              <h2>{{ club.name }}</h2>
+
+              @if (club.viewerIsPresident) {
+                <div class="club-page__category-row">
+                  <div class="club-page__category-chips">
+                    @for (category of club.categories; track category.id) {
+                      <span class="club-page__category-chip">{{ category.name }}</span>
+                    } @empty {
+                      <span class="club-page__category-empty">No categories set</span>
+                    }
+                  </div>
+                  <button type="button" class="club-page__category-edit-btn" [attr.aria-label]="(club.categories.length ? 'Edit' : 'Set') + ' categories for ' + club.name" (click)="openCategoryPicker(club)">
+                    <span class="material-symbols-rounded" aria-hidden="true">tune</span>
+                  </button>
+                </div>
+              } @else if (club.categories.length) {
+                <div class="club-page__category-chips">
+                  @for (category of club.categories; track category.id) {
+                    <span class="club-page__category-chip">{{ category.name }}</span>
+                  }
+                </div>
+              }
+
+              <p>{{ club.description || 'No description provided.' }}</p>
+              <div class="club-page__meta">
+                <span class="material-symbols-rounded" aria-hidden="true">how_to_reg</span>
+                {{ club.president?.displayName ?? 'Unassigned' }}
+                <span class="club-page__dot" aria-hidden="true">·</span>
+                <span class="material-symbols-rounded" aria-hidden="true">group</span>
+                {{ club.memberCount }} member{{ club.memberCount === 1 ? '' : 's' }}
+              </div>
+            </div>
+            <div class="club-page__footer">
+              <span class="club-page__status">
+                <span class="material-symbols-rounded" aria-hidden="true">{{ club.viewerIsPresident ? 'star' : 'check_circle' }}</span>
+                {{ club.viewerIsPresident ? 'You are the President' : 'You are a member' }}
+              </span>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <app-internal-data-page
+      [config]="config()" [records]="records()" [filters]="filters" [searchValue]="search()" [loading]="loading()"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+      [hideHeader]="true"
+      [hideControls]="true"
+      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+      (recordOpen)="handleAction({ action: { key: 'categories', label: 'Edit categories', icon: 'tune' }, record: $event })"
+    />
+  }
+</section>
+
+<app-club-category-picker
+  [open]="categoryPickerClub() !== null" [club]="categoryPickerClub()" [currentUserId]="currentUserId"
+  (close)="closeCategoryPicker()" (saved)="onCategoriesSaved($event)"
+/>
