@@ -1,4 +1,7 @@
 .env
+# Any .env variant - backups and per-environment copies hold the same secrets.
+.env.*
+!.env.example
 .venv/
 __pycache__/
 *.py[cod]
