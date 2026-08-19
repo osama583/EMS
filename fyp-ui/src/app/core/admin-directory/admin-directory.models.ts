@@ -67,7 +67,10 @@ export type NavEntryType = 'page' | 'folder';
 //   unit_role: BOTH set — cross-product WITHIN the row: holds any role in roleCodes AND is in any
 //              unit in unitCodes.
 //   unit:      unitCodes set, roleCodes empty — holds ANY role, in any of these units.
-export type NavGrantType = 'role' | 'unit_role' | 'unit';
+//   cafeteria: roleCodes set, unitCodes empty — holds any of these roles in ANY cafeteria. Unlike
+//              unit_role it names the group rather than today's members, so an outlet created later
+//              is covered without editing the grant (see migration 004).
+export type NavGrantType = 'role' | 'unit_role' | 'unit' | 'cafeteria';
 
 export interface AdminNavPageGrant {
   readonly grantId: number;

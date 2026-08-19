@@ -139,6 +139,16 @@
         <button type="button" class="page-visibility__select-all" (click)="selectAllGrantRoles()">Select all roles</button>
       </div>
     }
+    @if (newGrantType() === 'cafeteria') {
+      <div class="page-visibility__multi-field">
+        <app-searchable-dropdown
+          controlId="new-grant-cafeteria-role" label="Roles" placeholder="Choose one or more roles" [isMulti]="true"
+          [options]="newGrantRoleOptions()" [value]="newGrantRoleCodes()" (valueChange)="setNewGrantRoleCodes($any($event))"
+        />
+        <button type="button" class="page-visibility__select-all" (click)="selectAllGrantRoles()">Select all roles</button>
+      </div>
+      <p class="page-visibility__muted">Applies to every cafeteria, including any added later — there are no outlets to pick.</p>
+    }
     @if (newGrantType() === 'unit') {
       <div class="page-visibility__multi-field">
         <app-searchable-dropdown

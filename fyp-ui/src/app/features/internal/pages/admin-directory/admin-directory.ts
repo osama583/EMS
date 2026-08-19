@@ -175,11 +175,12 @@ export class AdminDirectoryComponent {
   readonly relationshipPopoverGroup = computed(() => this.userAssignmentGroups().find((g) => g.userId === this.relationshipPopoverUserId()) ?? null);
   readonly relationshipPopoverItems = computed<readonly string[]>(() => this.relationshipPopoverGroup()?.rows.map((r) => this.relationshipLabel(r)) ?? []);
 
-  // Add popup: only users with NO unit-scoped role yet are assignable — a user already holding a
-  // unit+role is managed via their row's Edit action instead of here.
+  // Add popup: only users with no role at all are assignable — anyone already holding one is
+  // managed through their row's Edit action instead. Note this counts flat roles (unitCode null)
+  // too: a System Admin holds a real assignment, so listing them here would offer a second one.
   readonly assignableUserOptions = computed<readonly SelectOption[]>(() =>
     this.users()
-      .filter((user) => !user.roles.some((role) => role.unitCode))
+      .filter((user) => user.roles.length === 0)
       .map((user) => ({ value: user.id, label: user.displayName, description: user.email })),
   );
   readonly editingAssignmentUserOption = computed<readonly SelectOption[]>(() => {

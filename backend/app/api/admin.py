@@ -28,6 +28,7 @@ from ..logging_setup import audit
 from ..security import require_admin
 from ..security.passwords import hash_password
 from ..security.principal import HEAD_ROLE_CODES, current_principal
+from ..services.identity import CAFETERIA_UNIT_PREFIX
 from ._helpers import body, flag, required
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -1247,7 +1248,10 @@ def purge_nav_page(page_code: str):
     return "", 204
 
 
-GRANT_TYPES = ("role", "unit_role", "unit")
+# 'cafeteria' carries roles only - it matches those roles in ANY cafeteria unit,
+# so unlike 'unit_role' it does not go stale when a new outlet is created. See
+# migration 004 and services/identity.py _satisfies_grant.
+GRANT_TYPES = ("role", "unit_role", "unit", "cafeteria")
 
 
 @bp.put("/nav-pages/<page_code>/grants")
@@ -1282,22 +1286,9 @@ def replace_grants(page_code: str):
                 )
             seen_types.add(grant_type)
 
-            role_codes = grant.get("roleCodes") or []
-            if grant_type == "role" and role_codes:
-                scoped = [
-                    r["role_code"]
-                    for r in fetch_all(
-                        cur,
-                        "SELECT DISTINCT role_code FROM role_unit WHERE role_code = ANY(%s)",
-                        (list(role_codes),),
-                    )
-                ]
-                if scoped:
-                    raise BadRequest(
-                        "A 'role' grant can only hold system-wide roles. "
-                        + ", ".join(sorted(scoped))
-                        + " must be granted with a unit, using 'unit_role'."
-                    )
+            _assert_grant_is_legal(
+                cur, str(grant_type), grant.get("roleCodes") or [], grant.get("unitCodes") or []
+            )
 
         cur.execute("DELETE FROM nav_page_grants WHERE page_code = %s", (page_code,))
         for grant in grants:
@@ -1307,16 +1298,13 @@ def replace_grants(page_code: str):
                 (page_code, grant["grantType"], bool(grant.get("isActive", True))),
             )
             grant_id = cur.fetchone()["grant_id"]
-            for role_code in grant.get("roleCodes") or []:
-                cur.execute(
-                    "INSERT INTO nav_page_grant_roles (grant_id, role_code) VALUES (%s, %s)",
-                    (grant_id, role_code),
-                )
-            for unit_code in grant.get("unitCodes") or []:
-                cur.execute(
-                    "INSERT INTO nav_page_grant_units (grant_id, unit_code) VALUES (%s, %s)",
-                    (grant_id, unit_code),
-                )
+            _write_grant_links(
+                cur,
+                grant_id,
+                grant.get("roleCodes") or [],
+                grant.get("unitCodes") or [],
+                str(grant["grantType"]),
+            )
         audit("admin.grants.replaced", page_code=page_code, count=len(grants),
               actor_user_id=current_principal().user_id)
     return jsonify({"pageCode": page_code, "grantCount": len(grants)})
@@ -1344,9 +1332,33 @@ def _grant_response(grant_id: int) -> dict:
 
 
 def _assert_grant_is_legal(cur, grant_type: str, role_codes, unit_codes) -> None:
-    """The two rules the database cannot state on its own."""
+    """The rules the database cannot state on its own."""
     if grant_type not in GRANT_TYPES:
         raise BadRequest("grantType must be one of: " + ", ".join(GRANT_TYPES) + ".")
+
+    # A 'cafeteria' grant takes its units from the prefix, so a role that cannot
+    # be held in a cafeteria would match nothing and read as access that isn't
+    # really granted.
+    if grant_type == "cafeteria":
+        if not role_codes:
+            raise BadRequest("A 'cafeteria' grant needs at least one role.")
+        eligible = {
+            r["role_code"]
+            for r in fetch_all(
+                cur,
+                "SELECT DISTINCT role_code FROM role_unit "
+                "WHERE role_code = ANY(%s) AND unit_code LIKE %s",
+                (list(role_codes), CAFETERIA_UNIT_PREFIX + "%"),
+            )
+        }
+        stray = sorted(set(role_codes) - eligible)
+        if stray:
+            raise BadRequest(
+                ", ".join(stray)
+                + " cannot be held in a cafeteria, so a 'cafeteria' grant for "
+                + ("them" if len(stray) > 1 else "it")
+                + " would match nobody."
+            )
 
     # A 'role' grant means "holds this role anywhere", which only a role with no
     # unit links can mean.
@@ -1374,7 +1386,11 @@ def _assert_grant_is_legal(cur, grant_type: str, role_codes, unit_codes) -> None
             raise BadRequest("No such unit: " + str(unit_code) + ".")
 
 
-def _write_grant_links(cur, grant_id: int, role_codes, unit_codes) -> None:
+def _write_grant_links(cur, grant_id: int, role_codes, unit_codes, grant_type: str = "") -> None:
+    # A 'cafeteria' grant draws its units from the code prefix. Storing a unit
+    # list alongside would be dead data that reads like a restriction.
+    if grant_type == "cafeteria":
+        unit_codes = ()
     cur.execute("DELETE FROM nav_page_grant_roles WHERE grant_id = %s", (grant_id,))
     cur.execute("DELETE FROM nav_page_grant_units WHERE grant_id = %s", (grant_id,))
     for role_code in dict.fromkeys(role_codes or ()):
@@ -1419,7 +1435,7 @@ def add_grant(page_code: str):
             (page_code, grant_type, bool(payload.get("active", True))),
         )
         grant_id = cur.fetchone()["grant_id"]
-        _write_grant_links(cur, grant_id, role_codes, unit_codes)
+        _write_grant_links(cur, grant_id, role_codes, unit_codes, str(grant_type))
         audit("admin.grant.created", page_code=page_code, grant_type=grant_type,
               actor_user_id=current_principal().user_id)
     return jsonify(_grant_response(grant_id)), 201
@@ -1452,7 +1468,7 @@ def update_grant(page_code: str, grant_id: int):
             "UPDATE nav_page_grants SET grant_type = %s WHERE grant_id = %s",
             (grant_type, grant_id),
         )
-        _write_grant_links(cur, grant_id, role_codes, unit_codes)
+        _write_grant_links(cur, grant_id, role_codes, unit_codes, str(grant_type))
         audit("admin.grant.updated", page_code=page_code, grant_id=grant_id,
               actor_user_id=current_principal().user_id)
     return jsonify(_grant_response(grant_id))

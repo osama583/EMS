@@ -71,7 +71,12 @@ const GRANT_TYPE_OPTIONS: readonly { readonly value: NavGrantType; readonly labe
   { value: 'role', label: 'Role only', description: 'Anyone holding this role, in any unit. Flat roles only (e.g. CFO, System Admin).' },
   { value: 'unit_role', label: 'Unit + role', description: 'Anyone holding this role SPECIFICALLY in this unit — e.g. "Staff, but only in Food & Beverage Services".' },
   { value: 'unit', label: 'Unit only', description: 'Anyone holding ANY role in this unit — e.g. "everyone in Finance".' },
+  { value: 'cafeteria', label: 'All cafeterias', description: 'Anyone holding this role in ANY cafeteria — including outlets added later. No need to pick outlets one by one.' },
 ];
+
+// Roles a 'cafeteria' grant can name. Every outlet accepts exactly these two, so the picker offers
+// them without a round trip — and the server rejects anything else (see _assert_grant_is_legal).
+const CAFETERIA_ROLE_CODES: readonly string[] = ['cafeteria-manager', 'cafeteria-staff'];
 
 // The deleted-items table names its first column differently per page (identity / name / label),
 // so the confirmation reads whichever cell actually carries the record's display name.
@@ -588,6 +593,8 @@ export class PageVisibilityComponent {
   grantSummaryItems(grant: { readonly grantType: NavGrantType; readonly roleCodes: readonly string[]; readonly unitCodes: readonly string[] }): readonly string[] {
     if (grant.grantType === 'role') return grant.roleCodes.map((code) => `${this.roleLabel(code)} · any unit`);
     if (grant.grantType === 'unit') return grant.unitCodes.map((code) => `Anyone in ${this.unitLabel(code)}`);
+    // No unit names to list — the grant covers every cafeteria, present and future.
+    if (grant.grantType === 'cafeteria') return grant.roleCodes.map((code) => `${this.roleLabel(code)} · all cafeterias`);
     const items: string[] = [];
     for (const roleCode of grant.roleCodes) {
       for (const unitCode of grant.unitCodes) items.push(`${this.roleLabel(roleCode)} in ${this.unitLabel(unitCode)}`);
@@ -627,7 +634,7 @@ export class PageVisibilityComponent {
         actionKeys: ['edit', 'status', 'remove'],
         cells: {
           page: { primary: page.label, secondary: page.pageCode },
-          type: { primary: this.grantTypeLabel(grant.grantType), badge: true, tone: grant.grantType === 'role' ? 'blue' : grant.grantType === 'unit' ? 'success' : 'warning' },
+          type: { primary: this.grantTypeLabel(grant.grantType), badge: true, tone: grant.grantType === 'role' ? 'blue' : grant.grantType === 'unit' ? 'success' : grant.grantType === 'cafeteria' ? 'neutral' : 'warning' },
           grant: { primary: grantLabel, badge: true, tone: items.length ? 'blue' : 'warning', clickable: true, badgeIcon: items.length > 1 ? 'share' : undefined },
           status: { primary: grant.active ? 'Active' : 'Inactive', badge: true, tone: grant.active ? 'success' : 'neutral' },
           actions: { primary: '' },
@@ -713,13 +720,20 @@ export class PageVisibilityComponent {
   // (union — see eligibleRolesForUnits' comment in role-eligibility.service.js).
   readonly newGrantRoleOptions = computed<readonly SelectOption[]>(() => {
     if (this.newGrantType() === 'role') return this.flatRoles().map((r) => ({ value: r.roleCode, label: r.roleName }));
+    // 'cafeteria' spans every outlet, so its roles come from the fixed cafeteria set rather than
+    // from whichever units happen to be picked.
+    if (this.newGrantType() === 'cafeteria') {
+      return this.roles()
+        .filter((r) => CAFETERIA_ROLE_CODES.includes(r.roleCode))
+        .map((r) => ({ value: r.roleCode, label: r.roleName }));
+    }
     return (this.grantEligibleRoles() ?? []).map((r) => ({ value: r.roleCode, label: r.roleName }));
   });
   readonly newGrantUnitOptions = computed<readonly SelectOption[]>(() => this.activeUnits().map((u) => ({ value: u.code, label: u.name })));
   readonly newGrantValid = computed(() => {
     if (!this.grantModalPageCode()) return false;
     const type = this.newGrantType();
-    if (type === 'role') return this.newGrantRoleCodes().length > 0;
+    if (type === 'role' || type === 'cafeteria') return this.newGrantRoleCodes().length > 0;
     if (type === 'unit') return this.newGrantUnitCodes().length > 0;
     return this.newGrantRoleCodes().length > 0 && this.newGrantUnitCodes().length > 0;
   });
@@ -802,7 +816,8 @@ export class PageVisibilityComponent {
     const grantDraft = {
       grantType: type,
       roleCodes: type === 'unit' ? undefined : this.newGrantRoleCodes(),
-      unitCodes: type === 'role' ? undefined : this.newGrantUnitCodes(),
+      // 'cafeteria' takes its units from the code prefix, so it sends none.
+      unitCodes: type === 'role' || type === 'cafeteria' ? undefined : this.newGrantUnitCodes(),
     };
     const request = editingId
       ? this.service.updateNavPageGrant(page.pageCode, editingId, grantDraft)

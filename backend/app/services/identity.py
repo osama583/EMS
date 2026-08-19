@@ -9,7 +9,10 @@ from typing import Any
 
 from ..db import query, query_one
 
-CAFETERIA_UNIT_PREFIX = "cafeteria_"
+# Every cafeteria outlet is a unit whose code the create endpoint prefixes
+# (app/api/cafeterias.py CAFETERIA_PREFIX), so this prefix is what makes a unit a
+# cafeteria. The 'cafeteria' grant type below relies on it.
+CAFETERIA_UNIT_PREFIX = "cafeteria__"
 
 _ROLES_SQL = """
     SELECT uur.user_unit_role_id,
@@ -69,6 +72,14 @@ def _satisfies_grant(roles: list[dict[str, Any]], grant: dict[str, Any]) -> bool
         return any(r["roleCode"] in role_codes for r in roles)
     if grant["grant_type"] == "unit":
         return any(r["unitCode"] in unit_codes for r in roles)
+    if grant["grant_type"] == "cafeteria":
+        # Names the group, not its members: any listed role held in ANY cafeteria,
+        # including outlets created after this grant was written. Cafeteria staff
+        # all see the same pages, so enumerating outlets only went stale.
+        return any(
+            r["roleCode"] in role_codes and (r["unitCode"] or "").startswith(CAFETERIA_UNIT_PREFIX)
+            for r in roles
+        )
     # unit_role: cross-product WITHIN the row - any listed role held in any listed unit.
     return any(r["roleCode"] in role_codes and r["unitCode"] in unit_codes for r in roles)
 
