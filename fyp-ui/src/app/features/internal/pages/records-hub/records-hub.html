@@ -1,4 +1,4 @@
-@if (showTasksTab() || showRequestsTab() || showClubRequestsTab() || showRegistrationsTab()) {
+@if (showTasksTab() || showRequestsTab() || showClubRequestsTab() || showRegistrationsTab() || showStaffRequestsTab()) {
   <nav class="shared-tabs" aria-label="{{ title }} sections">
     <a class="shared-tabs__tab" routerLink="proposals" routerLinkActive="shared-tabs__tab--active">
       <span class="material-symbols-rounded" aria-hidden="true">description</span>
@@ -20,6 +20,12 @@
       <a class="shared-tabs__tab" routerLink="registrations" routerLinkActive="shared-tabs__tab--active">
         <span class="material-symbols-rounded" aria-hidden="true">how_to_reg</span>
         Registrations
+      </a>
+    }
+    @if (showStaffRequestsTab()) {
+      <a class="shared-tabs__tab" routerLink="staff-requests" routerLinkActive="shared-tabs__tab--active">
+        <span class="material-symbols-rounded" aria-hidden="true">badge</span>
+        Staff Requests
       </a>
     }
     @if (showClubRequestsTab()) {

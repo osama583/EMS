@@ -101,10 +101,14 @@ export class CafeteriaMenuOversightComponent {
   closeDetails(): void { this.detailsTarget.set(null); }
 
   private optionLabel(id: string | undefined): string { return id ? this.lookupLabels().get(id) ?? id : ''; }
+  // Several dietary tags read as one comma-separated phrase in the card's badge.
+  private optionLabels(ids: readonly string[] | undefined): string {
+    return (ids ?? []).map((id) => this.optionLabel(id)).filter(Boolean).join(', ');
+  }
 
   private toCardViewModel(option: FoodRequestOption): OptionCardViewModel {
     const unit = this.optionLabel(option.servingUnitId);
-    const dietary = this.optionLabel(option.dietaryInformationId);
+    const dietary = this.optionLabels(option.dietaryInformationIds);
     return {
       id: option.id,
       label: option.label,

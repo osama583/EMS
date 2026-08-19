@@ -3,6 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../../../core/auth/auth.service';
+import { EVENT_IMAGE_UPLOAD_API } from '../../../../core/events/event-image-upload.service';
 import { managerOptionKinds } from '../../../../core/request-options/request-option.permissions';
 import { ArchivedRequestOption, RequestOption, RequestOptionDraft, RequestOptionKind } from '../../../../core/request-options/request-option.models';
 import { RequestOptionService } from '../../../../core/request-options/request-option.service';
@@ -25,7 +26,7 @@ import { OptionItemDetailsModalComponent } from '../../../../shared/components/o
 interface ManagerField {
   readonly key: string;
   readonly label: string;
-  readonly type: 'text' | 'textarea' | 'number' | 'select';
+  readonly type: 'text' | 'textarea' | 'number' | 'select' | 'multiselect';
   readonly required?: boolean;
   readonly min?: number;
   readonly options?: readonly SelectOption[];
@@ -69,6 +70,7 @@ export class RequestOptionManagementComponent {
   private readonly auth = inject(AuthService);
   private readonly optionService = inject(RequestOptionService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly imageUpload = inject(EVENT_IMAGE_UPLOAD_API);
   readonly cafeteriaPage = this.route.snapshot.data['optionPage'] === 'menu';
   private readonly explicitKind = this.route.snapshot.data['optionKind'] as RequestOptionKind | undefined;
   private readonly managerKinds = managerOptionKinds(this.auth.user()!);
@@ -92,9 +94,10 @@ export class RequestOptionManagementComponent {
   readonly pageSize = signal(10);
   readonly modalOpen = signal(false);
   readonly editingId = signal<string | null>(null);
-  readonly draft = signal<Record<string, string | number | boolean>>({});
+  readonly draft = signal<Record<string, string | number | boolean | readonly string[]>>({});
   readonly errorMessage = signal('');
   readonly imageError = signal('');
+  readonly imageUploading = signal(false);
   readonly viewMode = signal<'table' | 'card'>('table');
   readonly deleteTarget = signal<RequestOption | null>(null);
   readonly deletePreview = signal<DeletionPreview | null>(null);
@@ -147,6 +150,7 @@ export class RequestOptionManagementComponent {
   readonly fields = computed(() => this.fieldsFor(this.selectedKind()));
   readonly formValid = computed(() => this.fields().filter((field) => field.required).every((field) => {
     const value = this.draft()[field.key];
+    if (field.type === 'multiselect') return Array.isArray(value) && value.length > 0;
     return field.type === 'number' ? value !== '' && value !== undefined && Number(value) >= (field.min ?? 0) : Boolean(String(value ?? '').trim());
   }));
   readonly config = computed<InternalDataPageConfig>(() => ({
@@ -323,6 +327,13 @@ export class RequestOptionManagementComponent {
     const field = this.fields().find((item) => item.key === key);
     this.draft.update((draft) => ({ ...draft, [key]: field?.type === 'number' ? (value === '' ? '' : Number(value)) : value }));
   }
+  setDraftList(key: string, values: readonly string[]): void {
+    this.draft.update((draft) => ({ ...draft, [key]: values }));
+  }
+  fieldValues(key: string): readonly string[] {
+    const value = this.draft()[key];
+    return Array.isArray(value) ? value : [];
+  }
   save(): void {
     if (!this.formValid()) return;
     this.saving.set(true); this.clearNotices();
@@ -333,7 +344,11 @@ export class RequestOptionManagementComponent {
       error: () => this.toast.error('The option could not be saved', 'Please try again.'),
     });
   }
-  fieldValue(key: string): string | number { const value = this.draft()[key]; return typeof value === 'boolean' ? '' : value ?? ''; }
+  fieldValue(key: string): string | number {
+    const value = this.draft()[key];
+    if (typeof value === 'boolean' || Array.isArray(value)) return '';
+    return (value as string | number) ?? '';
+  }
   fieldOptions(field: ManagerField): readonly SelectOption[] { return field.options ?? []; }
   kindLabel(kind: RequestOptionKind): string { return KIND_LABELS[kind]; }
   imagePreview(): string { return String(this.draft()['imageDataUrl'] ?? ''); }
@@ -354,17 +369,22 @@ export class RequestOptionManagementComponent {
     }
   }
 
+  // Uploads and stores the returned URL, never the data URL itself: the image
+  // columns are VARCHAR(255), so an inlined base64 photo overflows the column
+  // and the save fails with a 500 (same reason EVENT_IMAGE_UPLOAD_API exists).
   selectImageFile(file: File): void {
     if (!file) return;
     if (!file.type.startsWith('image/')) { this.imageError.set('Select a valid image file.'); return; }
     if (file.size > 5 * 1024 * 1024) { this.imageError.set(`${this.imageFieldLabel()} must be 5 MB or smaller.`); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      this.draft.update((draft) => ({ ...draft, imageDataUrl: String(reader.result ?? ''), imageFileName: file.name }));
-      this.imageError.set('');
-    };
-    reader.onerror = () => this.imageError.set('The image could not be read. Please choose another file.');
-    reader.readAsDataURL(file);
+    this.imageError.set('');
+    this.imageUploading.set(true);
+    this.imageUpload.upload({ file }).pipe(
+      finalize(() => this.imageUploading.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: ({ image }) => this.draft.update((draft) => ({ ...draft, imageDataUrl: image.url, imageFileName: file.name })),
+      error: () => this.imageError.set('The image could not be uploaded. Please try again.'),
+    });
   }
 
   selectImage(event: Event): void {
@@ -386,10 +406,13 @@ export class RequestOptionManagementComponent {
     });
   }
   private clearNotices(): void { this.errorMessage.set(''); }
-  private emptyDraft(kind: RequestOptionKind): Record<string, string | number | boolean> {
-    const draft: Record<string, string | number | boolean> = { kind, label: '', description: '', active: true };
+  private emptyDraft(kind: RequestOptionKind): Record<string, string | number | boolean | readonly string[]> {
+    const draft: Record<string, string | number | boolean | readonly string[]> = { kind, label: '', description: '', active: true };
     if (kind === 'fmb' && this.auth.user()?.cafeteriaCode !== undefined) draft['cafeteriaCode'] = this.auth.user()!.cafeteriaCode!;
-    this.fieldsFor(kind).forEach((field) => { if (!(field.key in draft)) draft[field.key] = field.type === 'number' ? '' : ''; });
+    this.fieldsFor(kind).forEach((field) => {
+      if (field.key in draft) return;
+      draft[field.key] = field.type === 'multiselect' ? [] : '';
+    });
     return draft;
   }
   private fieldsFor(kind: RequestOptionKind): readonly ManagerField[] {
@@ -404,7 +427,9 @@ export class RequestOptionManagementComponent {
       fmb: [
         { key: 'servingUnitId', label: 'Serving Unit', type: 'select', required: true, options: this.managedSelectOptions('servingUnit') },
         { key: 'orderingNotes', label: 'Availability / Ordering Notes', type: 'textarea' },
-        { key: 'dietaryInformationId', label: 'Dietary Information', type: 'select', required: true, options: this.managedSelectOptions('dietaryInformation') },
+        // A dish is routinely more than one of vegetarian/halal/nut-free, so this
+        // is a set rather than a single choice (see migration 006).
+        { key: 'dietaryInformationIds', label: 'Dietary Information', type: 'multiselect', required: true, options: this.managedSelectOptions('dietaryInformation') },
       ],
       dietaryInformation: [],
       servingUnit: [],
@@ -427,7 +452,7 @@ export class RequestOptionManagementComponent {
       case 'transportation': return [`${option.passengerCapacity} passengers`, `${option.availableVehicles} vehicle(s)`, option.imageFileName ? 'Image added' : ''].filter(Boolean).join(' · ');
       case 'photoVideo': return option.description ?? '';
       case 'soundLight': return option.setupRequirements ?? '';
-      case 'fmb': return [this.optionLabel(option.servingUnitId), this.optionLabel(option.dietaryInformationId), option.orderingNotes, option.imageFileName ? 'Image added' : ''].filter(Boolean).join(' · ');
+      case 'fmb': return [this.optionLabel(option.servingUnitId), this.optionLabels(option.dietaryInformationIds), option.orderingNotes, option.imageFileName ? 'Image added' : ''].filter(Boolean).join(' · ');
       case 'dietaryInformation': case 'servingUnit': return option.description ?? '';
       case 'campusTourStart': return [option.maximumGroupSize ? `Maximum ${option.maximumGroupSize}` : '', option.meetingInstructions].filter(Boolean).join(' · ');
       case 'campusTourType': return option.description ?? '';
@@ -447,6 +472,11 @@ export class RequestOptionManagementComponent {
     return id ? this.allOptions().find((option) => option.id === id)?.label ?? id : '';
   }
 
+  // Several tags read as one comma-separated phrase wherever a single label used to sit.
+  private optionLabels(ids: readonly string[] | undefined): string {
+    return (ids ?? []).map((id) => this.optionLabel(id)).filter(Boolean).join(', ');
+  }
+
   private toCardViewModel(option: RequestOption): OptionCardViewModel {
     const base = {
       id: option.id,
@@ -459,7 +489,7 @@ export class RequestOptionManagementComponent {
     switch (option.kind) {
       case 'fmb':
         const unit = this.optionLabel(option.servingUnitId);
-        const dietary = this.optionLabel(option.dietaryInformationId);
+        const dietary = this.optionLabels(option.dietaryInformationIds);
         return {
           ...base,
           servingUnitLabel: unit,

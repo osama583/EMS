@@ -1,0 +1,41 @@
+<app-feedback-banner [message]="errorMessage()" tone="error" />
+
+@if (loading()) {
+  <app-loading-state label="Loading staff requests…" />
+} @else if (requests().length === 0) {
+  <p class="hub-staff-requests__empty">No staff requests are waiting for a decision.</p>
+} @else {
+  <ul class="hub-staff-requests__list">
+    @for (request of requests(); track request.id) {
+      <li class="hub-staff-requests__row">
+        <div class="hub-staff-requests__info">
+          <strong>{{ actionLabel(request.action) }} — {{ subjectOf(request) }}</strong>
+          <span>{{ request.cafeteriaName }} · requested by {{ request.requestedByName }}</span>
+          @if (request.email && request.displayName) { <span class="hub-staff-requests__meta">{{ request.email }}</span> }
+        </div>
+        <div class="hub-staff-requests__actions">
+          <button type="button" class="table-control table-control--primary" [disabled]="processingId() === request.id" (click)="openApprove(request)">Approve</button>
+          <button type="button" class="table-control table-control--danger" [disabled]="processingId() === request.id" (click)="openReject(request)">Reject</button>
+        </div>
+      </li>
+    }
+  </ul>
+}
+
+<app-confirm-dialog
+  [open]="!!approveTarget()"
+  title="Approve staff request"
+  [message]="approveTarget() ? (actionLabel(approveTarget()!.action) + ' for ' + subjectOf(approveTarget()!) + ' at ' + approveTarget()!.cafeteriaName + '? The roster changes immediately.') : ''"
+  confirmLabel="Approve"
+  [danger]="false"
+  [loading]="!!processingId()"
+  (confirm)="confirmApprove()"
+  (cancel)="closeApprove()"
+/>
+
+<app-proposal-comment-dialog
+  [open]="!!rejectTarget()" title="Reject Staff Request" label="Reason for rejection" confirmLabel="Reject" [danger]="true" [loading]="rejecting()"
+  [message]="rejectTarget() ? ('Tell ' + rejectTarget()!.requestedByName + ' why this request is being rejected. They will see this reason.') : ''"
+  [minLength]="rejectionCommentMinLength"
+  (cancel)="closeReject()" (confirm)="confirmReject($event)"
+/>

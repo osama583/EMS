@@ -52,6 +52,23 @@ RETENTION_DAYS = 7
 
 
 @dataclass(frozen=True)
+class Collection:
+    """A many-to-many DTO field backed by a junction table.
+
+    A menu item carries one or more dietary tags, so the value is a list of
+    composite ids rather than one. The junction keeps a real FK per pairing,
+    which an array column could not, so a tag cannot be referenced after it is
+    deleted.
+    """
+    table: str
+    # Column in the junction naming the owning row, and the one naming the target.
+    owner_column: str
+    target_column: str
+    # Kind of the referenced catalogue, so ids round-trip as "{kind}:{n}".
+    target_kind: str
+
+
+@dataclass(frozen=True)
 class Catalogue:
     table: str
     pk: str
@@ -69,6 +86,10 @@ class Catalogue:
     # DTO fields holding another option's id, as {dtoField: kind of the target}.
     # Stored as a bare integer, exposed as a composite id.
     references: dict[str, str] = field(default_factory=dict)
+    # DTO fields holding a LIST of another option's ids, stored in a junction
+    # table rather than a column: {dtoField: Collection}. Declared here so the
+    # generic read/write paths handle them without special-casing a kind.
+    collections: dict[str, "Collection"] = field(default_factory=dict)
 
     @property
     def extra_columns(self) -> tuple[str, ...]:
@@ -119,9 +140,13 @@ CATALOGUES: dict[str, Catalogue] = {
     "fmb": Catalogue(
         "fmb_options", "fmb_option_id", None, None,
         {"cafeteriaCode": "unit_code", "servingUnitId": "serving_unit_option_id",
-         "dietaryInformationId": "dietary_information_option_id",
          "orderingNotes": "availability_ordering_notes", "imageDataUrl": "menu_image_url"},
-        references={"servingUnitId": "servingUnit", "dietaryInformationId": "dietaryInformation"}),
+        references={"servingUnitId": "servingUnit"},
+        # A dish is routinely more than one of vegetarian/nut-free/halal, so the
+        # tags live in a junction table (migration 006).
+        collections={"dietaryInformationIds": Collection(
+            "fmb_option_dietary_information", "fmb_option_id",
+            "dietary_information_option_id", "dietaryInformation")}),
 }
 
 # Requirement each catalogue's rows belong to, for the requirement_id column.
@@ -251,16 +276,88 @@ def parse_option_id(value: str) -> tuple[str, int]:
 _BASE_FIELDS = {"label": "label", "description": "description", "active": "active"}
 
 
-def to_dto(kind: str, row: dict) -> dict:
-    """The client's RequestOption. Only declared fields cross the boundary."""
+def to_dto(kind: str, row: dict, collections: dict[str, dict[int, list]] | None = None) -> dict:
+    """The client's RequestOption. Only declared fields cross the boundary.
+
+    `collections` carries pre-loaded junction rows keyed by owner id, so a list
+    of options costs one query per collection rather than one per row.
+    """
     catalogue = CATALOGUES[kind]
-    dto: dict[str, object] = {"id": option_id(kind, row[catalogue.pk]), "kind": kind}
+    row_id = row[catalogue.pk]
+    dto: dict[str, object] = {"id": option_id(kind, row_id), "kind": kind}
     for dto_field, column in {**_BASE_FIELDS, **catalogue.fields}.items():
         value = row.get(column)
         if dto_field in catalogue.references and value is not None:
             value = option_id(catalogue.references[dto_field], value)
         dto[dto_field] = value
+    for dto_field, collection in catalogue.collections.items():
+        ids = (collections or {}).get(dto_field, {}).get(row_id, [])
+        dto[dto_field] = [option_id(collection.target_kind, n) for n in ids]
     return dto
+
+
+def _load_collections(cur_or_none, kind: str, row_ids: list) -> dict[str, dict[int, list]]:
+    """Every declared collection for these rows, one query each."""
+    catalogue = CATALOGUES[kind]
+    if not catalogue.collections or not row_ids:
+        return {}
+    runner = (
+        (lambda sql, params: fetch_all(cur_or_none, sql, params))
+        if cur_or_none is not None
+        else query
+    )
+    out: dict[str, dict[int, list]] = {}
+    for dto_field, c in catalogue.collections.items():
+        grouped: dict[int, list] = {}
+        for r in runner(
+            f"SELECT {c.owner_column} AS owner, {c.target_column} AS target "
+            f"FROM {c.table} WHERE {c.owner_column} = ANY(%s) ORDER BY {c.target_column}",
+            (list(row_ids),),
+        ):
+            grouped.setdefault(r["owner"], []).append(r["target"])
+        out[dto_field] = grouped
+    return out
+
+
+def _to_dtos(kind: str, rows: list[dict], cur=None) -> list[dict]:
+    """DTOs for a whole result set, with collections batched across it."""
+    catalogue = CATALOGUES[kind]
+    loaded = _load_collections(cur, kind, [r[catalogue.pk] for r in rows])
+    return [to_dto(kind, r, loaded) for r in rows]
+
+
+def _write_collections(cur, kind: str, row_id: int, payload: dict) -> None:
+    """Replace declared collections from the payload.
+
+    Absent field means "leave as is"; an empty list means "clear it" - so a
+    partial update cannot silently drop tags it never mentioned.
+    """
+    catalogue = CATALOGUES[kind]
+    for dto_field, c in catalogue.collections.items():
+        if dto_field not in payload:
+            continue
+        values = payload[dto_field] or []
+        if not isinstance(values, list):
+            raise BadRequest(f"{dto_field} must be a list of option ids.")
+        numbers = []
+        for value in values:
+            target_kind, number = parse_option_id(value)
+            if target_kind != c.target_kind:
+                raise BadRequest(f"{dto_field} must contain {c.target_kind} option ids.")
+            if fetch_one(
+                cur,
+                f"SELECT 1 FROM {CATALOGUES[c.target_kind].table} "
+                f"WHERE {CATALOGUES[c.target_kind].pk} = %s AND archived_at IS NULL",
+                (number,),
+            ) is None:
+                raise BadRequest(f"No such {c.target_kind} option: {value}.")
+            numbers.append(number)
+        cur.execute(f"DELETE FROM {c.table} WHERE {c.owner_column} = %s", (row_id,))
+        for number in dict.fromkeys(numbers):
+            cur.execute(
+                f"INSERT INTO {c.table} ({c.owner_column}, {c.target_column}) VALUES (%s, %s)",
+                (row_id, number),
+            )
 
 
 def _writable_values(payload: dict, catalogue: Catalogue, allowed: set[str]) -> dict:
@@ -347,7 +444,7 @@ def list_options():
             f"SELECT * FROM {catalogue.table} WHERE " + " AND ".join(clauses) + " ORDER BY label",
             params,
         )
-        out += [to_dto(kind, r) for r in rows]
+        out += _to_dtos(kind, rows)
     return jsonify(out)
 
 
@@ -372,9 +469,10 @@ def list_deleted():
                 f"FROM {catalogue.table} WHERE archived_at IS NOT NULL ORDER BY archived_at DESC",
                 (RETENTION_DAYS, RETENTION_DAYS),
             )
+            loaded = _load_collections(cur, kind, [r[catalogue.pk] for r in rows])
             out.extend(
                 {
-                    **to_dto(kind, r),
+                    **to_dto(kind, r, loaded),
                     "deletedAt": r["deleted_at"],
                     "permanentDeletionAt": r["permanent_deletion_at"],
                     "daysRemaining": r["days_remaining"],
@@ -401,7 +499,8 @@ def get_option(option_ref: str):
     kind, number = parse_option_id(option_ref)
     with transaction() as cur:
         row = _load(cur, kind, number, live_only=True)
-    return jsonify(to_dto(kind, row))
+        dto = to_dto(kind, row, _load_collections(cur, kind, [number]))
+    return jsonify(dto)
 
 
 @bp.post("")
@@ -440,9 +539,11 @@ def create_option():
             list(values.values()),
         )
         row = dict(cur.fetchone())
+        _write_collections(cur, str(kind), row[catalogue.pk], payload)
+        dto = to_dto(str(kind), row, _load_collections(cur, str(kind), [row[catalogue.pk]]))
         audit("options.created", kind=kind, option_id=row[catalogue.pk],
               actor_user_id=current_principal().user_id)
-    return jsonify(to_dto(str(kind), row)), 201
+    return jsonify(dto), 201
 
 
 def _apply_update(option_ref: str, payload: dict) -> dict:
@@ -453,17 +554,26 @@ def _apply_update(option_ref: str, payload: dict) -> dict:
         _assert_may_write(cur, kind, catalogue, {**existing, **payload})
 
         values = _writable_values(payload, catalogue, _columns(cur, catalogue))
-        if not values:
+        # A collection lives in its own table, so changing only the tags is a
+        # real edit even though no column moved.
+        touches_collection = any(f in payload for f in catalogue.collections)
+        if not values and not touches_collection:
             raise BadRequest("No updatable fields were supplied.")
-        assignments = ", ".join(f"{c} = %s" for c in values)
-        cur.execute(
-            f"UPDATE {catalogue.table} SET {assignments} WHERE {catalogue.pk} = %s RETURNING *",
-            [*values.values(), number],
-        )
-        row = dict(cur.fetchone())
+
+        if values:
+            assignments = ", ".join(f"{c} = %s" for c in values)
+            cur.execute(
+                f"UPDATE {catalogue.table} SET {assignments} WHERE {catalogue.pk} = %s RETURNING *",
+                [*values.values(), number],
+            )
+            row = dict(cur.fetchone())
+        else:
+            row = dict(existing)
+        _write_collections(cur, kind, number, payload)
+        dto = to_dto(kind, row, _load_collections(cur, kind, [number]))
         audit("options.updated", kind=kind, option_id=number,
               actor_user_id=current_principal().user_id)
-    return to_dto(kind, row)
+    return dto
 
 
 @bp.put("/<option_ref>")
@@ -542,9 +652,10 @@ def delete_option(option_ref: str):
             (number,),
         )
         row = dict(cur.fetchone())
+        dto = to_dto(kind, row, _load_collections(cur, kind, [number]))
         audit("options.deleted", kind=kind, option_id=number,
               actor_user_id=current_principal().user_id)
-    return jsonify(to_dto(kind, row))
+    return jsonify(dto)
 
 
 @bp.post("/<option_ref>/restore")
@@ -560,9 +671,10 @@ def restore_option(option_ref: str):
             (number,),
         )
         row = dict(cur.fetchone())
+        dto = to_dto(kind, row, _load_collections(cur, kind, [number]))
         audit("options.restored", kind=kind, option_id=number,
               actor_user_id=current_principal().user_id)
-    return jsonify(to_dto(kind, row))
+    return jsonify(dto)
 
 
 @bp.delete("/<option_ref>/purge")

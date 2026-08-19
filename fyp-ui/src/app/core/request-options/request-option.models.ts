@@ -48,7 +48,9 @@ export interface FoodRequestOption extends RequestOptionBase {
   readonly kind: 'fmb';
   readonly servingUnitId?: string;
   readonly orderingNotes?: string;
-  readonly dietaryInformationId?: string;
+  // A dish carries one or more dietary tags (halal AND nut-free, say), so this is
+  // a set. Backed by a junction table server-side — see migration 006.
+  readonly dietaryInformationIds?: readonly string[];
   // Cafeteria unit code (unit.code, CAFETERIA_UNIT_PREFIX-coded) — a Cafeteria is a Unit, see
   // server/db.js's seedCafeteriaDomain().
   readonly cafeteriaCode?: string;

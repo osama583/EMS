@@ -64,7 +64,10 @@ export class CafeteriaMyStaffComponent {
     ariaLabel: 'My cafeteria staff', paginationLabel: 'Staff pages', rowsPerPageLabel: 'Staff per page', mobileListLabel: 'Staff cards',
     header: {
       title: 'My Staff',
-      description: 'Add, edit, or remove staff at your cafeteria. Changes are sent to Cafeteria Admin for approval.',
+      // No "edit" here: an assignment's only editable field is its role, and a Manager may only
+      // ever request Cafeteria Staff (the server rejects anything else), so an edit they could
+      // raise would always be staff -> staff. Changing someone's role is the Admin's to make.
+      description: 'Add or remove staff at your cafeteria. Changes are sent to Cafeteria Admin for approval.',
       countLabel: `${this.filteredStaff().length} staff member${this.filteredStaff().length === 1 ? '' : 's'}`,
       primaryActionLabel: 'Request new staff',
     },

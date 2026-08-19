@@ -503,6 +503,38 @@ def _staff_request_response(request_id: int) -> dict:
     return _shape_requests(rows)[0]
 
 
+def _assert_no_pending_request(cur, cafeteria_code: str, target_user, email) -> None:
+    """One request per person may await a decision (migration 007).
+
+    Two pending rows about the same person are two roster changes the Admin will
+    apply, and the second lands on a roster the first already changed.
+    """
+    if target_user:
+        clash = fetch_one(
+            cur,
+            "SELECT cafeteria_staff_request_id FROM cafeteria_staff_requests "
+            "WHERE status = 'pending' AND cafeteria_code = %s AND target_user_id = %s",
+            (cafeteria_code, int(target_user)),
+        )
+        who = "That person"
+    elif email:
+        clash = fetch_one(
+            cur,
+            "SELECT cafeteria_staff_request_id FROM cafeteria_staff_requests "
+            "WHERE status = 'pending' AND cafeteria_code = %s AND target_user_id IS NULL "
+            "AND lower(payload_email) = lower(%s)",
+            (cafeteria_code, str(email).strip()),
+        )
+        who = "That email address"
+    else:
+        return
+    if clash:
+        raise Conflict(
+            f"{who} already has a request awaiting a decision. Wait for the Cafeteria "
+            "Admin to resolve it, or withdraw it first."
+        )
+
+
 @bp.post("/staff-requests")
 @require_internal
 def submit_staff_request():
@@ -524,9 +556,16 @@ def submit_staff_request():
     if cafeteria_code not in managed:
         raise Forbidden("You do not manage that cafeteria.")
 
+    # A Manager staffs their outlet; they do not appoint their own peers. Naming
+    # a manager is how someone would grant themselves a colleague with equal
+    # authority over the roster, so the role is fixed here rather than trusted
+    # from the body. Only a Cafeteria Admin assigns managers.
     role_code = payload.get("roleCode") or "cafeteria-staff"
-    if role_code not in STAFF_ROLES:
-        raise BadRequest("roleCode must be one of: " + ", ".join(STAFF_ROLES) + ".")
+    if role_code != "cafeteria-staff":
+        raise Forbidden(
+            "A Manager can only request Cafeteria Staff. Ask a Cafeteria Admin to "
+            "appoint a manager."
+        )
 
     principal = current_principal()
     with transaction() as cur:
@@ -548,6 +587,13 @@ def submit_staff_request():
             target_user = owned["user_id"]
         elif not (target_user or payload.get("email")):
             raise BadRequest("An 'add' request needs targetUserId or an email address.")
+
+        # Spell out the clash before the unique index raises a raw constraint
+        # error. The index is what actually guarantees it (two concurrent
+        # submits both pass this read), but it cannot produce a useful message.
+        _assert_no_pending_request(
+            cur, str(cafeteria_code), target_user, payload.get("email")
+        )
 
         cur.execute(
             """INSERT INTO cafeteria_staff_requests
