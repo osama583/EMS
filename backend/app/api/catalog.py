@@ -411,16 +411,6 @@ def units():
     return jsonify(query(sql + " ORDER BY description"))
 
 
-@bp.get("/cafeterias")
-@require_auth
-def cafeterias():
-    """A cafeteria is a unit with a reserved code prefix - there is no separate
-    table, so "which cafeterias exist" is a prefix query. The underscores are
-    escaped because _ is a LIKE wildcard."""
-    return jsonify(
-        query(
-            "SELECT code, description, is_active FROM unit "
-            "WHERE code LIKE 'cafeteria!_!_%%' ESCAPE '!' "
-            "AND archived_at IS NULL AND is_active ORDER BY description"
-        )
-    )
+# Cafeterias used to be a read-only listing here. They are a resource of their
+# own now - outlets, staffing, and the requests to change it - and live in
+# api/cafeterias.py under the same /catalog/cafeterias path.
