@@ -1,4 +1,6 @@
-export type CafeteriaStaffRequestAction = 'add' | 'edit' | 'remove';
+// 'suspend'/'restore' stand someone down without discarding the assignment, so a spell of leave
+// keeps its history rather than becoming a delete-and-re-add (migration 008).
+export type CafeteriaStaffRequestAction = 'add' | 'edit' | 'remove' | 'suspend' | 'restore';
 export type CafeteriaStaffRequestStatus = 'pending' | 'approved' | 'rejected';
 
 // A Cafeteria Manager cannot write user_unit_roles directly — every add/edit/remove of a
@@ -15,6 +17,16 @@ export interface CafeteriaStaffRequest {
   readonly targetUserId?: string;
   readonly displayName: string;
   readonly email: string;
+  readonly username: string;
+  // What the request proposes, and what the target looks like now — so the Admin can see what
+  // approving actually changes rather than only what it asks for.
+  readonly proposedActive?: boolean | null;
+  readonly setsPassword?: boolean;
+  readonly currentDisplayName?: string | null;
+  readonly currentEmail?: string | null;
+  readonly currentUsername?: string | null;
+  readonly currentActive?: boolean | null;
+  readonly assignmentActive?: boolean | null;
   readonly roleCode: string;
   readonly status: CafeteriaStaffRequestStatus;
   readonly comment?: string;
@@ -30,5 +42,10 @@ export interface CafeteriaStaffRequestDraft {
   readonly targetUserId?: string;
   readonly email?: string;
   readonly displayName?: string;
+  readonly username?: string;
+  // Sent once, hashed server-side before it is stored, and copied into the account only when the
+  // Cafeteria Admin approves — the request table never holds a usable secret.
+  readonly password?: string;
+  readonly active?: boolean;
   readonly roleCode?: string;
 }

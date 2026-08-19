@@ -6,7 +6,10 @@ import { CafeteriaStaffRequestService } from '../../../../core/cafeterias/cafete
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
 import { InternalCellTone, InternalDataPageConfig, InternalDataRecord } from '../../../../shared/components/internal-data-page/internal-data-page.models';
 
-const ACTION_LABELS: Record<CafeteriaStaffRequest['action'], string> = { add: 'Add staff', edit: 'Edit staff', remove: 'Remove staff' };
+const ACTION_LABELS: Record<CafeteriaStaffRequest['action'], string> = {
+  add: 'Add staff', edit: 'Edit staff', remove: 'Remove staff',
+  suspend: 'Suspend staff', restore: 'Restore staff',
+};
 const STATUS_TONE: Record<CafeteriaStaffRequest['status'], InternalCellTone> = { pending: 'warning', approved: 'success', rejected: 'danger' };
 const STATUS_LABEL: Record<CafeteriaStaffRequest['status'], string> = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
 

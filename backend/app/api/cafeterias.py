@@ -37,7 +37,7 @@ from ..db import fetch_all, fetch_one, query, transaction
 from ..errors import BadRequest, Conflict, Forbidden, NotFound
 from ..logging_setup import audit
 from ..security import require_auth, require_internal
-from ..security.passwords import hash_password
+from ..security.passwords import MAX_PASSWORD_BYTES, hash_password
 from ..security.principal import current_principal
 from ._helpers import body, flag, required
 
@@ -47,7 +47,7 @@ CAFETERIA_PREFIX = "cafeteria__"
 RETENTION_DAYS = 7
 STAFF_ROLES = ("cafeteria-manager", "cafeteria-staff")
 ROLE_LABELS = {"cafeteria-manager": "Cafeteria Manager", "cafeteria-staff": "Cafeteria Staff"}
-ACTIONS = ("add", "edit", "remove")
+ACTIONS = ("add", "edit", "remove", "suspend", "restore")
 MIN_REJECTION_COMMENT = 20
 
 
@@ -69,6 +69,20 @@ def _is_cafeteria_admin() -> bool:
 def _assert_cafeteria_admin() -> None:
     if not _is_cafeteria_admin():
         raise Forbidden("Only a Cafeteria Admin can do that.")
+
+
+def _assert_may_decide_staff_request() -> None:
+    """Deciding a Manager's staffing request is the Cafeteria Admin's alone.
+
+    Deliberately NOT _assert_cafeteria_admin: that one also admits System Admin,
+    which is right for managing outlets but wrong here. The chain is Manager ->
+    Cafeteria Admin, and a System Admin standing in for the approver would make
+    the approval step something the chain does not actually require.
+    """
+    if not current_principal().has_role("cafeteria-admin"):
+        raise Forbidden(
+            "Only a Cafeteria Admin can decide staffing requests."
+        )
 
 
 def _managed_codes() -> set[str]:
@@ -281,8 +295,10 @@ def purge_cafeteria(code: str):
 # --- Assignments ----------------------------------------------------------
 _ASSIGNMENT_SELECT = """
     SELECT uur.user_unit_role_id AS "assignmentId", u.user_id AS "userId",
-           u.full_name AS "displayName", u.email,
+           u.full_name AS "displayName", u.email, u.username,
+           u.is_active AS "userActive",
            uur.role_code AS "roleCode", uur.unit_code AS "cafeteriaCode",
+           uur.is_active AS active,
            un.description AS "cafeteriaName"
       FROM user_unit_roles uur
       JOIN users u ON u.user_id = uur.user_id
@@ -395,12 +411,22 @@ def _assert_assignable(cur, user_id: int, cafeteria_code: str, role_code: str,
 @bp.post("/assignments")
 @require_internal
 def create_assignment():
+    """Assign someone to a cafeteria.
+
+    The Admin creates the person and their posting in one step: a cafeteria hire
+    is a new account far more often than an existing user changing jobs, and
+    creating the account elsewhere first only to come back and assign it is two
+    screens for one act. Passing `userId` instead still assigns an existing
+    account, which is what the edit path does.
+    """
     _assert_cafeteria_admin()
     payload = body()
-    user_id, cafeteria_code, role_code = required(
-        payload, "userId", "cafeteriaCode", "roleCode"
-    )
+    cafeteria_code, role_code = required(payload, "cafeteriaCode", "roleCode")
+    user_id = payload.get("userId")
+
     with transaction() as cur:
+        if not user_id:
+            user_id = _create_staff_account(cur, payload)
         _assert_assignable(cur, int(user_id), str(cafeteria_code), str(role_code))
         cur.execute(
             "INSERT INTO user_unit_roles (user_id, unit_code, role_code) VALUES (%s, %s, %s) "
@@ -444,8 +470,43 @@ def update_assignment(assignment_id: int):
             "WHERE user_unit_role_id = %s",
             (cafeteria_code, role_code, assignment_id),
         )
+        # The person's own details, when the Admin edited them on the same form.
+        _apply_user_detail_changes(cur, existing["user_id"], {
+            "payload_display_name": payload.get("displayName"),
+            "payload_username": payload.get("username"),
+            "payload_email": payload.get("email"),
+            "payload_active": payload.get("userActive"),
+            "payload_password_hash": (
+                _hash_new_password(str(payload["password"])) if payload.get("password") else None
+            ),
+        })
         audit("cafeterias.assignment.updated", assignment_id=assignment_id,
               actor_user_id=current_principal().user_id)
+    return jsonify(_assignment_response(assignment_id))
+
+
+@bp.patch("/assignments/<int:assignment_id>/status")
+@require_internal
+def set_assignment_status(assignment_id: int):
+    """Suspend or restore a posting without discarding it.
+
+    Distinct from DELETE: someone on leave keeps their assignment (and its
+    history) and simply stops appearing on the active roster.
+    """
+    _assert_cafeteria_admin()
+    payload = body()
+    if "active" not in payload:
+        raise BadRequest("An 'active' field is required.")
+    with transaction() as cur:
+        cur.execute(
+            "UPDATE user_unit_roles SET is_active = %s "
+            "WHERE user_unit_role_id = %s AND role_code = ANY(%s)",
+            (bool(payload["active"]), assignment_id, list(STAFF_ROLES)),
+        )
+        if cur.rowcount == 0:
+            raise NotFound("Assignment not found.")
+        audit("cafeterias.assignment.status", assignment_id=assignment_id,
+              active=bool(payload["active"]), actor_user_id=current_principal().user_id)
     return jsonify(_assignment_response(assignment_id))
 
 
@@ -477,6 +538,14 @@ _STAFF_REQUEST_SELECT = """
            r.target_user_id AS "targetUserId",
            COALESCE(r.payload_display_name, t.full_name, '') AS "displayName",
            COALESCE(r.payload_email, t.email, '') AS email,
+           COALESCE(r.payload_username, t.username, '') AS username,
+           r.payload_active AS "proposedActive",
+           (r.payload_password_hash IS NOT NULL) AS "setsPassword",
+           -- The target's CURRENT details, so the Admin can see what an edit
+           -- actually changes rather than only what it proposes.
+           t.full_name AS "currentDisplayName", t.email AS "currentEmail",
+           t.username AS "currentUsername", t.is_active AS "currentActive",
+           a.is_active AS "assignmentActive",
            r.role_code AS "roleCode", r.status, COALESCE(r.comment, '') AS comment,
            r.created_at AS "createdAt", r.resolved_at AS "resolvedAt",
            res.full_name AS "resolvedByName"
@@ -485,6 +554,7 @@ _STAFF_REQUEST_SELECT = """
       JOIN users req ON req.user_id = r.requested_by_user_id
  LEFT JOIN users t ON t.user_id = r.target_user_id
  LEFT JOIN users res ON res.user_id = r.resolved_by_user_id
+ LEFT JOIN user_unit_roles a ON a.user_unit_role_id = r.target_assignment_id
 """
 
 
@@ -501,6 +571,29 @@ def _staff_request_response(request_id: int) -> dict:
     if not rows:
         raise NotFound("Request not found.")
     return _shape_requests(rows)[0]
+
+
+def _hash_new_password(plaintext: str) -> str:
+    """Hash a password chosen for someone else, refusing one bcrypt cannot hold."""
+    if len(plaintext.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise BadRequest(f"A password must be {MAX_PASSWORD_BYTES} bytes or fewer.")
+    if len(plaintext) < 8:
+        raise BadRequest("A password must be at least 8 characters.")
+    return hash_password(plaintext)
+
+
+def _assert_identity_free(cur, email: str, username=None) -> None:
+    """Reject a clash while the Manager can still fix it.
+
+    Without this the request is accepted and only fails at approval, in front of
+    the Admin, with the Manager no longer present to correct it.
+    """
+    if fetch_one(cur, "SELECT 1 FROM users WHERE lower(email) = lower(%s)", (email.strip(),)):
+        raise Conflict("An account with that email address already exists.")
+    if username and fetch_one(
+        cur, "SELECT 1 FROM users WHERE lower(username) = lower(%s)", (str(username).strip(),)
+    ):
+        raise Conflict("An account with that username already exists.")
 
 
 def _assert_no_pending_request(cur, cafeteria_code: str, target_user, email) -> None:
@@ -573,7 +666,7 @@ def submit_staff_request():
         target_assignment = payload.get("targetAssignmentId")
         target_user = payload.get("targetUserId")
 
-        if action in ("edit", "remove"):
+        if action in ("edit", "remove", "suspend", "restore"):
             if not target_assignment:
                 raise BadRequest(f"A '{action}' request needs targetAssignmentId.")
             owned = fetch_one(
@@ -588,6 +681,14 @@ def submit_staff_request():
         elif not (target_user or payload.get("email")):
             raise BadRequest("An 'add' request needs targetUserId or an email address.")
 
+        # An 'add' creates the account only once approved, so the credential has
+        # to survive until then - hashed here, never stored in the clear.
+        password_hash = None
+        if payload.get("password"):
+            password_hash = _hash_new_password(str(payload["password"]))
+        if action == "add" and payload.get("email"):
+            _assert_identity_free(cur, str(payload["email"]), payload.get("username"))
+
         # Spell out the clash before the unique index raises a raw constraint
         # error. The index is what actually guarantees it (two concurrent
         # submits both pass this read), but it cannot produce a useful message.
@@ -598,8 +699,10 @@ def submit_staff_request():
         cur.execute(
             """INSERT INTO cafeteria_staff_requests
                    (cafeteria_code, requested_by_user_id, action, target_user_id,
-                    target_assignment_id, payload_display_name, payload_email, role_code, status)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'pending')
+                    target_assignment_id, payload_display_name, payload_email,
+                    payload_username, payload_password_hash, payload_active,
+                    role_code, status)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending')
                RETURNING cafeteria_staff_request_id""",
             (
                 cafeteria_code,
@@ -609,6 +712,9 @@ def submit_staff_request():
                 int(target_assignment) if target_assignment else None,
                 payload.get("displayName"),
                 payload.get("email"),
+                payload.get("username"),
+                password_hash,
+                payload.get("active") if "active" in payload else None,
                 role_code,
             ),
         )
@@ -642,6 +748,77 @@ def staff_request_inbox():
     return jsonify(_shape_requests(rows))
 
 
+def _create_staff_account(cur, payload: dict) -> int:
+    """Create the account a cafeteria posting is for.
+
+    Shares its rules with the request flow so a Manager's proposal and an
+    Admin's direct create cannot diverge on what makes a valid account.
+    """
+    display_name, email = required(payload, "displayName", "email")
+    email = str(email).strip().lower()
+    username = str(payload.get("username") or email.split("@")[0]).strip()[:80]
+    _assert_identity_free(cur, email, username)
+
+    password = payload.get("password")
+    password_hash = (
+        _hash_new_password(str(password))
+        if password
+        # No password named: a random one nobody holds, so the account exists
+        # but is reachable only through a reset.
+        else hash_password(secrets.token_urlsafe(32))
+    )
+    cur.execute(
+        """INSERT INTO users (full_name, username, email, password, is_active)
+           VALUES (%s, %s, %s, %s, %s) RETURNING user_id""",
+        (
+            str(display_name).strip(),
+            username,
+            email,
+            password_hash,
+            bool(payload.get("active", True)),
+        ),
+    )
+    user_id = cur.fetchone()["user_id"]
+    audit("cafeterias.staff_account.created", target_user_id=user_id,
+          actor_user_id=current_principal().user_id)
+    return user_id
+
+
+def _apply_user_detail_changes(cur, user_id: int, req: dict) -> None:
+    """Write the person's own details from an approved request.
+
+    Only the fields the request named are touched: a Manager who changed just
+    the email must not silently reset the display name or the active flag.
+    """
+    fields: dict[str, object] = {}
+    if req.get("payload_display_name"):
+        fields["full_name"] = req["payload_display_name"]
+    if req.get("payload_username"):
+        fields["username"] = req["payload_username"]
+    if req.get("payload_email"):
+        fields["email"] = str(req["payload_email"]).strip().lower()
+    if req.get("payload_active") is not None:
+        fields["is_active"] = req["payload_active"]
+    if req.get("payload_password_hash"):
+        fields["password"] = req["payload_password_hash"]
+    if not fields:
+        return
+
+    for column, value in (("username", fields.get("username")), ("email", fields.get("email"))):
+        if value and fetch_one(
+            cur,
+            f"SELECT 1 FROM users WHERE lower({column}) = lower(%s) AND user_id <> %s",
+            (value, user_id),
+        ):
+            raise Conflict(f"Another account already uses that {column}.")
+
+    assignments = ", ".join(f"{c} = %s" for c in fields)
+    cur.execute(
+        f"UPDATE users SET {assignments} WHERE user_id = %s",
+        [*fields.values(), user_id],
+    )
+
+
 def _apply_staff_request(cur, req: dict) -> None:
     """Carry out an approved request against user_unit_roles."""
     action = req["action"]
@@ -653,6 +830,18 @@ def _apply_staff_request(cur, req: dict) -> None:
             "DELETE FROM user_unit_roles WHERE user_unit_role_id = %s AND unit_code = %s",
             (req["target_assignment_id"], code),
         )
+        return
+
+    if action in ("suspend", "restore"):
+        # Suspending clears the roster without discarding the assignment, so the
+        # person's history (and assigned_at) survives a spell of leave.
+        cur.execute(
+            "UPDATE user_unit_roles SET is_active = %s "
+            "WHERE user_unit_role_id = %s AND unit_code = %s",
+            (action == "restore", req["target_assignment_id"], code),
+        )
+        if cur.rowcount == 0:
+            raise Conflict("That assignment no longer exists.")
         return
 
     if action == "edit":
@@ -671,6 +860,10 @@ def _apply_staff_request(cur, req: dict) -> None:
             "UPDATE user_unit_roles SET role_code = %s WHERE user_unit_role_id = %s",
             (role_code, req["target_assignment_id"]),
         )
+        # An edit request may also carry the person's own details. Applied only
+        # for the fields the request actually named, so approving an edit cannot
+        # blank out something the Manager left alone.
+        _apply_user_detail_changes(cur, assignment["user_id"], req)
         return
 
     # add: an existing user, or a new account created for the named address.
@@ -683,19 +876,22 @@ def _apply_staff_request(cur, req: dict) -> None:
         if found:
             user_id = found["user_id"]
         else:
-            username = email.split("@")[0][:80]
+            username = req.get("payload_username") or email.split("@")[0][:80]
             if fetch_one(cur, "SELECT 1 FROM users WHERE lower(username) = lower(%s)", (username,)):
                 username = username[:70] + "-" + str(req["cafeteria_staff_request_id"])
             cur.execute(
                 """INSERT INTO users (full_name, username, email, password, is_active)
-                   VALUES (%s, %s, %s, %s, TRUE) RETURNING user_id""",
+                   VALUES (%s, %s, %s, %s, %s) RETURNING user_id""",
                 (
                     req["payload_display_name"] or email.split("@")[0],
                     username,
                     email,
-                    # No usable password: the account is reachable only through
-                    # a reset, so approving a request never mints a credential.
-                    hash_password(secrets.token_urlsafe(32)),
+                    # Already hashed when the request was raised (migration 009),
+                    # so no plaintext credential is ever stored. A request that
+                    # named no password gets a random one nobody holds, leaving
+                    # the account reachable only through a reset.
+                    req.get("payload_password_hash") or hash_password(secrets.token_urlsafe(32)),
+                    req["payload_active"] if req.get("payload_active") is not None else True,
                 ),
             )
             user_id = cur.fetchone()["user_id"]
@@ -708,7 +904,7 @@ def _apply_staff_request(cur, req: dict) -> None:
 
 
 def _decide_staff_request(request_id: int, decision: str, comment: str) -> dict:
-    _assert_cafeteria_admin()
+    _assert_may_decide_staff_request()
     if decision == "reject" and len(comment) < MIN_REJECTION_COMMENT:
         raise BadRequest(
             f"A rejection needs an explanation of at least {MIN_REJECTION_COMMENT} characters."

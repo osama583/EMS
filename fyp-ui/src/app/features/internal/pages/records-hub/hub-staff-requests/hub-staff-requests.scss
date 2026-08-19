@@ -38,6 +38,15 @@
   color: var(--apu-text-muted);
 }
 
+.hub-staff-requests__changes {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.82rem;
+  color: var(--apu-navy-900);
+
+  li { margin: 0.1rem 0; }
+}
+
 .hub-staff-requests__actions {
   display: flex;
   gap: 0.5rem;

@@ -34,18 +34,11 @@
 
 <app-form-modal [open]="modalOpen()" [title]="editingAssignmentId() ? 'Edit Assignment' : 'Add Assignment'" [primaryLabel]="editingAssignmentId() ? 'Save Changes' : 'Add Assignment'" [loading]="saving()" [disabled]="!formValid()" (close)="closeModal()" (cancel)="closeModal()" (submit)="save()">
   <div class="cafeteria-staff-assignments__form">
-    @if (editingAssignmentId()) {
-      <app-searchable-dropdown
-        controlId="assignment-user" label="User" [readOnly]="true"
-        [options]="editingUserOption()" [value]="selectedUserId()"
-      />
-    } @else {
-      <app-searchable-dropdown
-        controlId="assignment-user" label="User" placeholder="Search for a user…" [required]="true"
-        hint="Only users without an existing role are listed."
-        [options]="userOptions()" [value]="selectedUserId()" (valueChange)="selectUser($event)"
-      />
-    }
+    <app-form-field controlId="assignment-name" label="Full Name" [required]="true" [value]="value('displayName')" (valueChange)="setDraft('displayName', $event)" />
+    <app-form-field controlId="assignment-username" label="Username" [value]="value('username')" hint="Leave blank to use the part of the email before the @." (valueChange)="setDraft('username', $event)" />
+    <app-form-field controlId="assignment-email" label="Email" type="email" [required]="true" [value]="value('email')" (valueChange)="setDraft('email', $event)" />
+    <app-form-field controlId="assignment-password" label="Password" type="password" [value]="value('password')" [hint]="passwordHint()" (valueChange)="setDraft('password', $event)" />
+    <app-status-toggle [active]="$any(draft()['userActive'])" label="Active user" description="Inactive users remain listed but cannot sign in." (activeChange)="setDraft('userActive', $event)" />
     <app-searchable-dropdown
       controlId="assignment-cafeteria" label="Cafeteria" placeholder="Select a cafeteria…" [required]="true" [clearable]="false"
       [options]="cafeteriaOptions()" [value]="selectedCafeteriaCode()" (valueChange)="selectCafeteria($event)"

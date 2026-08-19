@@ -75,11 +75,15 @@ _USER_SQL = """
      WHERE user_id = %s
 """
 
+# A suspended assignment (uur.is_active false - migration 008) confers nothing.
+# Filtered here, in the one query every authorization decision reads, so a
+# suspension cannot be honoured by some checks and missed by others.
 _ASSIGNMENTS_SQL = """
     SELECT uur.role_code, uur.unit_code
       FROM user_unit_roles uur
       JOIN role r ON r.role_code = uur.role_code
      WHERE uur.user_id = %s
+       AND uur.is_active
        AND r.archived_at IS NULL
        AND r.is_active
 """

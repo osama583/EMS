@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject, Observable, shareReplay, switchMap, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AssignableCafeteriaUser, Cafeteria, CafeteriaAssignment, CafeteriaAssignmentDraft, CafeteriaDraft } from './cafeteria.models';
+import { AssignableCafeteriaUser, Cafeteria, CafeteriaAssignment, CafeteriaAssignmentDraft, CafeteriaDraft, CafeteriaStaffAccountDraft } from './cafeteria.models';
 import { Archived } from '../admin-directory/admin-directory.models';
 
 @Injectable({ providedIn: 'root' })
@@ -53,6 +53,14 @@ export class CafeteriaService {
   }
   assign(userId: string, cafeteriaCode: string, roleCode: string): Observable<CafeteriaAssignment> {
     return this.http.post<CafeteriaAssignment>(`${this.baseUrl}/assignments`, { userId, cafeteriaCode, roleCode }).pipe(tap(() => this.refresh()));
+  }
+  // Creates the account and its posting in one call — the server does both in one transaction, so
+  // a half-made staff member (account with no cafeteria) is not a reachable state.
+  assignNewAccount(draft: CafeteriaStaffAccountDraft): Observable<CafeteriaAssignment> {
+    return this.http.post<CafeteriaAssignment>(`${this.baseUrl}/assignments`, draft).pipe(tap(() => this.refresh()));
+  }
+  setAssignmentActive(assignmentId: string, active: boolean): Observable<CafeteriaAssignment> {
+    return this.http.patch<CafeteriaAssignment>(`${this.baseUrl}/assignments/${encodeURIComponent(assignmentId)}/status`, { active }).pipe(tap(() => this.refresh()));
   }
   updateAssignment(assignmentId: string, draft: CafeteriaAssignmentDraft): Observable<CafeteriaAssignment> {
     return this.http.put<CafeteriaAssignment>(`${this.baseUrl}/assignments/${encodeURIComponent(assignmentId)}`, draft).pipe(tap(() => this.refresh()));

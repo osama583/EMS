@@ -15,8 +15,15 @@ import { SelectOption } from '../../../../shared/components/form-controls/form-c
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
 import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent } from '../../../../shared/components/internal-data-page/internal-data-page.models';
 import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
+import { FormFieldComponent } from '../../../../shared/components/form-controls/form-field';
+import { StatusToggleComponent } from '../../../../shared/components/status-toggle/status-toggle';
 
-const REQUEST_ACTION_LABELS: Record<CafeteriaStaffRequest['action'], string> = { add: 'Add staff', edit: 'Edit staff', remove: 'Remove staff' };
+const REQUEST_ACTION_LABELS: Record<CafeteriaStaffRequest['action'], string> = {
+  add: 'Add staff', edit: 'Edit staff', remove: 'Remove staff',
+  suspend: 'Suspend staff', restore: 'Restore staff',
+};
+
+const PASSWORD_MIN_LENGTH = 8;
 
 const ROLE_OPTIONS: readonly SelectOption[] = [
   { value: 'cafeteria-manager', label: 'Cafeteria Manager' },
@@ -32,7 +39,7 @@ const ROLE_OPTIONS: readonly SelectOption[] = [
 // Users/Assignments screens are unaffected — a separate, general-purpose view over the same rows).
 @Component({
   selector: 'app-cafeteria-staff-assignments',
-  imports: [InternalDataPageComponent, FormModalComponent, FeedbackBannerComponent, ConfirmDialogComponent, DeleteConfirmDialogComponent, SearchableDropdownComponent],
+  imports: [InternalDataPageComponent, FormModalComponent, FeedbackBannerComponent, ConfirmDialogComponent, DeleteConfirmDialogComponent, SearchableDropdownComponent, FormFieldComponent, StatusToggleComponent],
   templateUrl: './cafeteria-staff-assignments.html',
   styleUrl: './cafeteria-staff-assignments.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -77,10 +84,31 @@ export class CafeteriaStaffAssignmentsComponent {
   readonly deleteTarget = signal<CafeteriaAssignment | null>(null);
   readonly deleting = signal(false);
 
+  // The account this posting is for — created with it when adding, amended when editing.
+  readonly draft = signal<Record<string, string | boolean>>({});
+
   readonly userOptions = computed<readonly SelectOption[]>(() => this.assignableUsers().map((u) => ({ value: u.id, label: u.displayName, description: u.email })));
   readonly cafeteriaOptions = computed<readonly SelectOption[]>(() => this.cafeterias().filter((c) => c.active).map((c) => ({ value: c.code, label: c.name })));
   readonly roleOptions = ROLE_OPTIONS;
-  readonly formValid = computed(() => !!this.selectedUserId() && !!this.selectedCafeteriaCode() && !!this.selectedRoleCode() && !this.managerConflict());
+  readonly passwordHint = computed(() => {
+    const password = String(this.draft()['password'] ?? '');
+    if (password && password.length < PASSWORD_MIN_LENGTH) return `At least ${PASSWORD_MIN_LENGTH} characters.`;
+    return this.editingAssignmentId()
+      ? 'Leave blank to keep the current password.'
+      : 'Leave blank to create the account without a password.';
+  });
+  readonly formValid = computed(() => {
+    const d = this.draft();
+    const name = String(d['displayName'] ?? '').trim();
+    const email = String(d['email'] ?? '').trim();
+    const password = String(d['password'] ?? '');
+    if (password && password.length < PASSWORD_MIN_LENGTH) return false;
+    return name.length > 0
+      && /^\S+@\S+\.\S+$/.test(email)
+      && !!this.selectedCafeteriaCode()
+      && !!this.selectedRoleCode()
+      && !this.managerConflict();
+  });
   // A cafeteria may have at most one Cafeteria Manager — checked against every OTHER assignment
   // (excluding the one currently being edited, so re-saving a manager row onto the same
   // cafeteria isn't blocked by its own existing row). Mirrors the server-side guard in
@@ -116,10 +144,12 @@ export class CafeteriaStaffAssignmentsComponent {
       { key: 'user', label: 'User' },
       { key: 'role', label: 'Role' },
       { key: 'cafeteria', label: 'Cafeteria' },
+      { key: 'status', label: 'Status' },
       { key: 'actions', label: 'Actions', actions: true },
     ],
     actions: [
       { key: 'edit', label: 'Edit assignment', icon: 'edit' },
+      { key: 'status', label: 'Suspend / restore', icon: 'toggle_on' },
       { key: 'remove', label: 'Remove assignment', icon: 'delete' },
     ],
     emptyTitle: 'No assignments found', emptyDescription: 'Add an assignment or change the current search.', pageSizeOptions: [5, 10, 25],
@@ -190,7 +220,7 @@ export class CafeteriaStaffAssignmentsComponent {
     this.clearMessages();
     this.editingAssignmentId.set(null);
     this.selectedUserId.set(''); this.selectedUserLabel.set(''); this.selectedCafeteriaCode.set(''); this.selectedRoleCode.set('');
-    this.loadAssignableUsers();
+    this.draft.set({ displayName: '', username: '', email: '', password: '', userActive: true });
     this.modalOpen.set(true);
   }
   openEdit(assignment: CafeteriaAssignment): void {
@@ -200,9 +230,21 @@ export class CafeteriaStaffAssignmentsComponent {
     this.selectedUserLabel.set(assignment.displayName);
     this.selectedCafeteriaCode.set(assignment.cafeteriaCode);
     this.selectedRoleCode.set(assignment.roleCode);
+    this.draft.set({
+      displayName: assignment.displayName,
+      username: assignment.username ?? '',
+      email: assignment.email,
+      // Blank means "leave it alone" — the stored value is a hash, so there is nothing to show.
+      password: '',
+      userActive: assignment.userActive !== false,
+    });
     this.modalOpen.set(true);
   }
   closeModal(): void { if (!this.saving()) this.modalOpen.set(false); }
+  setDraft(key: string, value: string | boolean): void {
+    this.draft.update((draft) => ({ ...draft, [key]: value }));
+  }
+  value(key: string): string { return String(this.draft()[key] ?? ''); }
   selectUser(value: string | readonly string[]): void { this.selectedUserId.set(Array.isArray(value) ? value[0] ?? '' : value); }
   selectCafeteria(value: string | readonly string[]): void { this.selectedCafeteriaCode.set(Array.isArray(value) ? value[0] ?? '' : value); }
   selectRole(value: string | readonly string[]): void { this.selectedRoleCode.set((Array.isArray(value) ? value[0] ?? '' : value) as CafeteriaStaffRoleCode | ''); }
@@ -218,9 +260,28 @@ export class CafeteriaStaffAssignmentsComponent {
     if (!this.formValid()) return;
     this.saving.set(true); this.clearMessages();
     const editingId = this.editingAssignmentId();
+    const d = this.draft();
+    const account = {
+      displayName: String(d['displayName']).trim(),
+      username: String(d['username'] ?? '').trim() || undefined,
+      email: String(d['email']).trim(),
+      password: String(d['password'] ?? '') || undefined,
+    };
     const request = editingId
-      ? this.service.updateAssignment(editingId, { cafeteriaCode: this.selectedCafeteriaCode(), roleCode: this.selectedRoleCode() as CafeteriaStaffRoleCode })
-      : this.service.assign(this.selectedUserId(), this.selectedCafeteriaCode(), this.selectedRoleCode());
+      ? this.service.updateAssignment(editingId, {
+          cafeteriaCode: this.selectedCafeteriaCode(),
+          roleCode: this.selectedRoleCode() as CafeteriaStaffRoleCode,
+          ...account,
+          userActive: d['userActive'] !== false,
+        })
+      : this.service.assignNewAccount({
+          ...account,
+          displayName: account.displayName,
+          email: account.email,
+          active: d['userActive'] !== false,
+          cafeteriaCode: this.selectedCafeteriaCode(),
+          roleCode: this.selectedRoleCode() as CafeteriaStaffRoleCode,
+        });
     request.pipe(finalize(() => this.saving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.modalOpen.set(false); this.toast.success(editingId ? 'Assignment updated.' : 'Assignment added.'); },
       error: (err) => this.toast.error(err?.error?.message || `The assignment could not be ${editingId ? 'updated' : 'added'}.`),
@@ -231,12 +292,24 @@ export class CafeteriaStaffAssignmentsComponent {
     const assignment = this.assignments().find((a) => a.assignmentId === event.record.id);
     if (!assignment) return;
     if (event.action.key === 'edit') { this.openEdit(assignment); return; }
+    if (event.action.key === 'status') { this.toggleAssignmentActive(assignment); return; }
     this.requestRemove(assignment);
   }
   targetLabel(): string {
     const target = this.deleteTarget();
     return target ? `"${target.displayName} · ${target.cafeteriaName}"` : '';
   }
+  // Suspending stops someone's cafeteria access without discarding the posting, so a spell of
+  // leave keeps its history instead of becoming a delete-and-re-add.
+  private toggleAssignmentActive(assignment: CafeteriaAssignment): void {
+    const next = assignment.active === false;
+    this.clearMessages();
+    this.service.setAssignmentActive(assignment.assignmentId, next).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => this.toast.success(`${assignment.displayName} is now ${next ? 'active' : 'suspended'}.`),
+      error: (err) => this.toast.error('The assignment status could not be changed', apiErrorMessage(err, 'Please try again.')),
+    });
+  }
+
   requestRemove(assignment: CafeteriaAssignment): void {
     this.clearMessages();
     this.deleteTarget.set(assignment);
@@ -263,14 +336,24 @@ export class CafeteriaStaffAssignmentsComponent {
   private assignmentRecords(): readonly InternalDataRecord[] {
     return this.pageSlice(this.filteredAssignments()).map((a) => ({
       id: a.assignmentId,
-      actionKeys: ['edit', 'remove'],
+      actionKeys: ['edit', 'status', 'remove'],
       cells: {
         user: { primary: a.displayName, secondary: a.email },
         role: { primary: a.roleLabel, badge: true, tone: a.roleCode === 'cafeteria-manager' ? 'blue' : 'neutral' },
         cafeteria: { primary: a.cafeteriaName },
+        status: {
+          primary: a.active === false ? 'Suspended' : 'Active',
+          badge: true,
+          tone: a.active === false ? 'warning' : 'success',
+        },
         actions: { primary: '' },
       },
-      mobile: { eyebrow: a.roleLabel, status: '', title: a.displayName, identity: a.email, details: [{ icon: 'storefront', text: a.cafeteriaName }] },
+      mobile: {
+        eyebrow: a.roleLabel,
+        status: a.active === false ? 'Suspended' : 'Active',
+        title: a.displayName, identity: a.email,
+        details: [{ icon: 'storefront', text: a.cafeteriaName }],
+      },
     }));
   }
 }

@@ -11,7 +11,9 @@
         <div class="hub-staff-requests__info">
           <strong>{{ actionLabel(request.action) }} — {{ subjectOf(request) }}</strong>
           <span>{{ request.cafeteriaName }} · requested by {{ request.requestedByName }}</span>
-          @if (request.email && request.displayName) { <span class="hub-staff-requests__meta">{{ request.email }}</span> }
+          <ul class="hub-staff-requests__changes">
+            @for (change of changesFor(request); track change) { <li>{{ change }}</li> }
+          </ul>
         </div>
         <div class="hub-staff-requests__actions">
           <button type="button" class="table-control table-control--primary" [disabled]="processingId() === request.id" (click)="openApprove(request)">Approve</button>

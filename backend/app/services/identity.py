@@ -24,6 +24,7 @@ _ROLES_SQL = """
       JOIN role r ON r.role_code = uur.role_code
  LEFT JOIN unit u ON u.code = uur.unit_code
      WHERE uur.user_id = %s
+       AND uur.is_active
        AND r.archived_at IS NULL
   ORDER BY uur.user_unit_role_id
 """

@@ -14,8 +14,10 @@ export const REJECTION_COMMENT_MIN_LENGTH = 20;
 
 const ACTION_LABELS: Readonly<Record<CafeteriaStaffRequestAction, string>> = {
   add: 'Add staff member',
-  edit: 'Change assignment',
+  edit: 'Edit staff details',
   remove: 'Remove staff member',
+  suspend: 'Suspend staff member',
+  restore: 'Restore staff member',
 };
 
 // Cafeteria Admin's queue of roster changes Managers have asked for. A Manager cannot write
@@ -58,6 +60,34 @@ export class HubStaffRequestsComponent {
   // Who the request is about — a named account, or the address an 'add' would create one for.
   subjectOf(request: CafeteriaStaffRequest): string {
     return request.displayName || request.email || 'Unnamed staff member';
+  }
+
+  // What approving would actually change. Shown so a decision is made on the diff rather than on
+  // the action name alone — "Edit staff details" says nothing about which detail.
+  changesFor(request: CafeteriaStaffRequest): readonly string[] {
+    if (request.action === 'add') {
+      return [
+        `Creates an account for ${request.email}`,
+        request.setsPassword ? 'Password set by the manager' : 'No password — sign-in needs a reset',
+        request.proposedActive === false ? 'Created inactive' : 'Created active',
+      ];
+    }
+    if (request.action === 'suspend') return ['Keeps the assignment but removes cafeteria access'];
+    if (request.action === 'restore') return ['Returns cafeteria access'];
+    if (request.action === 'remove') return ['Deletes the assignment'];
+
+    const changes: string[] = [];
+    const diff = (label: string, before?: string | null, after?: string | null) => {
+      if (after && before !== after) changes.push(`${label}: ${before || '—'} → ${after}`);
+    };
+    diff('Name', request.currentDisplayName, request.displayName);
+    diff('Username', request.currentUsername, request.username);
+    diff('Email', request.currentEmail, request.email);
+    if (request.proposedActive != null && request.proposedActive !== request.currentActive) {
+      changes.push(`Account: ${request.currentActive ? 'active' : 'inactive'} → ${request.proposedActive ? 'active' : 'inactive'}`);
+    }
+    if (request.setsPassword) changes.push('Password: replaced');
+    return changes.length ? changes : ['No changes — the details match what is already stored'];
   }
 
   openApprove(request: CafeteriaStaffRequest): void { this.approveTarget.set(request); }
