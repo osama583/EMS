@@ -31,6 +31,9 @@ interface ManagerField {
   readonly min?: number;
   readonly options?: readonly SelectOption[];
   readonly placeholder?: string;
+  readonly step?: string;
+  // Renders at half width so two related fields share a row — fewer, shorter modals to scroll.
+  readonly half?: boolean;
 }
 
 const KIND_LABELS: Readonly<Record<RequestOptionKind, string>> = {
@@ -94,7 +97,7 @@ export class RequestOptionManagementComponent {
   readonly pageSize = signal(10);
   readonly modalOpen = signal(false);
   readonly editingId = signal<string | null>(null);
-  readonly draft = signal<Record<string, string | number | boolean | readonly string[]>>({});
+  readonly draft = signal<Record<string, string | number | boolean | readonly string[] | null>>({});
   readonly errorMessage = signal('');
   readonly imageError = signal('');
   readonly imageUploading = signal(false);
@@ -406,8 +409,8 @@ export class RequestOptionManagementComponent {
     });
   }
   private clearNotices(): void { this.errorMessage.set(''); }
-  private emptyDraft(kind: RequestOptionKind): Record<string, string | number | boolean | readonly string[]> {
-    const draft: Record<string, string | number | boolean | readonly string[]> = { kind, label: '', description: '', active: true };
+  private emptyDraft(kind: RequestOptionKind): Record<string, string | number | boolean | readonly string[] | null> {
+    const draft: Record<string, string | number | boolean | readonly string[] | null> = { kind, label: '', description: '', active: true };
     if (kind === 'fmb' && this.auth.user()?.cafeteriaCode !== undefined) draft['cafeteriaCode'] = this.auth.user()!.cafeteriaCode!;
     this.fieldsFor(kind).forEach((field) => {
       if (field.key in draft) return;
@@ -418,14 +421,18 @@ export class RequestOptionManagementComponent {
   private fieldsFor(kind: RequestOptionKind): readonly ManagerField[] {
     const common: readonly ManagerField[] = [{ key: 'label', label: kind === 'fmb' ? 'Food or Service Type' : 'Option Name', type: 'text', required: true }, { key: 'description', label: 'Description', type: 'textarea' }];
     const specific: Readonly<Record<RequestOptionKind, readonly ManagerField[]>> = {
-      logistics: [{ key: 'availableQuantity', label: 'Available Quantity', type: 'number', required: true, min: 0 }, { key: 'quantityUnit', label: 'Quantity Unit', type: 'text', required: true }],
-      transportation: [{ key: 'passengerCapacity', label: 'Passenger Capacity', type: 'number', required: true, min: 1 }, { key: 'availableVehicles', label: 'Available Vehicle Count', type: 'number', required: true, min: 0 }, { key: 'instructions', label: 'Instructions', type: 'textarea' }],
+      // `half` pairs fields that read as one fact ("20 chairs", "44 seats across 3 vehicles") onto
+      // a single row, so these modals are shorter and need less scrolling.
+      logistics: [{ key: 'availableQuantity', label: 'Available Quantity', type: 'number', required: true, min: 0, half: true }, { key: 'quantityUnit', label: 'Quantity Unit', type: 'text', required: true, half: true }],
+      transportation: [{ key: 'passengerCapacity', label: 'Passenger Capacity', type: 'number', required: true, min: 1, half: true }, { key: 'availableVehicles', label: 'Available Vehicle Count', type: 'number', required: true, min: 0, half: true }, { key: 'instructions', label: 'Instructions', type: 'textarea' }],
       photoVideo: [],
       soundLight: [
         { key: 'setupRequirements', label: 'Technical Description / Setup Requirements', type: 'textarea', required: true },
       ],
       fmb: [
-        { key: 'servingUnitId', label: 'Serving Unit', type: 'select', required: true, options: this.managedSelectOptions('servingUnit') },
+        // Price and serving unit read as one fact ("RM 12.50 per tray"), so they sit on one row.
+        { key: 'unitPriceRm', label: 'Price (RM)', type: 'number', min: 0, step: '0.01', placeholder: '0.00', half: true },
+        { key: 'servingUnitId', label: 'Serving Unit', type: 'select', required: true, options: this.managedSelectOptions('servingUnit'), half: true },
         { key: 'orderingNotes', label: 'Availability / Ordering Notes', type: 'textarea' },
         // A dish is routinely more than one of vegetarian/halal/nut-free, so this
         // is a set rather than a single choice (see migration 006).
@@ -433,11 +440,11 @@ export class RequestOptionManagementComponent {
       ],
       dietaryInformation: [],
       servingUnit: [],
-      campusTourStart: [{ key: 'meetingInstructions', label: 'Meeting Instructions', type: 'textarea' }, { key: 'maximumGroupSize', label: 'Maximum Group Size', type: 'number', min: 1 }],
+      campusTourStart: [{ key: 'maximumGroupSize', label: 'Maximum Group Size', type: 'number', min: 1 }, { key: 'meetingInstructions', label: 'Meeting Instructions', type: 'textarea' }],
       campusTourType: [],
       waterNormal: [
-        { key: 'bottleCount', label: 'Number of Bottles', type: 'number', required: true, min: 0 },
-        { key: 'availableStock', label: 'Available Stock', type: 'number', required: true, min: 0 },
+        { key: 'bottleCount', label: 'Number of Bottles', type: 'number', required: true, min: 0, half: true },
+        { key: 'availableStock', label: 'Available Stock', type: 'number', required: true, min: 0, half: true },
         { key: 'orderingInstructions', label: 'Ordering / Delivery Instructions', type: 'textarea' },
         { key: 'brandingRequirement', label: 'Logo / Branding Requirement (if requested with logo)', type: 'textarea' },
       ],
@@ -452,7 +459,7 @@ export class RequestOptionManagementComponent {
       case 'transportation': return [`${option.passengerCapacity} passengers`, `${option.availableVehicles} vehicle(s)`, option.imageFileName ? 'Image added' : ''].filter(Boolean).join(' · ');
       case 'photoVideo': return option.description ?? '';
       case 'soundLight': return option.setupRequirements ?? '';
-      case 'fmb': return [this.optionLabel(option.servingUnitId), this.optionLabels(option.dietaryInformationIds), option.orderingNotes, option.imageFileName ? 'Image added' : ''].filter(Boolean).join(' · ');
+      case 'fmb': return [this.priceLabel(option), this.optionLabel(option.servingUnitId), this.optionLabels(option.dietaryInformationIds), option.orderingNotes, option.imageFileName ? 'Image added' : ''].filter(Boolean).join(' · ');
       case 'dietaryInformation': case 'servingUnit': return option.description ?? '';
       case 'campusTourStart': return [option.maximumGroupSize ? `Maximum ${option.maximumGroupSize}` : '', option.meetingInstructions].filter(Boolean).join(' · ');
       case 'campusTourType': return option.description ?? '';
@@ -470,6 +477,13 @@ export class RequestOptionManagementComponent {
 
   private optionLabel(id: string | undefined): string {
     return id ? this.allOptions().find((option) => option.id === id)?.label ?? id : '';
+  }
+
+  // "" when no price is recorded, so callers can drop the field entirely — an unpriced item must
+  // not read as RM 0.00, which would claim it is free.
+  private priceLabel(option: RequestOption): string {
+    const price = (option as { unitPriceRm?: number | null }).unitPriceRm;
+    return price == null ? '' : `RM ${price.toFixed(2)}`;
   }
 
   // Several tags read as one comma-separated phrase wherever a single label used to sit.
@@ -496,6 +510,7 @@ export class RequestOptionManagementComponent {
           dietaryInformationLabel: dietary,
           orderingNotes: option.orderingNotes ?? '',
           metaFields: [
+            ...(this.priceLabel(option) ? [{ label: 'Price', value: this.priceLabel(option), icon: 'payments', isBadge: true, badgeTone: 'amber' as const }] : []),
             ...(unit ? [{ label: 'Serving unit', value: unit, icon: 'restaurant', isBadge: true, badgeTone: 'blue' as const }] : []),
             ...(dietary ? [{ label: 'Dietary info', value: dietary, icon: 'nutrition', isBadge: true, badgeTone: 'emerald' as const }] : []),
             ...(option.orderingNotes ? [{ label: 'Ordering notes', value: option.orderingNotes, icon: 'notes', isNotes: true }] : []),

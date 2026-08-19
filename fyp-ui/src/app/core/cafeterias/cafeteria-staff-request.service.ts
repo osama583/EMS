@@ -23,6 +23,13 @@ export class CafeteriaStaffRequestService {
     return this.http.get<readonly CafeteriaStaffRequest[]>(`${this.baseUrl}/inbox`);
   }
 
+  // Decided requests. Shares the refresh trigger with inbox$ so approving something moves it from
+  // one list to the other without either going stale.
+  readonly history$ = this.refreshRequests.pipe(switchMap(() => this.getHistory()), shareReplay({ bufferSize: 1, refCount: true }));
+  getHistory(): Observable<readonly CafeteriaStaffRequest[]> {
+    return this.http.get<readonly CafeteriaStaffRequest[]>(`${this.baseUrl}/history`);
+  }
+
   approve(id: string, resolvedByUserId: string): Observable<CafeteriaStaffRequest> {
     return this.http.post<CafeteriaStaffRequest>(`${this.baseUrl}/${encodeURIComponent(id)}/approve`, { resolvedByUserId }).pipe(tap(() => this.refresh()));
   }

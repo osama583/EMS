@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { combineLatest, finalize } from 'rxjs';
 import { AuthService } from '../../../../core/auth/auth.service';
@@ -39,7 +40,7 @@ const ROLE_OPTIONS: readonly SelectOption[] = [
 // Users/Assignments screens are unaffected — a separate, general-purpose view over the same rows).
 @Component({
   selector: 'app-cafeteria-staff-assignments',
-  imports: [InternalDataPageComponent, FormModalComponent, FeedbackBannerComponent, ConfirmDialogComponent, DeleteConfirmDialogComponent, SearchableDropdownComponent, FormFieldComponent, StatusToggleComponent],
+  imports: [InternalDataPageComponent, FormModalComponent, FeedbackBannerComponent, DeleteConfirmDialogComponent, SearchableDropdownComponent, FormFieldComponent, StatusToggleComponent, RouterLink],
   templateUrl: './cafeteria-staff-assignments.html',
   styleUrl: './cafeteria-staff-assignments.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -54,11 +55,6 @@ export class CafeteriaStaffAssignmentsComponent {
   // Pending My Staff requests (see cafeteria-my-staff.ts) awaiting this Cafeteria Admin's
   // approve/reject — a flat oversight role, so every cafeteria's requests show here, not just one.
   readonly pendingRequests = signal<readonly CafeteriaStaffRequest[]>([]);
-  readonly requestActionPending = signal<string | null>(null);
-  readonly approveRequestTarget = signal<CafeteriaStaffRequest | null>(null);
-  readonly rejectTarget = signal<CafeteriaStaffRequest | null>(null);
-  readonly rejectComment = signal('');
-  readonly rejecting = signal(false);
 
   readonly assignments = signal<readonly CafeteriaAssignment[]>([]);
   readonly cafeterias = signal<readonly Cafeteria[]>([]);
@@ -164,47 +160,6 @@ export class CafeteriaStaffAssignmentsComponent {
       error: () => { this.errorMessage.set('The staff assignments could not be loaded.'); this.loading.set(false); },
     });
     this.staffRequests.inbox$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((requests) => this.pendingRequests.set(requests));
-  }
-
-  requestActionLabel(action: CafeteriaStaffRequest['action']): string { return REQUEST_ACTION_LABELS[action]; }
-  rejectActionVerb(): string {
-    const action = this.rejectTarget()?.action;
-    return action === 'remove' ? 'remove this staff member' : action === 'edit' ? 'edit this staff member' : 'add this staff member';
-  }
-
-  // Approving a staff request grants (or revokes) that person's access to a cafeteria, so it is
-  // confirmed before it runs.
-  openApproveRequest(request: CafeteriaStaffRequest): void { this.approveRequestTarget.set(request); }
-  closeApproveRequest(): void { if (!this.requestActionPending()) this.approveRequestTarget.set(null); }
-  confirmApproveRequest(): void {
-    const request = this.approveRequestTarget();
-    this.approveRequestTarget.set(null);
-    if (request) this.approveRequest(request);
-  }
-
-  approveRequest(request: CafeteriaStaffRequest): void {
-    this.clearMessages();
-    this.requestActionPending.set(request.id);
-    this.staffRequests.approve(request.id, this.auth.user()!.id!).pipe(finalize(() => this.requestActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.toast.success(`${REQUEST_ACTION_LABELS[request.action]} request approved.`); this.service.refresh(); },
-      error: (err) => this.toast.error('The request could not be approved', apiErrorMessage(err, 'Please try again.')),
-    });
-  }
-
-  openRejectModal(request: CafeteriaStaffRequest): void {
-    this.clearMessages();
-    this.rejectTarget.set(request);
-    this.rejectComment.set('');
-  }
-  cancelReject(): void { if (!this.rejecting()) this.rejectTarget.set(null); }
-  confirmReject(): void {
-    const target = this.rejectTarget();
-    if (!target) return;
-    this.rejecting.set(true);
-    this.staffRequests.reject(target.id, this.auth.user()!.id!, this.rejectComment().trim()).pipe(finalize(() => this.rejecting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.rejectTarget.set(null); this.toast.success(`${REQUEST_ACTION_LABELS[target.action]} request rejected.`); },
-      error: (err) => { this.rejectTarget.set(null); this.toast.error('The request could not be rejected', apiErrorMessage(err, 'Please try again.')); },
-    });
   }
 
   setSearch(value: string): void { this.search.set(value); this.page.set(1); }

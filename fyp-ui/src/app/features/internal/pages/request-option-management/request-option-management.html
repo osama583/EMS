@@ -83,13 +83,16 @@
 >
   <div class="option-management__form">
     @for (field of fields(); track field.key) {
+      <!-- Consecutive half-width fields flow onto one row (see .option-management__form--pairs). -->
+      <div [class.option-management__field--half]="field.half">
       @if (field.type === 'multiselect') {
         <app-searchable-dropdown [controlId]="'option-' + field.key" [label]="field.label" [required]="field.required ?? false" [isMulti]="true" [options]="fieldOptions(field)" [value]="fieldValues(field.key)" (valueChange)="setDraftList(field.key, $any($event))" />
       } @else if (field.type === 'select') {
         <app-searchable-dropdown [controlId]="'option-' + field.key" [label]="field.label" [required]="field.required ?? false" [options]="fieldOptions(field)" [value]="$any(fieldValue(field.key))" (valueChange)="setDraft(field.key, $any($event))" />
       } @else {
-        <app-form-field [controlId]="'option-' + field.key" [label]="field.label" [type]="$any(field.type)" [required]="field.required ?? false" [min]="field.min ?? ''" [value]="fieldValue(field.key)" [rows]="4" (valueChange)="setDraft(field.key, $event)" />
+        <app-form-field [controlId]="'option-' + field.key" [label]="field.label" [type]="$any(field.type)" [required]="field.required ?? false" [min]="field.min ?? ''" [step]="field.step ?? ''" [placeholder]="field.placeholder ?? ''" [value]="fieldValue(field.key)" [rows]="4" (valueChange)="setDraft(field.key, $event)" />
       }
+      </div>
     }
     @if (supportsImage()) {
       <app-image-upload-field

@@ -36,6 +36,7 @@ so an unknown kind is a 404 rather than a chance to name an arbitrary table.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, jsonify, request
 
@@ -140,6 +141,7 @@ CATALOGUES: dict[str, Catalogue] = {
     "fmb": Catalogue(
         "fmb_options", "fmb_option_id", None, None,
         {"cafeteriaCode": "unit_code", "servingUnitId": "serving_unit_option_id",
+         "unitPriceRm": "unit_price_rm",
          "orderingNotes": "availability_ordering_notes", "imageDataUrl": "menu_image_url"},
         references={"servingUnitId": "servingUnit"},
         # A dish is routinely more than one of vegetarian/nut-free/halal, so the
@@ -275,6 +277,29 @@ def parse_option_id(value: str) -> tuple[str, int]:
 # --- DTO ------------------------------------------------------------------
 _BASE_FIELDS = {"label": "label", "description": "description", "active": "active"}
 
+# Columns holding money, so they are parsed and rendered as such rather than as
+# whatever the payload happened to contain.
+_MONEY_COLUMNS = frozenset({"unit_price_rm"})
+
+
+def _money(dto_field: str, value) -> Decimal | None:
+    """A price, or None for "not priced yet" - which is not the same as free."""
+    if value in (None, ""):
+        return None
+    try:
+        amount = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        raise BadRequest(f"{dto_field} must be an amount, for example 12.50.") from None
+    if amount.is_nan() or amount.is_infinite():
+        raise BadRequest(f"{dto_field} must be an amount, for example 12.50.")
+    if amount < 0:
+        raise BadRequest(f"{dto_field} cannot be negative.")
+    if amount.as_tuple().exponent < -2:
+        raise BadRequest(f"{dto_field} cannot have more than 2 decimal places.")
+    if amount >= Decimal("100000000"):
+        raise BadRequest(f"{dto_field} is too large.")
+    return amount
+
 
 def to_dto(kind: str, row: dict, collections: dict[str, dict[int, list]] | None = None) -> dict:
     """The client's RequestOption. Only declared fields cross the boundary.
@@ -289,6 +314,11 @@ def to_dto(kind: str, row: dict, collections: dict[str, dict[int, list]] | None 
         value = row.get(column)
         if dto_field in catalogue.references and value is not None:
             value = option_id(catalogue.references[dto_field], value)
+        # NUMERIC arrives as Decimal, which Flask renders as a JSON *string*.
+        # The client would then concatenate rather than add when it multiplies a
+        # price by a quantity, so it crosses the boundary as a number.
+        elif isinstance(value, Decimal):
+            value = float(value)
         dto[dto_field] = value
     for dto_field, collection in catalogue.collections.items():
         ids = (collections or {}).get(dto_field, {}).get(row_id, [])
@@ -372,6 +402,12 @@ def _writable_values(payload: dict, catalogue: Catalogue, allowed: set[str]) -> 
         if dto_field not in payload or column not in allowed:
             continue
         value = payload[dto_field]
+        # Money is parsed as Decimal, never float: a price read back must equal
+        # the price written, and a bad value is the caller's mistake (400) not
+        # a constraint violation surfacing as a 500.
+        if column in _MONEY_COLUMNS:
+            values[column] = _money(dto_field, value)
+            continue
         # A reference arrives as a composite id; the column stores the integer.
         if dto_field in catalogue.references and value not in (None, ""):
             target_kind, number = parse_option_id(value)

@@ -127,11 +127,6 @@ export const routes: Routes = [
             title: 'Club Requests | APU Events',
           },
           {
-            path: 'staff-requests',
-            loadComponent: () => import('./features/internal/pages/records-hub/hub-staff-requests/hub-staff-requests').then((module) => module.HubStaffRequestsComponent),
-            title: 'Staff Requests | APU Events',
-          },
-          {
             path: 'registrations',
             loadComponent: () => import('./features/internal/pages/records-hub/hub-registrations/hub-registrations').then((module) => module.HubRegistrationsComponent),
             title: 'Registrations | APU Events',
@@ -271,6 +266,16 @@ export const routes: Routes = [
         path: 'cafeterias/manage',
         loadComponent: () => import('./features/internal/pages/cafeteria-manage/cafeteria-manage').then((module) => module.CafeteriaManageComponent),
         title: 'Manage Cafeterias | APU Events',
+      },
+      {
+        path: 'cafeterias/staff-requests',
+        loadComponent: () => import('./features/internal/pages/cafeteria-staff-requests/cafeteria-staff-requests').then((module) => module.CafeteriaStaffRequestsComponent),
+        title: 'Staff Requests | APU Events',
+      },
+      {
+        path: 'cafeterias/staff-requests-history',
+        loadComponent: () => import('./features/internal/pages/cafeteria-staff-requests-history/cafeteria-staff-requests-history').then((module) => module.CafeteriaStaffRequestsHistoryComponent),
+        title: 'Staff Request History | APU Events',
       },
       {
         path: 'cafeterias/staff-assignments',

@@ -3,7 +3,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { isClubPresident } from '../../../../core/auth/role-navigation';
-import { hasRole } from '../../../../core/auth/role-access';
 import { requestKindsForRole } from '../../../../core/departments/department-workflow.config';
 import { staffTaskRoutingKeyFor } from '../../../../core/staff-tasks/staff-task-routing';
 import { PublishedEventService } from '../../../../core/events/published-event.service';
@@ -63,13 +62,6 @@ export class RecordsHubComponent {
     return this.bucket === 'inbox' && !!user && isClubPresident(user);
   });
 
-  // Staff Requests tab: the Cafeteria Admin decides every roster change a Manager asks for, so the
-  // pending queue belongs in their Inbox alongside everything else awaiting them. Inbox only —
-  // a resolved request is history on the staff-assignments page, not an action.
-  readonly showStaffRequestsTab = computed(() => {
-    const user = this.auth.user();
-    return this.bucket === 'inbox' && !!user && hasRole(user, 'cafeteria-admin');
-  });
 
   readonly title = this.bucket === 'inbox' ? 'Inbox' : this.bucket === 'ongoing' ? 'Ongoing' : 'History';
 

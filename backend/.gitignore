@@ -7,3 +7,5 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 *.log
+# Uploaded images are user data, not source - they land here at runtime.
+var/uploads/

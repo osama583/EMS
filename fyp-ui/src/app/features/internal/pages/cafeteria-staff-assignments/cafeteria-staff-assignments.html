@@ -1,26 +1,17 @@
 <section class="cafeteria-staff-assignments">
   <app-feedback-banner [message]="errorMessage()" tone="error" />
 
+  <!-- Deciding requests lives on its own page now; this only says how many are waiting, so the
+       count stays visible where the Admin already works without duplicating the queue. -->
   @if (pendingRequests().length) {
-    <div class="cafeteria-staff-assignments__requests">
-      <h3 class="cafeteria-staff-assignments__requests-title">Staff Requests ({{ pendingRequests().length }})</h3>
-      <p class="cafeteria-staff-assignments__requests-subtitle">Pending My Staff requests from Cafeteria Managers.</p>
-      <ul class="cafeteria-staff-assignments__requests-list">
-        @for (request of pendingRequests(); track request.id) {
-          <li class="cafeteria-staff-assignments__request">
-            <div class="cafeteria-staff-assignments__request-body">
-              <strong>{{ requestActionLabel(request.action) }}</strong>
-              <span>{{ request.displayName }} ({{ request.email }}) · {{ request.cafeteriaName }}</span>
-              <span class="cafeteria-staff-assignments__request-by">Requested by {{ request.requestedByName }}</span>
-            </div>
-            <div class="cafeteria-staff-assignments__request-actions">
-              <button type="button" class="table-control table-control--primary" [disabled]="requestActionPending() === request.id" (click)="openApproveRequest(request)">Approve</button>
-              <button type="button" class="table-control table-control--danger" [disabled]="requestActionPending() === request.id" (click)="openRejectModal(request)">Reject</button>
-            </div>
-          </li>
-        }
-      </ul>
-    </div>
+    <a class="cafeteria-staff-assignments__pending-link" routerLink="/app/cafeterias/staff-requests">
+      <span class="material-symbols-rounded" aria-hidden="true">inbox</span>
+      <span>
+        <strong>{{ pendingRequests().length }} staff request{{ pendingRequests().length === 1 ? '' : 's' }} waiting</strong>
+        <span>Review and decide them on the Staff Requests page.</span>
+      </span>
+      <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+    </a>
   }
 
   <app-internal-data-page
@@ -61,21 +52,3 @@
   (confirm)="confirmRemove()" (cancel)="cancelRemove()"
 />
 
-<app-form-modal [open]="!!rejectTarget()" title="Reject staff request" primaryLabel="Reject" [danger]="true" [loading]="rejecting()" (close)="cancelReject()" (cancel)="cancelReject()" (submit)="confirmReject()">
-  <div class="cafeteria-staff-assignments__form">
-    <p>Reject the request to {{ rejectActionVerb() }} for {{ rejectTarget()?.displayName }}?</p>
-    <label class="cafeteria-staff-assignments__reject-label" for="reject-comment">Comment (optional)</label>
-    <textarea id="reject-comment" rows="3" [value]="rejectComment()" (input)="rejectComment.set($any($event.target).value)"></textarea>
-  </div>
-</app-form-modal>
-
-<app-confirm-dialog
-  [open]="!!approveRequestTarget()"
-  title="Approve staff request"
-  [message]="approveRequestTarget() ? (requestActionLabel(approveRequestTarget()!.action) + ' — ' + approveRequestTarget()!.displayName + ' at ' + approveRequestTarget()!.cafeteriaName + '. Apply this change now?') : ''"
-  confirmLabel="Approve"
-  [danger]="false"
-  [loading]="!!requestActionPending()"
-  (confirm)="confirmApproveRequest()"
-  (cancel)="closeApproveRequest()"
-/>

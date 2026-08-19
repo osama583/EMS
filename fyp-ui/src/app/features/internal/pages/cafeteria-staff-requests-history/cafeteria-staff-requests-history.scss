@@ -1,0 +1,88 @@
+:host { display: block; }
+
+.cafeteria-staff-requests-history__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+}
+
+.cafeteria-staff-requests-history__controls {
+  margin-top: var(--space-4, 1rem);
+  margin-bottom: var(--space-5, 1.25rem);
+}
+
+.cafeteria-staff-requests-history__empty {
+  padding: var(--space-6, 1.5rem);
+  text-align: center;
+  color: var(--apu-text-muted);
+}
+
+.cafeteria-staff-requests-history__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(22rem, 100%), 1fr));
+  gap: var(--space-4, 1rem);
+}
+
+.cafeteria-staff-requests-history__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
+  padding: var(--space-4, 1rem);
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-card, 0.75rem);
+  background: var(--apu-white);
+}
+
+.cafeteria-staff-requests-history__card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 0.75rem);
+}
+
+.cafeteria-staff-requests-history__action {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--apu-navy-950);
+}
+
+.cafeteria-staff-requests-history__badge {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  background: var(--apu-surface-muted);
+  color: var(--apu-navy-900);
+
+  &[data-tone='success'] { background: var(--apu-success-soft, #e7f6ec); color: var(--apu-success-strong, #1b5e34); }
+  &[data-tone='danger']  { background: var(--apu-danger-soft, #fdecec); color: var(--apu-danger-strong, #8c1d1d); }
+  &[data-tone='warning'] { background: var(--apu-warning-soft, #fdf3e2); color: var(--apu-warning-strong, #8a5a12); }
+}
+
+.cafeteria-staff-requests-history__identity {
+  display: grid;
+  gap: 0.15rem;
+
+  strong { font-size: 0.95rem; color: var(--apu-navy-950); }
+  span { font-size: 0.82rem; color: var(--apu-text-muted); word-break: break-word; }
+}
+
+.cafeteria-staff-requests-history__comment {
+  margin: 0;
+  font-size: 0.83rem;
+  font-style: italic;
+  color: var(--apu-navy-900);
+}
+
+.cafeteria-staff-requests-history__card-foot {
+  display: grid;
+  gap: 0.15rem;
+  margin-top: auto;
+  padding-top: var(--space-3, 0.75rem);
+  border-top: 1px solid var(--apu-border);
+  font-size: 0.78rem;
+  color: var(--apu-text-muted);
+}

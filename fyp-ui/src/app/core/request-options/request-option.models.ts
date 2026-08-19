@@ -47,6 +47,9 @@ export interface SoundLightRequestOption extends RequestOptionBase {
 export interface FoodRequestOption extends RequestOptionBase {
   readonly kind: 'fmb';
   readonly servingUnitId?: string;
+  // Price per serving unit in RM. Undefined means "not priced yet", which is not the same as 0
+  // (free) — the two are stored and rendered differently.
+  readonly unitPriceRm?: number | null;
   readonly orderingNotes?: string;
   // A dish carries one or more dietary tags (halal AND nut-free, say), so this is
   // a set. Backed by a junction table server-side — see migration 006.

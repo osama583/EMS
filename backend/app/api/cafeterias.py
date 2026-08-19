@@ -748,6 +748,23 @@ def staff_request_inbox():
     return jsonify(_shape_requests(rows))
 
 
+@bp.get("/staff-requests/history")
+@require_internal
+def staff_request_history():
+    """Every request the Admin has already decided.
+
+    Separate from /inbox because the two answer different questions: the inbox
+    is work outstanding, this is the record of what was done. Newest first -
+    a decision log is read from the most recent end.
+    """
+    _assert_cafeteria_admin()
+    rows = query(
+        _STAFF_REQUEST_SELECT
+        + " WHERE r.status <> 'pending' ORDER BY r.resolved_at DESC NULLS LAST, r.created_at DESC",
+    )
+    return jsonify(_shape_requests(rows))
+
+
 def _create_staff_account(cur, payload: dict) -> int:
     """Create the account a cafeteria posting is for.
 
