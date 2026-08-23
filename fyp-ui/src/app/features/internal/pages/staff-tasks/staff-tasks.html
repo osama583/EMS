@@ -1,9 +1,35 @@
 @if (error()) { <app-feedback-banner tone="error" [message]="error()" /> }
+
+<div class="staff-tasks-calendar-bar">
+  <div class="staff-tasks-calendar-toggle">
+    <button
+      type="button"
+      class="staff-tasks-calendar-toggle__btn"
+      [class.staff-tasks-calendar-toggle__btn--active]="!isDefaultDateFilter()"
+      [attr.aria-expanded]="calendarOpen()"
+      (click)="toggleCalendar()"
+    >
+      <span class="material-symbols-rounded" aria-hidden="true">calendar_month</span>
+      <span>{{ calendarButtonLabel() }}</span>
+      @if (!isDefaultDateFilter()) { <span class="staff-tasks-calendar-toggle__dot" aria-hidden="true"></span> }
+      <span class="material-symbols-rounded staff-tasks-calendar-toggle__chevron" aria-hidden="true">{{ calendarOpen() ? 'expand_less' : 'expand_more' }}</span>
+    </button>
+    @if (calendarOpen()) {
+      <div class="staff-tasks-calendar-toggle__panel" role="dialog" aria-label="Filter by date">
+        <app-task-calendar [taskDates]="taskDates()" [selection]="dateFilter()" (selectionChange)="setDateFilter($event)" />
+        @if (!isDefaultDateFilter()) {
+          <button type="button" class="staff-tasks-calendar-toggle__clear" (click)="clearDateFilter()">Clear date filter</button>
+        }
+      </div>
+    }
+  </div>
+</div>
+
 <app-internal-data-page [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()" [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()" (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()" (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)" (recordOpen)="openRecord($event)" />
 
 <app-form-modal [open]="modalOpen()" [title]="modalTitle()" [primaryLabel]="pendingStatus() ? 'Confirm' : 'Close'" [secondaryLabel]="'Cancel'" [showSecondary]="!!pendingStatus()" [loading]="saving()" [fixedSize]="true" (close)="closeModal()" (cancel)="closeModal()" (submit)="confirm()">
   @if (selected(); as task) {
     @if (pendingStatus()) { <p class="task-confirmation">Confirm this status change for <strong>{{ task.eventTitle }}</strong>. The task list and History will update immediately.</p> }
-    <dl class="task-details"><div><dt>Event</dt><dd>{{ task.eventTitle }} · {{ task.eventCode }}</dd></div><div><dt>Request</dt><dd>{{ task.request }}</dd></div><div><dt>{{ task.detailLabel }}</dt><dd>{{ task.detail }}</dd></div>@if (task.quantity) { <div><dt>Quantity</dt><dd>{{ task.quantity }}</dd></div> }<div><dt>Schedule</dt><dd>{{ task.schedule }}</dd></div><div><dt>Location</dt><dd>{{ task.location }}</dd></div></dl>
+    <dl class="task-details"><div><dt>Event</dt><dd>{{ task.eventTitle }} · {{ task.proposalId }}</dd></div><div><dt>Request</dt><dd>{{ task.item }}</dd></div>@if (task.quantity) { <div><dt>Quantity</dt><dd>{{ task.quantity }}</dd></div> }<div><dt>Schedule</dt><dd>{{ task.schedule }}</dd></div><div><dt>Location</dt><dd>{{ task.location }}</dd></div>@if (task.notes) { <div><dt>Notes</dt><dd>{{ task.notes }}</dd></div> }</dl>
   }
 </app-form-modal>

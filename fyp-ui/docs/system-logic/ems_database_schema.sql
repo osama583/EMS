@@ -400,30 +400,9 @@ CREATE UNIQUE INDEX uq_club_join_request_pending
     ON club_join_requests (club_id, requester_user_id)
     WHERE status = 'pending';
 
--- A Cafeteria Manager cannot write user_unit_roles directly for their own cafeteria's staff —
--- every add/edit/remove of a cafeteria-staff member is a pending request here for Cafeteria
--- Admin to approve or reject first (mirrors club_join_requests' shape/lifecycle exactly).
--- Approval applies the change via the same assignment mutation Cafeteria Admin's own direct
--- Staff Assignments screen uses (see server/routes/cafeterias.routes.js's createAssignment/
--- updateAssignment/removeAssignment helpers) — no separate mutation path.
-CREATE TABLE cafeteria_staff_requests (
-    cafeteria_staff_request_id  BIGSERIAL PRIMARY KEY,
-    cafeteria_code               VARCHAR(40) NOT NULL REFERENCES unit(code),
-    requested_by_user_id             BIGINT NOT NULL REFERENCES users(user_id),
-    action                                VARCHAR(10) NOT NULL,
-    target_user_id                           BIGINT REFERENCES users(user_id),      -- set for 'edit'/'remove' (resolved via target_assignment_id's holder)
-    target_assignment_id                         BIGINT,                            -- user_unit_role_id being edited/removed; NULL for 'add'
-    payload_display_name                             VARCHAR(255),                  -- 'add' snapshot (target user not yet confirmed)
-    payload_email                                        VARCHAR(255),
-    role_code                                                VARCHAR(40) NOT NULL DEFAULT 'cafeteria-staff',
-    status                                                        VARCHAR(10) NOT NULL DEFAULT 'pending',
-    comment                                                           TEXT,  -- populated on rejection
-    created_at                                                           TIMESTAMP NOT NULL DEFAULT now(),
-    resolved_at                                                              TIMESTAMP,
-    resolved_by_user_id                                                          BIGINT REFERENCES users(user_id),
-    CONSTRAINT chk_cafeteria_staff_request_action CHECK (action IN ('add', 'edit', 'remove')),
-    CONSTRAINT chk_cafeteria_staff_request_status CHECK (status IN ('pending', 'approved', 'rejected'))
-);
+-- (2026-08-23: the cafeteria_staff_requests approval table that used to live here is gone —
+-- see SECTION 2's cafeteria domain note below. A Cafeteria Manager now writes user_unit_roles
+-- for their own outlet directly, same as Cafeteria Admin, via migration 015_drop_staff_requests.)
 
 
 -- ============================================================================
@@ -455,10 +434,10 @@ CREATE TABLE cafeteria_staff_requests (
 -- soft-delete window). Both come for free from `unit` and needed bespoke reimplementation under
 -- the old `cafeteria` table.
 --
--- The one thing that is NOT modelled as a plain user_unit_roles write is a Cafeteria Manager
--- changing their own cafeteria's staff: managers cannot write user_unit_roles directly, so every
--- add/edit/remove is an approval request for Cafeteria Admin first — see cafeteria_staff_requests
--- in SECTION 1 above (same status / resolved_at / resolved_by_user_id shape as club_join_requests).
+-- A Cafeteria Manager changing their own cafeteria's staff IS a plain user_unit_roles write
+-- (2026-08-23): they create/edit/suspend/restore/remove staff directly, scoped to their own
+-- unit_code and to role_code = 'cafeteria-staff', through the same assignment endpoints
+-- Cafeteria Admin uses. There is no approval step and no request/history table for this anymore.
 
 
 -- ============================================================================

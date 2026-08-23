@@ -16,13 +16,15 @@
     role="search"
   >
     <div class="explore-toolbar__controls">
-      <app-filter-button
-        label="Filters"
-        ariaLabel="Open event filters"
-        [count]="appliedFilterCount()"
-        [expanded]="filterOpen()"
-        (triggered)="openFilters()"
-      />
+      @if (variant() === 'internal') {
+        <app-filter-button
+          label="Filters"
+          ariaLabel="Open event filters"
+          [count]="appliedFilterCount()"
+          [expanded]="filterOpen()"
+          (triggered)="openFilters()"
+        />
+      }
 
       <app-expandable-search
         ariaLabel="Search events, categories or venues"
@@ -34,8 +36,8 @@
 
     <div class="explore-toolbar__right">
       <p class="explore-toolbar__count" aria-live="polite">
-        <strong>{{ matchingEvents().length }}</strong>
-        {{ matchingEvents().length === 1 ? 'event' : 'events' }} found
+        <strong>{{ resultCount() }}</strong>
+        {{ resultCount() === 1 ? 'event' : 'events' }} found
       </p>
 
       @if (variant() === 'internal') {
@@ -47,7 +49,7 @@
     </div>
   </div>
 
-  @if (appliedFilterChips().length > 0) {
+  @if (variant() === 'internal' && appliedFilterChips().length > 0) {
     <div class="applied-filters" aria-label="Applied filters">
       @for (chip of appliedFilterChips(); track chip.group + chip.value) {
         <button
@@ -66,96 +68,49 @@
     </div>
   }
 
-  @if (variant() === 'internal') {
-    @if (loading()) {
-      <app-loading-state variant="grid" label="Loading events…" [count]="9" />
-    } @else if (loadError()) {
-      <div class="explore-empty" role="status">
-        <span aria-hidden="true">⚠</span>
-        <h3>Events could not be loaded</h3>
-        <p>{{ loadError() }}</p>
-      </div>
-    } @else if (pagedEvents().length > 0) {
-      <div class="explore-grid">
-        @for (event of pagedEvents(); track event.id) {
-          @if (publishedEvent(event.id); as pub) {
-            <app-event-card
-              [event]="pub"
-              [saved]="isSaved(pub.id)"
-              [registrationStatus]="registrationStatus(pub.id)"
-              [registering]="registeringEventId() === pub.id"
-              (favourite)="toggleSaved($event)"
-              (explore)="selectedPublishedEvent.set($event)"
-              (register)="registerForEvent($event)"
-            />
-          }
-        }
-      </div>
-
-      <footer class="internal-table-workspace__pagination">
-        <span class="internal-table-workspace__pagination-spacer" aria-hidden="true"></span>
-        <app-internal-pagination
-          [totalPages]="totalPages()"
-          [page]="currentPage()"
-          [pageSize]="pageSize()"
-          [pageSizeOptions]="[9, 18, 27]"
-          (pageChange)="goToPage($event)"
-          (pageSizeChange)="changePageSize($event)"
+  @if (showSkeleton()) {
+    <app-loading-state variant="grid" label="Loading events…" [count]="pageSize()" />
+  } @else if (loadError()) {
+    <div class="explore-empty" role="status">
+      <span aria-hidden="true">⚠</span>
+      <h3>Events could not be loaded</h3>
+      <p>{{ loadError() }}</p>
+    </div>
+  } @else if (pagedPublishedEvents().length > 0) {
+    <div class="explore-grid" [class.explore-grid--refreshing]="loading()" [attr.aria-busy]="loading()">
+      @for (pub of pagedPublishedEvents(); track pub.id) {
+        <app-event-card
+          [event]="pub"
+          [saved]="favourites.savedEventIds().has(pub.id)"
+          [registrationStatus]="registrationStatus(pub.id)"
+          [registering]="registeringEventId() === pub.id"
+          (favourite)="toggleSaved($event)"
+          (explore)="selectedPublishedEvent.set($event)"
+          (register)="registerForEvent($event)"
         />
-      </footer>
-    } @else {
-      <div class="explore-empty" role="status">
-        <span aria-hidden="true">⌕</span>
-        <h3>No events found</h3>
-        <p>Try another search or remove a few filters to discover more events.</p>
-        <button type="button" (click)="clearAppliedFilters()">Reset filters</button>
-      </div>
-    }
+      }
+    </div>
+
+    <footer [class]="variant() === 'internal' ? 'internal-table-workspace__pagination' : 'explore-events__pagination'">
+      <span [class]="variant() === 'internal' ? 'internal-table-workspace__pagination-spacer' : 'explore-events__pagination-spacer'" aria-hidden="true"></span>
+      <app-internal-pagination
+        [totalPages]="totalPages()"
+        [page]="currentPage()"
+        [pageSize]="pageSize()"
+        [pageSizeOptions]="variant() === 'internal' ? [9, 18, 27] : [6, 12, 24]"
+        (pageChange)="goToPage($event)"
+        (pageSizeChange)="changePageSize($event)"
+      />
+    </footer>
   } @else {
-    @if (loading()) {
-      <app-loading-state variant="grid" label="Loading events…" [count]="6" />
-    } @else if (loadError()) {
-      <div class="explore-empty" role="status">
-        <span aria-hidden="true">⚠</span>
-        <h3>Events could not be loaded</h3>
-        <p>{{ loadError() }}</p>
-      </div>
-    } @else if (pagedEvents().length > 0) {
-      <div class="explore-grid">
-        @for (event of pagedEvents(); track event.id) {
-          @if (publishedEvent(event.id); as pub) {
-            <app-event-card
-              [event]="pub"
-              [saved]="isSaved(pub.id)"
-              [registrationStatus]="registrationStatus(pub.id)"
-              [registering]="registeringEventId() === pub.id"
-              (favourite)="toggleSaved($event)"
-              (explore)="selectedPublishedEvent.set($event)"
-              (register)="registerForEvent($event)"
-            />
-          }
-        }
-      </div>
-
-      <footer class="explore-events__pagination">
-        <span class="explore-events__pagination-spacer" aria-hidden="true"></span>
-        <app-internal-pagination
-          [totalPages]="totalPages()"
-          [page]="currentPage()"
-          [pageSize]="pageSize()"
-          [pageSizeOptions]="[5, 10, 25, 50]"
-          (pageChange)="goToPage($event)"
-          (pageSizeChange)="changePageSize($event)"
-        />
-      </footer>
-    } @else {
-      <div class="explore-empty" role="status">
-        <span aria-hidden="true">⌕</span>
-        <h3>No events found</h3>
-        <p>Try another search or remove a few filters to discover more events.</p>
+    <div class="explore-empty" role="status">
+      <span aria-hidden="true">⌕</span>
+      <h3>No events found</h3>
+      <p>Try another search{{ variant() === 'internal' ? ' or remove a few filters' : '' }} to discover more events.</p>
+      @if (variant() === 'internal') {
         <button type="button" (click)="clearAppliedFilters()">Reset filters</button>
-      </div>
-    }
+      }
+    </div>
   }
   </div>
 </section>
@@ -163,7 +118,7 @@
 <app-event-details-modal [open]="!!selectedPublishedEvent()" [event]="selectedPublishedEvent()" (close)="closeEvent()" (registered)="onModalRegistered($event)" />
 
 <app-form-modal
-  [open]="filterOpen()"
+  [open]="variant() === 'internal' && filterOpen()"
   title="Filter events"
   [primaryLabel]="'Show ' + draftResultCount() + (draftResultCount() === 1 ? ' Result' : ' Results')"
   secondaryLabel="Reset filters"

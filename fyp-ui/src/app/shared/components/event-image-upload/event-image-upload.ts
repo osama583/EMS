@@ -11,7 +11,7 @@ import { ValidationMessageComponent } from '../validation-message/validation-mes
     <section class="event-image-upload" [class.event-image-upload--invalid]="!!error()" aria-labelledby="event-image-label">
       <header>
         <div>
-          <h4 id="event-image-label">Event Image</h4>
+          <h4 id="event-image-label">{{ label() }}</h4>
           <p>PNG, JPG or WebP · Maximum {{ maxFileSizeMb }} MB</p>
         </div>
         @if (value()) {
@@ -63,6 +63,7 @@ export class EventImageUploadComponent {
   private readonly uploadApi = inject(EventImageUploadApi);
   private readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
   readonly value = input<EventImageAsset | null>(null);
+  readonly label = input('Event Image');
   readonly valueChange = output<EventImageAsset | null>();
   readonly error = signal('');
   readonly uploading = signal(false);
@@ -77,11 +78,11 @@ export class EventImageUploadComponent {
     input.value = '';
     if (!file) return;
     if (!this.allowedTypes.has(file.type)) {
-      this.error.set('Event Image must be a PNG, JPG, or WebP file.');
+      this.error.set(`${this.label()} must be a PNG, JPG, or WebP file.`);
       return;
     }
     if (file.size > this.maxFileSizeMb * 1024 * 1024) {
-      this.error.set(`Event Image must be ${this.maxFileSizeMb} MB or smaller.`);
+      this.error.set(`${this.label()} must be ${this.maxFileSizeMb} MB or smaller.`);
       return;
     }
     this.error.set('');
@@ -90,7 +91,7 @@ export class EventImageUploadComponent {
       next: ({ image }) => this.valueChange.emit(image),
       error: () => {
         this.uploading.set(false);
-        this.error.set('Event Image could not be prepared. Please try another file.');
+        this.error.set(`${this.label()} could not be prepared. Please try another file.`);
       },
       complete: () => this.uploading.set(false),
     });

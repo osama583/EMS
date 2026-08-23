@@ -16,7 +16,7 @@ export interface ProposalDepartmentRequest {
   readonly notes: string;
 }
 
-export type FmbSelectionStatus = 'pending' | 'approved' | 'resubmitted' | 'preparing' | 'fulfilled' | 'cancelled';
+export type FmbSelectionStatus = 'pending' | 'approved' | 'resubmitted' | 'preparing' | 'ready' | 'fulfilled' | 'cancelled';
 
 export interface FmbSelection {
   readonly id: number;
@@ -51,6 +51,13 @@ export interface ProposalReviewRecord {
   readonly benefits: string;
   readonly totalPax: number;
   readonly status: string;
+  // Server-computed, present only on GET /proposals list responses (not single-item reads):
+  // which of the four list pages this proposal belongs to for the CALLER specifically, and the
+  // human-readable label those pages show as the status badge. See proposals.py's _BUCKET_SQL /
+  // _STATUS_LABEL_SQL — replaces the client-side proposalSectionForUser()/displayStatus() that
+  // used to compute both from the full unbucketed list.
+  readonly bucket?: 'inbox' | 'ongoing' | 'history' | 'drafts';
+  readonly statusLabel?: string;
   readonly category: string;
   readonly requests: readonly ProposalDepartmentRequest[];
   // Structured (non-flattened) per-requirement rows — mirrors what event-proposal.ts's own

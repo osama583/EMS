@@ -1,5 +1,13 @@
-export type EventVisibility = 'Public' | 'Private' | 'Club Only';
-export type RegistrationMode = 'Automatic' | 'Approval Required';
+// 'Internal' is visible to any authenticated internal (non-guest) user, same reach as Public but
+// excluded from the guest-facing landing page/discovery surface — see events.py's
+// _published_clause()/_INTERNAL_VISIBLE. 'Private' is never surfaced on any discovery endpoint.
+export type EventVisibility = 'Public' | 'Private' | 'Club Only' | 'Internal';
+// 'Automatic' | 'Manual' are the backend's REGISTRATION_MODES (proposals.py) — published-event
+// reads (events.py's registrationMode column) only ever send these two. 'Approval Required' is
+// the proposal FORM's own UI label for 'Manual' (event-proposal.ts bridges the two on submit/load);
+// it is never present on a published event, so published-event call sites must compare against
+// 'Manual', not 'Approval Required'.
+export type RegistrationMode = 'Automatic' | 'Manual' | 'Approval Required';
 export type RegistrationStatus = 'confirmed' | 'pending' | 'duplicate' | 'rejected';
 
 export interface ProposalEventSchedule {
@@ -30,7 +38,7 @@ export interface PublishedEvent {
   readonly eventVisibility: EventVisibility;
   readonly promotionMethod?: string;
   readonly eventFormat: string;
-  readonly eventImage: EventImageAsset;
+  readonly eventImage: EventImageAsset | null;
   readonly schoolDepartment: string;
   readonly audience: readonly string[];
   readonly schedule: readonly ProposalEventSchedule[];
@@ -75,9 +83,38 @@ export interface PendingEventRegistration extends EventRegistration {
   readonly paymentRequired: boolean;
 }
 
-/** Public events are visible to everyone; Private/Club Only events are APU-community-only. */
+// Public events are visible to everyone; Club Only is APU-community-only. In practice this only
+// ever receives 'Public' or 'Club Only' — the endpoints that feed it (GET /events) never return
+// 'Private' or 'Internal' events to begin with (see events.py's list_events()/_EVENT_SELECT).
 export function isEventVisibleTo(visibility: EventVisibility, isAuthenticated: boolean): boolean {
   return visibility === 'Public' || isAuthenticated;
+}
+
+// Query params for GET /events/search - one field per Explore Events filter group, plus search
+// and pagination. Every field is optional; an absent/empty array means "no filter applied" for
+// that group, matching how the old client-side `matches()` treated an empty selection.
+export interface EventSearchParams {
+  readonly q?: string;
+  readonly visibility?: readonly EventVisibility[];
+  readonly category?: readonly string[];
+  readonly school?: readonly string[];
+  readonly format?: readonly string[];
+  readonly time?: readonly ('Morning' | 'Afternoon' | 'Evening')[];
+  readonly registration?: readonly ('No Registration Required' | 'Registration Required')[];
+  readonly cost?: readonly ('Free' | 'Paid')[];
+  readonly date?: readonly string[];
+  readonly dateFrom?: string;
+  readonly dateTo?: string;
+  readonly excludeRegistered?: boolean;
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface EventSearchResponse {
+  readonly items: readonly PublishedEvent[];
+  readonly total: number;
+  readonly page: number;
+  readonly pageSize: number;
 }
 
 export const EVENT_FIELD_MAPPING = {

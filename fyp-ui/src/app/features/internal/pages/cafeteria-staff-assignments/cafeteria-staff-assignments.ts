@@ -1,12 +1,9 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { combineLatest, finalize } from 'rxjs';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { CafeteriaService } from '../../../../core/cafeterias/cafeteria.service';
 import { AssignableCafeteriaUser, Cafeteria, CafeteriaAssignment, CafeteriaStaffRoleCode } from '../../../../core/cafeterias/cafeteria.models';
-import { CafeteriaStaffRequest } from '../../../../core/cafeterias/cafeteria-staff-request.models';
-import { CafeteriaStaffRequestService } from '../../../../core/cafeterias/cafeteria-staff-request.service';
 import { FeedbackBannerComponent } from '../../../../shared/components/feedback-banner/feedback-banner';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog';
@@ -18,11 +15,6 @@ import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, Inter
 import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 import { FormFieldComponent } from '../../../../shared/components/form-controls/form-field';
 import { StatusToggleComponent } from '../../../../shared/components/status-toggle/status-toggle';
-
-const REQUEST_ACTION_LABELS: Record<CafeteriaStaffRequest['action'], string> = {
-  add: 'Add staff', edit: 'Edit staff', remove: 'Remove staff',
-  suspend: 'Suspend staff', restore: 'Restore staff',
-};
 
 const PASSWORD_MIN_LENGTH = 8;
 
@@ -40,7 +32,7 @@ const ROLE_OPTIONS: readonly SelectOption[] = [
 // Users/Assignments screens are unaffected — a separate, general-purpose view over the same rows).
 @Component({
   selector: 'app-cafeteria-staff-assignments',
-  imports: [InternalDataPageComponent, FormModalComponent, FeedbackBannerComponent, DeleteConfirmDialogComponent, SearchableDropdownComponent, FormFieldComponent, StatusToggleComponent, RouterLink],
+  imports: [InternalDataPageComponent, FormModalComponent, FeedbackBannerComponent, DeleteConfirmDialogComponent, SearchableDropdownComponent, FormFieldComponent, StatusToggleComponent],
   templateUrl: './cafeteria-staff-assignments.html',
   styleUrl: './cafeteria-staff-assignments.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -49,12 +41,7 @@ export class CafeteriaStaffAssignmentsComponent {
   private readonly toast = inject(ToastService);
   private readonly service = inject(CafeteriaService);
   private readonly auth = inject(AuthService);
-  private readonly staffRequests = inject(CafeteriaStaffRequestService);
   private readonly destroyRef = inject(DestroyRef);
-
-  // Pending My Staff requests (see cafeteria-my-staff.ts) awaiting this Cafeteria Admin's
-  // approve/reject — a flat oversight role, so every cafeteria's requests show here, not just one.
-  readonly pendingRequests = signal<readonly CafeteriaStaffRequest[]>([]);
 
   readonly assignments = signal<readonly CafeteriaAssignment[]>([]);
   readonly cafeterias = signal<readonly Cafeteria[]>([]);
@@ -159,7 +146,6 @@ export class CafeteriaStaffAssignmentsComponent {
       next: ([assignments, cafeterias]) => { this.assignments.set(assignments); this.cafeterias.set(cafeterias); this.loading.set(false); },
       error: () => { this.errorMessage.set('The staff assignments could not be loaded.'); this.loading.set(false); },
     });
-    this.staffRequests.inbox$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((requests) => this.pendingRequests.set(requests));
   }
 
   setSearch(value: string): void { this.search.set(value); this.page.set(1); }
@@ -175,7 +161,7 @@ export class CafeteriaStaffAssignmentsComponent {
     this.clearMessages();
     this.editingAssignmentId.set(null);
     this.selectedUserId.set(''); this.selectedUserLabel.set(''); this.selectedCafeteriaCode.set(''); this.selectedRoleCode.set('');
-    this.draft.set({ displayName: '', username: '', email: '', password: '', userActive: true });
+    this.draft.set({ displayName: '', email: '', password: '', userActive: true });
     this.modalOpen.set(true);
   }
   openEdit(assignment: CafeteriaAssignment): void {
@@ -187,7 +173,6 @@ export class CafeteriaStaffAssignmentsComponent {
     this.selectedRoleCode.set(assignment.roleCode);
     this.draft.set({
       displayName: assignment.displayName,
-      username: assignment.username ?? '',
       email: assignment.email,
       // Blank means "leave it alone" — the stored value is a hash, so there is nothing to show.
       password: '',
@@ -218,7 +203,6 @@ export class CafeteriaStaffAssignmentsComponent {
     const d = this.draft();
     const account = {
       displayName: String(d['displayName']).trim(),
-      username: String(d['username'] ?? '').trim() || undefined,
       email: String(d['email']).trim(),
       password: String(d['password'] ?? '') || undefined,
     };

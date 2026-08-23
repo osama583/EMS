@@ -26,6 +26,10 @@ import { SearchableDropdownComponent } from '../../../../shared/components/searc
 import { PopoverComponent } from '../../../../shared/components/popover/popover';
 import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 
+// Matches the backend's own floor (_hash_new_password in api/cafeterias.py) and the identical
+// constant in the cafeteria staff forms.
+const PASSWORD_MIN_LENGTH = 8;
+
 type AdminEntity = 'users' | 'units';
 type AdminTab = 'active' | 'assignments' | 'deleted';
 
@@ -211,7 +215,7 @@ export class AdminDirectoryComponent {
     return this.users().filter((user) =>
       (this.statusFilter() === 'all' || (this.statusFilter() === 'active') === user.active)
       && (this.unitFilter() === 'all' || user.roles.some((r) => r.unitCode === this.unitFilter()))
-      && (!search || `${user.displayName} ${user.username} ${user.email} ${user.roleLabel} ${user.department}`.toLowerCase().includes(search)),
+      && (!search || `${user.displayName} ${user.email} ${user.roleLabel} ${user.department}`.toLowerCase().includes(search)),
     );
   });
   readonly filteredUnits = computed(() => {
@@ -232,7 +236,7 @@ export class AdminDirectoryComponent {
       countLabel: `${this.filteredCount()} ${this.entity === 'users' ? 'user' : 'unit'}${this.filteredCount() === 1 ? '' : 's'}`,
       primaryActionLabel: this.entity === 'users' ? 'Add user' : 'Add unit',
     },
-    search: { ariaLabel: `Search ${this.entity}`, placeholder: this.entity === 'users' ? 'Search name, username, email, role, or unit' : 'Search unit name, code, or description' },
+    search: { ariaLabel: `Search ${this.entity}`, placeholder: this.entity === 'users' ? 'Search name, email, role, or unit' : 'Search unit name, code, or description' },
     columns: this.entity === 'users'
       ? [{ key: 'identity', label: 'User' }, { key: 'relationship', label: 'Relationship' }, { key: 'status', label: 'Status' }, { key: 'actions', label: 'Actions', actions: true }]
       : [{ key: 'unit', label: 'Unit' }, { key: 'code', label: 'Code' }, { key: 'members', label: 'Users' }, { key: 'status', label: 'Status' }, { key: 'actions', label: 'Actions', actions: true }],
@@ -249,9 +253,15 @@ export class AdminDirectoryComponent {
     ] : []),
     { key: 'status', ariaLabel: `Filter ${this.entity} by status`, value: this.statusFilter(), options: [{ value: 'all', label: 'All statuses' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }] },
   ]);
+  // Same wording as the cafeteria staff forms: an empty box is never an error, it just means
+  // "don't set one" on create and "don't change it" on edit.
+  readonly passwordHint = computed(() =>
+    this.editingId()
+      ? 'Leave blank to keep the current password.'
+      : 'Leave blank to create the account without a password.');
   readonly formValid = computed(() => {
     if (this.entity === 'users') {
-      return ['displayName', 'username', 'email'].every((key) => String(this.draft()[key] ?? '').trim()) && !this.fieldError('username') && !this.fieldError('email');
+      return ['displayName', 'email'].every((key) => String(this.draft()[key] ?? '').trim()) && !this.fieldError('email') && !this.fieldError('password');
     }
     // Unit Code is server-derived/read-only (see deriveUnitCode() above) — only Unit Name is a
     // real required input; `code` no longer needs its own presence check.
@@ -494,7 +504,7 @@ export class AdminDirectoryComponent {
   openAdd(): void {
     this.editingId.set(null); this.clearMessages();
     this.draft.set(this.entity === 'users'
-      ? { displayName: '', username: '', email: '', active: true }
+      ? { displayName: '', email: '', password: '', active: true }
       : { name: '', description: '', active: true, roleCodes: [] });
     this.modalOpen.set(true);
   }
@@ -504,7 +514,8 @@ export class AdminDirectoryComponent {
     if (event.action.key === 'edit') {
       this.editingId.set(record.id);
       this.draft.set(this.entity === 'users'
-        ? { displayName: (record as AdminUserRecord).displayName, username: (record as AdminUserRecord).username, email: (record as AdminUserRecord).email, active: record.active }
+        // Blank password means "leave it alone" — the stored value is a hash, so there is nothing to show.
+        ? { displayName: (record as AdminUserRecord).displayName, email: (record as AdminUserRecord).email, password: '', active: record.active }
         : { name: (record as AdminUnitRecord).name, description: (record as AdminUnitRecord).description ?? '', active: record.active, roleCodes: (record as AdminUnitRecord).roleCodes });
       this.modalOpen.set(true); this.clearMessages(); return;
     }
@@ -533,7 +544,7 @@ export class AdminDirectoryComponent {
     if (!value) return '';
     if (key === 'email' && !/^\S+@\S+\.\S+$/.test(value)) return 'Email must be a valid email address.';
     if (key === 'email' && this.users().some((user) => user.id !== id && user.email.toLowerCase() === value)) return 'Email is already assigned to another user.';
-    if (key === 'username' && this.users().some((user) => user.id !== id && user.username.toLowerCase() === value)) return 'Username is already assigned to another user.';
+    if (key === 'password' && this.value('password').length < PASSWORD_MIN_LENGTH) return `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`;
     if (key === 'name') {
       if (this.units().some((unit) => unit.id !== id && unit.name.toLowerCase() === value)) return 'Unit Name already exists.';
       // Unit Code is derived from Unit Name (read-only) — check the DERIVED code for a
@@ -645,8 +656,9 @@ export class AdminDirectoryComponent {
   private userDraft(): AdminUserDraft {
     return {
       displayName: this.value('displayName').trim(),
-      username: this.value('username').trim(),
       email: this.value('email').trim().toLowerCase(),
+      // Omitted rather than sent blank: an empty string would be a password change to nothing.
+      password: this.value('password') || undefined,
       active: Boolean(this.draft()['active']),
     };
   }
@@ -676,10 +688,10 @@ export class AdminDirectoryComponent {
         : `${user.roles.length} grants`;
     return { id: user.id,
     cells: {
-      identity: { primary: user.displayName, secondary: `${user.username} · ${user.email}`, avatar: this.initials(user.displayName) },
+      identity: { primary: user.displayName, secondary: user.email, avatar: this.initials(user.displayName) },
       relationship: { primary: relationshipLabel, badge: true, tone: user.roles.length ? 'blue' : 'warning', clickable: user.roles.length > 1, badgeIcon: user.roles.length > 1 ? 'share' : undefined },
       status: { primary: user.active ? 'Active' : 'Inactive', badge: true, tone: user.active ? 'success' : 'neutral' }, actions: { primary: '' } },
-    mobile: { eyebrow: user.roleLabel, status: user.active ? 'Active' : 'Inactive', title: user.displayName, identity: user.email, initials: this.initials(user.displayName), details: [{ icon: 'alternate_email', text: user.username }, { icon: 'domain', text: user.department }] },
+    mobile: { eyebrow: user.roleLabel, status: user.active ? 'Active' : 'Inactive', title: user.displayName, identity: user.email, initials: this.initials(user.displayName), details: [{ icon: 'alternate_email', text: user.email }, { icon: 'domain', text: user.department }] },
   }; }); }
   private unitRecords(): readonly InternalDataRecord[] { return this.pageSlice(this.filteredUnits()).map((unit) => {
     const count = this.users().filter((user) => user.roles.some((r) => r.unitCode === unit.id)).length;
@@ -689,7 +701,7 @@ export class AdminDirectoryComponent {
     id: user.id,
     actionKeys: ['restore', 'purge'],
     cells: {
-      identity: { primary: user.displayName, secondary: `${user.username} · ${user.email}`, avatar: this.initials(user.displayName) },
+      identity: { primary: user.displayName, secondary: user.email, avatar: this.initials(user.displayName) },
       deletedAt: { primary: this.formatDate(user.deletedAt) },
       remaining: { primary: user.daysRemaining > 0 ? `${user.daysRemaining} day${user.daysRemaining === 1 ? '' : 's'} left` : 'Due for permanent deletion', badge: true, tone: user.daysRemaining <= 1 ? 'warning' : 'neutral' },
       actions: { primary: '' },

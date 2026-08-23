@@ -39,7 +39,6 @@ def principal_for(cur, email: str) -> Principal:
     return Principal(
         user_id=user["user_id"],
         full_name=user["full_name"],
-        username=user["username"],
         email=user["email"],
         is_active=True,
         assignments=assignments,
@@ -314,6 +313,74 @@ def test_department_send_back_requires_a_comment(cur):
         )
 
 
+# --- Per-partner conversations ---------------------------------------------
+def test_conversations_group_a_reviewer_stage_thread_across_cycles(cur):
+    """Two resubmit cycles at the same stage, same person, stay ONE thread -
+    with every message preserved in order, none overwritten."""
+    request_id = create_proposal(cur, "student.computing@demo.apu.edu.my")
+    wf.submit(cur, request_id)
+    hos = principal_for(cur, "hoshod@demo.apu.edu.my")
+    applicant = principal_for(cur, "student.computing@demo.apu.edu.my")
+
+    wf.send_back(cur, request_id, hos, "Please add a budget.")
+    wf.applicant_resubmit(cur, request_id, applicant, comment="Added the budget.")
+    wf.send_back(cur, request_id, hos, "The transportation cost still needs clarification.")
+    wf.applicant_resubmit(cur, request_id, applicant, comment="Clarified the transportation cost.")
+
+    request = wf.load_request(cur, request_id)
+    threads = wf.conversations_for(cur, request, applicant.user_id)
+    assert len(threads) == 1
+    texts = [m["text"] for m in threads[0]["messages"]]
+    assert texts == [
+        "Please add a budget.",
+        "Added the budget.",
+        "The transportation cost still needs clarification.",
+        "Clarified the transportation cost.",
+    ]
+    assert threads[0]["partnerName"] == "Rahim Abdullah" or threads[0]["partnerRoleLabel"] == "HOS/HOD"
+
+
+def test_conversations_are_scoped_per_authority(cur):
+    """A department thread and a reviewer-stage thread on the same proposal
+    stay separate, and each authority sees only their own."""
+    request_id = create_proposal(
+        cur, "hoshod@demo.apu.edu.my", selectedRequirements=["logistics"]
+    )
+    wf.submit(cur, request_id)
+    applicant = principal_for(cur, "hoshod@demo.apu.edu.my")
+    logistics_head = principal_for(cur, "logistics.manager@demo.apu.edu.my")
+
+    wf.send_task_back(cur, request_id, "logistics", logistics_head.user_id, "Need exact quantities.")
+    wf.applicant_resubmit_task(cur, request_id, "logistics", applicant.user_id, comment="Set to 50.")
+
+    request = wf.load_request(cur, request_id)
+
+    applicant_threads = wf.conversations_for(cur, request, applicant.user_id)
+    assert len(applicant_threads) == 1
+    assert applicant_threads[0]["conversationId"].startswith("task:")
+
+    logistics_threads = wf.conversations_for(cur, request, logistics_head.user_id)
+    assert logistics_threads == applicant_threads
+
+    # A different department head, never involved, sees nothing.
+    av_head = principal_for(cur, "av.manager@demo.apu.edu.my")
+    assert wf.conversations_for(cur, request, av_head.user_id) == []
+
+
+def test_reject_does_not_appear_in_conversations(cur):
+    """A rejection is terminal, not a back-and-forth - it must not surface as
+    a conversation thread."""
+    request_id = create_proposal(cur, "student.computing@demo.apu.edu.my")
+    wf.submit(cur, request_id)
+    hos = principal_for(cur, "hoshod@demo.apu.edu.my")
+    applicant = principal_for(cur, "student.computing@demo.apu.edu.my")
+
+    wf.reject(cur, request_id, hos, "Does not meet policy.")
+
+    request = wf.load_request(cur, request_id)
+    assert wf.conversations_for(cur, request, applicant.user_id) == []
+
+
 # --- Staff assignment and completion --------------------------------------
 def test_staff_assignment_and_completion_finishes_the_proposal(cur):
     request_id = create_proposal(cur, "hoshod@demo.apu.edu.my", selectedRequirements=["logistics"])
@@ -420,3 +487,125 @@ def test_every_transition_is_recorded(cur):
     assert last["previous_status"] == "fmb_review"
     assert last["new_status"] == "cfo_review"
     assert last["actor_name"] == "Nadia Hashim"
+
+
+# --- Cafeteria order lifecycle (request_fmb_selection) --------------------
+# Previously untested end to end (migration 013 adds the 'ready' status and
+# delivery photo requirement) - these exercise the full staff-facing chain:
+# create (F&B) -> approve (cafeteria manager) -> claim/"Start Preparing" ->
+# ready/"Done Preparing" -> fulfil/"Delivered" (staff).
+def _place_and_approve_order(cur, **create_overrides) -> tuple[int, int]:
+    """A food proposal through fmb_review, with one cafeteria order approved
+    and sitting in the Atrium Cafeteria's shared staff pool. Returns
+    (request_id, selection_id)."""
+    day = (date.today() + timedelta(days=30)).isoformat()
+    request_id = create_proposal(
+        cur, "student.computing@demo.apu.edu.my", selectedRequirements=["fmb"],
+        requestRows={"fmb": [{
+            "foodType": "fmb:1", "quantity": 20, "date": day,
+            "start": "12:00", "location": "Hall A",
+        }]},
+    )
+    wf.submit(cur, request_id)
+    wf.approve(cur, request_id, principal_for(cur, "hoshod@demo.apu.edu.my"))
+    # Below the high-pax threshold, hos_hod_review goes straight to
+    # department_review - fmb_review only gates high-pax proposals (see
+    # test_high_pax_runs_fmb_then_cfo_then_departments above). F&B can place a
+    # cafeteria order as soon as the proposal reaches department_review.
+    assert status_of(cur, request_id) == "department_review"
+
+    fmb_principal = principal_for(cur, "fmb@demo.apu.edu.my")
+    selection = wf.create_selection(
+        cur, request_id, fmb_principal.user_id,
+        cafeteria_unit_code="cafeteria__atrium_cafeteria", fmb_option_id=1, quantity=10,
+        **create_overrides,
+    )
+    selection_id = selection["id"]
+
+    manager = principal_for(cur, "cafeteria.manager@demo.apu.edu.my")
+    approved = wf.approve_selection(cur, selection_id, manager.user_id)
+    assert approved["status"] == "approved"
+    return request_id, selection_id
+
+
+def test_cafeteria_order_lifecycle_reaches_delivered(cur):
+    _request_id, selection_id = _place_and_approve_order(cur)
+    staff = principal_for(cur, "cafeteria.staff2@demo.apu.edu.my")
+
+    claimed = wf.claim_selection(cur, selection_id, staff.user_id)
+    assert claimed["status"] == "preparing"
+    assert claimed["claimed_by_user_id"] == staff.user_id
+
+    ready = wf.mark_selection_ready(cur, selection_id, staff.user_id)
+    assert ready["status"] == "ready"
+
+    delivered = wf.fulfil_selection(cur, selection_id, staff.user_id, "/api/v1/uploads/deadbeef.jpg")
+    assert delivered["status"] == "fulfilled"
+    assert delivered["delivery_photo_url"] == "/api/v1/uploads/deadbeef.jpg"
+    assert delivered["delivered_at"] is not None
+
+
+def test_fulfilment_is_refused_without_going_through_ready(cur):
+    """Delivered must be reached via Ready, not straight from Start Preparing."""
+    from app.errors import WorkflowError
+
+    _request_id, selection_id = _place_and_approve_order(cur)
+    staff = principal_for(cur, "cafeteria.staff2@demo.apu.edu.my")
+    wf.claim_selection(cur, selection_id, staff.user_id)
+
+    with pytest.raises(WorkflowError):
+        wf.fulfil_selection(cur, selection_id, staff.user_id, "/api/v1/uploads/deadbeef.jpg")
+
+
+def test_fulfilment_is_refused_without_a_delivery_photo(cur):
+    from app.errors import WorkflowError
+
+    _request_id, selection_id = _place_and_approve_order(cur)
+    staff = principal_for(cur, "cafeteria.staff2@demo.apu.edu.my")
+    wf.claim_selection(cur, selection_id, staff.user_id)
+    wf.mark_selection_ready(cur, selection_id, staff.user_id)
+
+    with pytest.raises(WorkflowError):
+        wf.fulfil_selection(cur, selection_id, staff.user_id, "")
+
+
+def test_ready_is_refused_for_a_non_claimant(cur):
+    from app.errors import Forbidden
+
+    _request_id, selection_id = _place_and_approve_order(cur)
+    claimant = principal_for(cur, "cafeteria.staff2@demo.apu.edu.my")
+    other = principal_for(cur, "cafeteria.staff3@demo.apu.edu.my")
+    wf.claim_selection(cur, selection_id, claimant.user_id)
+
+    with pytest.raises(Forbidden):
+        wf.mark_selection_ready(cur, selection_id, other.user_id)
+
+
+def test_shared_pool_for_staff_carries_serve_date_and_time(cur):
+    """The staff queue needs the raw serve date/time for same-day-start gating
+    and the deadline reminder countdown - list_orders() (the manager's
+    equivalent) already surfaces these; shared_pool_for_staff must too."""
+    _request_id, selection_id = _place_and_approve_order(cur)
+    staff = principal_for(cur, "cafeteria.staff2@demo.apu.edu.my")
+
+    pool = wf.shared_pool_for_staff(cur, staff.user_id)
+    mine = next(row for row in pool if row["request_fmb_selection_id"] == selection_id)
+    assert mine["serve_date"] is not None
+    assert mine["serve_time"] is not None
+
+
+def test_flatten_requests_carries_a_raw_deadline_for_row_assignable_kinds(cur):
+    """flatten_requests() must emit a real ISO deadline alongside the display
+    'schedule' string, for the My Tasks calendar/same-day-start feature."""
+    day = (date.today() + timedelta(days=30)).isoformat()
+    request_id = create_proposal(
+        cur, "hoshod@demo.apu.edu.my", selectedRequirements=["logistics"],
+        requestRows={"logistics": [{
+            "item": "logistics:1", "quantity": 5, "date": day,
+            "start": "09:00", "end": "10:00", "location": "Hall A",
+        }]},
+    )
+    rows = proposals.flatten_requests(cur, request_id)
+    logistics_row = next(row for row in rows if row["department"] == "logistics")
+    assert "deadline" in logistics_row
+    assert logistics_row["deadline"] == f"{day}T09:00:00"

@@ -1,0 +1,140 @@
+:host { display: block; min-width: 0; grid-column: 1 / -1; }
+
+.camera-capture {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-card);
+  background: #fff;
+  transition: border-color 220ms var(--ease-standard), box-shadow 220ms var(--ease-standard);
+}
+
+.camera-capture--invalid {
+  border-color: #d92d3f;
+  box-shadow: 0 0 0 3px rgb(217 45 63 / 12%);
+}
+
+.camera-capture header,
+.camera-capture__preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.camera-capture h4 { margin: 0; color: var(--apu-navy-900); font-size: 1rem; }
+.camera-capture p { margin: .25rem 0 0; color: var(--apu-text-muted); font-size: .82rem; }
+
+.camera-capture__remove {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  min-height: 2.5rem;
+  padding: 0 .85rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #d92d3f;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.camera-capture__remove:hover { background: rgb(217 45 63 / 8%); }
+.camera-capture__remove .material-symbols-rounded { font-size: 1.15rem; }
+
+.camera-capture__dropzone {
+  display: grid;
+  place-items: center;
+  gap: .35rem;
+  min-height: 11rem;
+  padding: var(--space-3);
+  border: 1px dashed #aebed0;
+  border-radius: var(--radius-card);
+  background: #f7f9fc;
+  color: var(--apu-navy-900);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 220ms var(--ease-standard), background-color 220ms var(--ease-standard), box-shadow 220ms var(--ease-standard);
+}
+
+.camera-capture__dropzone:hover,
+.camera-capture__dropzone:focus-visible {
+  border-color: var(--apu-blue-600);
+  background: #f1f7ff;
+  box-shadow: 0 0 0 3px rgb(42 131 255 / 10%);
+  outline: 0;
+}
+
+.camera-capture__dropzone:disabled { cursor: wait; opacity: .7; }
+.camera-capture__dropzone > span:last-child { color: var(--apu-text-muted); font-size: .85rem; text-align: center; }
+.camera-capture__icon { color: var(--apu-blue-600); font-size: 2.25rem; }
+
+.camera-capture__live {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: #000;
+}
+
+.camera-capture__live video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.camera-capture__shutter {
+  position: absolute;
+  bottom: .9rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 22%);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 160ms var(--ease-standard), transform 160ms var(--ease-standard);
+}
+
+.camera-capture__shutter:hover:not(:disabled) { background: rgb(255 255 255 / 34%); }
+.camera-capture__shutter:active:not(:disabled) { transform: translateX(-50%) scale(.92); }
+.camera-capture__shutter:disabled { cursor: wait; opacity: .7; }
+.camera-capture__shutter .material-symbols-rounded { font-size: 1.6rem; }
+
+.camera-capture__preview {
+  justify-content: flex-start;
+  padding: .75rem;
+  border-radius: var(--radius-card);
+  background: #f4f7fb;
+}
+
+.camera-capture__preview img {
+  width: clamp(9rem, 22vw, 14rem);
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-control);
+}
+
+.camera-capture__preview-copy { display: grid; align-content: center; justify-items: start; gap: .5rem; min-width: 0; }
+.camera-capture__preview-copy strong { max-width: 100%; overflow-wrap: anywhere; color: var(--apu-navy-900); }
+.camera-capture__preview-copy > span { color: var(--apu-text-muted); font-size: .8rem; }
+
+@media (max-width: 48rem) {
+  .camera-capture { padding: var(--space-2); }
+  .camera-capture header { align-items: flex-start; }
+  .camera-capture__preview { align-items: stretch; flex-direction: column; }
+  .camera-capture__preview img { width: 100%; }
+  .camera-capture__dropzone { min-height: 9rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .camera-capture,
+  .camera-capture__dropzone,
+  .camera-capture__shutter { transition: none; }
+}

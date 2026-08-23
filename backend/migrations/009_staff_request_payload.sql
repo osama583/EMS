@@ -20,7 +20,7 @@
 -- ============================================================================
 
 ALTER TABLE cafeteria_staff_requests
-    ADD COLUMN IF NOT EXISTS payload_username      VARCHAR(80),
+    -- payload_username was here; dropped again in migration 014.
     ADD COLUMN IF NOT EXISTS payload_password_hash VARCHAR(255),
     ADD COLUMN IF NOT EXISTS payload_active        BOOLEAN;
 

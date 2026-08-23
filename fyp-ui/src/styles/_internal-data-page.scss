@@ -18,6 +18,9 @@
 }
 
 .shared-page-header__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   flex: 0 0 auto;
   padding: var(--space-1) 0.85rem;
   border-radius: var(--radius-pill);
@@ -25,6 +28,10 @@
   color: var(--apu-blue-700);
   font-size: 0.76rem;
   font-weight: 700;
+}
+
+.shared-page-header__count > .material-symbols-rounded {
+  font-size: 1rem;
 }
 
 .shared-page-header__actions {
@@ -208,6 +215,28 @@
 .shared-data-table :where([data-actions]) {
   text-align: center;
   white-space: nowrap;
+}
+
+.shared-data-table__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
+.shared-data-table__sort .material-symbols-rounded {
+  font-size: 1.05rem;
+}
+
+.shared-data-table th[aria-sort="ascending"] .shared-data-table__sort,
+.shared-data-table th[aria-sort="descending"] .shared-data-table__sort {
+  color: var(--apu-primary-600, var(--apu-navy-950));
 }
 
 .shared-data-cell {
@@ -439,7 +468,6 @@
 
 .shared-mobile-card {
   position: relative;
-  overflow: hidden;
   border: 1px solid var(--apu-border);
   border-radius: 0.9rem;
   background: var(--apu-surface);
@@ -578,6 +606,13 @@
   z-index: 4;
   top: 0.6rem;
   right: 0.6rem;
+}
+
+// An open menu must win against every sibling card's own box/shadow, regardless of DOM order —
+// a plain z-index on the (always-present) wrapper above is not enough once two adjacent cards are
+// both closed (equal z-index, later sibling paints on top by default). Bump it only while open.
+.shared-mobile-card__menu[open] {
+  z-index: 20;
 }
 
 .shared-mobile-card__menu summary {

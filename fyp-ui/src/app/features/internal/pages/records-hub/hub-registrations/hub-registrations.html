@@ -15,6 +15,7 @@
   (pageChange)="setPage($event)"
   (pageSizeChange)="setPageSize($event)"
   (rowAction)="handleAction($event)"
+  (cellClick)="handleCellClick($event)"
 />
 
 <app-confirm-dialog
@@ -27,3 +28,27 @@
   (confirm)="confirmAction()"
   (cancel)="cancelAction()"
 />
+
+@if (proofPreview(); as registration) {
+  <app-form-modal
+    [open]="true"
+    title="Payment proof"
+    [hidePrimary]="true"
+    secondaryLabel="Close"
+    [fixedSize]="true"
+    (close)="closeProofPreview()"
+    (cancel)="closeProofPreview()"
+    (submit)="closeProofPreview()"
+  >
+    <p class="proof-preview__meta">{{ registration.name || registration.email }} · {{ registration.eventTitle }}</p>
+    @if (registration.paymentProofUrl) {
+      <a [href]="registration.paymentProofUrl" target="_blank" rel="noopener" class="proof-preview__link">
+        <img class="proof-preview__image" [src]="registration.paymentProofUrl" [alt]="'Payment proof from ' + (registration.name || registration.email)" />
+      </a>
+      <a [href]="registration.paymentProofUrl" target="_blank" rel="noopener" class="proof-preview__open">
+        <span class="material-symbols-rounded" aria-hidden="true">open_in_new</span>
+        Open full size
+      </a>
+    }
+  </app-form-modal>
+}

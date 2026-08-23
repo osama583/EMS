@@ -140,7 +140,9 @@
 CREATE TABLE users (
     user_id        BIGSERIAL PRIMARY KEY,
     full_name      VARCHAR(150) NOT NULL,
-    username       VARCHAR(80)  NOT NULL UNIQUE,
+    -- No username column: email is the sole identifier an account is known by, and the only
+    -- thing sign-in accepts. A username was briefly added here and dropped again in
+    -- migration 014 - see that file for why.
     email          VARCHAR(150) NOT NULL UNIQUE,
     password       VARCHAR(255) NOT NULL,
     is_active      BOOLEAN NOT NULL DEFAULT TRUE,

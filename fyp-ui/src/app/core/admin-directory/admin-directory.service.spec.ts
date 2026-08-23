@@ -10,7 +10,7 @@ import { AdminDirectoryService } from './admin-directory.service';
 
 const SEED_USERS: readonly AdminUserRecord[] = [
   {
-    id: 'user-1', displayName: 'Cafeteria Admin', username: 'cafeteria.admin',
+    id: 'user-1', displayName: 'Cafeteria Admin',
     email: 'cafeteria.admin@demo.apu.edu.my', roles: [{ assignmentId: '1', roleCode: 'cafeteria-admin', roleName: 'Cafeteria Admin', unitCode: null, unitDescription: null }],
     roleLabel: 'Cafeteria Admin', department: 'Cafeteria Services', active: true,
   },

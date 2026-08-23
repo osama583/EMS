@@ -124,8 +124,6 @@ def nav_catalogue() -> list[dict]:
     folder("my-cafeteria-folder", "My Cafeteria", "storefront", 10, [cafeteria_manager_grant()])
     page("cafeteria-my-staff", "My Staff", "assignment_ind", "/app/cafeterias/my-staff",
          "my-cafeteria-folder", 0, [cafeteria_manager_grant()])
-    page("cafeteria-my-staff-history", "History", "history", "/app/cafeterias/my-staff-history",
-         "my-cafeteria-folder", 1, [cafeteria_manager_grant()])
 
     # --- Dropdown Settings ------------------------------------------------
     # Each kind is granted only to the department that actually owns it. A
@@ -173,6 +171,11 @@ def nav_catalogue() -> list[dict]:
              ("role", ["cafeteria-admin"], []),
              ("unit_role", ["head-of-department"], ["food_beverage_services"]),
          ])
+    # Audit log of every staff create/edit/suspend/restore/remove - Admin sees every cafeteria,
+    # Manager sees only their own outlet's timeline (server-side scoped, not a client filter).
+    page("cafeteria-staff-requests-history", "Staff Action History", "history",
+         "/app/cafeterias/staff-requests-history", "cafeteria-admin-folder", 3,
+         grants_for(["cafeteria-admin"]) + [cafeteria_manager_grant()])
 
     # --- Internal Directory (System Admin) -------------------------------
     folder("admin-directory", "Internal Directory", "folder_shared", 18,
@@ -197,6 +200,8 @@ def nav_catalogue() -> list[dict]:
          grants_for(["club-admin", "student", "lecturer"]))
     page("clubs-discover", "Discover Clubs", "explore", "/app/clubs/discover", "manage-clubs", 2,
          grants_for(["club-admin", "student", "lecturer"]))
+    page("club-category", "Club Category", "category", "/app/club-category",
+         "manage-clubs", 3, grants_for(["club-admin"]))
 
     # --- System Configuration --------------------------------------------
     folder("system-config", "System Configuration", "settings", 20, grants_for(["system-admin"]))

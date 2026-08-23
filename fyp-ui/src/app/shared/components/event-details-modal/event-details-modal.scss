@@ -202,21 +202,53 @@
   overflow-wrap: anywhere;
 }
 
+// Distinct from the neutral gray cards used elsewhere in this modal (.event-details__summary-card,
+// dl > div) — this one is a hard registration requirement (the backend rejects registration
+// without it, see events.py's POST /events/{id}/registrations), so it gets the same warning/error
+// visual language as a required form field rather than reading as just another info box.
 .event-details__payment {
   display: grid;
-  gap: .6rem;
-  padding: 1rem 1.1rem 1.05rem;
-  border: 1px solid #d8e1ec;
+  gap: .75rem;
+  padding: 1.1rem 1.2rem 1.2rem;
+  border: 1px solid rgb(201 54 79 / 22%);
   border-radius: 16px;
-  background-color: #f4f7fb;
+  background: linear-gradient(180deg, rgb(201 54 79 / 6%), rgb(201 54 79 / 2%));
 }
+
+.event-details__payment-head {
+  display: flex;
+  align-items: flex-start;
+  gap: .65rem;
+}
+
+.event-details__payment-head > .material-symbols-rounded {
+  flex-shrink: 0;
+  display: grid;
+  width: 2.15rem;
+  height: 2.15rem;
+  place-items: center;
+  border-radius: .6rem;
+  background: rgb(201 54 79 / 12%);
+  color: var(--form-error);
+  font-size: 1.15rem;
+}
+
+.event-details__payment-head > div { min-width: 0; }
 
 .event-details__payment h3 {
   margin: 0;
-  color: var(--apu-blue-700);
-  font-size: .8rem;
+  color: var(--form-error);
+  font-size: .82rem;
+  font-weight: 800;
   letter-spacing: .025em;
   text-transform: uppercase;
+}
+
+.event-details__payment-subtitle {
+  margin: .2rem 0 0;
+  color: var(--apu-text-muted);
+  font-size: .82rem;
+  line-height: 1.5;
 }
 
 .event-details__payment dl {
@@ -230,12 +262,66 @@
   background: none;
 }
 
-.event-details__payment p {
-  margin: 0;
-  color: var(--apu-text-muted);
-  font-size: .88rem;
-  line-height: 1.5;
+.event-details__payment-proof-field {
+  display: grid;
+  gap: .4rem;
 }
+
+.event-details__payment-proof-label {
+  display: flex;
+  align-items: center;
+  gap: .2rem;
+  color: var(--apu-navy-900);
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.event-details__payment-required { color: var(--form-error); font-weight: 800; }
+
+// The upload control itself, styled as a required control (dashed border, error-tinted) rather
+// than a plain secondary button — matches this section's "this blocks registration" weight.
+.event-details__payment-upload {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  width: 100%;
+  padding: .8rem .95rem;
+  border: 1.5px dashed rgb(201 54 79 / 40%);
+  border-radius: var(--radius-control);
+  background: var(--apu-white);
+  color: var(--form-error);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 180ms var(--ease-standard), background 180ms var(--ease-standard);
+}
+
+.event-details__payment-upload:hover,
+.event-details__payment-upload:focus-visible {
+  border-color: var(--form-error);
+  background: var(--form-error-soft);
+  outline: 0;
+}
+
+.event-details__payment-upload:disabled { opacity: .6; cursor: default; }
+
+.event-details__payment-upload > .material-symbols-rounded { flex-shrink: 0; font-size: 1.3rem; }
+
+.event-details__payment-upload strong {
+  display: block;
+  color: var(--apu-navy-900);
+  font-size: .88rem;
+  font-weight: 700;
+}
+
+.event-details__payment-upload small {
+  display: block;
+  margin-top: .1rem;
+  color: var(--apu-text-muted);
+  font-size: .74rem;
+  font-weight: 500;
+}
+
+.event-details__payment-upload--invalid { border-color: var(--form-error); box-shadow: var(--form-error-ring); }
 
 .event-details__payment-proof {
   display: flex;
@@ -243,6 +329,18 @@
   gap: .5rem;
   font-size: .9rem;
 }
+
+// Once a file is attached, the requirement is satisfied — switches to a calm confirmed state
+// (green) rather than staying in the error-toned upload prompt.
+.event-details__payment-proof--attached {
+  padding: .7rem .9rem;
+  border: 1px solid rgb(22 132 91 / 25%);
+  border-radius: var(--radius-control);
+  background: rgb(22 132 91 / 6%);
+  color: #16845b;
+}
+
+.event-details__payment-proof--attached strong { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; color: var(--apu-navy-900); }
 
 .event-details__summary-card:hover,
 .event-details__introduction:hover,

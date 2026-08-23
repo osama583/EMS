@@ -15,7 +15,6 @@ const APPLICANT_USER: AuthUser = testUser(
   {
     email: 'applicant@demo.apu.edu.my',
     displayName: 'Demo Applicant',
-    username: 'applicant',
     nav: [testNavPage('dashboard', 'Dashboard')],
   },
 );
@@ -51,7 +50,8 @@ describe('event engagement mock services', () => {
     loginViaMock(auth, httpMock);
 
     const savePromise = firstValueFrom(saved.saveEvent(auth.user()!.email, 'evt-1'));
-    httpMock.expectOne(`${`${environment.apiBaseUrl}/events/me`}/saved`).flush({ eventId: 'evt-1', saved: true });
+    httpMock.expectOne((req) => req.method === 'PUT' && req.url === `${`${environment.apiBaseUrl}/events/me`}/saved/evt-1`)
+      .flush({ eventId: 'evt-1', saved: true });
     await savePromise;
     expect(saved.isSaved('evt-1')).toBe(true);
 
@@ -81,7 +81,7 @@ describe('event engagement mock services', () => {
     const resultPromise = firstValueFrom(registration.verifyOtp({ challengeId: challenge.challengeId, otp: challenge.developmentOtp! }));
     await new Promise((resolve) => setTimeout(resolve, 0));
     httpMock.expectOne(`${environment.apiBaseUrl}/auth/register`).flush(sessionEnvelope(testUser([testRole('external-user')], {
-      email: 'guest@example.com', displayName: 'Guest User', username: 'guest', accountType: 'external',
+      email: 'guest@example.com', displayName: 'Guest User', accountType: 'external',
     })));
     const result = await resultPromise;
     expect(result.status).toBe('verified');

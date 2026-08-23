@@ -70,10 +70,10 @@ export interface SavedEventsApi {
   updateNotificationPreferences(userEmail: string, preferences: NotificationPreference): import('rxjs').Observable<NotificationPreference>;
 }
 
-/** Each method is designed to be swapped for a real GET endpoint without page-level redesign. */
+/** The acting user is resolved server-side from the bearer token. */
 export interface EventRegistrationApi {
-  getActiveRegistrations(userEmail: string): import('rxjs').Observable<RegisteredEventsResponse>;
-  getRegistrationHistory(userEmail: string): import('rxjs').Observable<RegisteredEventsResponse>;
+  getActiveRegistrations(): import('rxjs').Observable<RegisteredEventsResponse>;
+  getRegistrationHistory(): import('rxjs').Observable<RegisteredEventsResponse>;
 }
 
 export interface ExternalRegistrationApi {

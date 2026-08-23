@@ -18,16 +18,19 @@ import { LogisticsAvailability } from '../../../../core/request-options/logistic
 import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
 import { OptionPickerGridComponent } from '../../../../shared/components/option-picker-grid/option-picker-grid';
 import { OptionPickerItem } from '../../../../shared/components/option-picker-grid/option-picker-grid.models';
+import { ReviewerCommentsDrawerComponent } from '../../../../shared/components/reviewer-comments-drawer/reviewer-comments-drawer';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { EventImageAsset, EventVisibility, RegistrationMode } from '../../../../core/events/published-event.models';
 import { ProposalWorkflowService } from '../../../../core/proposals/proposal-workflow.service';
+import { ProposalConversation } from '../../../../core/proposals/proposal-conversation.models';
 import { ProposalReviewRecord } from '../../../../core/proposals/proposal-review.models';
-import { ReviewerCommentEntry, allCommentEntries } from '../../../../core/proposals/proposal-status.models';
+import { ReviewerCommentEntry, allCommentEntries, reviewerCommentEntry } from '../../../../core/proposals/proposal-status.models';
 
-import { AdminDirectoryService } from '../../../../core/admin-directory/admin-directory.service';
+import { InternalUserDirectoryService } from '../../../../core/users/internal-user-directory.service';
 import { SystemConfigService } from '../../../../core/config/system-config.service';
 import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 import { EventCategoryService, EventFormatService } from '../../../../core/event-catalog/event-catalog.service';
+import { resolveDepartmentRowLabels } from '../../../../core/departments/department-request-columns';
 
 type RequirementKey = 'logistics' | 'transportation' | 'photoVideo' | 'soundLight' | 'fmb' | 'campusTour' | 'waterNormal' | 'fundingPurchase';
 type RowCollection = 'coOwners' | 'schedule' | 'organizers' | 'importantPeople' | 'guests' | 'agenda' | 'discussions';
@@ -41,9 +44,23 @@ interface ProposalReviewSection { readonly title: string; readonly icon: string;
 const option = (label: string): SelectOption => ({ value: label, label });
 const options = (...labels: string[]): readonly SelectOption[] => labels.map(option);
 
+// Which option kinds each "Required for Event" checkbox needs, so the catalog only ever fetches
+// what the applicant actually selected rather than every dropdown in the system up front.
+// dietaryInformation/servingUnit ride along with fmb since they only ever render inside its rows.
+const REQUIREMENT_OPTION_KINDS: Record<RequirementKey, readonly RequestOptionKind[]> = {
+  logistics: ['logistics'],
+  transportation: ['transportation'],
+  photoVideo: ['photoVideo'],
+  soundLight: ['soundLight'],
+  fmb: ['fmb', 'dietaryInformation', 'servingUnit'],
+  campusTour: ['campusTourStart', 'campusTourType'],
+  waterNormal: ['waterNormal'],
+  fundingPurchase: ['fundingMain', 'fundingSub'],
+};
+
 @Component({
   selector: 'app-event-proposal',
-  imports: [FormFieldComponent, SearchableDropdownComponent, ProposalTableComponent, ValidationMessageComponent, StepIndicatorComponent, FormModalComponent, EventImageUploadComponent, LoadingStateComponent, OptionPickerGridComponent],
+  imports: [FormFieldComponent, SearchableDropdownComponent, ProposalTableComponent, ValidationMessageComponent, StepIndicatorComponent, FormModalComponent, EventImageUploadComponent, LoadingStateComponent, OptionPickerGridComponent, ReviewerCommentsDrawerComponent],
   templateUrl: './event-proposal.html',
   styleUrl: './event-proposal.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -59,8 +76,9 @@ export class EventProposalComponent implements OnDestroy {
   private readonly availabilityService = inject(LogisticsAvailabilityService);
   private readonly applicant = this.auth.user();
   private readonly requestOptionCatalog = signal<readonly RequestOption[]>([]);
-  readonly requestCatalogLoading = signal(true);
-  private readonly requestOptionSubscription: Subscription = this.optionService.watchActiveCatalog().subscribe({ next: (options) => { this.requestOptionCatalog.set(options); this.requestCatalogLoading.set(false); }, error: () => this.requestCatalogLoading.set(false) });
+  readonly requestCatalogLoading = signal(false);
+  private readonly loadedRequestOptionKinds = new Set<RequestOptionKind>();
+  private readonly requestOptionSubscription = new Subscription();
   private validationGuidanceTimer: ReturnType<typeof setTimeout> | undefined;
   private requestOptionsTimer: ReturnType<typeof setTimeout> | undefined;
   private logisticsAvailabilityTimer: ReturnType<typeof setTimeout> | undefined;
@@ -76,9 +94,42 @@ export class EventProposalComponent implements OnDestroy {
   readonly draftRequestId = signal<number | null>(null);
   readonly savingDraft = signal(false);
   // Every comment waiting on the applicant: the reviewer stage that sent the whole proposal back,
-  // and/or each department that asked for changes to its own part of it.
+  // and/or each department that asked for changes to its own part of it. Kept as a fallback for a
+  // proposal with no conversation rows yet (see reviewer-comments-drawer.ts).
   readonly reviewerComments = signal<readonly ReviewerCommentEntry[]>([]);
+  // Full per-partner chat history for this proposal, once it has an id (a brand-new,
+  // never-submitted proposal has no conversations to fetch).
+  readonly conversations = signal<readonly ProposalConversation[]>([]);
   readonly commentsPanelOpen = signal(true);
+  // True only when this proposal was opened because a reviewer/department sent it back for
+  // changes (not when the applicant is just reviewing an already-decided proposal from their
+  // history) — the signal for whether the comments drawer should jump straight into the
+  // conversation that needs a reply, rather than the Conversations list.
+  readonly isResubmissionRequired = signal(false);
+  // Which single thread put this proposal into resubmission_required — read straight from
+  // record.workflow.resumeStage/departmentConfirmations in prefillFromRecord (the same source
+  // reviewerComments() uses, see allCommentEntries()), preferring the whole-proposal reviewer
+  // stage over a department if both are somehow present. Deliberately NOT "whichever conversation
+  // has the most recent message" — with multiple parallel department threads open, the most
+  // recent message is not necessarily the one that blocked the proposal.
+  //
+  // A task-thread conversation's partnerName is the RAW requirement key (e.g. "photoVideo" — see
+  // history.py's conversations_for(), unmapped from event_requirements.requirement_name), not a
+  // display label like DEPARTMENT_LABELS produces — so 'department' below is deliberately the raw
+  // key, matched against partnerName as-is. A reviewer-stage thread's partnerRoleLabel IS already
+  // the display label ("HOS/HOD"/"F&B"/"CFO"), so 'reviewerRoleLabel' matches that directly.
+  readonly pendingRequester = signal<{ department: string } | { reviewerRoleLabel: string } | null>(null);
+  readonly pendingRequesterConversationId = computed<string | null>(() => {
+    const requester = this.pendingRequester();
+    if (!requester) return null;
+    const match = 'department' in requester
+      ? this.conversations().find((c) => c.partnerName === requester.department)
+      : this.conversations().find((c) => c.partnerRoleLabel === requester.reviewerRoleLabel);
+    return match?.conversationId ?? null;
+  });
+  // The applicant's required reply, captured in the resubmit confirm modal and sent together
+  // with the resubmission so it lands in the same conversation as the comment that prompted it.
+  readonly replyComment = signal('');
   readonly resubmitting = signal(false);
   readonly errors = signal<Readonly<Record<string, string>>>({});
   readonly previewOpen = signal(false);
@@ -132,7 +183,7 @@ export class EventProposalComponent implements OnDestroy {
 
   private readonly toastService = inject(ToastService);
   private readonly systemConfig = inject(SystemConfigService);
-  private readonly directory = inject(AdminDirectoryService);
+  private readonly directory = inject(InternalUserDirectoryService);
   private readonly eventCategoryService = inject(EventCategoryService);
   private readonly eventFormatService = inject(EventFormatService);
   // ACTIVE-only options — an archived category/format must not be offered on a new proposal, even
@@ -146,7 +197,7 @@ export class EventProposalComponent implements OnDestroy {
   // Club Only visibility is gated on being the President of at least one club — a data fact
   // (AuthUser.presidentOfClubIds, sourced from the clubs table), not a role check.
   private readonly isClubPresident = Boolean(this.applicant?.presidentOfClubIds?.length);
-  readonly visibilityOptions: readonly SelectOption[] = (this.isClubPresident ? ['Public', 'Private', 'Club Only'] : ['Public', 'Private']).map((label) => ({ value: label, label }));
+  readonly visibilityOptions: readonly SelectOption[] = (this.isClubPresident ? ['Public', 'Private', 'Internal', 'Club Only'] : ['Public', 'Private', 'Internal']).map((label) => ({ value: label, label }));
   readonly formatOptions = computed<readonly SelectOption[]>(() =>
     this.eventFormatService.activeEntries().map((entry) => ({ value: entry.id, label: entry.name }))
   );
@@ -181,19 +232,21 @@ export class EventProposalComponent implements OnDestroy {
   private readonly pendingFormatName = signal<string | null>(null);
 
   constructor() {
-    // Co-owner candidates: every active internal account except the applicant themselves.
-    this.directory.users$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((users) => {
-      this.staff.set(users
-        // External (guest) accounts hold only the flat 'external-user' role and can never be
-        // co-owners or organizers of an internal proposal.
-        .filter((user) => user.active && !user.roles.some((role) => role.roleCode === 'external-user'))
-        .map((user) => ({
-          value: user.displayName,
-          label: user.displayName,
-          email: user.email,
-          role: user.roleLabel,
-          description: user.department,
-        })));
+    // Co-owner/Organizer candidates: anyone who can plausibly BE an applicant themselves —
+    // both roles can act in the applicant's place (a Co-owner can resubmit/continue exactly
+    // like the applicant; an Organizer helps run the event) — server-scoped to whoever the
+    // admin's Page Visibility settings grant the proposal form to (see
+    // InternalUserDirectoryService.proposalCollaboratorCandidates$), NOT every active internal
+    // account. The old blanket /auth/internal-users fetch offered e.g. the CFO or a cafeteria
+    // manager as a co-owner candidate even though neither role could ever open this form.
+    this.directory.proposalCollaboratorCandidates$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((users) => {
+      this.staff.set(users.map((user) => ({
+        value: user.displayName,
+        label: user.displayName,
+        email: user.email,
+        role: user.roleLabel,
+        description: user.department,
+      })));
     });
     effect(() => {
       const names = this.pendingCategoryNames();
@@ -216,6 +269,26 @@ export class EventProposalComponent implements OnDestroy {
       if (first) this.eventFormat.set(first.id);
     });
 
+    // Paid events must use manual approval — enforced reactively so it applies whether
+    // the cost is typed in live or loaded from a saved draft/resubmission.
+    effect(() => {
+      if (this.requiresPayment()) this.registrationMode.set('Approval Required');
+    });
+
+    // Only fetch the option catalog for requirement kinds the applicant has actually selected on
+    // "Required for Event" — previously this loaded every dropdown option in the system (every
+    // department's items, every cafeteria's menu) unconditionally at page load. Checkboxes on
+    // step 2 just accumulate into selectedRequirements(); the fetch itself waits until the user
+    // actually reaches step 3 (Request Details) so ticking N boxes fires one batched request
+    // instead of N separate ones — and re-fires (still batched) if they go back and add more.
+    // currentStep() drives it (not just selectedRequirements()) so prefill from a draft/
+    // resubmission — which lands on step 0 with selectedRequirements already set — only fetches
+    // once the applicant actually reaches that step, not immediately on load.
+    effect(() => {
+      if (this.currentStep() !== 3) return;
+      this.loadRequestOptionCatalog();
+    });
+
     const proposalId = Number(this.route.snapshot.queryParamMap.get('proposalId'));
     if (Number.isFinite(proposalId) && proposalId > 0) {
       this.workflow.getById(proposalId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((record) => {
@@ -224,18 +297,55 @@ export class EventProposalComponent implements OnDestroy {
         // continues saving as a draft (and eventually submits fresh) rather than going through
         // resubmitFromApplicant(), which only exists for proposals a reviewer sent back
         // (status='resubmission_required') and would reject a plain draft's status server-side.
-        if (record.status === 'Draft') this.draftRequestId.set(proposalId);
+        if (record.status === 'draft') this.draftRequestId.set(proposalId);
         else this.resubmitProposalId.set(proposalId);
         this.prefillFromRecord(record);
       });
+      this.workflow.getConversations(proposalId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: (conversations) => this.conversations.set(conversations),
+        error: () => undefined,
+      });
     }
+  }
+
+  // Fetches whichever option kinds the applicant's current selectedRequirements() need and
+  // haven't been loaded yet, batched into one request. Normally only fires once the applicant
+  // reaches step 3 (see the effect in the constructor); prefillFromRecord() also calls it
+  // directly for a resubmission/draft, since submit() validates every step immediately and the
+  // fundingPurchase check below needs the catalog loaded to recognize prefilled mainItem/subItem
+  // values as valid even if the applicant never revisits Request Details.
+  private loadRequestOptionCatalog(): void {
+    const kinds = new Set(this.selectedRequirements().flatMap((key) => REQUIREMENT_OPTION_KINDS[key as RequirementKey] ?? []));
+    const missing = [...kinds].filter((kind) => !this.loadedRequestOptionKinds.has(kind));
+    if (!missing.length) return;
+    missing.forEach((kind) => this.loadedRequestOptionKinds.add(kind));
+    this.requestCatalogLoading.set(true);
+    this.requestOptionSubscription.add(
+      this.optionService.watchActiveCatalog(missing).subscribe({
+        next: (options) => {
+          this.requestOptionCatalog.update((current) => [...current, ...options]);
+          this.requestCatalogLoading.set(false);
+        },
+        error: () => this.requestCatalogLoading.set(false),
+      }),
+    );
   }
 
   // Loads a proposal a reviewer sent back with a comment so the applicant can see what needs to
   // change and edit in place, rather than starting a fresh submission from scratch.
   private prefillFromRecord(record: ProposalReviewRecord): void {
-    this.reviewerComments.set(allCommentEntries(record.workflow));
-    this.commentsPanelOpen.set(this.reviewerComments().length > 0);
+    const comments = allCommentEntries(record.workflow);
+    this.reviewerComments.set(comments);
+    this.commentsPanelOpen.set(comments.length > 0);
+    this.isResubmissionRequired.set(record.status === 'resubmission_required');
+    // Same "who's blocking this" priority allCommentEntries() uses: the whole-proposal reviewer
+    // stage first, else the first department still waiting on a resubmit — see pendingRequester's
+    // own doc comment for why department must stay the raw key rather than a display label.
+    const reviewer = reviewerCommentEntry(record.workflow);
+    const department = record.workflow.departmentConfirmations.find((entry) => entry.status === 'resubmitted');
+    this.pendingRequester.set(
+      reviewer ? { reviewerRoleLabel: reviewer.reviewer } : department ? { department: department.department } : null,
+    );
     this.eventTitle.set(record.eventTitle);
     this.shortIntro.set(record.shortIntroduction);
     this.goals.set(record.goals);
@@ -248,7 +358,7 @@ export class EventProposalComponent implements OnDestroy {
     this.pendingFormatName.set(record.eventFormat);
     this.eventVisibility.set(record.eventVisibility);
     this.eventImage.set(record.eventImage);
-    this.registrationMode.set(record.registrationMode);
+    this.registrationMode.set(record.registrationMode === 'Manual' as any ? 'Approval Required' : record.registrationMode);
     this.coOwners.set(record.coOwners);
     this.schedule.set(record.scheduleRows);
     this.organizers.set(record.organizers);
@@ -269,6 +379,7 @@ export class EventProposalComponent implements OnDestroy {
         record.selectedRequirements.map((key) => [key, (structuredRows[key] ?? []).map((row) => ({ ...row }))]),
       ),
     });
+    this.loadRequestOptionCatalog();
   }
 
   readonly coOwnerColumns: readonly EditableTableColumn[] = [
@@ -289,9 +400,20 @@ export class EventProposalComponent implements OnDestroy {
   readonly guestColumns: readonly EditableTableColumn[] = [
     { key: 'guestType', label: 'Guest Type', type: 'select', options: options('Students', 'APU Staff', 'External Guests', 'Parents-Guardians', 'Industry Partners', 'Alumni', 'Others') }, { key: 'count', label: 'Count', type: 'number', min: 0, step: 1 }, { key: 'notes', label: 'Notes', type: 'text', span: 'full' },
   ];
-  readonly agendaColumns: readonly EditableTableColumn[] = [
-    { key: 'time', label: 'Time', type: 'time', required: true }, { key: 'activity', label: 'Activity', type: 'text', required: true }, { key: 'location', label: 'Location', type: 'text', required: true }, { key: 'pic', label: 'PIC', type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'text', span: 'full' },
-  ];
+  readonly scheduleDates = computed<readonly string[]>(() => {
+    const dates = [...new Set(this.schedule().map((row) => String(row['date'] ?? '')).filter(Boolean))].sort();
+    return dates;
+  });
+  readonly isMultiDay = computed(() => this.scheduleDates().length > 1);
+  readonly agendaColumns = computed<readonly EditableTableColumn[]>(() => {
+    const base: EditableTableColumn[] = [
+      { key: 'time', label: 'Time', type: 'time', required: true }, { key: 'activity', label: 'Activity', type: 'text', required: true }, { key: 'location', label: 'Location', type: 'text', required: true }, { key: 'pic', label: 'PIC', type: 'text', required: true }, { key: 'notes', label: 'Notes', type: 'text', span: 'full' },
+    ];
+    if (this.isMultiDay()) {
+      base.unshift({ key: 'date', label: 'Date', type: 'select', required: true, options: this.scheduleDates().map((d) => ({ value: d, label: new Date(d + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) })) });
+    }
+    return base;
+  });
   readonly discussionColumns: readonly EditableTableColumn[] = [{ key: 'topic', label: 'Discussion Topic', type: 'text', required: true, span: 'full' }];
 
   get requirements(): readonly RequestDefinition[] { this.requestOptionCatalog(); return this.buildRequirementDefinitions(); }
@@ -388,7 +510,7 @@ export class EventProposalComponent implements OnDestroy {
           ...(requestedServices ? [this.reviewItem('Departments / Services', requestedServices, true)] : []),
           ...(this.totalCost() > 0 ? [this.reviewItem('Total Expected Cost', this.currency(this.totalCost()))] : []),
           ...(this.showCostFields() && this.cost() !== null ? [this.reviewItem('Event Cost', this.cost()! > 0 ? this.currency(this.cost()!) : 'Free')] : []),
-          ...(agenda.length ? [this.reviewItem('Agenda', agenda.map((row) => `${row['time']} · ${row['activity']} · ${row['location']}`).join('\n'), true)] : []),
+          ...(agenda.length ? [this.reviewItem('Agenda', agenda.map((row) => `${this.isMultiDay() && row['date'] ? row['date'] + ' · ' : ''}${row['time']} · ${row['activity']} · ${row['location']}`).join('\n'), true)] : []),
           ...(discussions.length ? [this.reviewItem('Discussion Topics', discussions.map((row) => String(row['topic'])).join(', '), true)] : []),
         ],
       },
@@ -486,7 +608,7 @@ export class EventProposalComponent implements OnDestroy {
   }
   addRow(collection: RowCollection): void {
     const target = this[collection] as unknown as { update(fn: (rows: readonly EditableRow[]) => readonly EditableRow[]): void };
-    const defaults: Record<RowCollection, EditableRow> = { coOwners: { name: '', email: '', role: '' }, schedule: { date: '', start: '', end: '', location: '' }, organizers: { name: '', email: '', role: '', notes: '' }, importantPeople: { name: '', type: '', organization: '', designation: '' }, guests: { guestType: '', count: 0, notes: '' }, agenda: { time: '', activity: '', location: '', pic: '', notes: '' }, discussions: { topic: '' } };
+    const defaults: Record<RowCollection, EditableRow> = { coOwners: { name: '', email: '', role: '' }, schedule: { date: '', start: '', end: '', location: '' }, organizers: { name: '', email: '', role: '', notes: '' }, importantPeople: { name: '', type: '', organization: '', designation: '' }, guests: { guestType: '', count: 0, notes: '' }, agenda: { date: '', time: '', activity: '', location: '', pic: '', notes: '' }, discussions: { topic: '' } };
     target.update((rows) => [...rows, this.row(defaults[collection])]);
   }
   removeRow(collection: RowCollection, index: number): void {
@@ -506,11 +628,18 @@ export class EventProposalComponent implements OnDestroy {
       return option?.kind === 'logistics' && option.imageDataUrl ? { ...row, itemImageUrl: option.imageDataUrl } : row;
     });
   }
+  // Same "raw catalog id, not label" gap as logisticsRowsWithImages() above, for every OTHER
+  // select-type request column (Transportation's Type, F&B's Food Type, Funding's Main/Sub Item,
+  // etc.) — ProposalTableComponent renders row['type'] etc. verbatim, and that value is stored as
+  // the option reference id (e.g. "transportation:2"), not the label the applicant picked.
+  requestRowsForDisplay(definition: RequestDefinition): readonly EditableRow[] {
+    return resolveDepartmentRowLabels(definition.key, definition.columns, this.requestRows()[definition.key], this.requestOptionCatalog());
+  }
   tableRows(collection: TableEditorCollection): readonly EditableRow[] {
     return (this[collection] as unknown as () => readonly EditableRow[])();
   }
   tableColumns(collection: TableEditorCollection): readonly EditableTableColumn[] {
-    return ({ schedule: this.scheduleColumns, organizers: this.organizerColumns, importantPeople: this.importantColumns, guests: this.guestColumns, agenda: this.agendaColumns, discussions: this.discussionColumns })[collection];
+    return ({ schedule: this.scheduleColumns, organizers: this.organizerColumns, importantPeople: this.importantColumns, guests: this.guestColumns, agenda: this.agendaColumns(), discussions: this.discussionColumns })[collection];
   }
   tableEditorColumns(): readonly EditableTableColumn[] { const collection = this.tableEditorCollection(); return collection ? this.tableColumns(collection) : []; }
   tableTitle(collection: TableEditorCollection): string {
@@ -715,7 +844,7 @@ export class EventProposalComponent implements OnDestroy {
   // the check hasn't completed yet or the network call failed, so the form never blocks on it.
   logisticsRemainingQuantity(): number | null {
     const availability = this.logisticsAvailability();
-    return availability ? availability.remainingQuantity : null;
+    return availability ? availability.availableQuantity : null;
   }
   logisticsExceedsRemaining(): boolean {
     const remaining = this.logisticsRemainingQuantity();
@@ -727,10 +856,7 @@ export class EventProposalComponent implements OnDestroy {
     if (!availability || !this.logisticsExceedsRemaining()) return '';
     const unit = this.logisticsQuantityUnit();
     const unitSuffix = this.logisticsRequestedQuantity() === 1 ? '' : 's';
-    if (availability.nextAvailableAt) {
-      return `Only ${availability.remainingQuantity} ${unit}${availability.remainingQuantity === 1 ? '' : 's'} available for this window. ${this.logisticsRequestedQuantity()} ${unit}${unitSuffix} will be available from ${availability.nextAvailableAt} onward.`;
-    }
-    return `Only ${availability.remainingQuantity} ${unit}${availability.remainingQuantity === 1 ? '' : 's'} available for this window — not enough frees up for ${this.logisticsRequestedQuantity()} ${unit}${unitSuffix} on this date.`;
+    return `Only ${availability.availableQuantity} ${unit}${availability.availableQuantity === 1 ? '' : 's'} available for this window — not enough frees up for ${this.logisticsRequestedQuantity()} ${unit}${unitSuffix} on this date.`;
   }
   private logisticsPickerContext(option: RequestOption): string {
     return option.kind === 'logistics' ? `${option.availableQuantity} ${option.quantityUnit}${option.availableQuantity === 1 ? '' : 's'} available` : '';
@@ -858,7 +984,6 @@ export class EventProposalComponent implements OnDestroy {
     });
   }
 
-  toggleCommentsPanel(): void { this.commentsPanelOpen.update((open) => !open); }
 
   // "Save" for a proposal a reviewer sent back — persists every edited field without submitting
   // it back into the workflow: the proposal stays in the applicant's Inbox at
@@ -898,7 +1023,7 @@ export class EventProposalComponent implements OnDestroy {
       totalPax: this.totalPax(),
       eventVisibility: this.eventVisibility(),
       eventFormat: this.eventFormat(),
-      registrationMode: this.registrationMode(),
+      registrationMode: this.registrationMode() === 'Approval Required' ? 'Manual' : this.registrationMode(),
       publicity: this.publicity(),
       costAmount: this.cost(),
       bankAccountName: this.bankAccountName().trim() || null,
@@ -943,9 +1068,10 @@ export class EventProposalComponent implements OnDestroy {
     const proposalId = this.resubmitProposalId();
     if (proposalId !== null) {
       this.resubmitting.set(true);
-      this.workflow.resubmitFromApplicant(proposalId, this.buildSubmissionPayload()).pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      const payload = { ...this.buildSubmissionPayload(), comment: this.replyComment().trim() };
+      this.workflow.resubmitFromApplicant(proposalId, payload).pipe(finalize(() => this.resubmitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
         next: () => {
-          this.status.set('Submitted'); this.previewOpen.set(false); this.reviewerComments.set([]);
+          this.status.set('Submitted'); this.previewOpen.set(false); this.reviewerComments.set([]); this.replyComment.set('');
           this.showToast('Proposal resubmitted', 'It resumes at whichever stage sent it back to you.');
           void this.router.navigateByUrl('/app/ongoing/proposals');
         },
@@ -990,7 +1116,7 @@ export class EventProposalComponent implements OnDestroy {
       this.validateRequestSpecific(next, step, definition.key, this.requestRows()[definition.key]);
     });
     if (step === 4) {
-      if (!this.eventCategories().length) add('eventCategories', 'Select at least one event category.');
+      if (this.isPublic() && !this.eventCategories().length) add('eventCategories', 'Select at least one event category.');
       if (this.eventCategories().length > 2) add('eventCategories', 'Select no more than two event categories.');
       if (!this.eventVisibility()) add('eventVisibility', 'Event Visibility is required.');
       if (!this.shortIntro().trim()) add('shortIntro', 'Short Introduction is required.');
@@ -1002,7 +1128,7 @@ export class EventProposalComponent implements OnDestroy {
         if (!this.bankAccountName().trim()) add('bankAccountName', 'Bank Account Name is required.');
         if (!this.bankAccountNumber().trim()) add('bankAccountNumber', 'Bank Account Number is required.');
       }
-      if (this.agendaRequired()) this.validateRows(next, step, 'agenda', this.agenda(), ['time', 'activity', 'location', 'pic']);
+      if (this.agendaRequired()) this.validateRows(next, step, 'agenda', this.agenda(), this.isMultiDay() ? ['date', 'time', 'activity', 'location', 'pic'] : ['time', 'activity', 'location', 'pic']);
       if (this.discussionRequired()) this.validateRows(next, step, 'discussions', this.discussions(), ['topic']);
     }
     this.errors.set(next);
@@ -1075,7 +1201,7 @@ export class EventProposalComponent implements OnDestroy {
   private tableColumnLabel(table: string, key: string): string {
     const requestKey = table.startsWith('request.') ? table.slice('request.'.length) as RequirementKey : null;
     const requestDefinition = requestKey ? this.requirements.find((item) => item.key === requestKey) : undefined;
-    const columns = requestDefinition?.columns ?? ({ coOwners: this.coOwnerColumns, schedule: this.scheduleColumns, organizers: this.organizerColumns, guests: this.guestColumns, agenda: this.agendaColumns, discussions: this.discussionColumns } as Record<string, readonly EditableTableColumn[]>)[table];
+    const columns = requestDefinition?.columns ?? ({ coOwners: this.coOwnerColumns, schedule: this.scheduleColumns, organizers: this.organizerColumns, guests: this.guestColumns, agenda: this.agendaColumns(), discussions: this.discussionColumns } as Record<string, readonly EditableTableColumn[]>)[table];
     return columns?.find((column) => column.key === key)?.label ?? key.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase());
   }
   private row(values: EditableRow): EditableRow { return { id: this.nextRowId++, ...values }; }
@@ -1168,7 +1294,7 @@ export class EventProposalComponent implements OnDestroy {
     const tableId = root === 'request' ? `request-${parts[1] ?? ''}` : tableIdMap[root] ?? root;
     const rowIndex = root === 'request' ? parts[2] : parts[1];
     const columnKey = root === 'request' ? parts[3] : parts[2];
-    const tableColumns: Record<string, readonly EditableTableColumn[]> = { coOwners: this.coOwnerColumns, schedule: this.scheduleColumns, organizers: this.organizerColumns, guests: this.guestColumns, agenda: this.agendaColumns, discussions: this.discussionColumns };
+    const tableColumns: Record<string, readonly EditableTableColumn[]> = { coOwners: this.coOwnerColumns, schedule: this.scheduleColumns, organizers: this.organizerColumns, guests: this.guestColumns, agenda: this.agendaColumns(), discussions: this.discussionColumns };
     const column = (requestDefinition?.columns ?? tableColumns[root] ?? []).find((item) => item.key === columnKey);
     const tableLabel = labels[root] ?? requestDefinition?.label ?? fallback;
     const directTargetMap: Record<string, string> = { applicantName: 'applicant-name', department: 'department', email: 'applicant-email', eventTitle: 'event-title', requirements: 'requirements-selection', shortIntro: 'short-intro', goals: 'goals', benefits: 'benefits', publicity: 'publicity', bankAccountName: 'event-bank-account-name', bankAccountNumber: 'event-bank-account-number' };

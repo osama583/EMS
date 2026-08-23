@@ -1,0 +1,60 @@
+<section class="club-category-management">
+  <app-feedback-banner [message]="errorMessage()" tone="error" />
+
+  <nav class="shared-tabs" aria-label="Sections">
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="!showDeleted()" (click)="setDeletedTab(false)">
+      <span class="material-symbols-rounded" aria-hidden="true">sell</span>
+      Categories
+    </button>
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="showDeleted()" (click)="setDeletedTab(true)">
+      <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+      Deleted
+    </button>
+  </nav>
+
+  @if (showDeleted()) {
+    <app-internal-data-page
+      [config]="deletedConfig()" [records]="deletedRecords()" [filters]="[]" [searchValue]="''" [loading]="deletedLoading()"
+      [totalPages]="1" [page]="1" [pageSize]="50" [hideControls]="true"
+      (rowAction)="handleDeletedAction($event)"
+    />
+  } @else {
+    <app-internal-data-page
+      [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+      [showViewToggle]="false"
+      (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
+      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+      (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit category', icon: 'edit' }, record: $event })"
+      (primaryAction)="openAdd()"
+    />
+  }
+</section>
+
+<app-form-modal
+  [open]="modalOpen()" [title]="editingId() ? 'Edit Category' : 'Add Category'"
+  [primaryLabel]="editingId() ? 'Save Changes' : 'Add Category'" [loading]="saving()" [disabled]="!formValid()"
+  (close)="closeModal()" (cancel)="closeModal()" (submit)="save()"
+>
+  <div class="club-category-management__form">
+    <app-form-field controlId="category-name" label="Category Name" type="text" [required]="true" [value]="draftName()" (valueChange)="setDraftName($event)" />
+    @if (formError()) { <app-feedback-banner [message]="formError()" tone="error" /> }
+    <app-status-toggle [active]="draftActive()" label="Active category" description="Only active categories appear when a President sets up their club." (activeChange)="setDraftActive($event)" />
+  </div>
+</app-form-modal>
+
+<app-delete-confirm-dialog
+  [open]="!!deleteTarget()" entityKind="Category" [entityLabel]="deleteTarget() ? '\'' + deleteTarget()!.name + '\'' : ''"
+  [checkingDependencies]="checkingDeletion()" [preview]="deletePreview()" [deleting]="deleting()"
+  (confirm)="confirmDelete()" (cancel)="cancelDelete()"
+/>
+
+<app-confirm-dialog
+  [open]="restoreTarget() !== null"
+  title="Restore category"
+  [message]="restoreMessage()"
+  confirmLabel="Restore"
+  [danger]="false"
+  (confirm)="confirmRestore()"
+  (cancel)="cancelRestore()"
+/>

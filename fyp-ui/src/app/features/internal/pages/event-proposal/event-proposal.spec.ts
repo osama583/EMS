@@ -15,22 +15,40 @@ const CATALOG_SEED: readonly RequestOption[] = [
   { id: 'fund-sub-speaker', kind: 'fundingSub', label: 'Guest speaker', parentId: 'fund-main-honorarium', active: true },
 ];
 
-// The form loads four catalogs on construction: request options, the two id-backed event
-// catalogs, the admin-settable config (MAX_EVENT_CATEGORIES), and the staff directory that backs
-// the Co-owner picker. Every one of them has to be answered or HttpTestingController.verify()
-// fails in afterEach.
+// The form loads three catalogs unconditionally on construction: the two id-backed event
+// catalogs, the admin-settable config (MAX_EVENT_CATEGORIES), and the collaborator-candidates
+// list that backs the Co-owner/Organizer pickers (server-scoped to whoever's page-visibility
+// grants include the proposal form itself — see identity.users_with_page_access()). Every one of
+// them has to be answered or HttpTestingController.verify() fails in afterEach.
+//
+// The request-option catalog (/options) is NOT one of these — it only fetches once the applicant
+// selects a requirement kind on "Required for Event" (see event-proposal.ts's
+// REQUIREMENT_OPTION_KINDS effect), so tests that need it call flushOptionsCatalog() after
+// selecting whichever requirement they're testing.
 function createComponent(): ComponentFixture<EventProposalComponent> {
   const fixture = TestBed.createComponent(EventProposalComponent);
   const httpMock = TestBed.inject(HttpTestingController);
-  httpMock.expectOne((request) => request.url === `${environment.apiBaseUrl}/options`).flush(CATALOG_SEED);
   httpMock.match((request) => request.url === `${environment.apiBaseUrl}/catalog/config`).forEach((request) => request.flush({
     paxReviewerThreshold: 50,
     cancellationDaysLimit: 3,
     maxEventCategories: 2,
   }));
   httpMock.match((request) => request.url.startsWith(`${environment.apiBaseUrl}/catalog`)).forEach((request) => request.flush([]));
-  httpMock.match((request) => request.url === `${`${environment.apiBaseUrl}/admin`}/users`).forEach((request) => request.flush([]));
+  httpMock.match((request) => request.url === `${environment.apiBaseUrl}/proposals/collaborator-candidates`).forEach((request) => request.flush([]));
   return fixture;
+}
+
+// Flushes whichever /options request(s) are currently pending (there may be more than one, since
+// each newly-selected requirement kind triggers its own fetch) with the full seed catalog.
+// The fetch is triggered by an effect() gated on currentStep() === 3 (Request Details) — real
+// applicants only pay this cost once they reach that step, not the moment they tick a checkbox on
+// step 2 — so this jumps straight to step 3 before ticking the effect. TestBed.tick() then runs
+// the pending effect, which (unlike a plain signal write) does not run synchronously.
+function flushOptionsCatalog(component: EventProposalComponent): void {
+  component.currentStep.set(3);
+  TestBed.tick();
+  const httpMock = TestBed.inject(HttpTestingController);
+  httpMock.match((request) => request.url === `${environment.apiBaseUrl}/options`).forEach((request) => request.flush(CATALOG_SEED));
 }
 
 describe('EventProposalComponent', () => {
@@ -113,6 +131,8 @@ describe('EventProposalComponent', () => {
 
   it('prefills new service requests from the first schedule row without changing edited rows', () => {
     const component = createComponent().componentInstance;
+    component.toggleRequirement('logistics', true);
+    flushOptionsCatalog(component);
     const logistics = component.requirements.find((item) => item.key === 'logistics')!;
     component.schedule.set([{ id: 1, date: '2026-08-10', start: '09:00', end: '11:00', location: 'Atrium' }]);
     component.openRequestEditor(logistics);
@@ -125,6 +145,8 @@ describe('EventProposalComponent', () => {
 
   it('shows logistics availability without blocking over-availability requests', () => {
     const component = createComponent().componentInstance;
+    component.toggleRequirement('logistics', true);
+    flushOptionsCatalog(component);
     const logistics = component.requirements.find((item) => item.key === 'logistics')!;
     component.openRequestEditor(logistics);
     component.setRequestDraftValue('item', 'Registration table');
@@ -135,6 +157,8 @@ describe('EventProposalComponent', () => {
 
   it('clears a funding sub-item when the selected main item changes', () => {
     const component = createComponent().componentInstance;
+    component.toggleRequirement('fundingPurchase', true);
+    flushOptionsCatalog(component);
     const funding = component.requirements.find((item) => item.key === 'fundingPurchase')!;
     component.openRequestEditor(funding);
     component.setRequestDraftValue('mainItem', 'Event supplies');
@@ -183,5 +207,17 @@ describe('EventProposalComponent', () => {
     fixture.componentInstance.eventVisibility.set('Public');
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('#event-categories')).not.toBeNull();
+  });
+
+  // Regression test: the "Event Categories" field is only rendered when eventVisibility is
+  // 'Public' (see the test above), but the step-4 validator required it unconditionally — so a
+  // Private/Club Only proposal could never pass step 4, even though the field wasn't on screen
+  // to fill in. See event-proposal.ts's validateStep(), step === 4 block.
+  it('does not require event categories for a non-public event', () => {
+    const component = createComponent().componentInstance;
+    component.eventVisibility.set('Private');
+    component.goToStep(4);
+    component.goToStep(5);
+    expect(component.errors()['4.eventCategories']).toBeUndefined();
   });
 });

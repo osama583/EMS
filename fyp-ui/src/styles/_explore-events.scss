@@ -252,6 +252,18 @@ body.filters-open {
   transform: scale(1.08);
 }
 
+/* A refresh keeps the cards mounted (so the heart never resets) and just dims them. */
+.explore-grid--refreshing {
+  opacity: 0.6;
+  transition: opacity var(--motion-control) var(--ease-standard);
+}
+
+/* The heart must stay clickable and instant while a refresh is in flight. */
+.explore-grid--refreshing .save-event {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .save-event--saved {
   border-color: var(--apu-blue-600);
   background: var(--apu-blue-600);

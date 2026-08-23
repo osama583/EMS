@@ -1,3 +1,7 @@
+@if (showHeader()) {
+  <app-internal-page-header [config]="headerConfig()" />
+}
+
 @if (loading()) {
   <app-internal-page-state [loading]="true" [showClear]="false" />
 } @else if (error()) {
@@ -9,7 +13,7 @@
     @for (entry of entries(); track entry.event.id) {
       <app-event-card
         [event]="entry.event"
-        [saved]="isSaved(entry.event.id)"
+        [saved]="savedEvents.savedEventIds().has(entry.event.id)"
         [registrationStatus]="entry.status"
         [registering]="registeringEventId() === entry.event.id"
         [showRegister]="mode() !== 'history'"

@@ -36,6 +36,14 @@ tasks_for_request = tasks.tasks_for_request
 find_task = tasks.find_task
 load_task = tasks.load_task
 check_all_tasks_resolved = tasks.check_all_tasks_resolved
+applicant_resubmit_task = tasks.applicant_resubmit_task
+row_assignments_for_task = tasks.row_assignments_for_task
+assign_to_row = tasks.assign_to_row
+unassign_from_row = tasks.unassign_from_row
+rows_fully_staffed = tasks.rows_fully_staffed
+update_row_status = tasks.update_row_status
+my_row_assignments = tasks.my_row_assignments
+co_assignees_for_task = tasks.co_assignees_for_task
 
 # --- F&B cafeteria orders ---
 create_selection = fmb.create_selection
@@ -43,6 +51,7 @@ approve_selection = fmb.approve_selection
 send_selection_back = fmb.send_selection_back
 edit_selection = fmb.edit_selection
 claim_selection = fmb.claim_selection
+mark_selection_ready = fmb.mark_selection_ready
 fulfil_selection = fmb.fulfil_selection
 selections_for_request = fmb.selections_for_request
 shared_pool_for_staff = fmb.shared_pool_for_staff
@@ -55,6 +64,7 @@ is_within_cancellation_window = authorization.is_within_cancellation_window
 heads_unit = authorization.heads_unit
 has_role = authorization.has_role
 history_for = history.history_for
+conversations_for = history.conversations_for
 
 __all__ = [
     "constants",
@@ -80,11 +90,20 @@ __all__ = [
     "find_task",
     "load_task",
     "check_all_tasks_resolved",
+    "applicant_resubmit_task",
+    "row_assignments_for_task",
+    "assign_to_row",
+    "unassign_from_row",
+    "rows_fully_staffed",
+    "update_row_status",
+    "my_row_assignments",
+    "co_assignees_for_task",
     "create_selection",
     "approve_selection",
     "send_selection_back",
     "edit_selection",
     "claim_selection",
+    "mark_selection_ready",
     "fulfil_selection",
     "selections_for_request",
     "shared_pool_for_staff",
@@ -95,4 +114,5 @@ __all__ = [
     "heads_unit",
     "has_role",
     "history_for",
+    "conversations_for",
 ]

@@ -28,7 +28,6 @@ function unitManager(unitCode: string, department: string): AuthUser {
   return testUser([testRole('head-of-department', unitCode, department)], {
     email: `${unitCode}.manager@demo.apu.edu.my`,
     displayName: `${department} Manager`,
-    username: `${unitCode}.manager`,
     nav: (DROPDOWN_PAGES_BY_UNIT[unitCode] ?? []).map((pageCode) => testNavPage(pageCode)),
   });
 }
@@ -37,15 +36,15 @@ const avManager = unitManager('a_v_services', 'A/V Services');
 const studentServicesManager = unitManager('student_services', 'Student Services');
 const fmbManager = unitManager('food_beverage_services', 'Food & Beverage Services');
 const studentUser: AuthUser = testUser([testRole('student', 'school_of_computing', 'School of Computing')], {
-  email: 'student@demo.apu.edu.my', displayName: 'Student', username: 'student',
+  email: 'student@demo.apu.edu.my', displayName: 'Student',
 });
 const cafeteriaManagerUser: AuthUser = testUser([testRole('cafeteria-manager', 'cafeteria__atrium_cafeteria', 'Atrium Cafeteria')], {
-  email: 'cafeteria.manager@demo.apu.edu.my', displayName: 'Cafeteria Manager', username: 'cafeteria.manager',
+  email: 'cafeteria.manager@demo.apu.edu.my', displayName: 'Cafeteria Manager',
   cafeteriaCode: 'cafeteria__atrium_cafeteria',
   nav: [testNavPage('menu', 'My Menu')],
 });
 const cfoUser: AuthUser = testUser([testRole('cfo')], {
-  email: 'cfo@demo.apu.edu.my', displayName: 'CFO', username: 'cfo', department: 'Finance Office',
+  email: 'cfo@demo.apu.edu.my', displayName: 'CFO', department: 'Finance Office',
   nav: [testNavPage('dropdown-options/fundingMain'), testNavPage('dropdown-options/fundingSub')],
 });
 

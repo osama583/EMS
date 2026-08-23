@@ -1,6 +1,8 @@
 .internal-table-workspace {
   display: grid;
-  width: 100%;
+  width: min(100%, 82rem);
+  min-width: 0;
+  margin: 0 auto;
   gap: 1.5rem;
   color: var(--apu-navy-900);
 }

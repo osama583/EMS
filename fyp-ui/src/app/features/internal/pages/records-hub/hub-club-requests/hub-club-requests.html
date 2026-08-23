@@ -1,26 +1,21 @@
-<app-feedback-banner [message]="errorMessage()" tone="error" />
+@if (errorMessage()) { <app-feedback-banner tone="error" [message]="errorMessage()" /> }
 
-@if (loading()) {
-  <app-loading-state label="Loading join requests…" />
-} @else if (requests().length === 0) {
-  <p class="hub-club-requests__empty">No pending club join requests.</p>
-} @else {
-  <ul class="hub-club-requests__list">
-    @for (request of requests(); track request.id) {
-      <li class="hub-club-requests__row">
-        <div class="hub-club-requests__info">
-          <strong>{{ request.requester.displayName }}</strong>
-          <span>{{ request.requester.email }} · wants to join {{ request.clubName }}</span>
-          @if (request.reason) { <p class="hub-club-requests__comment">"{{ request.reason }}"</p> }
-        </div>
-        <div class="hub-club-requests__actions">
-          <button type="button" class="table-control table-control--primary" [disabled]="processingId() === request.id" (click)="openApprove(request)">Approve</button>
-          <button type="button" class="table-control table-control--danger" [disabled]="processingId() === request.id" (click)="openReject(request)">Reject</button>
-        </div>
-      </li>
-    }
-  </ul>
-}
+<app-internal-data-page
+  [config]="config()"
+  [records]="records()"
+  [filters]="filters()"
+  [searchValue]="search()"
+  [loading]="loading()"
+  [totalPages]="totalPages()"
+  [page]="currentPage()"
+  [pageSize]="pageSize()"
+  (searchChange)="setSearch($event)"
+  (filterChange)="setFilter($event)"
+  (reset)="reset()"
+  (pageChange)="setPage($event)"
+  (pageSizeChange)="setPageSize($event)"
+  (rowAction)="handleAction($event)"
+/>
 
 <app-confirm-dialog
   [open]="!!approveTarget()"

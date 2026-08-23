@@ -1,154 +1,211 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { CafeteriaStaffRequest, CafeteriaStaffRequestAction } from '../../../../core/cafeterias/cafeteria-staff-request.models';
-import { CafeteriaStaffRequestService } from '../../../../core/cafeterias/cafeteria-staff-request.service';
-import { FeedbackBannerComponent } from '../../../../shared/components/feedback-banner/feedback-banner';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
+import { AuthService } from '../../../../core/auth/auth.service';
+import { CafeteriaService } from '../../../../core/cafeterias/cafeteria.service';
+import { Cafeteria } from '../../../../core/cafeterias/cafeteria.models';
+import {
+  CafeteriaStaffAuditAction,
+  CafeteriaStaffAuditActorRole,
+  CafeteriaStaffAuditEntry,
+  CafeteriaStaffAuditSortKey,
+} from '../../../../core/cafeterias/cafeteria-audit-log.models';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
-import { InternalPageHeaderComponent, InternalSearchFieldComponent, InternalFilterControlsComponent, InternalResetButtonComponent } from '../../../../shared/components/internal-data-page/internal-data-page-parts';
-import { InternalCellTone, InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalPageHeaderConfig } from '../../../../shared/components/internal-data-page/internal-data-page.models';
-import { ViewToggleComponent } from '../../../../shared/components/view-toggle/view-toggle';
-import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
+import {
+  InternalCellTone,
+  InternalDataPageConfig,
+  InternalDataRecord,
+  InternalFilterChange,
+  InternalSortChange,
+  InternalSortState,
+} from '../../../../shared/components/internal-data-page/internal-data-page.models';
 
-const ACTION_LABELS: Readonly<Record<CafeteriaStaffRequestAction, string>> = {
-  add: 'Add staff', edit: 'Edit details', remove: 'Remove staff',
-  suspend: 'Suspend staff', restore: 'Restore staff',
+const ACTION_LABELS: Record<CafeteriaStaffAuditAction, string> = {
+  create: 'Created', edit: 'Edited', suspend: 'Suspended', restore: 'Restored', remove: 'Removed',
 };
-const STATUS_TONE: Readonly<Record<CafeteriaStaffRequest['status'], InternalCellTone>> = {
-  pending: 'warning', approved: 'success', rejected: 'danger',
-};
-const STATUS_LABEL: Readonly<Record<CafeteriaStaffRequest['status'], string>> = {
-  pending: 'Pending', approved: 'Approved', rejected: 'Rejected',
+const ACTION_TONES: Record<CafeteriaStaffAuditAction, InternalCellTone> = {
+  create: 'success', edit: 'blue', suspend: 'warning', restore: 'blue', remove: 'danger',
 };
 
-// Read-only record of every staffing request the Cafeteria Admin has already decided. Separate
-// from the Staff Requests queue because the two answer different questions: that page is work
-// outstanding, this is what was done and why.
+// Audit log of every cafeteria staff create/edit/suspend/restore/remove — GET
+// /catalog/cafeterias/staff-requests-history (see backend/app/api/cafeterias.py). Every search/
+// filter/sort/page control is a real server query param; the server already scopes visible rows
+// (Cafeteria Admin: every cafeteria; Cafeteria Manager: their own outlet's timeline, which may
+// include actions an Admin took there too — the 'Performed by' filter lets the Manager tell what
+// they are and are not responsible for). This is a pure history: no approve/reject here.
 @Component({
   selector: 'app-cafeteria-staff-requests-history',
-  imports: [
-    InternalDataPageComponent, FeedbackBannerComponent, InternalPageHeaderComponent,
-    InternalSearchFieldComponent, InternalFilterControlsComponent, InternalResetButtonComponent,
-    ViewToggleComponent, LoadingStateComponent,
-  ],
+  imports: [InternalDataPageComponent],
   templateUrl: './cafeteria-staff-requests-history.html',
   styleUrl: './cafeteria-staff-requests-history.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CafeteriaStaffRequestsHistoryComponent {
-  private readonly service = inject(CafeteriaStaffRequestService);
+  private readonly service = inject(CafeteriaService);
+  private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly items = signal<readonly CafeteriaStaffRequest[]>([]);
+  // Only an Admin manages more than one cafeteria, so the cafeteria filter is only meaningful
+  // (and only shown) for them — a Manager's rows are already scoped to their one outlet by the
+  // server. cafeteriaCode is set only for a 'cafeteria-manager' role holder (auth.models.ts).
+  readonly isCafeteriaAdmin = computed(() => this.auth.user()?.cafeteriaCode === undefined);
+
+  readonly cafeterias = signal<readonly Cafeteria[]>([]);
+  readonly entries = signal<readonly CafeteriaStaffAuditEntry[]>([]);
+  readonly total = signal(0);
+  readonly totalPages = signal(1);
   readonly loading = signal(true);
-  readonly errorMessage = signal('');
+
   readonly search = signal('');
-  readonly statusFilter = signal('all');
+  private readonly debouncedSearch = signal('');
+  readonly cafeteriaFilter = signal('all');
   readonly actionFilter = signal('all');
+  readonly actorRoleFilter = signal('all');
   readonly page = signal(1);
   readonly pageSize = signal(10);
-  readonly viewMode = signal<'table' | 'card'>('table');
+  readonly sort = signal<InternalSortState>({ key: 'createdAt', order: 'desc' });
 
-  readonly filtered = computed(() => {
-    const search = this.search().trim().toLowerCase();
-    const status = this.statusFilter();
-    const action = this.actionFilter();
-    return this.items().filter((r) =>
-      (status === 'all' || r.status === status)
-      && (action === 'all' || r.action === action)
-      && (!search || `${r.displayName} ${r.email} ${r.cafeteriaName} ${r.requestedByName}`.toLowerCase().includes(search)),
-    );
-  });
-  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filtered().length / this.pageSize())));
-  private readonly pageSlice = computed(() =>
-    this.filtered().slice((this.page() - 1) * this.pageSize(), this.page() * this.pageSize()),
+  readonly records = computed<readonly InternalDataRecord[]>(() =>
+    this.entries().map((entry) => ({
+      id: entry.id,
+      cells: {
+        action: { primary: ACTION_LABELS[entry.action], badge: true, tone: ACTION_TONES[entry.action] },
+        target: { primary: entry.targetDisplayName, secondary: entry.targetEmail },
+        cafeteria: { primary: entry.cafeteriaName },
+        actor: { primary: entry.actorDisplayName, secondary: this.actorRoleLabel(entry) },
+        when: { primary: this.formatWhen(entry.createdAt) },
+      },
+      mobile: {
+        eyebrow: ACTION_LABELS[entry.action],
+        status: entry.cafeteriaName,
+        title: entry.targetDisplayName,
+        identity: entry.targetEmail,
+        details: [
+          { icon: 'person', text: `By ${entry.actorDisplayName}` },
+          { icon: 'schedule', text: this.formatWhen(entry.createdAt) },
+        ],
+      },
+    })),
   );
-  readonly cards = computed(() => this.pageSlice());
-
-  readonly headerConfig = computed<InternalPageHeaderConfig>(() => ({
-    title: 'Staff Request History',
-    description: 'Every My Staff request you have approved or rejected.',
-    countLabel: `${this.filtered().length} decided`,
-  }));
-
-  readonly filters = computed(() => [
-    {
-      key: 'status', ariaLabel: 'Filter by outcome', value: this.statusFilter(),
-      options: [
-        { value: 'all', label: 'All outcomes' },
-        { value: 'approved', label: 'Approved' },
-        { value: 'rejected', label: 'Rejected' },
-      ],
-    },
-    {
-      key: 'action', ariaLabel: 'Filter by request type', value: this.actionFilter(),
-      options: [{ value: 'all', label: 'All types' }, ...Object.entries(ACTION_LABELS).map(([value, label]) => ({ value, label }))],
-    },
-  ]);
 
   readonly config = computed<InternalDataPageConfig>(() => ({
-    ariaLabel: 'Staff request history', paginationLabel: 'History pages', rowsPerPageLabel: 'Requests per page', mobileListLabel: 'Request cards',
-    header: this.headerConfig(),
-    search: { ariaLabel: 'Search request history', placeholder: 'Search name, email, cafeteria, or manager' },
+    ariaLabel: 'Cafeteria staff action history', paginationLabel: 'History pages', rowsPerPageLabel: 'Rows per page', mobileListLabel: 'History cards',
+    header: {
+      title: 'Staff Action History',
+      description: this.isCafeteriaAdmin()
+        ? 'Every staff create, edit, suspend, restore, or remove action across the cafeterias you manage.'
+        : 'Every staff create, edit, suspend, restore, or remove action at your cafeteria.',
+      countLabel: `${this.total()} action${this.total() === 1 ? '' : 's'}`,
+    },
+    search: { ariaLabel: 'Search history', placeholder: 'Search staff name, email, or cafeteria' },
     columns: [
-      { key: 'request', label: 'Request' },
-      { key: 'staff', label: 'Staff Member' },
-      { key: 'cafeteria', label: 'Cafeteria' },
-      { key: 'outcome', label: 'Outcome' },
-      { key: 'decided', label: 'Decided' },
+      { key: 'target', label: 'Staff Member', width: '17rem' },
+      { key: 'action', label: 'Action', width: '9rem' },
+      { key: 'cafeteria', label: 'Cafeteria', width: '14rem' },
+      { key: 'actor', label: 'Performed By', width: '15rem' },
+      { key: 'when', label: 'Date & Time', width: '13rem', sortKey: 'createdAt' },
     ],
-    // Read-only: a decided request is a record, not something to act on again.
     actions: [],
-    emptyTitle: 'No decided requests yet',
-    emptyDescription: 'Requests you approve or reject are recorded here.',
-    pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No history found', emptyDescription: 'Staff actions will appear here as they happen.', pageSizeOptions: [10, 25, 50],
   }));
 
-  readonly records = computed<readonly InternalDataRecord[]>(() => this.pageSlice().map((r) => ({
-    id: r.id,
-    cells: {
-      request: { primary: ACTION_LABELS[r.action] ?? r.action, secondary: `by ${r.requestedByName}` },
-      staff: { primary: this.subjectOf(r), secondary: r.email },
-      cafeteria: { primary: r.cafeteriaName },
-      outcome: { primary: STATUS_LABEL[r.status], badge: true, tone: STATUS_TONE[r.status] },
-      decided: { primary: this.decidedOn(r), secondary: r.resolvedByName ?? '' },
-    },
-    mobile: {
-      eyebrow: ACTION_LABELS[r.action] ?? r.action, status: STATUS_LABEL[r.status],
-      title: this.subjectOf(r), identity: r.email,
-      details: [
-        { icon: 'storefront', text: r.cafeteriaName },
-        { icon: 'schedule', text: this.decidedOn(r) },
-        ...(r.comment ? [{ icon: 'comment', text: r.comment }] : []),
-      ],
-    },
-  })));
+  readonly filters = computed(() => {
+    const filters = [
+      {
+        key: 'action', ariaLabel: 'Filter by action', value: this.actionFilter(),
+        options: [
+          { value: 'all', label: 'All actions' },
+          { value: 'create', label: 'Created' },
+          { value: 'edit', label: 'Edited' },
+          { value: 'suspend', label: 'Suspended' },
+          { value: 'restore', label: 'Restored' },
+          { value: 'remove', label: 'Removed' },
+        ],
+      },
+      {
+        key: 'actorRole', ariaLabel: 'Filter by who performed the action', value: this.actorRoleFilter(),
+        options: [
+          { value: 'all', label: 'Performed by anyone' },
+          { value: 'cafeteria-manager', label: 'Cafeteria Manager' },
+          { value: 'cafeteria-admin', label: 'Cafeteria Admin' },
+        ],
+      },
+    ];
+    if (this.isCafeteriaAdmin()) {
+      filters.unshift({
+        key: 'cafeteria', ariaLabel: 'Filter by cafeteria', value: this.cafeteriaFilter(),
+        options: [{ value: 'all', label: 'All cafeterias' }, ...this.cafeterias().map((c) => ({ value: c.code, label: c.name }))],
+      });
+    }
+    return filters;
+  });
 
   constructor() {
-    this.service.history$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (items) => { this.items.set(items); this.loading.set(false); },
-      error: () => { this.errorMessage.set('Request history could not be loaded. Please try again.'); this.loading.set(false); },
-    });
+    toObservable(this.search).pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe((value) => { this.debouncedSearch.set(value); this.page.set(1); });
+
+    this.service.cafeterias$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((cafeterias) => this.cafeterias.set(cafeterias));
+
+    toObservable(computed(() => ({
+      q: this.debouncedSearch(),
+      cafeteria: this.cafeteriaFilter(),
+      action: this.actionFilter(),
+      actorRole: this.actorRoleFilter(),
+      sort: this.sort(),
+      page: this.page(),
+      pageSize: this.pageSize(),
+    })))
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        switchMap((query) => {
+          this.loading.set(true);
+          return this.service.staffAuditLog({
+            page: query.page,
+            pageSize: query.pageSize,
+            q: query.q || undefined,
+            cafeteriaCode: query.cafeteria === 'all' ? undefined : query.cafeteria,
+            action: query.action === 'all' ? undefined : (query.action as CafeteriaStaffAuditAction),
+            actorRole: query.actorRole === 'all' ? undefined : (query.actorRole as CafeteriaStaffAuditActorRole),
+            sort: query.sort.key as CafeteriaStaffAuditSortKey,
+            order: query.sort.order,
+          });
+        }),
+      )
+      .subscribe({
+        next: (result) => {
+          this.entries.set(result.items);
+          this.total.set(result.total);
+          this.totalPages.set(result.totalPages);
+          this.loading.set(false);
+        },
+        error: () => this.loading.set(false),
+      });
   }
 
-  actionLabel(action: CafeteriaStaffRequestAction): string { return ACTION_LABELS[action] ?? action; }
-  statusLabel(status: CafeteriaStaffRequest['status']): string { return STATUS_LABEL[status]; }
-  statusTone(status: CafeteriaStaffRequest['status']): string { return STATUS_TONE[status]; }
-  subjectOf(request: CafeteriaStaffRequest): string {
-    return request.displayName || request.email || 'Unnamed staff member';
-  }
-  decidedOn(request: CafeteriaStaffRequest): string {
-    const iso = request.resolvedAt ?? request.createdAt;
-    return iso ? new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
-  }
-
-  setViewMode(mode: 'table' | 'card'): void { this.viewMode.set(mode); }
-  setSearch(value: string): void { this.search.set(value); this.page.set(1); }
+  setSearch(value: string): void { this.search.set(value); }
   setFilter(change: InternalFilterChange): void {
-    if (change.key === 'status') this.statusFilter.set(change.value);
+    if (change.key === 'cafeteria') this.cafeteriaFilter.set(change.value);
     if (change.key === 'action') this.actionFilter.set(change.value);
+    if (change.key === 'actorRole') this.actorRoleFilter.set(change.value);
     this.page.set(1);
   }
-  reset(): void { this.search.set(''); this.statusFilter.set('all'); this.actionFilter.set('all'); this.page.set(1); }
+  setSort(change: InternalSortChange): void { this.sort.set({ key: change.key, order: change.order }); this.page.set(1); }
+  reset(): void {
+    this.search.set(''); this.debouncedSearch.set('');
+    this.cafeteriaFilter.set('all'); this.actionFilter.set('all'); this.actorRoleFilter.set('all');
+    this.sort.set({ key: 'createdAt', order: 'desc' });
+    this.page.set(1);
+  }
   setPage(value: number): void { this.page.set(Math.max(1, Math.min(value, this.totalPages()))); }
   setPageSize(value: number): void { this.pageSize.set(value); this.page.set(1); }
+
+  private actorRoleLabel(entry: CafeteriaStaffAuditEntry): string {
+    if (entry.actorRole === 'system-admin') return 'System Admin';
+    if (entry.actorRole === 'cafeteria-admin') return 'Cafeteria Admin';
+    return 'Cafeteria Manager';
+  }
+
+  private formatWhen(iso: string): string {
+    return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  }
 }

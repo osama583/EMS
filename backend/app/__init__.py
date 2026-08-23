@@ -1,11 +1,13 @@
 """Flask application factory for the APU EMS API."""
 from __future__ import annotations
 
+import datetime
 import logging
 import time
 import uuid
 
 from flask import Flask, g, jsonify, request
+from flask.json.provider import DefaultJSONProvider
 from flask_cors import CORS
 
 from .config import config
@@ -19,10 +21,31 @@ log = logging.getLogger(__name__)
 API_PREFIX = "/api/v1"
 
 
+class _JSONProvider(DefaultJSONProvider):
+    """Flask's DefaultJSONProvider does serialize datetime.date/datetime.datetime
+    without crashing, but as an RFC 1123 string ("Fri, 21 Aug 2026 00:00:00
+    GMT") rather than ISO 8601 - surprising for a JSON API and silently wrong
+    for any client doing a string comparison against an ISO date (e.g.
+    serve_date === "2026-08-21"). It also doesn't handle a bare datetime.time
+    at all - psycopg2 returns TIME columns (start_time, serve_time,
+    moving_time, ...) as datetime.time, and any endpoint that jsonifies a raw
+    fetch_all()/fetch_one() row containing one of those columns 500s. Route
+    handlers that already format dates/times into strings themselves are
+    unaffected; this is a safety net for the ones that return raw rows (e.g.
+    GET /cafeteria-orders)."""
+
+    @staticmethod
+    def default(o):
+        if isinstance(o, (datetime.date, datetime.time)):
+            return o.isoformat()
+        return DefaultJSONProvider.default(o)
+
+
 def create_app(*, validate_config: bool = True) -> Flask:
     configure_logging(config.log_level, config.log_format)
 
     app = Flask(__name__)
+    app.json = _JSONProvider(app)
     app.config["EXPOSE_ERRORS"] = config.is_development
     # Reject oversized bodies before they are parsed. Event images arrive as
     # base64 data URLs, hence the headroom.

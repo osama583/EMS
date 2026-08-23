@@ -3,7 +3,8 @@ import { Injectable, InjectionToken, inject } from '@angular/core';
 import { Observable, map, switchMap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { DepartmentRequestKind } from '../departments/department-workflow.config';
-import { ProposalReviewRecord } from './proposal-review.models';
+import { ProposalConversation } from './proposal-conversation.models';
+import { ProposalDepartmentRequest, ProposalReviewRecord } from './proposal-review.models';
 
 /**
  * No method here takes an acting-user identity.
@@ -24,6 +25,16 @@ export interface FmbSelectionDraft {
   readonly notes?: string;
 }
 
+// FmbSelectionDraft/Edit's fmbOptionId is a RequestOption id, the composite "fmb:<n>" form
+// (see request-option.service.ts/options.py's option_id()) - POST/PATCH /cafeteria-orders,
+// unlike the general /options catalogue routes, wants just the bare row number, and has no
+// parse_option_id() of its own to unwrap a composite id server-side. `Number("fmb:3")` is NaN,
+// which JSON.stringify sends as `null`, which the backend's required() rejects as "missing" -
+// this strips the "fmb:" prefix before it ever leaves the client.
+function fmbOptionRowId(optionId: string): number {
+  return Number(optionId.includes(':') ? optionId.split(':')[1] : optionId);
+}
+
 export interface FmbSelectionEdit {
   readonly cafeteriaCode?: string;
   readonly fmbOptionId?: string;
@@ -34,12 +45,89 @@ export interface FmbSelectionEdit {
 }
 
 /** The server's paginated envelope for list endpoints. */
-interface Page<T> {
+export interface Page<T> {
   readonly items: readonly T[];
   readonly page: number;
   readonly pageSize: number;
   readonly total: number;
   readonly totalPages: number;
+}
+
+export type ProposalBucket = 'inbox' | 'ongoing' | 'history' | 'drafts';
+export type ProposalSortKey = 'updatedAt' | 'schedule' | 'eventTitle' | 'applicant' | 'status';
+export type SortOrder = 'asc' | 'desc';
+
+export interface ProposalListQuery {
+  readonly bucket: ProposalBucket;
+  readonly page: number;
+  readonly pageSize: number;
+  readonly sort?: ProposalSortKey;
+  readonly order?: SortOrder;
+  // Substring match on proposal id / event title / applicant name (server-side, case-insensitive).
+  readonly q?: string;
+  // Exact match on the bucket's human-readable status label — see listStatusLabels().
+  readonly statusLabel?: string;
+  // Exact match on one of the proposal's event categories — see listCategories(). Drafts only.
+  readonly category?: string;
+  // 'mine' = the caller is the applicant; 'other' = anyone else's proposal the caller can see
+  // (co-owner, reviewer/department who acted on it). Omit for both. History's Requester filter.
+  readonly requester?: 'mine' | 'other';
+}
+
+export type DepartmentRequestBucket = 'inbox' | 'ongoing' | 'history';
+export type DepartmentRequestSortKey = 'schedule' | 'event' | 'status';
+
+export interface DepartmentRequestListQuery {
+  readonly bucket: DepartmentRequestBucket;
+  readonly page: number;
+  readonly pageSize: number;
+  // Omit to get every one of the caller's routed department kinds in one list (hub-requests.ts's
+  // current behaviour); pass one to scope to just that department.
+  readonly requestKind?: DepartmentRequestKind;
+  // Substring match on proposal code / event title / item (server-side, case-insensitive).
+  readonly q?: string;
+  readonly sort?: DepartmentRequestSortKey;
+  readonly order?: SortOrder;
+}
+
+/** One cafeteria order placed against an fmb/waterNormal request row — one raw ask can fan out
+ * into several of these (one per cafeteria), each independently staffed. */
+export interface DepartmentRequestOrder {
+  readonly cafeteriaName: string;
+  readonly claimedByName: string | null;
+  readonly status: string;
+}
+
+/** One row of GET /proposals/requests — a single department_review task's request detail,
+ * with just enough of the parent proposal to display and open it. See proposals.py's
+ * list_department_requests(); mirrors what hub-requests.ts used to assemble client-side from a
+ * full ProposalReviewRecord (proposal.requests / proposal.workflow.departmentConfirmations). */
+export interface DepartmentRequestListItem {
+  readonly proposalId: number;
+  readonly proposalCode: string;
+  // null for a cafeteria manager's own order rows (_cafeteria_manager_order_rows) — those aren't
+  // backed by a request_task at all, only by a request_fmb_selection order.
+  readonly requestTaskId: number | null;
+  readonly taskStatus: string;
+  readonly taskComment: string | null;
+  readonly eventTitle: string;
+  readonly shortIntroduction: string;
+  readonly goals: string;
+  readonly applicant: string;
+  readonly applicantEmail: string;
+  readonly applicantInitials: string;
+  readonly schedule: string;
+  readonly request: ProposalDepartmentRequest;
+  // Every staff member currently on this row — for the 5 row-assignable departments, every
+  // co-assignee sharing the row's status; for fmb/waterNormal, every order's claimant.
+  readonly assignedTo: readonly string[];
+  // The row-assignment's own step status (assigned/preparing/completed) for the 5 row-assignable
+  // departments; null for fmb/waterNormal (see `orders` instead) and fundingPurchase.
+  readonly progressStatus: string | null;
+  // fmb/waterNormal only: every cafeteria order placed against this ask, each with its own status.
+  readonly orders: readonly DepartmentRequestOrder[];
+  // Present only on a cafeteria manager's own order rows — which cafeteria the order belongs to.
+  readonly cafeteriaName?: string;
 }
 
 export interface ProposalWorkflowRepository {
@@ -48,6 +136,24 @@ export interface ProposalWorkflowRepository {
    * awaiting their decision. Scoped server-side; the client no longer filters.
    */
   list(): Observable<readonly ProposalReviewRecord[]>;
+  /**
+   * One list page's worth of proposals, already scoped to a bucket (inbox /
+   * ongoing / history / drafts), paginated and sorted server-side - the query
+   * itself decides which page of which bucket comes back, not the client
+   * slicing a bigger fetch. See proposals.py's list_proposals().
+   */
+  listPage(query: ProposalListQuery): Observable<Page<ProposalReviewRecord>>;
+  /** Every status label that appears anywhere in this bucket, for its status filter dropdown. */
+  listStatusLabels(bucket: ProposalBucket): Observable<readonly string[]>;
+  /** Every event category that appears anywhere in this bucket, for its category filter dropdown. */
+  listCategories(bucket: ProposalBucket): Observable<readonly string[]>;
+  /**
+   * One list page's worth of department requests routed to the caller (the Requests hub) -
+   * bucketed by the OWNING TASK's own status, not the whole proposal's, so a department's row
+   * moves to history the moment their own work is done even while sibling departments are still
+   * in progress. See proposals.py's list_department_requests().
+   */
+  listDepartmentRequests(query: DepartmentRequestListQuery): Observable<Page<DepartmentRequestListItem>>;
   getById(id: number): Observable<ProposalReviewRecord | undefined>;
   create(payload: Record<string, unknown>): Observable<ProposalReviewRecord>;
   saveDraft(payload: Record<string, unknown>): Observable<ProposalReviewRecord>;
@@ -60,11 +166,25 @@ export interface ProposalWorkflowRepository {
   confirmDepartment(id: number, department: DepartmentRequestKind): Observable<ProposalReviewRecord>;
   sendBackAsDepartment(id: number, department: DepartmentRequestKind, comment: string): Observable<ProposalReviewRecord>;
 
-  /** `payload` is the proposal form's full submission shape, including child rows. */
+  /** `payload` is the proposal form's full submission shape, including child rows and a required `comment` reply. */
   resubmitFromApplicant(id: number, payload: Record<string, unknown>): Observable<ProposalReviewRecord>;
+  /**
+   * Fix and resend ONE department's request rows only - everything else on the
+   * proposal (other departments' rows, already-approved content) is untouched.
+   * `comment` is the applicant's required reply to that department.
+   * See proposals.py's resubmit_department_task().
+   */
+  resubmitDepartmentTask(id: number, department: DepartmentRequestKind, rows: readonly Record<string, unknown>[], comment: string): Observable<ProposalReviewRecord>;
   /** Persist in-progress edits without advancing the stage or clearing the comment. */
   saveEdits(id: number, payload: Record<string, unknown>): Observable<ProposalReviewRecord>;
   cancelProposal(id: number): Observable<ProposalReviewRecord>;
+  /**
+   * Per-partner resubmission chat threads on this proposal, already scoped
+   * server-side to what the caller may see (the applicant/co-owners see every
+   * thread; anyone else sees only their own). See proposals.py's
+   * get_conversations() / history.py's conversations_for().
+   */
+  getConversations(id: number): Observable<readonly ProposalConversation[]>;
 
   createFmbSelection(id: number, draft: FmbSelectionDraft): Observable<ProposalReviewRecord>;
   approveFmbSelection(id: number, selectionId: number): Observable<ProposalReviewRecord>;
@@ -84,6 +204,38 @@ export class ApiProposalWorkflowRepository implements ProposalWorkflowRepository
     return this.http
       .get<Page<ProposalReviewRecord>>(this.baseUrl, { params: { pageSize: 200 } })
       .pipe(map((page) => page.items));
+  }
+
+  listPage(query: ProposalListQuery): Observable<Page<ProposalReviewRecord>> {
+    const params: Record<string, string | number> = {
+      bucket: query.bucket,
+      page: query.page,
+      pageSize: query.pageSize,
+    };
+    if (query.sort) params['sort'] = query.sort;
+    if (query.order) params['order'] = query.order;
+    if (query.q) params['q'] = query.q;
+    if (query.statusLabel && query.statusLabel !== 'All') params['statusLabel'] = query.statusLabel;
+    if (query.category && query.category !== 'All') params['category'] = query.category;
+    if (query.requester) params['requester'] = query.requester;
+    return this.http.get<Page<ProposalReviewRecord>>(this.baseUrl, { params });
+  }
+
+  listStatusLabels(bucket: ProposalBucket): Observable<readonly string[]> {
+    return this.http.get<readonly string[]>(`${this.baseUrl}/status-labels`, { params: { bucket } });
+  }
+
+  listCategories(bucket: ProposalBucket): Observable<readonly string[]> {
+    return this.http.get<readonly string[]>(`${this.baseUrl}/categories`, { params: { bucket } });
+  }
+
+  listDepartmentRequests(query: DepartmentRequestListQuery): Observable<Page<DepartmentRequestListItem>> {
+    const params: Record<string, string | number> = { bucket: query.bucket, page: query.page, pageSize: query.pageSize };
+    if (query.requestKind) params['requestKind'] = query.requestKind;
+    if (query.q) params['q'] = query.q;
+    if (query.sort) params['sort'] = query.sort;
+    if (query.order) params['order'] = query.order;
+    return this.http.get<Page<DepartmentRequestListItem>>(`${this.baseUrl}/requests`, { params });
   }
 
   getById(id: number): Observable<ProposalReviewRecord | undefined> {
@@ -164,6 +316,14 @@ export class ApiProposalWorkflowRepository implements ProposalWorkflowRepository
     return this.http.post<ProposalReviewRecord>(`${this.baseUrl}/${id}/resubmission`, payload);
   }
 
+  resubmitDepartmentTask(id: number, department: DepartmentRequestKind, rows: readonly Record<string, unknown>[], comment: string): Observable<ProposalReviewRecord> {
+    return this.http.post<ProposalReviewRecord>(`${this.baseUrl}/${id}/department-tasks/${department}/resubmission`, { rows, comment });
+  }
+
+  getConversations(id: number): Observable<readonly ProposalConversation[]> {
+    return this.http.get<readonly ProposalConversation[]>(`${this.baseUrl}/${id}/conversations`);
+  }
+
   saveEdits(id: number, payload: Record<string, unknown>): Observable<ProposalReviewRecord> {
     return this.http.patch<ProposalReviewRecord>(`${this.baseUrl}/${id}`, payload);
   }
@@ -177,7 +337,7 @@ export class ApiProposalWorkflowRepository implements ProposalWorkflowRepository
       .post(this.ordersUrl, {
         requestId: id,
         cafeteriaCode: draft.cafeteriaCode,
-        fmbOptionId: Number(draft.fmbOptionId),
+        fmbOptionId: fmbOptionRowId(draft.fmbOptionId),
         menuItemLabel: draft.menuItemLabel,
         quantity: draft.quantity,
         notes: draft.notes,
@@ -203,7 +363,7 @@ export class ApiProposalWorkflowRepository implements ProposalWorkflowRepository
     edit: FmbSelectionEdit,
   ): Observable<ProposalReviewRecord> {
     const body: Record<string, unknown> = { ...edit };
-    if (edit.fmbOptionId !== undefined) body['fmbOptionId'] = Number(edit.fmbOptionId);
+    if (edit.fmbOptionId !== undefined) body['fmbOptionId'] = fmbOptionRowId(edit.fmbOptionId);
     return this.http
       .patch(`${this.ordersUrl}/${selectionId}`, body)
       .pipe(switchMap(() => this.reload(id)));

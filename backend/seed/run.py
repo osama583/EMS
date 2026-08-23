@@ -44,7 +44,6 @@ SEEDABLE_TABLES = [
     "club_join_requests",
     "clubs",
     "club_categories",
-    "cafeteria_staff_requests",
     "funding_sub_options",
     "funding_main_options",
     "fmb_options",
@@ -73,10 +72,17 @@ SEEDABLE_TABLES = [
 
 
 def _icon(name: str) -> str:
+    """Look up the inline SVG for a nav icon name. Raises rather than falling back to
+    "" - a silently empty icon renders as nothing in NavIconComponent, and a warning
+    buried in seed output is easy to miss (this is how clubs-manage and manage-clubs
+    shipped with invisible icons)."""
     icon = ICONS.get(name)
     if icon is None:
-        log.warning("seed.icon_missing", extra={"icon": name})
-    return icon or ""
+        raise SystemExit(
+            f"seed: no icon named {name!r} in seed/icons.json. "
+            "Add it there before referencing it from seed/nav.py."
+        )
+    return icon
 
 
 def wipe(cur) -> None:
@@ -138,11 +144,10 @@ def seed_users(cur, password: str) -> list[tuple[str, str, str]]:
     summary: list[tuple[str, str, str]] = []
 
     for email, display_name, assignments in D.SEED_ACCOUNTS:
-        username = email.split("@")[0]
         cur.execute(
-            """INSERT INTO users (full_name, username, email, password, is_active)
-               VALUES (%s, %s, %s, %s, TRUE) RETURNING user_id""",
-            (display_name, username, email, password_hash),
+            """INSERT INTO users (full_name, email, password, is_active)
+               VALUES (%s, %s, %s, TRUE) RETURNING user_id""",
+            (display_name, email, password_hash),
         )
         user_id = cur.fetchone()["user_id"]
 

@@ -1,0 +1,37 @@
+@if (errorMessage()) { <app-feedback-banner tone="error" [message]="errorMessage()" /> }
+
+<app-internal-data-page
+  [config]="config()"
+  [records]="records()"
+  [filters]="filters"
+  [searchValue]="search()"
+  [loading]="loading()"
+  [totalPages]="totalPages()"
+  [page]="page()"
+  [pageSize]="pageSize()"
+  [sort]="sort()"
+  (searchChange)="setSearch($event)"
+  (sortChange)="setSort($event)"
+  (reset)="reset()"
+  (pageChange)="setPage($event)"
+  (pageSizeChange)="setPageSize($event)"
+  (rowAction)="handleAction($event)"
+/>
+
+<app-confirm-dialog
+  [open]="!!approveTarget()"
+  title="Approve President change"
+  [message]="approveTarget() ? ('Approve ' + approveTarget()!.requestedPresident.displayName + ' as the new President of ' + approveTarget()!.clubName + '? This takes effect immediately.') : ''"
+  confirmLabel="Approve"
+  [danger]="false"
+  [loading]="!!processingId()"
+  (confirm)="confirmApprove()"
+  (cancel)="closeApprove()"
+/>
+
+<app-proposal-comment-dialog
+  [open]="!!rejectTarget()" title="Reject President Change Request" label="Reason for rejection" confirmLabel="Reject" [danger]="true" [loading]="rejecting()"
+  [message]="rejectTarget() ? ('Tell ' + rejectTarget()!.currentPresident.displayName + ' why this request is being rejected. They will see this reason.') : ''"
+  [minLength]="rejectionCommentMinLength"
+  (cancel)="closeReject()" (confirm)="confirmReject($event)"
+/>

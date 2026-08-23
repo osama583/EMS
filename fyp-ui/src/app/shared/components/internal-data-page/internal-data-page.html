@@ -46,8 +46,10 @@
       [columns]="config().columns"
       [records]="records()"
       [actions]="config().actions"
+      [sort]="sort()"
       (actionSelect)="rowAction.emit($event)"
       (cellClick)="cellClick.emit($event)"
+      (sortChange)="sortChange.emit($event)"
     />
   }
 

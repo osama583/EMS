@@ -43,6 +43,9 @@ SEL_PENDING = "pending"
 SEL_APPROVED = "approved"
 SEL_RESUBMITTED = "resubmitted"
 SEL_PREPARING = "preparing"
+# Staff has finished preparing but not yet delivered - sits between claim and
+# fulfilment (migration 013). Not terminal: SEL_TERMINAL is unchanged.
+SEL_READY = "ready"
 SEL_FULFILLED = "fulfilled"
 SEL_CANCELLED = "cancelled"
 SEL_TERMINAL = (SEL_FULFILLED, SEL_CANCELLED)
@@ -73,7 +76,72 @@ FMB_REQUIREMENT = "fmb"
 # the flat 'fmb' assigned_role token, because the cafeteria fan-out keys off it.
 FMB_UNIT_CODE = "food_beverage_services"
 
+# The one child table + its primary key column each requirement's rows live in.
+# Shared by proposals.py (clearing/rewriting one requirement's rows on a scoped
+# resubmission) and tasks.py (row-level assignment, below) - one definition, so
+# the two can never drift into disagreeing about which table backs which
+# requirement name.
+TABLE_FOR_REQUIREMENT = {
+    "logistics": ("request_logistics", "request_logistics_id"),
+    "transportation": ("request_transportation", "request_transportation_id"),
+    "photoVideo": ("request_photography_videography", "request_photography_videography_id"),
+    "soundLight": ("request_sound_light", "request_sound_light_id"),
+    "fmb": ("request_fmb", "request_fmb_id"),
+    "campusTour": ("request_campus_tour", "request_campus_tour_id"),
+    "waterNormal": ("request_mineral_water", "request_mineral_water_id"),
+    "fundingPurchase": ("request_funding_purchase", "request_funding_purchase_id"),
+}
+
+# The five requirements whose rows can be individually assigned to staff (see
+# request_row_assignment, migration 012). fmb/waterNormal go through F&B's
+# existing cafeteria shared-pool flow instead (request_fmb_selection) and
+# fundingPurchase is never routed for approval at all - see
+# NON_WORKFLOW_REQUIREMENTS above.
+ROW_ASSIGNABLE_REQUIREMENTS = frozenset({"logistics", "transportation", "photoVideo", "soundLight", "campusTour"})
+
+# How many staff a single row of this requirement may have assigned at once.
+# None means unlimited. Transportation is capped at 1: one row is one vehicle,
+# one vehicle needs exactly one driver - a second assignee on the same row
+# would just be wrong, not merely uncommon, the way it can legitimately be for
+# a big Logistics or Photography row.
+MAX_ASSIGNEES_PER_ROW: dict[str, int | None] = {
+    "logistics": None,
+    "transportation": 1,
+    "photoVideo": None,
+    "soundLight": None,
+    "campusTour": None,
+}
+
 HEAD_ROLE_CODES = ("head-of-school", "head-of-department")
+
+# request.status (snake_case) -> the client's ProposalStage vocabulary
+# (kebab-case, and completed_approved/completed_rejected collapse to a single
+# 'approved'/'rejected' with no 'completed_' prefix). Used for every value the
+# client compares stage-by-stage: workflow.stage, workflow.resumeStage, and the
+# top-level status field project() sends back. DRAFT has no client-side
+# enum member - the client checks status === 'draft' directly, unchanged.
+STAGE_FOR_CLIENT = {
+    SUBMITTED: "submitted",
+    HOS_HOD_REVIEW: "hos-hod-review",
+    FMB_REVIEW: "fmb-review",
+    CFO_REVIEW: "cfo-review",
+    DEPARTMENT_REVIEW: "department-review",
+    RESUBMISSION_REQUIRED: "resubmission-required",
+    COMPLETED_APPROVED: "approved",
+    COMPLETED_REJECTED: "rejected",
+    CANCELLED: "cancelled",
+}
+
+
+def stage_for_client(status: str | None) -> str | None:
+    """Translate a raw request.status/resume_stage value for the client.
+
+    Passes DRAFT and anything unrecognised through unchanged rather than
+    raising - a resume_stage of None is common and must stay None.
+    """
+    if status is None:
+        return None
+    return STAGE_FOR_CLIENT.get(status, status)
 
 
 def config_number(cur, code: str) -> Decimal:

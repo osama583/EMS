@@ -30,7 +30,7 @@ describe('InternalLayoutComponent', () => {
     // session carries the same tree a Student is really granted: a standalone Dashboard, the
     // Proposals folder, the Forms folder and the Events folder.
     TestBed.inject(AuthService).establishSession(testUser([testRole('student', 'school_of_computing', 'School of Computing')], {
-      email: 'student@demo.apu.edu.my', displayName: 'Demo Student', username: 'student',
+      email: 'student@demo.apu.edu.my', displayName: 'Demo Student',
       nav: [
         testNavPage('dashboard', 'Dashboard'),
         {
@@ -199,7 +199,6 @@ describe('InternalLayoutComponent', () => {
     auth.establishSession(testUser([testRole('cafeteria-staff', 'cafeteria__atrium_cafeteria', 'Atrium Cafeteria')], {
       email: 'cafeteria.staff@apu.edu.my',
       displayName: 'Cafeteria Staff',
-      username: 'cafeteria.staff',
       nav: [testNavPage('tasks', 'My Tasks')],
     }), testTokens());
 

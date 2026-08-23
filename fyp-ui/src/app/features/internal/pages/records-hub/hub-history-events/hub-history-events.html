@@ -1,0 +1,108 @@
+<section class="events-history">
+  <app-feedback-banner [message]="errorMessage()" tone="error" />
+
+  <app-internal-page-header [config]="headerConfig()">
+    <app-view-toggle headerTrailing [mode]="viewMode()" (modeChange)="setViewMode($event)" />
+  </app-internal-page-header>
+
+  <section class="internal-table-workspace__controls events-history__controls">
+    <div workspaceControls class="shared-page-controls">
+      <app-internal-search-field
+        workspaceControlWide
+        [config]="{ ariaLabel: 'Search events', placeholder: 'Search event title' }"
+        [value]="search()"
+        (valueChange)="setSearch($event)"
+      />
+      <div workspaceControlRight class="shared-page-controls__right">
+        <app-internal-filter-controls [filters]="filters()" (filterChange)="setFilter($event)" />
+        <div class="shared-page-controls__actions">
+          <app-internal-reset-button (reset)="reset()" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  @if (viewMode() === 'card') {
+    @if (loading()) {
+      <div class="events-history__grid-loading" role="status" aria-label="Loading registration history">
+        @for (line of [1, 2, 3]; track line) { <span></span> }
+      </div>
+    } @else if (visibleEntries().length === 0) {
+      <div class="events-history__empty">
+        <span class="material-symbols-rounded" aria-hidden="true">inbox</span>
+        <h2>No resolved registrations yet</h2>
+        <p>Resolved event registrations — yours or ones you decided as organiser — will show up here.</p>
+      </div>
+    } @else {
+      <ul class="events-history__grid">
+        @for (entry of visibleEntries(); track entry.key) {
+          <li class="events-history__card">
+            <div class="events-history__image">
+              <span class="material-symbols-rounded" aria-hidden="true">event</span>
+            </div>
+            <div class="events-history__body">
+              <h2>{{ entry.eventTitle }}</h2>
+              <span class="events-history__direction-chip">{{ requesterLabel(entry) }}</span>
+              <span class="events-history__outcome" [attr.data-status]="entry.outcome">
+                <span class="material-symbols-rounded" aria-hidden="true">{{ entry.outcome === 'confirmed' ? 'check_circle' : 'cancel' }}</span>
+                {{ entry.outcome === 'confirmed' ? 'Confirmed' : 'Rejected' }}
+              </span>
+            </div>
+            <div class="events-history__footer">
+              <button type="button" class="events-history__status-btn" (click)="openDetails(entry)">
+                <span class="material-symbols-rounded" aria-hidden="true">visibility</span>
+                View details
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <app-internal-data-page
+      [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+      [hideHeader]="true"
+      [hideControls]="true"
+      (filterChange)="setFilter($event)"
+      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+      (recordOpen)="handleAction({ action: { key: 'view', label: 'View details', icon: 'visibility' }, record: $event })"
+    />
+  }
+</section>
+
+<app-form-modal
+  [open]="detailsTarget() !== null" [title]="detailsTarget()?.eventTitle ?? 'Registration details'"
+  [hidePrimary]="true" secondaryLabel="Close"
+  (close)="closeDetails()" (cancel)="closeDetails()" (submit)="closeDetails()"
+>
+  @if (detailsTarget(); as entry) {
+    <article class="events-history__details">
+      <span class="events-history__direction-chip">{{ requesterLabel(entry) }}</span>
+      <span class="events-history__outcome events-history__outcome--large" [attr.data-status]="entry.outcome">
+        <span class="material-symbols-rounded" aria-hidden="true">{{ entry.outcome === 'confirmed' ? 'check_circle' : 'cancel' }}</span>
+        {{ entry.outcome === 'confirmed' ? 'Confirmed' : 'Rejected' }}
+      </span>
+
+      @if (entry.requester === 'other') {
+        <section>
+          <h3>Registrant</h3>
+          <p>{{ entry.registrantName }} · {{ entry.registrantEmail }}</p>
+        </section>
+        @if (entry.reason) {
+          <section>
+            <h3>Reason for attending</h3>
+            <p>{{ entry.reason }}</p>
+          </section>
+        }
+      }
+
+      <dl>
+        <div>
+          <dt>{{ entry.requester === 'me' ? 'Event date' : 'Registered' }}</dt>
+          <dd>{{ formatDate(entry.registeredAt) }}</dd>
+        </div>
+      </dl>
+    </article>
+  }
+</app-form-modal>

@@ -1,0 +1,53 @@
+<app-form-modal
+  [open]="open()"
+  [title]="(club()?.name ?? 'Club') + ' — Members'"
+  [hidePrimary]="true"
+  secondaryLabel="Close"
+  (close)="close.emit()"
+  (cancel)="close.emit()"
+  (submit)="close.emit()"
+>
+  @if (loading()) {
+    <div class="club-roster__loading" role="status" aria-label="Loading members">
+      @for (line of [1, 2, 3]; track line) { <span></span> }
+    </div>
+  } @else if (errorMessage()) {
+    <p class="club-roster__error">{{ errorMessage() }}</p>
+  } @else if (members().length === 0) {
+    <p class="club-roster__empty">This club has no members yet.</p>
+  } @else {
+    <ul class="club-roster__list">
+      @for (member of members(); track member.user.id) {
+        <li class="club-roster__item">
+          <div class="club-roster__identity">
+            <strong>{{ member.user.displayName }}</strong>
+            <span>{{ member.user.email }}</span>
+          </div>
+          <div class="club-roster__meta">
+            <span class="club-roster__role" [attr.data-role]="member.user.role">{{ member.user.role }}</span>
+            <span class="club-roster__joined">Joined {{ formatDate(member.dateJoined) }}</span>
+          </div>
+          @if (canAct(member)) {
+            <button type="button" class="club-roster__action" [attr.aria-label]="actionLabel(member) + ' ' + member.user.displayName" (click)="openRemove(member)">
+              <span class="material-symbols-rounded" aria-hidden="true">{{ isSelf(member) ? 'logout' : 'person_remove' }}</span>
+              {{ actionLabel(member) }}
+            </button>
+          }
+        </li>
+      }
+    </ul>
+  }
+</app-form-modal>
+
+<app-confirm-dialog
+  [open]="!!removeTarget()"
+  [title]="removeTarget() && isSelf(removeTarget()!) ? 'Leave club' : 'Remove member'"
+  [message]="removeTarget() ? (isSelf(removeTarget()!)
+      ? ('Leave ' + (club()?.name ?? 'this club') + '? You will need to request to join again to rejoin.')
+      : ('Remove ' + removeTarget()!.user.displayName + ' from ' + (club()?.name ?? 'this club') + '?')) : ''"
+  [confirmLabel]="removeTarget() && isSelf(removeTarget()!) ? 'Leave' : 'Remove'"
+  [danger]="true"
+  [loading]="removing()"
+  (confirm)="confirmRemove()"
+  (cancel)="closeRemove()"
+/>

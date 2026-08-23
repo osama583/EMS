@@ -18,6 +18,7 @@ __all__ = [
 
 from .decorators import (  # noqa: E402
     authenticate,
+    authenticate_optional,
     require_admin,
     require_auth,
     require_internal,
@@ -27,6 +28,7 @@ from .decorators import (  # noqa: E402
 
 __all__ += [
     "authenticate",
+    "authenticate_optional",
     "require_auth",
     "require_roles",
     "require_admin",

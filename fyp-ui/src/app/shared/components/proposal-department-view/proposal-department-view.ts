@@ -1,20 +1,24 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { finalize } from 'rxjs';
-import { AdminDirectoryService } from '../../../core/admin-directory/admin-directory.service';
+import { Observable, finalize, forkJoin, switchMap } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import { AuthUser } from '../../../core/auth/auth.models';
 import { hasRole } from '../../../core/auth/role-access';
 import { CafeteriaService } from '../../../core/cafeterias/cafeteria.service';
 import { Cafeteria } from '../../../core/cafeterias/cafeteria.models';
-import { staffUnitCodeForManager } from '../../../core/departments/department-workflow.config';
+import { assignmentRequiredForManager, DepartmentRequestKind, maxAssigneesPerRow, staffUnitCodeForManager } from '../../../core/departments/department-workflow.config';
+import { ProposalConversation } from '../../../core/proposals/proposal-conversation.models';
 import { departmentsForRole, FmbSelection, ProposalReviewRecord } from '../../../core/proposals/proposal-review.models';
+import { DEPARTMENT_LABELS, initialsFor } from '../../../core/proposals/proposal-status.models';
 import { ProposalWorkflowService } from '../../../core/proposals/proposal-workflow.service';
+import { FmbSelectionDraft } from '../../../core/proposals/proposal-workflow.repository';
+import { RowAssignmentService } from '../../../core/row-assignments/row-assignment.service';
 import { RequestOptionService } from '../../../core/request-options/request-option.service';
 import { FoodRequestOption } from '../../../core/request-options/request-option.models';
-import { StaffTaskService } from '../../../core/staff-tasks/staff-task.service';
+import { ConversationThreadComponent } from '../conversation-thread/conversation-thread';
 import { EditableRow } from '../form-controls/form-controls.models';
 import { FormModalComponent } from '../form-modal/form-modal';
+import { PopoverComponent } from '../popover/popover';
 import { ProposalFieldComponent } from '../proposal-field/proposal-field';
 import { ProposalKpiBarComponent } from '../proposal-kpi-bar/proposal-kpi-bar';
 import { ProposalSectionComponent } from '../proposal-section/proposal-section';
@@ -22,11 +26,13 @@ import { ProposalTableColumn, ProposalTableComponent } from '../proposal-table/p
 import { SearchableDropdownComponent } from '../searchable-dropdown/searchable-dropdown';
 import { ToastService, apiErrorMessage } from '../toast/toast.service';
 
-interface ReviewerComment {
-  readonly stage: string;
-  readonly reviewer: string;
-  readonly initials: string;
-  readonly text: string;
+// A "Create Order" click that hasn't been sent to the server yet — same shape as
+// FmbSelectionDraft (what actually gets POSTed) plus a local id and the display text the modal
+// already has on hand (cafeteria name, menu item label), so the staged row can render without
+// re-fetching anything. id is negative so it never collides with a real request_fmb_selection id.
+interface StagedFmbOrder extends FmbSelectionDraft {
+  readonly id: number;
+  readonly cafeteriaName: string;
 }
 
 @Component({
@@ -35,9 +41,11 @@ interface ReviewerComment {
     ProposalTableComponent,
     SearchableDropdownComponent,
     FormModalComponent,
+    PopoverComponent,
     ProposalKpiBarComponent,
     ProposalSectionComponent,
     ProposalFieldComponent,
+    ConversationThreadComponent,
   ],
   template: `
     @if (proposal(); as item) {
@@ -72,20 +80,23 @@ interface ReviewerComment {
             }
           </app-proposal-section>
 
-          <!-- Section: Department Requests -->
-          <app-proposal-section icon="inventory_2" title="Your Department's Requested Items" description="Only requests assigned to your department are shown.">
-            <div class="prv-table-wrap">
-              <h4 class="prv-table-wrap__label">Department Requests</h4>
-              <app-proposal-table
-                tableId="department-proposal-requests"
-                [columns]="requestColumns"
-                [rows]="requestRows()"
-                [readOnly]="true"
-                emptyIcon="assignment_late"
-                emptyMessage="No request details are assigned to this department."
-              />
-            </div>
-          </app-proposal-section>
+          <!-- Section: Department Requests (not shown to the Cafeteria Manager — they only need
+               to see the cafeteria orders routed to them, in the section below.) -->
+          @if (!isCafeteriaSelectionView()) {
+            <app-proposal-section icon="inventory_2" title="Your Department's Requested Items" description="Only requests assigned to your department are shown.">
+              <div class="prv-table-wrap">
+                <h4 class="prv-table-wrap__label">Department Requests</h4>
+                <app-proposal-table
+                  tableId="department-proposal-requests"
+                  [columns]="requestColumns()"
+                  [rows]="requestRows()"
+                  [readOnly]="true"
+                  emptyIcon="assignment_late"
+                  emptyMessage="No request details are assigned to this department."
+                />
+              </div>
+            </app-proposal-section>
+          }
 
           <!-- Section: F&B Cafeteria Selections (Cafeteria Manager only, on the fmb department) -->
           @if (isCafeteriaSelectionView()) {
@@ -169,40 +180,93 @@ interface ReviewerComment {
             </app-proposal-section>
           }
 
-          @if (isFmbCreateOrderView()) {
+          <!-- Hidden while a cafeteria manager's pushback is unresolved (see
+               resubmittedSelections()/"Orders Sent Back To You" above) — the F&B head's job right
+               then is to fix or cancel that one order, not get offered a full "create a new order
+               against any request row" workspace on top of it. Reappears once every pushback is
+               resolved (edited-and-resent, or cancelled). -->
+          @if (isFmbCreateOrderView() && !resubmittedSelections().length) {
             <app-proposal-section icon="restaurant" title="Cafeteria Orders" description="Pick a cafeteria and menu item to fulfill each request. Create as many orders per request as needed.">
-              <div class="prv-fmb-selections">
-                @for (row of requestRows(); track row['id']) {
-                  <div class="prv-fmb-selection">
-                    <div class="prv-fmb-selection__body">
-                      <div class="prv-fmb-selection__row">
-                        <span class="prv-fmb-selection__label">Requested</span>
-                        <strong>{{ row['item'] }} — {{ row['quantity'] }}</strong>
-                      </div>
-                      @if (ordersFor($any(row['id'])).length) {
-                        <div class="prv-fmb-selection__row">
-                          <span class="prv-fmb-selection__label">Orders placed</span>
-                          <span>
-                            @for (order of ordersFor($any(row['id'])); track order.id) {
-                              {{ order.cafeteriaName }} · {{ order.menuItemLabel }} × {{ order.quantity }} ({{ selectionStatusLabel(order.status) }})@if (!$last) {, }
-                            }
-                          </span>
-                        </div>
-                      }
+              <div class="prv-table-wrap">
+                <h4 class="prv-table-wrap__label">Food &amp; Water Requests</h4>
+                <section class="prv-orders-table">
+                  @if (!requestRows().length) {
+                    <div class="prv-orders-table__state">
+                      <span class="material-symbols-rounded prv-orders-table__state-icon" aria-hidden="true">restaurant_menu</span>
+                      <span>No food or water requests on this proposal yet.</span>
                     </div>
-                    <div class="prv-fmb-selection__actions">
-                      <button type="button" class="prv-btn prv-btn--approve" (click)="openCreateOrderModal(row)">
-                        <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">add_circle</span>
-                        <span class="prv-btn__label">Create Order</span>
-                      </button>
+                  } @else {
+                    <div class="prv-orders-table__scroll">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th scope="col" class="prv-orders-table__index">#</th>
+                            <th scope="col">Requested</th>
+                            <th scope="col">Orders</th>
+                            <th scope="col" class="prv-orders-table__actions">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (row of requestRows(); track row['id']; let rowIndex = $index) {
+                            <tr>
+                              <td class="prv-orders-table__index">{{ rowIndex + 1 }}</td>
+                              <td><strong>{{ row['item'] }}</strong> — {{ row['quantity'] }}</td>
+                              <td>
+                                @if (rowOrderCount($any(row['id']))) {
+                                  <button type="button" class="prv-orders-badge" (click)="openOrdersPopover(row)">
+                                    <span class="material-symbols-rounded" aria-hidden="true">restaurant</span>
+                                    {{ rowOrderCount($any(row['id'])) }} order{{ rowOrderCount($any(row['id'])) === 1 ? '' : 's' }}
+                                  </button>
+                                } @else {
+                                  <span class="prv-orders-empty">No orders yet</span>
+                                }
+                              </td>
+                              <td class="prv-orders-table__actions">
+                                <button type="button" class="table-control table-control--primary" (click)="openCreateOrderModal(row)">
+                                  <span class="material-symbols-rounded" aria-hidden="true">add_circle</span>
+                                  Create Order
+                                </button>
+                              </td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
                     </div>
-                  </div>
-                }
-                @if (!requestRows().length) {
-                  <p class="prv-fmb-selections__empty">No food or water requests on this proposal.</p>
-                }
+                  }
+                </section>
               </div>
             </app-proposal-section>
+
+            <!-- Orders popup for whichever row's badge was clicked — lists every placed order
+                 (with its status) and every staged one (editable/removable, not yet sent). -->
+            <app-popover [open]="ordersPopoverRow() !== null" [title]="ordersPopoverTitle()" icon="restaurant" (close)="closeOrdersPopover()">
+              <ul class="prv-orders-popover-list">
+                @for (order of ordersPopoverPlaced(); track order.id) {
+                  <li class="prv-orders-popover-item">
+                    <div class="prv-orders-popover-item__main">
+                      <span class="prv-orders-popover-item__label">{{ order.cafeteriaName }} · {{ order.menuItemLabel }}</span>
+                      <span class="prv-orders-popover-item__meta">× {{ order.quantity }} · {{ selectionStatusLabel(order.status) }}</span>
+                    </div>
+                  </li>
+                }
+                @for (staged of ordersPopoverStaged(); track staged.id) {
+                  <li class="prv-orders-popover-item prv-orders-popover-item--staged">
+                    <div class="prv-orders-popover-item__main">
+                      <span class="prv-orders-popover-item__label">{{ staged.cafeteriaName }} · {{ staged.menuItemLabel }}</span>
+                      <span class="prv-orders-popover-item__meta">× {{ staged.quantity }} · Not yet sent</span>
+                    </div>
+                    <div class="prv-orders-popover-item__actions">
+                      <button type="button" class="prv-orders-popover-item__action" aria-label="Edit staged order" (click)="editStagedOrder(staged)">
+                        <span class="material-symbols-rounded" aria-hidden="true">edit</span>
+                      </button>
+                      <button type="button" class="prv-orders-popover-item__action" aria-label="Remove staged order" (click)="removeStagedOrderFromPopover(staged.id)">
+                        <span class="material-symbols-rounded" aria-hidden="true">close</span>
+                      </button>
+                    </div>
+                  </li>
+                }
+              </ul>
+            </app-popover>
           }
 
         </div><!-- /prv-main -->
@@ -276,63 +340,19 @@ interface ReviewerComment {
             </div>
           }
 
-          <!-- Section: Assign Department Work -->
-          @if (!readOnly() && allowAssignment() && !isCafeteriaSelectionView() && staffUnitCode(); as assignmentRole) {
-            <div class="prv-panel-card">
-              <div class="prv-panel-card__head">
-                <span class="prv-panel-card__icon material-symbols-rounded" aria-hidden="true">person_add</span>
-                <div>
-                  <h3 class="prv-panel-card__title">Assign Department Work</h3>
-                  <p class="prv-panel-card__subtitle">Select team member for these tasks.</p>
-                </div>
-              </div>
-              <div class="proposal-department-view__assignment-controls">
-                <app-searchable-dropdown
-                  controlId="department-assignee"
-                  label="Assigned team member"
-                  placeholder="Select a team member"
-                  [required]="true"
-                  [options]="staffOptions()"
-                  [value]="assigneeEmail()"
-                  (valueChange)="assigneeEmail.set($any($event))"
-                />
-                <button
-                  type="button"
-                  class="prv-btn prv-btn--approve"
-                  [disabled]="!assigneeEmail() || assigning() || !requestRows().length"
-                  (click)="assignConfirm.set(true)"
-                >
-                  <span class="prv-btn__icon material-symbols-rounded" aria-hidden="true">assignment_ind</span>
-                  <span class="prv-btn__label">{{ assigning() ? 'Assigning...' : 'Assign Tasks' }}</span>
-                </button>
-              </div>
-            </div>
-          }
-
-          <!-- Reviewer Comments card -->
-          @if (reviewerComments().length) {
+          <!-- Reviewer Comments card - this department's own conversation thread with the
+               applicant (conversations_for scopes a department caller to their own task's thread
+               only, so this never shows another department's or reviewer stage's comments). -->
+          @if (activeConversation(); as active) {
             <div class="prv-panel-card prv-panel-card--comments">
               <div class="prv-panel-card__head">
                 <span class="prv-panel-card__icon material-symbols-rounded" aria-hidden="true">forum</span>
                 <div>
-                  <h3 class="prv-panel-card__title">Reviewer Comments</h3>
-                  <p class="prv-panel-card__subtitle">Comments left by reviewers in this chain.</p>
+                  <h3 class="prv-panel-card__title">{{ activeSummary()!.partnerName }}</h3>
+                  <p class="prv-panel-card__subtitle">{{ activeSummary()!.partnerRoleLabel }}</p>
                 </div>
               </div>
-              <ul class="prv-comments-list">
-                @for (entry of reviewerComments(); track entry.stage) {
-                  <li class="prv-comment-entry">
-                    <div class="prv-comment-entry__avatar" aria-hidden="true">{{ entry.initials }}</div>
-                    <div class="prv-comment-entry__body">
-                      <div class="prv-comment-entry__meta">
-                        <strong>{{ entry.reviewer }}</strong>
-                        <span class="prv-comment-entry__stage">{{ entry.stage }}</span>
-                      </div>
-                      <p class="prv-comment-entry__text">{{ entry.text }}</p>
-                    </div>
-                  </li>
-                }
-              </ul>
+              <app-conversation-thread [messages]="active.messages" [title]="activeSummary()!.partnerName" />
             </div>
           }
 
@@ -341,13 +361,17 @@ interface ReviewerComment {
       </div><!-- /prv-layout -->
     }
 
-    <!-- Approve confirmation modal popup (whole-department flow) -->
+    <!-- Approve confirmation modal popup (whole-department flow). When this department requires
+         naming who does the work, approving IS assigning — one action, one call — so the picker
+         lives here instead of a separate "Assign Department Work" card/button the manager had to
+         remember to use afterward. -->
     <app-form-modal
       [open]="approveConfirm()"
       title="Confirm department fulfilment"
       primaryLabel="Confirm Approval"
       secondaryLabel="Cancel"
-      [loading]="confirming()"
+      [loading]="confirming() || assigning() || staffUsersLoading() || sendingStagedOrders()"
+      [disabled]="assignmentRequired() && !allRowsStaged()"
       (close)="approveConfirm.set(false)"
       (cancel)="approveConfirm.set(false)"
       (submit)="confirmApprove()"
@@ -357,6 +381,36 @@ interface ReviewerComment {
           <span class="material-symbols-rounded" aria-hidden="true">task_alt</span>
           Confirm that your department can fulfill all requested items for this proposal.
         </p>
+        @if (isFmbCreateOrderView() && stagedOrders().length) {
+          <p class="prv-action-modal__info">
+            <span class="material-symbols-rounded" aria-hidden="true">restaurant</span>
+            {{ stagedOrders().length }} order{{ stagedOrders().length === 1 ? '' : 's' }} will be sent to their cafeterias now.
+          </p>
+        }
+        @if (assignmentRequired()) {
+          <div class="prv-row-assignment-list">
+            @for (row of requestRows(); track row['id']) {
+              <div class="prv-row-assignment">
+                <p class="prv-row-assignment__label">
+                  {{ row['item'] }}
+                  @if (row['quantity']) { <span>&middot; {{ row['quantity'] }}</span> }
+                </p>
+                <app-searchable-dropdown
+                  [controlId]="'row-assignee-' + row['id']"
+                  label="Assigned team member"
+                  placeholder="Select a team member"
+                  [required]="true"
+                  [isMulti]="rowAssigneeLimit() !== 1"
+                  [maxSelections]="rowAssigneeLimit()"
+                  [loading]="staffUsersLoading()"
+                  [options]="staffOptions()"
+                  [value]="rowSelection($any(row['id']))"
+                  (valueChange)="setRowSelection($any(row['id']), $any($event))"
+                />
+              </div>
+            }
+          </div>
+        }
       </div>
     </app-form-modal>
 
@@ -440,13 +494,13 @@ interface ReviewerComment {
       </div>
     </app-form-modal>
 
-    <!-- Create Order modal popup (F&B flow: pick cafeteria + menu item + quantity for one request row) -->
+    <!-- Stage Order modal popup (F&B flow: pick cafeteria + menu item + quantity for one request
+         row — this only stages the order locally; nothing is sent until Approve, see approve()). -->
     <app-form-modal
       [open]="createOrderTarget() !== null"
-      title="Create cafeteria order"
-      primaryLabel="Create Order"
+      [title]="editingStagedOrderId() === null ? 'Stage a cafeteria order' : 'Edit staged order'"
+      [primaryLabel]="editingStagedOrderId() === null ? 'Add to Approval' : 'Save changes'"
       secondaryLabel="Cancel"
-      [loading]="creatingOrder()"
       [disabled]="!createOrderValid()"
       (close)="closeCreateOrderModal()"
       (cancel)="closeCreateOrderModal()"
@@ -506,26 +560,6 @@ interface ReviewerComment {
             {{ createOrderError() }}
           </p>
         }
-      </div>
-    </app-form-modal>
-
-    <!-- Assign confirmation modal (every critical action is confirmed before it runs) -->
-    <app-form-modal
-      [open]="assignConfirm()"
-      title="Assign this work"
-      primaryLabel="Assign Tasks"
-      secondaryLabel="Cancel"
-      [loading]="assigning()"
-      (close)="assignConfirm.set(false)"
-      (cancel)="assignConfirm.set(false)"
-      (submit)="confirmAssign()"
-    >
-      <div class="prv-action-modal-body">
-        <p class="prv-action-modal__info">
-          <span class="material-symbols-rounded" aria-hidden="true">assignment_ind</span>
-          Assign all {{ requestRows().length }} of this department's requested item(s) to
-          <strong>{{ assigneeName() }}</strong>? They will see the work in their Inbox immediately.
-        </p>
       </div>
     </app-form-modal>
 
@@ -611,10 +645,9 @@ interface ReviewerComment {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProposalDepartmentViewComponent {
-  private readonly directory = inject(AdminDirectoryService);
   private readonly auth = inject(AuthService);
-  private readonly tasks = inject(StaffTaskService);
   private readonly workflow = inject(ProposalWorkflowService);
+  private readonly rowAssignments = inject(RowAssignmentService);
   private readonly cafeterias = inject(CafeteriaService);
   private readonly options = inject(RequestOptionService);
   private readonly destroyRef = inject(DestroyRef);
@@ -628,15 +661,41 @@ export class ProposalDepartmentViewComponent {
   readonly allowAssignment = input(true);
   readonly readOnly = input(false);
   readonly actionComplete = output<number>();
+  // Emitted instead of actionComplete when an action only disposed of PART of what's on this
+  // page (currently: resubmitting one F&B cafeteria selection while sibling selections for the
+  // same cafeteria are still pending) — the parent should refresh its copy of the proposal and
+  // keep the detail view open, rather than navigating away as it does for actionComplete.
+  readonly proposalRefreshed = output<ProposalReviewRecord>();
 
   readonly departments = computed(() => departmentsForRole(this.role()));
   readonly staffUnitCode = computed(() => staffUnitCodeForManager(this.role()));
-  readonly staffUsers = signal<readonly { email: string; displayName: string }[]>([]);
-  readonly assigneeEmail = signal('');
+  // Whether THIS department's approval requires naming who does the work (Logistics/AV/
+  // Photography/Transportation/Campus Tour: yes: F&B/Cafeteria Manager: no, they use the
+  // cafeteria-order flow instead). Drives whether the Approve modal below asks for a team member
+  // at all — see assignmentRequiredForManager()'s config in department-workflow.config.ts.
+  readonly assignmentRequired = computed(() => this.allowAssignment() && assignmentRequiredForManager(this.role()));
+  // null = unlimited assignees per row (Logistics/Photography/Sound & Light/Campus Tour); 1 =
+  // exactly one (Transportation) — drives whether each row's picker renders multi- or single-select.
+  readonly rowAssigneeLimit = computed(() => {
+    const department = this.departments()[0];
+    return department ? maxAssigneesPerRow(department) : null;
+  });
+  readonly staffUsers = signal<readonly { userId: number; email: string; displayName: string }[]>([]);
+  readonly staffUsersLoading = signal(false);
   readonly assigning = signal(false);
-  readonly assignConfirm = signal(false);
-  readonly staffOptions = computed(() => this.staffUsers().map((user) => ({ value: user.email, label: user.displayName, description: user.email })));
-  readonly assigneeName = computed(() => this.staffUsers().find((user) => user.email === this.assigneeEmail())?.displayName ?? this.assigneeEmail());
+  readonly staffOptions = computed(() => this.staffUsers().map((user) => ({ value: String(user.userId), label: user.displayName, description: user.email })));
+  // Row assignment state while the Approve modal is open: taskId resolved once, then each row's
+  // CURRENT server-side assignees (already-assigned staff, shown pre-selected) plus any pending
+  // change the manager makes before hitting Confirm Approval — nothing is sent to the server until
+  // then, matching every other confirm-modal action in this component.
+  private approveTaskId = signal<number | null>(null);
+  private readonly initialRowAssignees = signal<ReadonlyMap<number, ReadonlySet<number>>>(new Map());
+  readonly rowAssigneeSelections = signal<ReadonlyMap<number, readonly number[]>>(new Map());
+  readonly allRowsStaged = computed(() => {
+    if (!this.assignmentRequired()) return true;
+    const selections = this.rowAssigneeSelections();
+    return this.requestRows().every((row) => (selections.get(Number(row['id'])) ?? []).length > 0);
+  });
 
   readonly confirming = signal(false);
   readonly resubmitting = signal(false);
@@ -697,11 +756,63 @@ export class ProposalDepartmentViewComponent {
   readonly menuItemSelectOptions = computed(() => this.createOrderMenuItems().map((item) => ({ value: item.id, label: item.label, description: item.description })));
   readonly createOrderValid = computed(() => !!this.createOrderCafeteria() && !!this.createOrderMenuItemId() && Number(this.createOrderQuantity()) > 0);
 
+  // "Create Order" used to POST immediately, one call per order — F&B could not build up a batch
+  // without each click round-tripping to the server and to the owning Cafeteria Manager's inbox
+  // right away. Orders are now staged here (draft + display fields, no request_fmb_selection row
+  // yet) and only sent, all at once, when F&B clicks Approve (see approve() below) — matching
+  // every other department's "one action, one send" shape, where Approve is the single moment the
+  // department's decision becomes visible to anyone else.
+  private nextStagedOrderId = -1;
+  readonly stagedOrders = signal<readonly StagedFmbOrder[]>([]);
+  readonly sendingStagedOrders = signal(false);
+  readonly editingStagedOrderId = signal<number | null>(null);
+
   // Existing selections for the request row currently being fulfilled — read-only for F&B (they
   // don't approve their own orders), shown so F&B can see how much of the request is already
   // covered before creating another order.
   ordersFor(requestFmbId: number): readonly FmbSelection[] {
     return (this.proposal()?.fmbSelections ?? []).filter((selection) => selection.requestFmbId === requestFmbId);
+  }
+
+  stagedOrdersFor(requestFmbId: number): readonly StagedFmbOrder[] {
+    return this.stagedOrders().filter((order) => order.requestFmbId === requestFmbId);
+  }
+
+  rowOrderCount(requestFmbId: number): number {
+    return this.ordersFor(requestFmbId).length + this.stagedOrdersFor(requestFmbId).length;
+  }
+
+  // Which request row's "N orders" badge was clicked — drives the shared popup below listing
+  // every placed + staged order for that one row. Holds the row itself (not just its id) so the
+  // popup title can read the item name without a second lookup.
+  readonly ordersPopoverRow = signal<EditableRow | null>(null);
+  readonly ordersPopoverTitle = computed(() => {
+    const row = this.ordersPopoverRow();
+    return row ? `${row['item']} — Orders` : 'Orders';
+  });
+  readonly ordersPopoverPlaced = computed<readonly FmbSelection[]>(() => {
+    const row = this.ordersPopoverRow();
+    return row ? this.ordersFor(Number(row['id'])) : [];
+  });
+  readonly ordersPopoverStaged = computed<readonly StagedFmbOrder[]>(() => {
+    const row = this.ordersPopoverRow();
+    return row ? this.stagedOrdersFor(Number(row['id'])) : [];
+  });
+
+  openOrdersPopover(row: EditableRow): void {
+    this.ordersPopoverRow.set(row);
+  }
+
+  closeOrdersPopover(): void {
+    this.ordersPopoverRow.set(null);
+  }
+
+  // Same removal as removeStagedOrder, but closes the popup afterward if that was the last order
+  // left for this row — nothing left to look at otherwise.
+  removeStagedOrderFromPopover(orderId: number): void {
+    this.removeStagedOrder(orderId);
+    const row = this.ordersPopoverRow();
+    if (row && !this.rowOrderCount(Number(row['id']))) this.closeOrdersPopover();
   }
 
   readonly canAct = computed(() => {
@@ -715,24 +826,35 @@ export class ProposalDepartmentViewComponent {
 
   readonly commentRequired = computed(() => this.comment().trim().length === 0);
 
-  readonly reviewerComments = computed<readonly ReviewerComment[]>(() => {
-    const proposal = this.proposal();
-    if (!proposal?.workflow.reviewerComment) return [];
-    return [{
-      stage: 'Reviewer Comment',
-      reviewer: 'Reviewer',
-      initials: 'REV',
-      text: proposal.workflow.reviewerComment,
-    }];
+  // A department manager only ever gets back their own department's thread from the server (see
+  // conversations_for's per-caller scoping), so there is exactly zero or one conversation here -
+  // no list/Back UI needed, unlike the applicant-facing drawer.
+  readonly conversations = signal<readonly ProposalConversation[]>([]);
+  readonly activeConversation = computed(() => this.conversations()[0] ?? null);
+  readonly activeSummary = computed(() => {
+    const active = this.activeConversation();
+    if (!active) return null;
+    const partnerName = active.conversationId.startsWith('task:') ? (DEPARTMENT_LABELS[active.partnerName] ?? active.partnerName) : active.partnerName;
+    return { partnerName, partnerRoleLabel: active.partnerRoleLabel, initials: initialsFor(partnerName) };
   });
 
-  readonly requestColumns: readonly ProposalTableColumn[] = [
-    { key: 'item', label: 'Requirement / Item', width: '15rem' },
-    { key: 'quantity', label: 'Quantity', width: '10rem' },
-    { key: 'schedule', label: 'Schedule', width: '15rem' },
-    { key: 'location', label: 'Location', width: '12rem' },
-    { key: 'notes', label: 'Notes', width: '17rem' },
-  ];
+  // Photography/Videography and Sound & Light never collect a quantity on the applicant's form
+  // (see department-request-columns.ts's column definitions for those two keys — no `quantity`
+  // column exists), so proposals.py's row projection always sends back "" for it. Showing the
+  // column anyway makes it look like data went missing; drop it for those two departments only.
+  private static readonly QUANTITY_COLUMN: ProposalTableColumn = { key: 'quantity', label: 'Quantity', width: '10rem' };
+  private static readonly NO_QUANTITY_DEPARTMENTS: ReadonlySet<DepartmentRequestKind> = new Set(['photoVideo', 'soundLight']);
+  readonly requestColumns = computed<readonly ProposalTableColumn[]>(() => {
+    const department = this.departments()[0];
+    const showQuantity = !department || !ProposalDepartmentViewComponent.NO_QUANTITY_DEPARTMENTS.has(department);
+    return [
+      { key: 'item', label: 'Requirement / Item', width: '15rem' },
+      ...(showQuantity ? [ProposalDepartmentViewComponent.QUANTITY_COLUMN] : []),
+      { key: 'schedule', label: 'Schedule', width: '15rem' },
+      { key: 'location', label: 'Location', width: '12rem' },
+      { key: 'notes', label: 'Notes', width: '17rem' },
+    ];
+  });
 
   readonly requestRows = computed<readonly EditableRow[]>(() => {
     const proposal = this.proposal();
@@ -742,14 +864,20 @@ export class ProposalDepartmentViewComponent {
   });
 
   constructor() {
-    this.directory.users$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((users) => {
-      const unitCode = this.staffUnitCode();
-      // Staff of this department share the SAME unitCode as their head under the RBAC redesign
-      // — exclude head-of-department/head-of-school holders so the assignment dropdown still
-      // only offers actual frontline staff, matching the old role-filter's intent.
-      this.staffUsers.set(unitCode ? users.filter((user) => user.active && user.roles.some((r) => r.unitCode === unitCode && r.roleCode !== 'head-of-department' && r.roleCode !== 'head-of-school')).map(({ email, displayName }) => ({ email, displayName })) : []);
-    });
+    // Loaded lazily, per-task, when the Approve modal opens for a department that requires
+    // assignment (see openApproveModal() below) — GET /tasks/:id/assignable-staff, the same
+    // endpoint the actual assignment call (POST /tasks/:id/assignments) authorizes against, so the
+    // picker can never offer someone that call would then reject.
     this.cafeterias.list().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((cafeterias) => this.cafeteriaOptions.set(cafeterias));
+
+    effect(() => {
+      const proposal = this.proposal();
+      if (!proposal) { this.conversations.set([]); return; }
+      this.workflow.getConversations(proposal.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: (conversations) => this.conversations.set(conversations),
+        error: () => this.conversations.set([]),
+      });
+    });
   }
 
   onCommentInput(event: Event): void {
@@ -763,13 +891,54 @@ export class ProposalDepartmentViewComponent {
       case 'approved': return 'Approved — in Cafeteria Staff inbox';
       case 'resubmitted': return 'Sent back to F&B';
       case 'preparing': return 'Being prepared';
-      case 'fulfilled': return 'Fulfilled';
+      case 'ready': return 'Ready for delivery';
+      case 'fulfilled': return 'Delivered';
       case 'cancelled': return 'Cancelled';
     }
   }
 
   openApproveModal(): void {
     this.approveConfirm.set(true);
+    this.rowAssigneeSelections.set(new Map());
+    this.initialRowAssignees.set(new Map());
+    this.approveTaskId.set(null);
+    if (!this.assignmentRequired()) return;
+    const proposal = this.proposal();
+    const department = this.departments()[0];
+    if (!proposal || !department) return;
+    this.staffUsersLoading.set(true);
+    this.rowAssignments.taskIdForDepartment(proposal.id, department).pipe(
+      switchMap((taskId) => {
+        this.approveTaskId.set(taskId);
+        return forkJoin([
+          this.rowAssignments.assignableStaff(taskId),
+          this.rowAssignments.rowAssignments(taskId, department),
+        ]);
+      }),
+      finalize(() => this.staffUsersLoading.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: ([staff, existing]) => {
+        this.staffUsers.set(staff);
+        const byRow = new Map<number, number[]>();
+        for (const assignment of existing.assignments) {
+          byRow.set(assignment.rowId, [...(byRow.get(assignment.rowId) ?? []), assignment.staffUserId]);
+        }
+        this.initialRowAssignees.set(new Map([...byRow.entries()].map(([rowId, ids]) => [rowId, new Set(ids)])));
+        this.rowAssigneeSelections.set(new Map([...byRow.entries()]));
+      },
+      error: (err) => this.toast.error('Could not load team members', apiErrorMessage(err, 'Please try again.')),
+    });
+  }
+
+  rowSelection(rowId: number): string | readonly string[] {
+    const selected = (this.rowAssigneeSelections().get(rowId) ?? []).map(String);
+    return this.rowAssigneeLimit() === 1 ? (selected[0] ?? '') : selected;
+  }
+
+  setRowSelection(rowId: number, value: string | readonly string[]): void {
+    const ids = (Array.isArray(value) ? value : value ? [value] : []).map(Number).filter((id) => id > 0);
+    this.rowAssigneeSelections.update((current) => new Map(current).set(rowId, ids));
   }
 
   confirmApprove(): void {
@@ -777,14 +946,60 @@ export class ProposalDepartmentViewComponent {
     this.approve();
   }
 
+  // For a department that requires naming who does the work, approving IS assigning: the first
+  // row assignment on a task flips it to 'approved' server-side (see tasks.py's assign_to_row),
+  // so there is no separate "approve, then also assign" round trip any more.
   approve(): void {
     const proposal = this.proposal();
     const department = this.departments()[0];
     if (!proposal || !department) return;
+    if (this.assignmentRequired()) {
+      const taskId = this.approveTaskId();
+      if (!taskId) return;
+      const initial = this.initialRowAssignees();
+      const selections = this.rowAssigneeSelections();
+      // Only the NEWLY added assignees per row need a call — anyone already assigned (loaded from
+      // the server when the modal opened) is left untouched, so reopening this modal and hitting
+      // Confirm again never re-sends or duplicates an assignment that already exists.
+      const calls: Observable<void>[] = [];
+      for (const [rowId, staffIds] of selections) {
+        const already = initial.get(rowId) ?? new Set<number>();
+        for (const staffId of staffIds) {
+          if (!already.has(staffId)) calls.push(this.rowAssignments.assignToRow(taskId, department, rowId, staffId));
+        }
+      }
+      if (!calls.length) { this.toast.info('Nothing to assign', 'No new team members were selected.'); return; }
+      this.assigning.set(true);
+      forkJoin(calls).pipe(finalize(() => this.assigning.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: () => { this.toast.success('Work assigned', 'Assigned team members will see it in their Inbox.'); this.actionComplete.emit(proposal.id); },
+        error: (err) => this.toast.error('Could not assign this work', apiErrorMessage(err, 'Please try again.')),
+      });
+      return;
+    }
+    // F&B: every staged order (see confirmCreateOrder above) becomes a real
+    // request_fmb_selection row now, in one batch — this is the single moment they become
+    // visible to the owning Cafeteria Managers, matching every other department's "one action,
+    // one send" shape. Falls through to the same confirmDepartment() call below once they're all
+    // created (or immediately, if nothing was staged).
+    if (this.isFmbCreateOrderView() && this.stagedOrders().length) {
+      this.sendingStagedOrders.set(true);
+      const staged = this.stagedOrders();
+      forkJoin(staged.map((order) => this.workflow.createFmbSelection(proposal.id, order))).pipe(
+        finalize(() => this.sendingStagedOrders.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      ).subscribe({
+        next: () => { this.stagedOrders.set([]); this.confirmDepartmentTask(proposal.id, department); },
+        error: (err) => this.toast.error('Could not send your orders', apiErrorMessage(err, 'Please try again.')),
+      });
+      return;
+    }
+    this.confirmDepartmentTask(proposal.id, department);
+  }
+
+  private confirmDepartmentTask(proposalId: number, department: DepartmentRequestKind): void {
     this.confirming.set(true);
-    const confirmedByEmail = this.auth.user()?.email ?? '';
-    this.workflow.confirmDepartment(proposal.id, department).pipe(finalize(() => this.confirming.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.toast.success('Fulfilment confirmed', 'Assign a team member to complete the work.'); this.actionComplete.emit(proposal.id); },
+    this.workflow.confirmDepartment(proposalId, department).pipe(finalize(() => this.confirming.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.toast.success('Fulfilment confirmed', 'Your department is done with this request.'); this.actionComplete.emit(proposalId); },
       error: (err) => this.toast.error('Could not confirm fulfilment', apiErrorMessage(err, 'Please try again.')),
     });
   }
@@ -829,7 +1044,18 @@ export class ProposalDepartmentViewComponent {
     if (!proposal) return;
     this.selectionActionPending.set(selection.id);
     this.workflow.approveFmbSelection(proposal.id, selection.id).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.toast.success('Order approved', 'It is now in your Cafeteria Staff shared inbox.'); this.actionComplete.emit(proposal.id); },
+      next: (record) => {
+        this.toast.success('Order approved', 'It is now in your Cafeteria Staff shared inbox.');
+        // Same exception as resubmitSelection below: approving disposes of only ONE order — stay
+        // put while this cafeteria still has other pending selections on the proposal, only
+        // bouncing to Ongoing once this was the last one.
+        const cafeteriaCode = this.auth.user()?.cafeteriaCode;
+        const stillPending = (record.fmbSelections ?? []).some(
+          (order) => order.cafeteriaCode === cafeteriaCode && order.status === 'pending',
+        );
+        if (stillPending) this.proposalRefreshed.emit(record);
+        else this.actionComplete.emit(proposal.id);
+      },
       error: (err) => this.toast.error('Could not approve this order', apiErrorMessage(err, 'Please try again.')),
     });
   }
@@ -864,17 +1090,34 @@ export class ProposalDepartmentViewComponent {
     if (!proposal) return;
     this.selectionActionPending.set(selection.id);
     this.workflow.sendBackFmbSelection(proposal.id, selection.id, comment).pipe(finalize(() => this.selectionActionPending.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.toast.info('Sent back to F&B', 'Only this order is affected — the rest continue as normal.'); this.selectionComment.set(''); this.actionComplete.emit(proposal.id); },
+      next: (record) => {
+        this.toast.info('Sent back to F&B', 'Only this order is affected — the rest continue as normal.');
+        this.selectionComment.set('');
+        // Same exception as approveSelection above: this only disposes of ONE order — if this
+        // cafeteria still has other pending selections on the same proposal, stay put so the
+        // manager can work through the rest instead of being bounced back to Ongoing after each
+        // one. Read the reloaded record sendBackFmbSelection() resolves with (this.proposal() is
+        // still the pre-action snapshot at this point), not myCafeteriaSelections(), which is
+        // derived off it.
+        const cafeteriaCode = this.auth.user()?.cafeteriaCode;
+        const stillPending = (record.fmbSelections ?? []).some(
+          (order) => order.cafeteriaCode === cafeteriaCode && order.status === 'pending',
+        );
+        if (stillPending) this.proposalRefreshed.emit(record);
+        else this.actionComplete.emit(proposal.id);
+      },
       error: (err) => this.toast.error('Could not send this order back', apiErrorMessage(err, 'Please try again.')),
     });
   }
 
   // ---------------------------------------------------------------------------
-  // F&B: create a cafeteria order (request_fmb_selection row) fulfilling a raw food/water
-  // request row. One row = one order; F&B repeats this per cafeteria/dish until the request's
-  // pax/quantity is covered — see createFmbSelection() in workflow.service.js.
+  // F&B: stage a cafeteria order fulfilling a raw food/water request row. One row = one order;
+  // F&B repeats this per cafeteria/dish until the request's pax/quantity is covered. Nothing is
+  // sent to the server here — see stagedOrders above and approve() below, which is the one moment
+  // every staged order actually becomes a request_fmb_selection row (createFmbSelection()).
   // ---------------------------------------------------------------------------
   openCreateOrderModal(row: EditableRow): void {
+    this.editingStagedOrderId.set(null);
     this.createOrderTarget.set(row);
     this.createOrderCafeteria.set('');
     this.createOrderMenuItems.set([]);
@@ -884,8 +1127,31 @@ export class ProposalDepartmentViewComponent {
     this.createOrderError.set('');
   }
 
+  // Re-opens the same modal against an order that was staged but not yet sent — the fields are
+  // already known locally (no server round trip needed to preselect them, unlike
+  // openEditOrderModal's already-sent orders).
+  editStagedOrder(order: StagedFmbOrder): void {
+    this.closeOrdersPopover();
+    this.editingStagedOrderId.set(order.id);
+    this.createOrderTarget.set(this.requestRows().find((row) => Number(row['id']) === order.requestFmbId) ?? { id: order.requestFmbId });
+    this.createOrderQuantity.set(order.quantity);
+    this.createOrderNotes.set(order.notes ?? '');
+    this.createOrderError.set('');
+    this.createOrderMenuItemId.set('');
+    this.selectCreateOrderCafeteria(order.cafeteriaCode);
+    this.options.watchByCafeteria(order.cafeteriaCode).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {
+      if (this.editingStagedOrderId() === order.id && !this.createOrderMenuItemId()) {
+        this.createOrderMenuItemId.set(order.fmbOptionId);
+      }
+    });
+  }
+
+  removeStagedOrder(orderId: number): void {
+    this.stagedOrders.update((current) => current.filter((order) => order.id !== orderId));
+  }
+
   closeCreateOrderModal(): void {
-    if (!this.creatingOrder()) this.createOrderTarget.set(null);
+    if (!this.creatingOrder()) { this.createOrderTarget.set(null); this.editingStagedOrderId.set(null); }
   }
 
   selectCreateOrderCafeteria(value: string | readonly string[]): void {
@@ -912,56 +1178,26 @@ export class ProposalDepartmentViewComponent {
   }
 
   confirmCreateOrder(): void {
-    const proposal = this.proposal();
     const row = this.createOrderTarget();
     const menuItem = this.createOrderMenuItems().find((item) => item.id === this.createOrderMenuItemId());
-    if (!proposal || !row || !menuItem || !this.createOrderValid()) return;
-    this.creatingOrder.set(true);
-    this.createOrderError.set('');
-    this.workflow.createFmbSelection(proposal.id, {
+    if (!row || !menuItem || !this.createOrderValid()) return;
+    const draft: StagedFmbOrder = {
+      id: this.editingStagedOrderId() ?? this.nextStagedOrderId--,
       requestFmbId: Number(row['id']),
       cafeteriaCode: this.createOrderCafeteria(),
+      cafeteriaName: this.cafeteriaSelectOptions().find((c) => c.value === this.createOrderCafeteria())?.label ?? this.createOrderCafeteria(),
       fmbOptionId: menuItem.id,
       menuItemLabel: menuItem.label,
       quantity: Number(this.createOrderQuantity()),
       notes: this.createOrderNotes().trim() || undefined,
-    }).pipe(finalize(() => this.creatingOrder.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.createOrderTarget.set(null); this.toast.success('Order created', 'It is now awaiting that cafeteria manager\u2019s approval.'); this.actionComplete.emit(proposal.id); },
-      error: (err) => { this.createOrderError.set(apiErrorMessage(err, 'Could not create this order. Please try again.')); this.toast.error('Could not create this order', apiErrorMessage(err, 'Please try again.')); },
-    });
+    };
+    const editingId = this.editingStagedOrderId();
+    this.stagedOrders.update((current) => editingId === null ? [...current, draft] : current.map((order) => order.id === editingId ? draft : order));
+    this.createOrderTarget.set(null);
+    this.editingStagedOrderId.set(null);
+    this.toast.info('Order staged', 'It will be sent once you Approve.');
   }
 
-  confirmAssign(): void {
-    this.assignConfirm.set(false);
-    this.assignRequests();
-  }
-
-  assignRequests(): void {
-    const proposal = this.proposal();
-    const assignedToEmail = this.assigneeEmail();
-    const unitCode = this.staffUnitCode();
-    const assignedByEmail = this.auth.user()?.email ?? '';
-    const departments = this.departments();
-    if (!proposal || !assignedToEmail || !unitCode) return;
-    const requests = proposal.requests.filter((request) => departments.includes(request.department));
-    if (!requests.length) return;
-    this.assigning.set(true);
-    // One request_task covers the whole department, so a single assign call is enough — issuing
-    // one per requested row used to make the backend reject every call after the first as a
-    // duplicate assignment.
-    const first = requests[0];
-    this.tasks.assign({
-      role: unitCode, assignedToEmail, assignedByEmail, eventCode: proposal.proposalId, eventTitle: proposal.eventTitle,
-      request: first.item, quantity: first.quantity, schedule: first.schedule, location: first.location,
-      detailLabel: 'Department notes', detail: first.notes,
-    }).pipe(finalize(() => this.assigning.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        this.toast.success('Work assigned', `${this.assigneeName()} will see it in their Inbox.`);
-        this.assigneeEmail.set('');
-      },
-      error: (err) => this.toast.error('Could not assign this work', apiErrorMessage(err, 'Please try again.')),
-    });
-  }
 
   // ---------------------------------------------------------------------------
   // F&B: edit or cancel an order a Cafeteria Manager pushed back. Saving IS the re-send.
@@ -999,7 +1235,11 @@ export class ProposalDepartmentViewComponent {
       quantity: Number(this.createOrderQuantity()),
       notes: this.createOrderNotes().trim(),
     }).pipe(finalize(() => this.creatingOrder.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.editOrderTarget.set(null); this.toast.success('Order re-sent', 'It is back with the cafeteria manager for approval.'); this.actionComplete.emit(proposal.id); },
+      next: (record) => {
+        this.editOrderTarget.set(null);
+        this.toast.success('Order re-sent', 'It is back with the cafeteria manager for approval.');
+        this.afterResubmittedOrderHandled(proposal.id, record);
+      },
       error: (err) => { this.createOrderError.set(apiErrorMessage(err, 'Could not save this order.')); this.toast.error('Could not re-send this order', apiErrorMessage(err, 'Please try again.')); },
     });
   }
@@ -1015,8 +1255,22 @@ export class ProposalDepartmentViewComponent {
     this.creatingOrder.set(true);
     this.workflow.editFmbSelection(proposal.id, selection.id, { cancel: true })
       .pipe(finalize(() => this.creatingOrder.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-        next: () => { this.cancelOrderTarget.set(null); this.toast.warning('Order cancelled', 'Create a new order if this part of the request still needs covering.'); this.actionComplete.emit(proposal.id); },
+        next: (record) => {
+          this.cancelOrderTarget.set(null);
+          this.toast.warning('Order cancelled', 'Create a new order if this part of the request still needs covering.');
+          this.afterResubmittedOrderHandled(proposal.id, record);
+        },
         error: (err) => { this.cancelOrderTarget.set(null); this.toast.error('Could not cancel this order', apiErrorMessage(err, 'Please try again.')); },
       });
+  }
+
+  // Same exception as the Cafeteria Manager's approveSelection/resubmitSelection: re-sending or
+  // cancelling disposes of only ONE order a manager sent back — if others are still awaiting F&B
+  // here (resubmittedSelections, unlike the manager's queue, isn't scoped to a single cafeteria),
+  // stay put so F&B can work through the rest instead of being bounced to Ongoing after each one.
+  private afterResubmittedOrderHandled(proposalId: number, record: ProposalReviewRecord): void {
+    const stillResubmitted = (record.fmbSelections ?? []).some((order) => order.status === 'resubmitted');
+    if (stillResubmitted) this.proposalRefreshed.emit(record);
+    else this.actionComplete.emit(proposalId);
   }
 }

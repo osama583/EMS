@@ -67,7 +67,13 @@ export function userIsApplicantForProposal(user: AuthUser | null, proposal: Prop
   const applicantName = proposal.applicant.trim().toLowerCase();
   if (userEmail && applicantEmail && userEmail === applicantEmail) return true;
   if (userName && applicantName && userName === applicantName) return true;
-  return proposal.coOwners.some((coOwner) => {
+  // List rows (Inbox/Ongoing/History) are projected without children — see
+  // proposals.py's list_proposals()/include_children=False — so coOwners is absent
+  // there; only the full detail fetch (GET /proposals/:id) populates it. A list row
+  // still needs a same-user/same-name applicant check to work (hub-proposals.ts's
+  // openProposal() calls this before it has the full record), so an undefined
+  // coOwners here means "this row has no co-owner data available," not zero co-owners.
+  return (proposal.coOwners ?? []).some((coOwner) => {
     const coOwnerEmail = String(coOwner['email'] ?? '').trim().toLowerCase();
     const coOwnerName = String(coOwner['name'] ?? '').trim().toLowerCase();
     return (userEmail && coOwnerEmail && userEmail === coOwnerEmail) || (userName && coOwnerName && userName === coOwnerName);
@@ -79,6 +85,17 @@ export function userIsApplicantForProposal(user: AuthUser | null, proposal: Prop
 // parallel — so this cannot be read off `workflow.stage`; it lives on the per-task status.
 export function departmentAwaitingApplicant(proposal: ProposalReviewRecord): boolean {
   return proposal.workflow.departmentConfirmations.some((entry) => entry.status === 'resubmitted');
+}
+
+// Which department(s), if any, are currently waiting on the applicant to fix and resend their own
+// request — used to route the applicant to the scoped department-resubmit page (see
+// hub-proposals.ts's openProposal()) instead of the whole-proposal form when exactly one
+// department sent its task back, since fixing one department's request should never require
+// touching (or risk overwriting) content the rest of the proposal already had approved.
+export function departmentsAwaitingApplicant(proposal: ProposalReviewRecord): readonly DepartmentRequestKind[] {
+  return proposal.workflow.departmentConfirmations
+    .filter((entry) => entry.status === 'resubmitted')
+    .map((entry) => entry.department as DepartmentRequestKind);
 }
 
 // Everything the applicant currently has to answer: a reviewer stage that sent the whole

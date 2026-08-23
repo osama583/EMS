@@ -51,7 +51,7 @@ def _slug(value: str) -> str:
 # a roleLabel built from the user's first assignment. Aliased in SQL so the
 # projection is the contract rather than something reshaped in Python.
 _USER_SELECT = """
-    SELECT u.user_id AS id, u.full_name AS "displayName", u.username, u.email,
+    SELECT u.user_id AS id, u.full_name AS "displayName", u.email,
            u.is_active AS active, u.archived_at,
            COALESCE(s.department_or_school, st.school, 'APU Community') AS department
       FROM users u
@@ -151,20 +151,16 @@ def list_deleted_users():
     return jsonify(_with_roles(rows))
 
 
-def _assert_email_and_username_free(cur, email: str, username: str, user_id: int | None) -> None:
+def _assert_email_free(cur, email: str, user_id: int | None) -> None:
+    """Email is the account's only identifier, so it is the only uniqueness rule."""
     clash = fetch_one(
         cur,
-        "SELECT lower(email) = lower(%s) AS email_taken FROM users "
-        "WHERE (lower(email) = lower(%s) OR lower(username) = lower(%s)) "
+        "SELECT 1 FROM users WHERE lower(email) = lower(%s) "
         "  AND (%s::int IS NULL OR user_id <> %s)",
-        (email, email, username, user_id, user_id),
+        (email, user_id, user_id),
     )
     if clash:
-        raise Conflict(
-            "That email is already in use."
-            if clash["email_taken"]
-            else "That username is already in use."
-        )
+        raise Conflict("That email is already in use.")
 
 
 @bp.post("/users")
@@ -172,25 +168,23 @@ def _assert_email_and_username_free(cur, email: str, username: str, user_id: int
 def create_user():
     """Create an account.
 
-    The directory form collects an identity, not a credential. When no password
-    is supplied the account gets a random one nobody holds: users.password is
-    NOT NULL, and a hash of an unknown secret is the honest way to say "this
-    account cannot be signed into yet" - better than an admin inventing a
-    password on someone else's behalf. Signing in then requires a reset.
+    The form may set an opening password. When none is supplied the account
+    gets a random one nobody holds: users.password is NOT NULL, and a hash of
+    an unknown secret is the honest way to say "this account cannot be signed
+    into yet" - better than an admin inventing a password on someone else's
+    behalf. Signing in then requires a reset.
     """
     payload = body()
     (display_name, email) = required(payload, "displayName", "email")
-    username = str(payload.get("username") or str(email).split("@")[0]).strip()
     password = payload.get("password") or secrets.token_urlsafe(32)
 
     with transaction() as cur:
-        _assert_email_and_username_free(cur, str(email), username, None)
+        _assert_email_free(cur, str(email), None)
         cur.execute(
-            """INSERT INTO users (full_name, username, email, password, is_active)
-               VALUES (%s, %s, %s, %s, %s) RETURNING user_id""",
+            """INSERT INTO users (full_name, email, password, is_active)
+               VALUES (%s, %s, %s, %s) RETURNING user_id""",
             (
                 str(display_name).strip(),
-                username,
                 str(email).strip().lower(),
                 hash_password(str(password)),
                 bool(payload.get("active", True)),
@@ -213,8 +207,6 @@ def _apply_user_update(user_id: int, payload: dict) -> dict:
         fields["full_name"] = str(payload["displayName"]).strip()
     if "fullName" in payload:
         fields["full_name"] = str(payload["fullName"]).strip()
-    if "username" in payload:
-        fields["username"] = str(payload["username"]).strip()
     if "email" in payload:
         fields["email"] = str(payload["email"]).strip().lower()
     if "active" in payload:
@@ -226,14 +218,10 @@ def _apply_user_update(user_id: int, payload: dict) -> dict:
         raise BadRequest("No updatable fields were supplied.")
 
     with transaction() as cur:
-        current = _user_row(cur, user_id)
-        if "email" in fields or "username" in fields:
-            _assert_email_and_username_free(
-                cur,
-                str(fields.get("email", current["email"])),
-                str(fields.get("username", current["username"])),
-                user_id,
-            )
+        # Raises NotFound for a missing or archived account before anything is written.
+        _user_row(cur, user_id)
+        if "email" in fields:
+            _assert_email_free(cur, str(fields["email"]), user_id)
         assignments = ", ".join(f"{c} = %s" for c in fields)
         cur.execute(
             f"UPDATE users SET {assignments} WHERE user_id = %s RETURNING user_id",

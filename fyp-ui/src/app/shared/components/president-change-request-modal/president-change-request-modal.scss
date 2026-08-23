@@ -1,0 +1,12 @@
+.president-change-request { display: grid; gap: var(--space-4); }
+
+.president-change-request__intro { margin: 0; color: var(--apu-text-muted); font-size: .88rem; line-height: 1.55; }
+
+.president-change-request__error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--apu-red-50, #fef2f2);
+  color: var(--apu-red-700, #b91c1c);
+  font-size: .88rem;
+}

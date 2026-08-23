@@ -11,42 +11,33 @@
 </section>
 
 <app-form-modal
-  [open]="modalOpen()" [title]="isEditing() ? 'Request staff edit' : 'Request new staff'"
-  primaryLabel="Send Request" [loading]="submitting()" [disabled]="!formValid()"
-  (close)="closeModal()" (cancel)="closeModal()" (submit)="submitAdd()"
+  [open]="modalOpen()" [title]="isEditing() ? 'Edit Staff' : 'Add Staff'"
+  [primaryLabel]="isEditing() ? 'Save Changes' : 'Add Staff'" [loading]="saving()" [disabled]="!formValid()"
+  (close)="closeModal()" (cancel)="closeModal()" (submit)="save()"
 >
   <div class="cafeteria-my-staff__form">
     <app-form-field controlId="my-staff-name" label="Full Name" [required]="true" [value]="value('displayName')" (valueChange)="setDraft('displayName', $event)" />
-    <app-form-field controlId="my-staff-username" label="Username" [value]="value('username')" hint="Leave blank to use the part of the email before the @." (valueChange)="setDraft('username', $event)" />
     <app-form-field controlId="my-staff-email" label="Email" type="email" [required]="true" [value]="value('email')" (valueChange)="setDraft('email', $event)" />
     <app-form-field controlId="my-staff-password" label="Password" type="password" [value]="value('password')" [hint]="passwordHint()" (valueChange)="setDraft('password', $event)" />
     <app-status-toggle [active]="$any(draft()['active'])" label="Active user" description="Inactive users remain listed but cannot sign in." (activeChange)="setDraft('active', $event)" />
-    <p class="cafeteria-my-staff__hint">
-      {{ isEditing()
-        ? 'These changes are sent to Cafeteria Admin. Nothing changes until they approve.'
-        : 'The account is created at your cafeteria only once Cafeteria Admin approves this request.' }}
-    </p>
   </div>
 </app-form-modal>
 
 <app-form-modal
-  [open]="!!statusTarget()" [title]="'Request staff ' + statusActionLabel()"
-  primaryLabel="Send Request" [loading]="changingStatus()"
+  [open]="!!statusTarget()" [title]="(statusActionLabel() === 'restore' ? 'Restore' : 'Suspend') + ' staff'"
+  [primaryLabel]="statusActionLabel() === 'restore' ? 'Restore' : 'Suspend'" [loading]="changingStatus()"
   (close)="cancelStatus()" (cancel)="cancelStatus()" (submit)="confirmStatus()"
 >
   <div class="cafeteria-my-staff__form">
-    <p>
-      A request to {{ statusActionLabel() }} <strong>{{ statusTarget()?.displayName }}</strong>
-      will be sent to Cafeteria Admin for approval.
-    </p>
+    <p>{{ statusActionLabel() === 'restore' ? 'Restore' : 'Suspend' }} <strong>{{ statusTarget()?.displayName }}</strong>?</p>
     <p class="cafeteria-my-staff__hint">
       Suspending keeps the person on your roster but stops their cafeteria access until they are restored. It does not delete anything.
     </p>
   </div>
 </app-form-modal>
 
-<app-form-modal [open]="!!removeTarget()" title="Request staff removal" primaryLabel="Send Request" [danger]="true" [loading]="removing()" (close)="cancelRemove()" (cancel)="cancelRemove()" (submit)="confirmRemove()">
+<app-form-modal [open]="!!removeTarget()" title="Remove Staff" primaryLabel="Remove" [danger]="true" [loading]="removing()" (close)="cancelRemove()" (cancel)="cancelRemove()" (submit)="confirmRemove()">
   <div class="cafeteria-my-staff__form">
-    <p>A request to remove <strong>{{ removeTarget()?.displayName }}</strong> from your cafeteria will be sent to Cafeteria Admin for approval.</p>
+    <p>Remove <strong>{{ removeTarget()?.displayName }}</strong> from your cafeteria?</p>
   </div>
 </app-form-modal>

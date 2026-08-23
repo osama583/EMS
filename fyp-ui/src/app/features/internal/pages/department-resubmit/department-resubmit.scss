@@ -1,0 +1,133 @@
+:host { display: block; }
+
+// Two-column grid (main + a fixed-width comments panel), matching proposal-reviewer-view.scss's
+// .prv-layout — replaces the earlier push-flex layout built for app-reviewer-comments-drawer's
+// sliding 'drawer' variant. This page now always renders the comments panel inline via the
+// 'panel' variant (see department-resubmit.html), so there is no open/closed state to size
+// around: the grid's second column simply IS the panel's width, always.
+.department-resubmit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  align-items: start;
+  gap: 1.25rem;
+  padding-bottom: var(--space-7);
+}
+.department-resubmit__main {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-4);
+}
+@media (max-width: 64rem) {
+  .department-resubmit { grid-template-columns: 1fr; }
+}
+
+// Sits ABOVE the .department-resubmit grid, not inside .department-resubmit__main, specifically
+// so the grid's two columns (main content, comments panel) start at the same vertical position —
+// keeping Back/EVT-code inside the left column pushed the panel's own top edge above the table's,
+// producing a visible misalignment between .comments-panel's top border and the table's.
+.department-resubmit__topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--apu-border);
+}
+
+.department-resubmit__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.4rem;
+  padding: 0 1rem 0 0.7rem;
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-pill);
+  background: var(--apu-surface);
+  color: var(--apu-navy-900);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--internal-transition), border-color var(--internal-transition);
+}
+
+.department-resubmit__back:hover,
+.department-resubmit__back:focus-visible {
+  outline: none;
+  background: rgb(42 131 255 / 5%);
+  border-color: rgb(42 131 255 / 28%);
+}
+
+.department-resubmit__state {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding: var(--space-7) var(--space-4);
+  text-align: center;
+  color: var(--apu-text-muted);
+}
+
+.department-resubmit__state span[aria-hidden] { font-size: 2.5rem; color: var(--apu-blue-400, var(--apu-blue-600)); }
+.department-resubmit__state h2 { margin: 0; color: var(--apu-navy-900); font-size: 1.1rem; }
+.department-resubmit__state p { margin: 0; font-size: 0.9rem; }
+
+.department-resubmit__proposal-id {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, var(--apu-blue-600) 0%, var(--apu-blue-700) 100%);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+// Its own card (border/radius/background/shadow), matching .comments-panel's box exactly — both
+// are now siblings inside the same grid row (align-items: start), so giving them identical outer
+// boxes is what actually makes their top borders land on the same line, not just similar-looking
+// spacing above each one.
+.department-resubmit__table {
+  display: grid;
+  gap: var(--space-3);
+  padding: 1.2rem 1.25rem;
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-card);
+  background: var(--apu-surface);
+  box-shadow: var(--internal-card-shadow);
+}
+.department-resubmit__table-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding-bottom: .85rem;
+  border-bottom: 1px solid var(--apu-border);
+}
+// The row/table component brings its own border+radius+background (proposal-table.scss's
+// .proposal-table) — now nested inside this card's own identical border, that reads as a
+// redundant double frame, so strip the inner one and let it sit flush inside the card instead.
+.department-resubmit__table app-proposal-table .proposal-table {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.department-resubmit__table-header h2 { margin: 0; color: var(--apu-blue-600); font-size: 1.1rem; font-weight: 700; }
+.department-resubmit__table-header p { margin: 0.25rem 0 0; color: var(--apu-text-muted); font-size: 0.85rem; }
+
+.department-resubmit__actions { display: flex; justify-content: flex-end; }
+.department-resubmit__spin { animation: department-resubmit-spin 0.9s linear infinite; }
+@keyframes department-resubmit-spin { to { transform: rotate(360deg); } }
+
+.department-resubmit-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4) var(--space-3);
+}
+.department-resubmit-form__field { display: grid; align-content: start; gap: 0.4rem; min-width: 0; }
+.department-resubmit-form__field--full { grid-column: 1 / -1; }
+@media (max-width: 640px) {
+  .department-resubmit-form { grid-template-columns: 1fr; }
+  .department-resubmit-form__field { grid-column: 1 / -1; }
+}

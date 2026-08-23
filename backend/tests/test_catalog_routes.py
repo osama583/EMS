@@ -59,8 +59,12 @@ def test_the_pre_migration_paths_still_resolve(rules):
 
 
 @pytest.mark.parametrize("resource", ["categories", "formats"])
-def test_reads_require_a_token(client, resource):
-    assert client.get(f"{PREFIX}/{resource}").status_code == 401
+def test_reads_are_public(client, resource):
+    """Category/format names are reference vocabulary, not private data - the
+    Explore Events filters need them before a guest has signed in, same as
+    the published events they filter (GET /events uses authenticate_optional
+    for the same reason)."""
+    assert client.get(f"{PREFIX}/{resource}").status_code == 200
 
 
 @pytest.mark.parametrize(

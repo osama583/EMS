@@ -1,0 +1,7 @@
+:host { display: block; min-width: 0; }
+.club-category-management { width: min(100%, 82rem); min-width: 0; margin: 0 auto; }
+
+.club-category-management__form {
+  display: grid;
+  gap: var(--space-4);
+}

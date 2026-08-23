@@ -1,0 +1,50 @@
+:host { display: contents; }
+
+.club-roster__loading {
+  display: grid; gap: var(--space-2);
+}
+.club-roster__loading span {
+  height: 3rem; border-radius: var(--radius-control); background: var(--apu-surface-muted);
+  animation: club-roster-pulse 1.4s ease-in-out infinite;
+}
+@keyframes club-roster-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+
+.club-roster__error,
+.club-roster__empty { margin: 0; color: var(--apu-text-muted); }
+
+.club-roster__list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+
+.club-roster__item {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-3); border: 1px solid var(--apu-border); border-radius: var(--radius-control);
+}
+
+.club-roster__identity { display: grid; gap: .15rem; min-width: 0; }
+.club-roster__identity strong { color: var(--apu-navy-950); font-size: .95rem; }
+.club-roster__identity span { color: var(--apu-text-muted); font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.club-roster__meta { display: grid; justify-items: end; gap: .3rem; flex-shrink: 0; }
+
+.club-roster__role {
+  display: inline-flex; align-items: center; padding: .15rem .6rem; border-radius: var(--radius-pill);
+  font-size: .75rem; font-weight: 700;
+  background: var(--apu-surface-muted); color: var(--apu-text-muted);
+}
+.club-roster__role[data-role='President'] { background: var(--apu-blue-50, #eaf2ff); color: var(--apu-blue-700); }
+
+.club-roster__joined { color: var(--apu-text-muted); font-size: .78rem; }
+
+.club-roster__action {
+  display: inline-flex; align-items: center; gap: .3rem; flex-shrink: 0;
+  padding: .4rem .7rem; border: 1px solid var(--apu-border); border-radius: var(--radius-control);
+  background: var(--apu-surface); color: var(--apu-red-600, #c0392b); font-size: .82rem; font-weight: 600;
+  cursor: pointer; transition: background-color .15s var(--ease-standard), border-color .15s var(--ease-standard);
+}
+.club-roster__action:hover { background: var(--apu-red-50, #fdecea); border-color: var(--apu-red-600, #c0392b); }
+.club-roster__action .material-symbols-rounded { font-size: 1.05rem; }
+
+@media (max-width: 47.99rem) {
+  .club-roster__item { flex-direction: column; align-items: flex-start; }
+  .club-roster__meta { justify-items: start; }
+  .club-roster__action { align-self: flex-end; }
+}

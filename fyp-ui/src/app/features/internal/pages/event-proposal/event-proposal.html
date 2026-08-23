@@ -1,10 +1,4 @@
 <section class="proposal-page" [class.proposal-page--drawer-open]="reviewerComments().length && commentsPanelOpen()">
-  @if (reviewerComments().length && !commentsPanelOpen()) {
-    <button type="button" class="comments-ribbon" [attr.aria-expanded]="commentsPanelOpen()" aria-controls="reviewer-comments-drawer" (click)="toggleCommentsPanel()">
-      Reviewer comment{{ reviewerComments().length === 1 ? '' : 's' }}
-    </button>
-  }
-
   <div class="proposal-page__main">
     <header class="proposal-page__header">
       <div class="proposal-title-banner">Event Proposal</div>
@@ -73,15 +67,11 @@
         <header><span class="material-symbols-rounded">checklist</span><div><h2 id="requirements-step-title">Required for Event</h2></div></header>
         <section id="requirements-selection" class="proposal-card proposal-card--requirements shared-validation-container" [class.is-invalid]="!!error('requirements')" [attr.aria-invalid]="error('requirements') ? 'true' : null" (focusout)="leaveRequirements($event)">
           <div class="proposal-card__title"><h3>Select event requirements</h3><p>Only selected services will appear in Request Details.</p></div>
-          @if (requestCatalogLoading()) {
-            <app-loading-state variant="bars" label="Loading requirements…" [count]="4" />
-          } @else {
-            <div class="requirement-grid">
-              @for (requirement of requirements; track requirement.key) {
-                <label [class.requirement-option--selected]="selectedRequirements().includes(requirement.key)"><input type="checkbox" [checked]="selectedRequirements().includes(requirement.key)" (change)="toggleRequirement(requirement.key, $any($event.target).checked)" /><span class="material-symbols-rounded">{{ selectedRequirements().includes(requirement.key) ? 'check_circle' : 'circle' }}</span><strong>{{ requirement.label }}</strong></label>
-              }
-            </div>
-          }
+          <div class="requirement-grid">
+            @for (requirement of requirements; track requirement.key) {
+              <label [class.requirement-option--selected]="selectedRequirements().includes(requirement.key)"><input type="checkbox" [checked]="selectedRequirements().includes(requirement.key)" (change)="toggleRequirement(requirement.key, $any($event.target).checked)" /><span class="material-symbols-rounded">{{ selectedRequirements().includes(requirement.key) ? 'check_circle' : 'circle' }}</span><strong>{{ requirement.label }}</strong></label>
+            }
+          </div>
           @if (error('requirements')) { <app-validation-message controlId="requirements-selection" [message]="error('requirements')" /> }
         </section>
       </section>
@@ -92,6 +82,8 @@
         <header><span class="material-symbols-rounded">request_page</span><div><h2 id="requests-step-title">Request Details</h2></div></header>
         @if (!selectedDefinitions().length) {
           <section class="proposal-empty"><span class="material-symbols-rounded">playlist_remove</span><h3>No requirements selected yet</h3><p>Return to Required for Event and select the services your event needs.</p><button type="button" class="table-control" (click)="goToStep(2)">Choose requirements</button></section>
+        } @else if (requestCatalogLoading()) {
+          <app-loading-state variant="bars" label="Loading request options…" [count]="4" />
         } @else {
           @for (definition of selectedDefinitions(); track definition.key) {
             <section class="proposal-request-table">
@@ -102,7 +94,7 @@
               @if (definition.key === 'logistics') {
                 <app-proposal-table [tableId]="'request-' + definition.key" [columns]="proposalColumns(definition.columns)" [rows]="logisticsRowsWithImages()" imageKey="item" [emptyMessage]="'No ' + definition.label + ' requests have been added yet.'" (edit)="editRequestRow(definition, $event)" (deleteRow)="removeRequestRow(definition.key, $event)" />
               } @else {
-                <app-proposal-table [tableId]="'request-' + definition.key" [columns]="proposalColumns(definition.columns)" [rows]="requestRows()[definition.key]" [emptyMessage]="'No ' + definition.label + ' requests have been added yet.'" (edit)="editRequestRow(definition, $event)" (deleteRow)="removeRequestRow(definition.key, $event)" />
+                <app-proposal-table [tableId]="'request-' + definition.key" [columns]="proposalColumns(definition.columns)" [rows]="requestRowsForDisplay(definition)" [emptyMessage]="'No ' + definition.label + ' requests have been added yet.'" (edit)="editRequestRow(definition, $event)" (deleteRow)="removeRequestRow(definition.key, $event)" />
               }
               @if (requestError(definition.key)) { <app-validation-message [controlId]="'request-' + definition.key" [message]="requestError(definition.key)" /> }
             </section>
@@ -230,7 +222,7 @@
             }
             <app-searchable-dropdown controlId="event-visibility" label="Event Visibility" [required]="true" [searchable]="false" [options]="visibilityOptions" [value]="eventVisibility()" [error]="error('eventVisibility')" (valueChange)="setEventVisibility($event)" />
             <app-searchable-dropdown controlId="event-format" label="Event Format" [required]="true" [searchable]="false" [options]="formatOptions()" [value]="eventFormat()" (valueChange)="setEventFormat($event)" />
-            <app-searchable-dropdown controlId="registration-mode" label="Registration Approval" [required]="true" [searchable]="false" [options]="registrationModeOptions" [value]="registrationMode()" (valueChange)="setRegistrationMode($event)" />
+            <app-searchable-dropdown controlId="registration-mode" label="Registration Approval" [required]="true" [searchable]="false" [disabled]="requiresPayment()" [options]="registrationModeOptions" [value]="registrationMode()" (valueChange)="setRegistrationMode($event)" hint="{{ requiresPayment() ? 'Paid events require manual approval so the organiser can verify payments.' : '' }}" />
           </div>
         </section>
         @if (showCostFields()) {
@@ -252,7 +244,7 @@
             @if (isPublic()) { <app-form-field class="proposal-grid--full" controlId="publicity" label="Promotion / Publicity Method" type="textarea" placeholder="How will people be informed or invited?" [required]="true" [value]="publicity()" [error]="error('publicity')" (valueChange)="setPublicity($event)" /> }
           </div>
         </section>
-        @if (agendaRequired()) { <section class="proposal-request-table"><header class="proposal-request-table__header"><div><h3 id="agenda-title">Brief Agenda</h3><p>Required because {{ agendaReasons().join(', ') }}.</p></div><button id="agenda-add" type="button" class="table-control table-control--primary" [disabled]="isTableAtLimit('agenda')" (click)="openTableEditor('agenda')"><span class="material-symbols-rounded">add</span>Add row</button></header><app-proposal-table tableId="agenda" [columns]="proposalColumns(agendaColumns)" [rows]="agenda()" (edit)="editTableRow('agenda', $event)" (deleteRow)="removeRow('agenda', $event)" />@if (error('agenda')) { <app-validation-message controlId="agenda" [message]="error('agenda')" /> }</section> }
+        @if (agendaRequired()) { <section class="proposal-request-table"><header class="proposal-request-table__header"><div><h3 id="agenda-title">Brief Agenda</h3><p>Required because {{ agendaReasons().join(', ') }}.</p></div><button id="agenda-add" type="button" class="table-control table-control--primary" [disabled]="isTableAtLimit('agenda')" (click)="openTableEditor('agenda')"><span class="material-symbols-rounded">add</span>Add row</button></header><app-proposal-table tableId="agenda" [columns]="proposalColumns(agendaColumns())" [rows]="agenda()" (edit)="editTableRow('agenda', $event)" (deleteRow)="removeRow('agenda', $event)" />@if (error('agenda')) { <app-validation-message controlId="agenda" [message]="error('agenda')" /> }</section> }
         @if (discussionRequired()) { <section class="proposal-request-table"><header class="proposal-request-table__header"><div><h3 id="discussions-title">Discussion Topics</h3><p>Required for this small external or VIP/partner discussion.</p></div><button id="discussions-add" type="button" class="table-control table-control--primary" [disabled]="isTableAtLimit('discussions')" (click)="openTableEditor('discussions')"><span class="material-symbols-rounded">add</span>Add row</button></header><app-proposal-table tableId="discussions" [columns]="proposalColumns(discussionColumns)" [rows]="discussions()" (edit)="editTableRow('discussions', $event)" (deleteRow)="removeRow('discussions', $event)" />@if (error('discussions')) { <app-validation-message controlId="discussions" [message]="error('discussions')" /> }</section> }
       </section>
     }
@@ -312,36 +304,7 @@
     </form>
   </div>
 
-  @if (reviewerComments().length) {
-    <aside id="reviewer-comments-drawer" class="comments-drawer" [class.comments-drawer--open]="commentsPanelOpen()" aria-label="Reviewer comments" (click)="toggleCommentsPanel()">
-      <div class="comments-drawer__inner" (click)="$event.stopPropagation()">
-        <header class="comments-drawer__header">
-          <span class="material-symbols-rounded" aria-hidden="true">forum</span>
-          <div>
-            <h3>Reviewer Comments</h3>
-            <p class="comments-drawer__subtitle">Everything that needs your attention before you resubmit.</p>
-          </div>
-          <button type="button" class="comments-drawer__close" (click)="toggleCommentsPanel()" aria-label="Collapse reviewer comments panel">
-            <span class="material-symbols-rounded" aria-hidden="true">close</span>
-          </button>
-        </header>
-        <ul class="comments-drawer__list">
-          @for (comment of reviewerComments(); track comment.reviewer + comment.text) {
-            <li class="comments-drawer__entry">
-              <div class="comments-drawer__avatar" aria-hidden="true">{{ comment.initials }}</div>
-              <div class="comments-drawer__entry-body">
-                <div class="comments-drawer__entry-meta">
-                  <strong>{{ comment.reviewer }}</strong>
-                  <span class="comments-drawer__entry-stage">{{ comment.stage }}</span>
-                </div>
-                <p class="comments-drawer__entry-text">{{ comment.text }}</p>
-              </div>
-            </li>
-          }
-        </ul>
-      </div>
-    </aside>
-  }
+  <app-reviewer-comments-drawer [comments]="reviewerComments()" [conversations]="conversations()" [initialConversationId]="isResubmissionRequired() ? pendingRequesterConversationId() : null" [(open)]="commentsPanelOpen" />
 </section>
 
 <app-form-modal
@@ -413,6 +376,7 @@
   [primaryLabel]="resubmitProposalId() !== null ? 'Resubmit' : 'Submit Proposal'"
   secondaryLabel="Keep Editing"
   [loading]="resubmitting()"
+  [disabled]="resubmitProposalId() !== null && !replyComment().trim()"
   (close)="submitConfirmOpen.set(false)"
   (cancel)="submitConfirmOpen.set(false)"
   (submit)="confirmSubmit()"
@@ -426,5 +390,16 @@
       review workflow immediately and can no longer be edited unless a reviewer sends it back.
     }
   </p>
+  @if (resubmitProposalId() !== null) {
+    <app-form-field
+      controlId="proposal-reply-comment"
+      label="Reply to the reviewer"
+      type="textarea"
+      placeholder="Explain what you changed…"
+      [required]="true"
+      [value]="replyComment()"
+      (valueChange)="replyComment.set($event)"
+    />
+  }
 </app-form-modal>
 

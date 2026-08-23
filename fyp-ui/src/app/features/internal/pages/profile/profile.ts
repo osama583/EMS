@@ -16,7 +16,6 @@ export class ProfileComponent {
     const user = this.user();
     if (!user) return [];
     return [
-      { label: 'Username', value: user.username },
       { label: 'Email', value: user.email },
       { label: 'Role', value: user.roleLabel },
       { label: 'Department', value: user.department },

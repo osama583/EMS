@@ -1,0 +1,20 @@
+<app-form-modal
+  [open]="open()" title="Request President Change"
+  primaryLabel="Submit Request" [loading]="saving()" [disabled]="!isValid()"
+  (close)="close.emit()" (cancel)="close.emit()" (submit)="submit()"
+>
+  <div class="president-change-request">
+    <p class="president-change-request__intro">
+      As President, you cannot leave or be removed from {{ club()?.name ?? 'this club' }} directly. Choose a student to
+      take over as President — a Club Admin will review and decide on this request.
+    </p>
+    @if (errorMessage()) { <p class="president-change-request__error">{{ errorMessage() }}</p> }
+    <app-searchable-dropdown
+      controlId="president-change-request" label="New President" [required]="true"
+      placeholder="Select a student"
+      [loading]="loading()"
+      [options]="candidateOptions()" [value]="selectedId()"
+      (valueChange)="setSelectedId($event)"
+    />
+  </div>
+</app-form-modal>

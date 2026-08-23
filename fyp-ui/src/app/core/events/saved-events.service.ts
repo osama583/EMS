@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { Observable, catchError, throwError } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DestroyRef } from '@angular/core';
 import { environment } from '../../../environments/environment';
@@ -34,15 +34,30 @@ export class SavedEventsService implements SavedEventsApi {
     return this.http.get<SavedEventsResponse>(`${this.baseUrl}/saved`, { params: { email: userEmail.trim().toLowerCase() } });
   }
 
+  // Optimistic: the heart flips the instant you click it, not after the PUT/DELETE round-trips —
+  // that's what "click and it updates" means. Flip first, then fire the request; roll the signal
+  // back only if the server actually rejects it, so a slow network never reads as "did nothing".
   saveEvent(userEmail: string, eventId: string): Observable<SavedEventMutationResponse> {
-    return this.http.post<SavedEventMutationResponse>(`${this.baseUrl}/saved`, { email: userEmail.trim().toLowerCase(), eventId }).pipe(
-      tap(() => this.savedIdsState.update((ids) => new Set([...ids, eventId]))),
+    this.savedIdsState.update((ids) => new Set([...ids, eventId]));
+    this.error.set('');
+    return this.http.put<SavedEventMutationResponse>(`${this.baseUrl}/saved/${encodeURIComponent(eventId)}`, {}).pipe(
+      catchError((error) => {
+        this.savedIdsState.update((ids) => { const next = new Set(ids); next.delete(eventId); return next; });
+        this.error.set('Could not save this event.');
+        return throwError(() => error);
+      }),
     );
   }
 
   removeSavedEvent(userEmail: string, eventId: string): Observable<SavedEventMutationResponse> {
+    this.savedIdsState.update((ids) => { const next = new Set(ids); next.delete(eventId); return next; });
+    this.error.set('');
     return this.http.delete<SavedEventMutationResponse>(`${this.baseUrl}/saved/${encodeURIComponent(eventId)}`, { params: { email: userEmail.trim().toLowerCase() } }).pipe(
-      tap(() => this.savedIdsState.update((ids) => { const next = new Set(ids); next.delete(eventId); return next; })),
+      catchError((error) => {
+        this.savedIdsState.update((ids) => new Set([...ids, eventId]));
+        this.error.set('Could not remove this event.');
+        return throwError(() => error);
+      }),
     );
   }
 

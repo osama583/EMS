@@ -16,12 +16,11 @@ code. See docs/security.md.
 from __future__ import annotations
 
 import logging
-import uuid
 
 from flask import Blueprint, jsonify, request
 
 from ..config import config
-from ..db import fetch_one, query_one, transaction
+from ..db import fetch_one, query, query_one, transaction
 from ..errors import BadRequest, Conflict, NotFound, Unauthorized
 from ..extensions import limiter
 from ..logging_setup import audit
@@ -33,6 +32,7 @@ from ..security import (
     issue_refresh_token,
     needs_rehash,
     require_auth,
+    require_internal,
     verify_password,
 )
 from ..security.passwords import MAX_PASSWORD_BYTES
@@ -81,7 +81,7 @@ def login():
         raise BadRequest(f"Password must be at most {MAX_PASSWORD_BYTES} bytes.")
 
     user = query_one(
-        "SELECT user_id, full_name, username, email, password, is_active, archived_at "
+        "SELECT user_id, full_name, email, password, is_active, archived_at "
         "FROM users WHERE lower(email) = %s",
         (email,),
     )
@@ -115,7 +115,7 @@ def refresh():
 
     claims = decode_token(token, expected_type=REFRESH)
     user = query_one(
-        "SELECT user_id, full_name, username, email, is_active, archived_at FROM users WHERE user_id = %s",
+        "SELECT user_id, full_name, email, is_active, archived_at FROM users WHERE user_id = %s",
         (claims["user_id"],),
     )
     if not user or not user["is_active"] or user["archived_at"] is not None:
@@ -140,12 +140,73 @@ def logout():
 def me():
     principal = current_principal()
     user = query_one(
-        "SELECT user_id, full_name, username, email FROM users WHERE user_id = %s",
+        "SELECT user_id, full_name, email FROM users WHERE user_id = %s",
         (principal.user_id,),
     )
     if not user:
         raise Unauthorized("Your account no longer exists.")
     return jsonify(project_auth_user(user))
+
+
+# This intentionally is not the administration directory.  Proposal authors
+# need a small, read-only list of internal colleagues to nominate co-owners,
+# and department heads need it to populate assignment pickers.  Sending those
+# pages through /admin/users made every non-system-admin workflow fail with a
+# 403, while opening /admin/users would expose account-management operations.
+_INTERNAL_DIRECTORY_SQL = """
+    SELECT u.user_id AS id, u.full_name AS "displayName", u.email,
+           COALESCE(s.department_or_school, st.school, 'APU Community') AS department
+      FROM users u
+ LEFT JOIN staff s ON s.user_id = u.user_id
+ LEFT JOIN student st ON st.user_id = u.user_id
+     WHERE u.is_active AND u.archived_at IS NULL
+       AND NOT EXISTS (
+           SELECT 1 FROM user_unit_roles external_role
+            WHERE external_role.user_id = u.user_id
+              AND external_role.role_code = 'external-user'
+              AND external_role.is_active
+       )
+  ORDER BY u.full_name
+"""
+
+_INTERNAL_DIRECTORY_ROLES_SQL = """
+    SELECT uur.user_id, uur.role_code AS "roleCode", r.role_name AS "roleName",
+           uur.unit_code AS "unitCode", un.description AS "unitDescription"
+      FROM user_unit_roles uur
+      JOIN role r ON r.role_code = uur.role_code
+ LEFT JOIN unit un ON un.code = uur.unit_code
+     WHERE uur.user_id = ANY(%s)
+       AND uur.is_active AND r.is_active AND r.archived_at IS NULL
+  ORDER BY uur.user_id, uur.user_unit_role_id
+"""
+
+
+@bp.get("/internal-users")
+@require_internal
+def internal_users():
+    """Active internal people, limited to fields needed by collaboration UI.
+
+    Administration-only details (IDs, assignment IDs and all mutations)
+    remain exclusively behind ``/admin/users``.
+    """
+    users = query(_INTERNAL_DIRECTORY_SQL)
+    if not users:
+        return jsonify([])
+
+    roles_by_user: dict[int, list[dict]] = {}
+    for role in query(_INTERNAL_DIRECTORY_ROLES_SQL, ([user["id"] for user in users],)):
+        roles_by_user.setdefault(role.pop("user_id"), []).append(role)
+
+    for user in users:
+        roles = roles_by_user.get(user["id"], [])
+        user["roles"] = roles
+        user["roleLabel"] = (
+            f"{roles[0]['roleName']} — {roles[0]['unitDescription']}"
+            if roles and roles[0]["unitDescription"]
+            else roles[0]["roleName"] if roles else "Unassigned"
+        )
+        user.pop("id")
+    return jsonify(users)
 
 
 @bp.post("/register")
@@ -183,16 +244,10 @@ def register():
             # addresses already hold an account.
             raise Conflict("That email address cannot be registered.")
 
-        username = email.split("@")[0][:80]
-        # Usernames are unique; a guest whose local part collides with an
-        # existing account gets a suffixed one rather than a failed signup.
-        if fetch_one(cur, "SELECT 1 FROM users WHERE lower(username) = lower(%s)", (username,)):
-            username = (username[:70] + "-" + uuid.uuid4().hex[:8])
-
         cur.execute(
-            """INSERT INTO users (full_name, username, email, password, is_active)
-               VALUES (%s, %s, %s, %s, TRUE) RETURNING user_id, full_name, username, email""",
-            (full_name, username, email, hash_password(password)),
+            """INSERT INTO users (full_name, email, password, is_active)
+               VALUES (%s, %s, %s, TRUE) RETURNING user_id, full_name, email""",
+            (full_name, email, hash_password(password)),
         )
         user = dict(cur.fetchone())
         cur.execute(

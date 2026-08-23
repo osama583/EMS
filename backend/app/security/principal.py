@@ -27,7 +27,6 @@ HEAD_ROLE_CODES = ("head-of-school", "head-of-department")
 class Principal:
     user_id: int
     full_name: str
-    username: str
     email: str
     is_active: bool
     # (role_code, unit_code | None) pairs, exactly as stored.
@@ -70,7 +69,7 @@ class Principal:
 
 
 _USER_SQL = """
-    SELECT user_id, full_name, username, email, is_active, archived_at
+    SELECT user_id, full_name, email, is_active, archived_at
       FROM users
      WHERE user_id = %s
 """
@@ -102,7 +101,6 @@ def load_principal(user_id: int) -> Principal:
     return Principal(
         user_id=row["user_id"],
         full_name=row["full_name"],
-        username=row["username"],
         email=row["email"],
         is_active=row["is_active"],
         assignments=assignments,

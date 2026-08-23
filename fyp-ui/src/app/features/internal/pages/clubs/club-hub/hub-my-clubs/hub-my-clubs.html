@@ -36,35 +36,53 @@
       <ul class="club-page__grid">
         @for (club of myClubs(); track club.id) {
           <li class="club-page__card">
-            <div class="club-page__image">
+            <button type="button" class="club-page__image club-page__image--clickable" [attr.aria-label]="'View members of ' + club.name" (click)="openRoster(club)">
               @if (club.imageUrl) {
                 <img [src]="club.imageUrl" [alt]="club.name" />
               } @else {
                 <span class="material-symbols-rounded" aria-hidden="true">groups</span>
               }
+            </button>
+            <div class="club-page__menu">
+              <button
+                type="button" class="club-page__menu-trigger"
+                [attr.aria-label]="'Actions for ' + club.name" [attr.aria-expanded]="menuOpenFor() === club.id"
+                (click)="toggleMenu(club.id, $event)"
+              >
+                <span class="material-symbols-rounded" aria-hidden="true">more_horiz</span>
+              </button>
+              @if (menuOpenFor() === club.id) {
+                <div class="club-page__menu-panel" role="menu" (click)="$event.stopPropagation()">
+                  <button type="button" role="menuitem" (click)="closeMenu(); openRoster(club)">
+                    <span class="material-symbols-rounded" aria-hidden="true">group</span>
+                    View members
+                  </button>
+                  @if (club.viewerIsPresident) {
+                    <button type="button" role="menuitem" (click)="closeMenu(); openCategoryPicker(club)">
+                      <span class="material-symbols-rounded" aria-hidden="true">tune</span>
+                      Edit categories
+                    </button>
+                    <button type="button" role="menuitem" (click)="closeMenu(); openPresidentChange(club)">
+                      <span class="material-symbols-rounded" aria-hidden="true">swap_horiz</span>
+                      Request President change
+                    </button>
+                  }
+                </div>
+              }
             </div>
             <div class="club-page__body">
-              <h2>{{ club.name }}</h2>
+              <button type="button" class="club-page__title-btn" (click)="openRoster(club)">
+                <h2>{{ club.name }}</h2>
+              </button>
 
-              @if (club.viewerIsPresident) {
-                <div class="club-page__category-row">
-                  <div class="club-page__category-chips">
-                    @for (category of club.categories; track category.id) {
-                      <span class="club-page__category-chip">{{ category.name }}</span>
-                    } @empty {
-                      <span class="club-page__category-empty">No categories set</span>
-                    }
-                  </div>
-                  <button type="button" class="club-page__category-edit-btn" [attr.aria-label]="(club.categories.length ? 'Edit' : 'Set') + ' categories for ' + club.name" (click)="openCategoryPicker(club)">
-                    <span class="material-symbols-rounded" aria-hidden="true">tune</span>
-                  </button>
-                </div>
-              } @else if (club.categories.length) {
+              @if (club.categories.length) {
                 <div class="club-page__category-chips">
                   @for (category of club.categories; track category.id) {
                     <span class="club-page__category-chip">{{ category.name }}</span>
                   }
                 </div>
+              } @else if (club.viewerIsPresident) {
+                <span class="club-page__category-empty">No categories set</span>
               }
 
               <p>{{ club.description || 'No description provided.' }}</p>
@@ -93,7 +111,7 @@
       [hideHeader]="true"
       [hideControls]="true"
       (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
-      (recordOpen)="handleAction({ action: { key: 'categories', label: 'Edit categories', icon: 'tune' }, record: $event })"
+      (recordOpen)="handleAction({ action: { key: 'roster', label: 'View members', icon: 'group' }, record: $event })"
     />
   }
 </section>
@@ -101,4 +119,14 @@
 <app-club-category-picker
   [open]="categoryPickerClub() !== null" [club]="categoryPickerClub()" [currentUserId]="currentUserId"
   (close)="closeCategoryPicker()" (saved)="onCategoriesSaved($event)"
+/>
+
+<app-club-roster-modal
+  [open]="rosterClub() !== null" [club]="rosterClub()"
+  (close)="closeRoster()" (membershipChanged)="onMembershipChanged()"
+/>
+
+<app-president-change-request-modal
+  [open]="presidentChangeClub() !== null" [club]="presidentChangeClub()"
+  (close)="closePresidentChange()" (submitted)="onPresidentChangeSubmitted()"
 />

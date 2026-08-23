@@ -52,6 +52,30 @@ _NAV_GRANTS_SQL = """
   GROUP BY g.grant_id, g.page_code, g.grant_type
 """
 
+_ACTIVE_INTERNAL_USERS_SQL = """
+    SELECT u.user_id, u.full_name AS "displayName", u.email,
+           COALESCE(s.department_or_school, st.school, 'APU Community') AS department
+      FROM users u
+ LEFT JOIN staff s ON s.user_id = u.user_id
+ LEFT JOIN student st ON st.user_id = u.user_id
+     WHERE u.is_active AND u.archived_at IS NULL
+       AND NOT EXISTS (
+           SELECT 1 FROM user_unit_roles external_role
+            WHERE external_role.user_id = u.user_id
+              AND external_role.role_code = 'external-user'
+              AND external_role.is_active
+       )
+  ORDER BY u.full_name
+"""
+
+_ALL_ACTIVE_ROLES_SQL = """
+    SELECT uur.user_id, uur.role_code, r.role_name, uur.unit_code, u.description AS unit_description
+      FROM user_unit_roles uur
+      JOIN role r ON r.role_code = uur.role_code
+ LEFT JOIN unit u ON u.code = uur.unit_code
+     WHERE uur.is_active AND r.archived_at IS NULL
+"""
+
 
 def roles_for(user_id: int) -> list[dict[str, Any]]:
     return [
@@ -120,6 +144,45 @@ def nav_tree_for(user_id: int, roles: list[dict[str, Any]] | None = None) -> lis
     return build(None)
 
 
+def users_with_page_access(page_code: str) -> list[dict[str, Any]]:
+    """Active internal users who can see `page_code` in their sidebar, per its
+    nav_page_grants rows - the same predicate nav_tree_for() uses per-user, run
+    once across every active internal account instead.
+
+    Used to scope candidate pickers (Co-owner/Organizer on the proposal form) to
+    people who could plausibly BE an applicant/collaborator on a proposal, rather
+    than every active internal account regardless of role - see
+    /auth/internal-users' docstring for why that endpoint stayed unscoped (it also
+    backs the department "Assign Work" picker, which filters by unit client-side
+    instead and is intentionally untouched by this function).
+    """
+    grants = [g for g in query(_NAV_GRANTS_SQL) if g["page_code"] == page_code]
+    if not grants:
+        return []
+
+    roles_by_user: dict[int, list[dict[str, Any]]] = {}
+    for row in query(_ALL_ACTIVE_ROLES_SQL):
+        roles_by_user.setdefault(row["user_id"], []).append({
+            "roleCode": row["role_code"], "roleName": row["role_name"] or row["role_code"],
+            "unitCode": row["unit_code"], "unitDescription": row["unit_description"],
+        })
+
+    users = query(_ACTIVE_INTERNAL_USERS_SQL)
+    result = []
+    for user in users:
+        roles = roles_by_user.get(user["user_id"], [])
+        if not any(_satisfies_grant(roles, g) for g in grants):
+            continue
+        result.append({
+            "displayName": user["displayName"],
+            "email": user["email"],
+            "department": user["department"],
+            "roles": roles,
+            "roleLabel": _role_label(roles[0]) if roles else "Unassigned",
+        })
+    return result
+
+
 def _role_label(entry: dict[str, Any]) -> str:
     return f"{entry['roleName']} — {entry['unitDescription']}" if entry["unitDescription"] else entry["roleName"]
 
@@ -157,7 +220,6 @@ def project_auth_user(user: dict[str, Any]) -> dict[str, Any]:
         "id": str(user_id),
         "email": user["email"],
         "displayName": user["full_name"],
-        "username": user["username"],
         "accountType": "external" if "external-user" in role_codes else "internal",
         "roles": [
             {

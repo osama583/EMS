@@ -190,8 +190,51 @@
         }
       </div>
 
-      <!-- Reviewer Comments card -->
-      @if (reviewerComments().length) {
+      <!-- Reviewer Comments / Conversations card -->
+      @if (conversations().length) {
+        <div class="prv-panel-card prv-panel-card--comments">
+          @if (activeConversation(); as active) {
+            <div class="prv-panel-card__head">
+              @if (conversations().length > 1) {
+                <button type="button" class="prv-panel-card__back" (click)="activeConversationId.set(null)" aria-label="Back to conversations">
+                  <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+                </button>
+              } @else {
+                <span class="prv-panel-card__icon material-symbols-rounded" aria-hidden="true">forum</span>
+              }
+              <div>
+                <h3 class="prv-panel-card__title">{{ activeSummary()!.partnerName }}</h3>
+                <p class="prv-panel-card__subtitle">{{ activeSummary()!.partnerRoleLabel }}</p>
+              </div>
+            </div>
+            <app-conversation-thread [messages]="active.messages" [title]="activeSummary()!.partnerName" />
+          } @else {
+            <div class="prv-panel-card__head">
+              <span class="prv-panel-card__icon material-symbols-rounded" aria-hidden="true">forum</span>
+              <div>
+                <h3 class="prv-panel-card__title">Conversations</h3>
+                <p class="prv-panel-card__subtitle">Every reply thread on this application.</p>
+              </div>
+            </div>
+            <ul class="prv-comments-list">
+              @for (conversation of conversationSummaries(); track conversation.conversationId) {
+                <li>
+                  <button type="button" class="prv-comment-entry prv-comment-entry--button" (click)="activeConversationId.set(conversation.conversationId)">
+                    <div class="prv-comment-entry__avatar" aria-hidden="true">{{ conversation.initials }}</div>
+                    <div class="prv-comment-entry__body">
+                      <div class="prv-comment-entry__row">
+                        <strong>{{ conversation.partnerName }}</strong>
+                        <time class="prv-comment-entry__time">{{ conversation.lastMessageAt }}</time>
+                      </div>
+                      <p class="prv-comment-entry__text">{{ conversation.lastMessage }}</p>
+                    </div>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      } @else if (reviewerComments().length) {
         <div class="prv-panel-card prv-panel-card--comments">
           <div class="prv-panel-card__head">
             <span class="prv-panel-card__icon material-symbols-rounded" aria-hidden="true">forum</span>

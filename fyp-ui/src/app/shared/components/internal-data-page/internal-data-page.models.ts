@@ -2,6 +2,9 @@ export interface InternalPageHeaderConfig {
   readonly title: string;
   readonly description: string;
   readonly countLabel?: string;
+  // Material Symbol shown before countLabel. Defaults to 'inbox' when countLabel is set, so
+  // existing configs need no change to pick up the icon — pass a different icon only to override.
+  readonly countIcon?: string;
   readonly primaryActionLabel?: string;
   readonly primaryActionIcon?: string;
 }
@@ -28,6 +31,22 @@ export interface InternalTableColumn {
   readonly label: string;
   readonly actions?: boolean;
   readonly width?: string;
+  // Opt-in: when set, the column header becomes a sort toggle. `sortKey` is what's emitted on
+  // InternalSortChange (usually, but not always, the same as `key` — e.g. a display column backed
+  // by a differently-named server sort field). Columns without this stay plain headers, unchanged.
+  readonly sortKey?: string;
+}
+
+export type InternalSortOrder = 'asc' | 'desc';
+
+export interface InternalSortState {
+  readonly key: string;
+  readonly order: InternalSortOrder;
+}
+
+export interface InternalSortChange {
+  readonly key: string;
+  readonly order: InternalSortOrder;
 }
 
 export type InternalCellTone = 'neutral' | 'blue' | 'success' | 'warning' | 'danger';

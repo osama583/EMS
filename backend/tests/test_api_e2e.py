@@ -117,6 +117,19 @@ def test_admin_routes_accept_an_admin(client):
     assert all("password" not in u for u in users)
 
 
+def test_internal_directory_is_available_without_admin_access(client):
+    """Picker data must not be fetched through the admin-only user API."""
+    res = client.get(
+        "/api/v1/auth/internal-users",
+        headers=auth(client, "student.computing@demo.apu.edu.my"),
+    )
+    assert res.status_code == 200
+    users = res.get_json()
+    assert users
+    assert all("password" not in user and "id" not in user for user in users)
+    assert all("external-user" not in {role["roleCode"] for role in user["roles"]} for user in users)
+
+
 # --- Proposal lifecycle over HTTP ----------------------------------------
 def test_full_proposal_lifecycle(client):
     student = auth(client, "student.computing@demo.apu.edu.my")
@@ -188,13 +201,40 @@ def test_send_back_and_resubmit_over_http(client):
     )
     assert bad.status_code == 409
 
-    resubmitted = client.post(
+    # A resubmission with no reply comment is refused - the applicant must
+    # answer the reviewer, not just silently resend edited content.
+    no_comment = client.post(
         f"/api/v1/proposals/{request_id}/resubmission",
         json=payload(shortIntroduction="Now with a budget."),
         headers=student,
     )
+    assert no_comment.status_code == 409
+
+    resubmitted = client.post(
+        f"/api/v1/proposals/{request_id}/resubmission",
+        json={**payload(shortIntroduction="Now with a budget."), "comment": "Added the budget."},
+        headers=student,
+    )
     assert resubmitted.status_code == 200
     assert resubmitted.get_json()["status"] == "hos_hod_review"
+
+    # The reply joins the same conversation as the HOS/HOD's original comment,
+    # visible to both the applicant and the HOS/HOD, chronologically ordered.
+    convos = client.get(f"/api/v1/proposals/{request_id}/conversations", headers=student).get_json()
+    assert len(convos) == 1
+    texts = [m["text"] for m in convos[0]["messages"]]
+    assert texts == ["Please add a budget.", "Added the budget."]
+    sides = [m["senderSide"] for m in convos[0]["messages"]]
+    assert sides == ["authority", "applicant"]
+
+    hos_convos = client.get(f"/api/v1/proposals/{request_id}/conversations", headers=hos).get_json()
+    assert hos_convos == convos
+
+    # A CFO who never touched this proposal sees no threads on it at all.
+    cfo_convos = client.get(
+        f"/api/v1/proposals/{request_id}/conversations", headers=auth(client, "cfo@demo.apu.edu.my")
+    ).get_json()
+    assert cfo_convos == []
 
 
 def test_an_unknown_decision_is_refused(client):

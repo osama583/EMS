@@ -1,0 +1,132 @@
+<div class="department-resubmit__topbar">
+  <button type="button" class="department-resubmit__back" (click)="goBack()">
+    <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+    Back
+  </button>
+  @if (proposal(); as p) {
+    <span class="department-resubmit__proposal-id">{{ p.proposalId }}</span>
+  }
+</div>
+
+<section class="department-resubmit">
+  <div class="department-resubmit__main">
+    @if (loading()) {
+      <app-loading-state variant="spinner" label="Loading request…" />
+    } @else if (!proposal() || !definition()) {
+      <div class="department-resubmit__state" role="status">
+        <span class="material-symbols-rounded" aria-hidden="true">search_off</span>
+        <h2>Request not found</h2>
+        <p>This request is no longer available or could not be loaded.</p>
+      </div>
+    } @else if (!canResubmit()) {
+      <div class="department-resubmit__state" role="status">
+        <span class="material-symbols-rounded" aria-hidden="true">block</span>
+        <h2>Nothing to resubmit</h2>
+        <p>This request is not currently waiting on your changes.</p>
+      </div>
+    } @else {
+      <section class="department-resubmit__table">
+        <header class="department-resubmit__table-header">
+          <div>
+            <h2>{{ definition()!.label }} request</h2>
+            <p>Only this department's request is editable here. The rest of your proposal is unaffected.</p>
+          </div>
+          <button type="button" class="table-control table-control--primary" [disabled]="rows().length >= 20" (click)="openAdd()">
+            <span class="material-symbols-rounded" aria-hidden="true">add</span>
+            Add {{ definition()!.label }} Request
+          </button>
+        </header>
+        <app-proposal-table
+          tableId="department-resubmit-rows"
+          [columns]="columns()"
+          [rows]="displayRows()"
+          emptyMessage="No requests have been added yet. Add at least one before resending."
+          (edit)="edit($event)"
+          (deleteRow)="deleteRow($event)"
+        />
+      </section>
+
+      <footer class="department-resubmit__actions">
+        <button type="button" class="table-control table-control--primary" [disabled]="!rows().length || saving()" (click)="openResubmitConfirm()">
+          @if (saving()) { <span class="material-symbols-rounded department-resubmit__spin" aria-hidden="true">progress_activity</span> }
+          {{ saving() ? 'Resending…' : 'Resend to ' + definition()!.label }}
+        </button>
+      </footer>
+
+      <app-form-modal
+        [open]="resubmitConfirmOpen()"
+        [title]="'Resend to ' + definition()!.label"
+        primaryLabel="Resend"
+        secondaryLabel="Keep Editing"
+        [loading]="saving()"
+        [disabled]="!replyComment().trim()"
+        (close)="closeResubmitConfirm()"
+        (cancel)="closeResubmitConfirm()"
+        (submit)="resubmit()"
+      >
+        <p class="department-resubmit-confirm__intro">
+          Resend {{ definition()!.label }} to the department? You will not be able to edit it again
+          until they review it.
+        </p>
+        <app-form-field
+          controlId="department-resubmit-reply-comment"
+          label="Reply to the department"
+          type="textarea"
+          placeholder="Explain what you changed…"
+          [required]="true"
+          [value]="replyComment()"
+          (valueChange)="replyComment.set($event)"
+        />
+      </app-form-modal>
+
+      <app-form-modal
+        [title]="modalTitle()"
+        [primaryLabel]="editingIndex() === null ? 'Add request' : 'Save changes'"
+        secondaryLabel="Cancel"
+        [open]="modalOpen()"
+        [disabled]="!formValid()"
+        (close)="closeModal()"
+        (cancel)="closeModal()"
+        (submit)="saveRow()"
+      >
+        <div class="department-resubmit-form">
+          @for (column of definition()!.columns; track column.key) {
+            @if (column.type === 'select') {
+              <div class="department-resubmit-form__field" [class.department-resubmit-form__field--full]="column.span !== 'half'">
+                <app-searchable-dropdown
+                  [controlId]="'department-resubmit-' + column.key"
+                  [label]="column.label"
+                  [placeholder]="fieldPlaceholder(column)"
+                  [required]="!!column.required"
+                  [disabled]="fieldDisabled(column)"
+                  [loading]="requestCatalogLoading()"
+                  [error]="fieldError(column)"
+                  [options]="fieldOptions(column)"
+                  [value]="draftValue(column.key).toString()"
+                  (valueChange)="setDraftValue(column.key, $any($event))"
+                />
+              </div>
+            } @else {
+              <div class="department-resubmit-form__field" [class.department-resubmit-form__field--full]="column.span !== 'half'">
+                <app-form-field
+                  [controlId]="'department-resubmit-' + column.key"
+                  [label]="column.label"
+                  [type]="fieldType(column)"
+                  [required]="!!column.required"
+                  [readOnly]="column.type === 'readonly'"
+                  [min]="column.min ?? ''"
+                  [step]="column.step ?? ''"
+                  [value]="draftValue(column.key)"
+                  [error]="fieldError(column)"
+                  (valueChange)="setDraftValue(column.key, $event)"
+                />
+              </div>
+            }
+          }
+        </div>
+      </app-form-modal>
+    }
+  </div>
+
+  <app-reviewer-comments-drawer variant="panel" [comments]="reviewerComments()" [conversations]="conversations()" [initialConversationId]="pendingRequesterConversationId()" />
+</section>

@@ -3,7 +3,6 @@ import { DeletionMetadata, DeletionPreview } from '../../shared/models/deletion.
 export interface AdminUserRecord {
   readonly id: string;
   readonly displayName: string;
-  readonly username: string;
   readonly email: string;
   readonly roleLabel: string;
   readonly department: string;
@@ -50,7 +49,10 @@ export interface AdminUserAssignment {
   readonly unitDescription: string | null;
 }
 
-export type AdminUserDraft = { readonly displayName: string; readonly username: string; readonly email: string; readonly active: boolean };
+// `password` is optional and write-only: on create, omitting it leaves the account with a random
+// hash nobody holds (reachable only through a reset); on edit, omitting it leaves the existing
+// password alone. It is never returned by any read.
+export type AdminUserDraft = { readonly displayName: string; readonly email: string; readonly password?: string; readonly active: boolean };
 export type AdminUnitDraft = { readonly description: string; readonly active: boolean; readonly roleCodes: readonly string[] };
 export type AdminRoleDraft = { readonly roleName: string; readonly description: string; readonly unitCodes: readonly string[]; readonly active: boolean };
 

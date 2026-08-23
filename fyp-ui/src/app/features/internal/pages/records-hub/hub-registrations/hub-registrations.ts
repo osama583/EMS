@@ -1,13 +1,13 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
-import { AuthService } from '../../../../../core/auth/auth.service';
 import { PendingEventRegistration } from '../../../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../../../core/events/published-event.service';
 import { ConfirmDialogComponent } from '../../../../../shared/components/confirm-dialog/confirm-dialog';
 import { FeedbackBannerComponent } from '../../../../../shared/components/feedback-banner/feedback-banner';
+import { FormModalComponent } from '../../../../../shared/components/form-modal/form-modal';
 import { InternalDataPageComponent } from '../../../../../shared/components/internal-data-page/internal-data-page';
-import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
+import { InternalCellClickEvent, InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
 import { ToastService, apiErrorMessage } from '../../../../../shared/components/toast/toast.service';
 
 // Inbox tab for events whose registration_approval is 'manual': the applicant (or a co-owner)
@@ -17,16 +17,21 @@ import { ToastService, apiErrorMessage } from '../../../../../shared/components/
 // is why it is its own tab rather than a row in the Proposals list.
 @Component({
   selector: 'app-hub-registrations',
-  imports: [InternalDataPageComponent, FeedbackBannerComponent, ConfirmDialogComponent],
+  imports: [InternalDataPageComponent, FeedbackBannerComponent, ConfirmDialogComponent, FormModalComponent],
   templateUrl: './hub-registrations.html',
+  styles: `
+    .proof-preview__meta { margin: 0 0 var(--space-3); color: var(--apu-text-muted); font-size: .9rem; }
+    .proof-preview__link { display: block; }
+    .proof-preview__image { display: block; width: 100%; max-height: 60vh; object-fit: contain; border: 1px solid var(--apu-border); border-radius: var(--radius-card); background: #f7f9fc; }
+    .proof-preview__open { display: inline-flex; align-items: center; gap: .4rem; margin-top: var(--space-2); color: var(--apu-blue-600); font-weight: 700; text-decoration: none; }
+    .proof-preview__open:hover { text-decoration: underline; }
+  `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HubRegistrationsComponent {
-  private readonly auth = inject(AuthService);
   private readonly events = inject(PublishedEventService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
-  private readonly actorEmail = this.auth.user()?.email ?? '';
 
   readonly registrations = signal<readonly PendingEventRegistration[]>([]);
   readonly loading = signal(true);
@@ -41,11 +46,15 @@ export class HubRegistrationsComponent {
   readonly pendingAction = signal<{ registration: PendingEventRegistration; action: 'approve' | 'reject' } | null>(null);
   readonly processing = signal(false);
 
+  // "Proof to review" used to be a static badge with nowhere to actually see the proof - clicking
+  // it now opens the uploaded image so the approver can verify payment before deciding.
+  readonly proofPreview = signal<PendingEventRegistration | null>(null);
+
   constructor() { this.load(); }
 
   private load(): void {
     this.loading.set(true);
-    this.events.getMyPendingRegistrations(this.actorEmail).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.events.getMyPendingRegistrations().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (rows) => { this.registrations.set(rows); this.loading.set(false); },
       error: () => { this.errorMessage.set('Pending registrations could not be loaded.'); this.loading.set(false); },
     });
@@ -68,7 +77,7 @@ export class HubRegistrationsComponent {
     rowsPerPageLabel: 'Registrations per page',
     mobileListLabel: 'Registration cards',
     header: {
-      title: 'Registrations',
+      title: 'Events',
       description: 'People asking to attend your events. Approve or reject each request.',
       countLabel: `${this.filtered().length} pending`,
     },
@@ -104,7 +113,13 @@ export class HubRegistrationsComponent {
       event: { primary: row.eventTitle, secondary: row.eventCode },
       registrant: { primary: row.name || row.email, secondary: row.email },
       reason: { primary: row.reason || '—' },
-      payment: { primary: row.paymentRequired ? this.paymentLabel(row) : 'Free event', badge: row.paymentRequired, tone: 'warning' },
+      payment: {
+        primary: row.paymentRequired ? this.paymentLabel(row) : 'Free event',
+        badge: row.paymentRequired,
+        tone: 'warning',
+        clickable: this.hasViewableProof(row),
+        badgeIcon: this.hasViewableProof(row) ? 'receipt_long' : undefined,
+      },
       requested: { primary: this.formatDate(row.registeredAt) },
     },
     mobile: {
@@ -144,6 +159,18 @@ export class HubRegistrationsComponent {
     }
   }
 
+  handleCellClick(event: InternalCellClickEvent): void {
+    if (event.columnKey !== 'payment') return;
+    const registration = this.registrations().find((row) => row.id === String(event.record.id));
+    if (registration && this.hasViewableProof(registration)) this.proofPreview.set(registration);
+  }
+
+  closeProofPreview(): void { this.proofPreview.set(null); }
+
+  hasViewableProof(row: PendingEventRegistration): boolean {
+    return row.paymentStatus === 'pending_review' && !!row.paymentProofUrl;
+  }
+
   cancelAction(): void { if (!this.processing()) this.pendingAction.set(null); }
 
   confirmAction(): void {
@@ -153,8 +180,8 @@ export class HubRegistrationsComponent {
     const who = registration.name || registration.email;
     this.processing.set(true);
     const request$ = action === 'approve'
-      ? this.events.approveRegistration(registration.id, this.actorEmail)
-      : this.events.rejectRegistration(registration.id, this.actorEmail);
+      ? this.events.approveRegistration(registration.eventId, registration.id)
+      : this.events.rejectRegistration(registration.eventId, registration.id);
     request$.pipe(finalize(() => this.processing.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.registrations.update((rows) => rows.filter((row) => row.id !== registration.id));

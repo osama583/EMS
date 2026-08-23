@@ -2,7 +2,17 @@
   [config]="config()"
   [records]="records()"
   [filters]="[]"
+  [searchValue]="search()"
   [loading]="loading()"
+  [totalPages]="totalPages()"
+  [page]="page()"
+  [pageSize]="pageSize()"
+  [sort]="sort()"
+  (searchChange)="updateSearchDraft($event)"
+  (reset)="resetFilters()"
+  (pageChange)="updatePage($event)"
+  (pageSizeChange)="updatePageSize($event)"
+  (sortChange)="updateSort($event)"
   (recordOpen)="openDetails($event)"
 />
 
@@ -30,31 +40,39 @@
         </section>
       }
 
-      @if (row.requestKind === 'fmb' || row.requestKind === 'waterNormal') {
-        @if (row.fmbSelections.length) {
+      @if (row.request.department === 'fmb' || row.request.department === 'waterNormal') {
+        @if (detailsFmbSelections().length) {
           <section>
             <h3>Orders placed</h3>
             <div class="hub-request-details__orders">
-              @for (order of row.fmbSelections; track order.id) {
+              @for (order of detailsFmbSelections(); track order.id) {
                 <dl class="hub-request-details__order">
                   <div><dt>Cafeteria</dt><dd>{{ order.cafeteriaName }}</dd></div>
                   <div><dt>Menu item picked</dt><dd>{{ order.menuItemLabel }}</dd></div>
                   <div><dt>Quantity</dt><dd>{{ order.quantity }}</dd></div>
                   @if (order.notes) { <div><dt>Notes</dt><dd>{{ order.notes }}</dd></div> }
-                  <div><dt>Order status</dt><dd>{{ order.status }}</dd></div>
+                  <div><dt>Order status</dt><dd>{{ orderStatusLabel(order.status) }}</dd></div>
+                  @if (order.managerComment) { <div><dt>Cafeteria manager's comment</dt><dd>{{ order.managerComment }}</dd></div> }
                 </dl>
               }
             </div>
           </section>
-        } @else {
+        } @else if (!detailsLoading()) {
           <p class="hub-request-details__empty">F&amp;B has not picked a menu item for this request yet.</p>
         }
+        <dl>
+          <div><dt>Assigned To</dt><dd>{{ assignedToText(row) }}</dd></div>
+          @if (row.cafeteriaName) { <div><dt>Cafeteria</dt><dd>{{ row.cafeteriaName }}</dd></div> }
+          <div><dt>Status</dt><dd>{{ statusLabel(row) }}</dd></div>
+        </dl>
       } @else {
         <dl>
           <div><dt>Item</dt><dd>{{ row.request.item }}</dd></div>
           <div><dt>Quantity</dt><dd>{{ row.request.quantity }}</dd></div>
+          @if (row.request.location) { <div><dt>Location</dt><dd>{{ row.request.location }}</dd></div> }
           @if (row.request.notes) { <div><dt>Notes</dt><dd>{{ row.request.notes }}</dd></div> }
-          <div><dt>Order status</dt><dd>{{ row.confirmed ? 'Fulfilled' : 'Awaiting confirmation' }}</dd></div>
+          <div><dt>Assigned To</dt><dd>{{ assignedToText(row) }}</dd></div>
+          <div><dt>Status</dt><dd>{{ statusLabel(row) }}</dd></div>
         </dl>
       }
     </article>

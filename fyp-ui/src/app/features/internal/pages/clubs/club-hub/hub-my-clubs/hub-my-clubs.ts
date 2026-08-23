@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, HostListener, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '../../../../../../core/auth/auth.service';
 import { ClubService } from '../../../../../../core/clubs/club.service';
@@ -8,13 +8,15 @@ import { InternalDataPageComponent } from '../../../../../../shared/components/i
 import { InternalPageHeaderComponent, InternalResetButtonComponent, InternalSearchFieldComponent } from '../../../../../../shared/components/internal-data-page/internal-data-page-parts';
 import { InternalDataPageConfig, InternalDataRecord, InternalFilterConfig, InternalPageHeaderConfig, InternalRowActionEvent } from '../../../../../../shared/components/internal-data-page/internal-data-page.models';
 import { ClubCategoryPickerComponent } from '../../../../../../shared/components/club-category-picker/club-category-picker';
+import { ClubRosterModalComponent } from '../../../../../../shared/components/club-roster-modal/club-roster-modal';
+import { PresidentChangeRequestModalComponent } from '../../../../../../shared/components/president-change-request-modal/president-change-request-modal';
 import { ViewToggleComponent } from '../../../../../../shared/components/view-toggle/view-toggle';
 
 type ViewMode = 'table' | 'card';
 
 @Component({
   selector: 'app-hub-my-clubs',
-  imports: [ViewToggleComponent, FeedbackBannerComponent, InternalPageHeaderComponent, InternalDataPageComponent, ClubCategoryPickerComponent, InternalSearchFieldComponent, InternalResetButtonComponent],
+  imports: [ViewToggleComponent, FeedbackBannerComponent, InternalPageHeaderComponent, InternalDataPageComponent, ClubCategoryPickerComponent, ClubRosterModalComponent, PresidentChangeRequestModalComponent, InternalSearchFieldComponent, InternalResetButtonComponent],
   templateUrl: './hub-my-clubs.html',
   styleUrl: './hub-my-clubs.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -29,6 +31,11 @@ export class HubMyClubsComponent {
   readonly loading = signal(true);
   readonly errorMessage = signal('');
   readonly categoryPickerClub = signal<ClubRecord | null>(null);
+  readonly rosterClub = signal<ClubRecord | null>(null);
+  readonly presidentChangeClub = signal<ClubRecord | null>(null);
+  // Which card's "⋯" action menu is open, by club id — a plain string rather than a per-card
+  // component-local flag, since only one menu should ever be open across the whole grid at once.
+  readonly menuOpenFor = signal<string | null>(null);
   readonly viewMode = signal<ViewMode>('card');
   readonly search = signal('');
   readonly page = signal(1);
@@ -54,7 +61,11 @@ export class HubMyClubsComponent {
     header: { title: this.headerConfig().title, description: this.headerConfig().description, countLabel: this.headerConfig().countLabel },
     search: { ariaLabel: 'Search clubs', placeholder: 'Search club name' },
     columns: [{ key: 'club', label: 'Club' }, { key: 'category', label: 'Categories' }, { key: 'role', label: 'Your role' }, { key: 'members', label: 'Members' }, { key: 'actions', label: 'Actions', actions: true }],
-    actions: [{ key: 'categories', label: 'Edit categories', icon: 'tune' }],
+    actions: [
+      { key: 'roster', label: 'View members', icon: 'group' },
+      { key: 'categories', label: 'Edit categories', icon: 'tune' },
+      { key: 'president-change', label: 'Request President change', icon: 'swap_horiz' },
+    ],
     emptyTitle: 'You haven\'t joined a club yet', emptyDescription: 'Head over to Discover Clubs to find one that fits your interests.', pageSizeOptions: [5, 10, 25],
   }));
   readonly records = computed<readonly InternalDataRecord[]>(() => this.visibleClubs().map((club) => ({
@@ -70,7 +81,7 @@ export class HubMyClubsComponent {
       eyebrow: club.viewerIsPresident ? 'President' : 'Member', status: '', title: club.name,
       details: [{ icon: 'category', text: club.categories.map((category) => category.name).join(', ') || 'No categories set' }, { icon: 'group', text: `${club.memberCount} member${club.memberCount === 1 ? '' : 's'}` }],
     },
-    actionKeys: club.viewerIsPresident ? ['categories'] : [],
+    actionKeys: club.viewerIsPresident ? ['roster', 'categories', 'president-change'] : ['roster'],
   })));
   readonly filters: readonly InternalFilterConfig[] = [];
 
@@ -96,8 +107,17 @@ export class HubMyClubsComponent {
 
   handleAction(event: InternalRowActionEvent): void {
     const club = this.clubs().find((item) => item.id === event.record.id);
-    if (club?.viewerIsPresident) this.openCategoryPicker(club);
+    if (!club) return;
+    if (event.action.key === 'roster') this.openRoster(club);
+    else if (event.action.key === 'categories' && club.viewerIsPresident) this.openCategoryPicker(club);
+    else if (event.action.key === 'president-change' && club.viewerIsPresident) this.openPresidentChange(club);
   }
+
+  openRoster(club: ClubRecord): void { this.rosterClub.set(club); }
+  closeRoster(): void { this.rosterClub.set(null); }
+  // The roster modal already updated the membership row itself — just reload this list so
+  // memberCount reflects it, and (if the viewer just left) the club drops out of myClubs().
+  onMembershipChanged(): void { this.loadAll(); }
 
   openCategoryPicker(club: ClubRecord): void { this.categoryPickerClub.set(club); }
   closeCategoryPicker(): void { this.categoryPickerClub.set(null); }
@@ -109,4 +129,22 @@ export class HubMyClubsComponent {
     this.clubs.update((clubs) => clubs.map((item) => item.id === updated.id ? { ...item, categories: updated.categories } : item));
     this.categoryPickerClub.set(null);
   }
+
+  openPresidentChange(club: ClubRecord): void { this.presidentChangeClub.set(club); }
+  closePresidentChange(): void { this.presidentChangeClub.set(null); }
+  onPresidentChangeSubmitted(): void { this.presidentChangeClub.set(null); }
+
+  toggleMenu(clubId: string, event: Event): void {
+    event.stopPropagation();
+    this.menuOpenFor.set(this.menuOpenFor() === clubId ? null : clubId);
+  }
+  closeMenu(): void { this.menuOpenFor.set(null); }
+
+  // A click anywhere outside an open menu closes it — the panel itself stops propagation (see the
+  // template), so this only ever fires for a genuine outside click.
+  @HostListener('document:click')
+  onDocumentClick(): void { this.closeMenu(); }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void { this.closeMenu(); }
 }

@@ -32,6 +32,7 @@ from .constants import (
     SEL_FULFILLED,
     SEL_PENDING,
     SEL_PREPARING,
+    SEL_READY,
     SEL_RESUBMITTED,
     SEL_TERMINAL,
     TASK_COMPLETED,
@@ -39,7 +40,40 @@ from .constants import (
 from .tasks import check_all_tasks_resolved, find_task
 
 
+def _project_selection(row: dict) -> dict:
+    """request_fmb_selection's raw columns -> the client's FmbSelection DTO
+    (proposal-review.models.ts). Every caller here used to hand back the bare
+    `fetch_all()`/`fetch_one()` row - snake_case column names
+    (unit_code/request_fmb_selection_id/fmb_option_id/manager_comment/...)
+    against a camelCase frontend model that was never once populated from it
+    correctly (cafeteriaCode, in particular, was always undefined, which is
+    what silently broke a Cafeteria Manager's proposal visibility check -
+    myCafeteriaSelections() filters on selection.cafeteriaCode). fmbOptionId
+    is rebuilt as the "fmb:<row>" composite id (see options.py's option_id())
+    because that's the format the create/edit-order dropdowns' SelectOption
+    values use - a bare row number would never match one of those options.
+    """
+    return {
+        "id": row["request_fmb_selection_id"],
+        "requestFmbId": row["request_fmb_id"],
+        "cafeteriaCode": row["unit_code"],
+        "cafeteriaName": row.get("cafeteria_name") or "",
+        "fmbOptionId": f"fmb:{row['fmb_option_id']}",
+        "menuItemLabel": row["menu_item_label"],
+        "quantity": row["quantity"],
+        "notes": row["notes"] or "",
+        "status": row["status"],
+        "managerComment": row["manager_comment"] or "",
+    }
+
+
 def load_selection(cur, selection_id: int) -> dict:
+    """Raw request_fmb_selection row (snake_case columns) - internal use only.
+    Every function below reads unit_code/claimed_by_user_id/etc. straight off
+    this result to make its own authorization/state decisions, so it stays
+    unprojected; callers that need the client-facing DTO should go through
+    selections_for_request() or wrap this in _project_selection() themselves.
+    """
     row = fetch_one(
         cur,
         "SELECT * FROM request_fmb_selection WHERE request_fmb_selection_id = %s",
@@ -65,7 +99,7 @@ def request_id_for_selection(cur, selection_id: int) -> int:
 
 
 def selections_for_request(cur, request_id: int) -> list[dict]:
-    return fetch_all(
+    rows = fetch_all(
         cur,
         """SELECT s.*, u.description AS cafeteria_name, cl.full_name AS claimed_by_name
              FROM request_fmb_selection s
@@ -76,6 +110,7 @@ def selections_for_request(cur, request_id: int) -> list[dict]:
          ORDER BY s.request_fmb_selection_id""",
         (request_id,),
     )
+    return [_project_selection(row) for row in rows]
 
 
 def _resolve_menu_item(cur, fmb_option_id: int) -> dict:
@@ -147,7 +182,7 @@ def create_selection(
         new_status=SEL_PENDING,
         comment="Order placed with " + cafeteria_unit_code + ".",
     )
-    return selection
+    return _project_selection(selection)
 
 
 def approve_selection(cur, selection_id: int, actor_user_id: int) -> dict:
@@ -173,7 +208,7 @@ def approve_selection(cur, selection_id: int, actor_user_id: int) -> dict:
         new_status=SEL_APPROVED,
     )
     check_fmb_task_resolved(cur, request_id)
-    return load_selection(cur, selection_id)
+    return _project_selection(load_selection(cur, selection_id))
 
 
 def send_selection_back(cur, selection_id: int, actor_user_id: int, comment: str) -> dict:
@@ -206,7 +241,7 @@ def send_selection_back(cur, selection_id: int, actor_user_id: int, comment: str
         previous_status=SEL_PENDING,
         new_status=SEL_RESUBMITTED,
     )
-    return load_selection(cur, selection_id)
+    return _project_selection(load_selection(cur, selection_id))
 
 
 def edit_selection(cur, selection_id: int, actor_user_id: int, updates: dict) -> dict:
@@ -241,7 +276,7 @@ def edit_selection(cur, selection_id: int, actor_user_id: int, updates: dict) ->
             new_status=SEL_CANCELLED,
         )
         check_fmb_task_resolved(cur, request_id)
-        return load_selection(cur, selection_id)
+        return _project_selection(load_selection(cur, selection_id))
 
     columns: dict[str, object] = {}
     if "cafeteriaCode" in updates:
@@ -283,7 +318,7 @@ def edit_selection(cur, selection_id: int, actor_user_id: int, updates: dict) ->
         previous_status=previous,
         new_status=SEL_PENDING,
     )
-    return load_selection(cur, selection_id)
+    return _project_selection(load_selection(cur, selection_id))
 
 
 def claim_selection(cur, selection_id: int, staff_user_id: int) -> dict:
@@ -315,19 +350,56 @@ def claim_selection(cur, selection_id: int, staff_user_id: int) -> dict:
         previous_status=SEL_APPROVED,
         new_status=SEL_PREPARING,
     )
+    # NOT _project_selection() here: cafeteria-order.service.ts's claim()/ready()/fulfil() read
+    # this response body directly as RawCafeteriaOrder (snake_case, including claimed_by_user_id/
+    # delivery_photo_url/delivered_at - none of which FmbSelection carries), unlike the F&B-facing
+    # create/approve/send-back/edit calls above, which the frontend ignores and reloads instead.
     return load_selection(cur, selection_id)
 
 
-def fulfil_selection(cur, selection_id: int, actor_user_id: int) -> dict:
+def mark_selection_ready(cur, selection_id: int, actor_user_id: int) -> dict:
+    """Claimant finishes preparing ("Done Preparing"); the order still needs
+    to be delivered (fulfil_selection) before it is terminal."""
     selection = load_selection(cur, selection_id)
     if selection["status"] != SEL_PREPARING:
-        raise WorkflowError("Claim this order before marking it fulfilled.")
+        raise WorkflowError("Start preparing this order before marking it ready.")
     if selection["claimed_by_user_id"] != actor_user_id:
         raise Forbidden("This order was claimed by another staff member.")
 
     cur.execute(
         "UPDATE request_fmb_selection SET status = %s WHERE request_fmb_selection_id = %s",
-        (SEL_FULFILLED, selection_id),
+        (SEL_READY, selection_id),
+    )
+    history.record(
+        cur,
+        request_id_for_selection(cur, selection_id),
+        action="ready-selection",
+        actor_user_id=actor_user_id,
+        actor_role="cafeteria-staff",
+        previous_status=SEL_PREPARING,
+        new_status=SEL_READY,
+    )
+    # See claim_selection's comment above - this stays raw for cafeteria-order.service.ts.
+    return load_selection(cur, selection_id)
+
+
+def fulfil_selection(cur, selection_id: int, actor_user_id: int, delivery_photo_url: str) -> dict:
+    """Claimant confirms delivery. A proof-of-delivery photo is mandatory -
+    the order is not considered delivered until delivery_photo_url is set."""
+    selection = load_selection(cur, selection_id)
+    if selection["status"] != SEL_READY:
+        raise WorkflowError("Mark this order ready before confirming delivery.")
+    if selection["claimed_by_user_id"] != actor_user_id:
+        raise Forbidden("This order was claimed by another staff member.")
+    delivery_photo_url = (delivery_photo_url or "").strip()
+    if not delivery_photo_url:
+        raise WorkflowError("Upload a delivery photo before marking this order delivered.")
+
+    cur.execute(
+        """UPDATE request_fmb_selection
+              SET status = %s, delivery_photo_url = %s, delivered_at = now()
+            WHERE request_fmb_selection_id = %s""",
+        (SEL_FULFILLED, delivery_photo_url, selection_id),
     )
     request_id = request_id_for_selection(cur, selection_id)
     history.record(
@@ -336,10 +408,11 @@ def fulfil_selection(cur, selection_id: int, actor_user_id: int) -> dict:
         action="fulfil-selection",
         actor_user_id=actor_user_id,
         actor_role="cafeteria-staff",
-        previous_status=SEL_PREPARING,
+        previous_status=SEL_READY,
         new_status=SEL_FULFILLED,
     )
     check_fmb_task_resolved(cur, request_id)
+    # See claim_selection's comment above - this stays raw for cafeteria-order.service.ts.
     return load_selection(cur, selection_id)
 
 
@@ -384,10 +457,17 @@ def check_fmb_task_resolved(cur, request_id: int) -> None:
 
 def shared_pool_for_staff(cur, staff_user_id: int) -> list[dict]:
     """Unclaimed orders in every cafeteria this staff member belongs to, plus
-    the ones they have already claimed."""
+    the ones they have already claimed.
+
+    serve_date/serve_time (the parent food request's own schedule) ride along
+    so the frontend can compute the same-day start rule and the 3-hour
+    deadline reminder without a second round trip - list_orders() (the
+    manager's equivalent query, api/tasks.py) already joins these two columns.
+    """
     return fetch_all(
         cur,
-        """SELECT s.*, u.description AS cafeteria_name, r.request_id, r.request_code, r.event_title
+        """SELECT s.*, u.description AS cafeteria_name, r.request_id, r.request_code, r.event_title,
+                  f.date AS serve_date, f.serve_time
              FROM request_fmb_selection s
              JOIN request_fmb f ON f.request_fmb_id = s.request_fmb_id
              JOIN request r ON r.request_id = f.request_id

@@ -90,6 +90,37 @@ export function requestKindsForManager(identity: WorkflowIdentity): readonly Dep
   return workflowForManager(identity)?.requestKinds ?? [];
 }
 
+export function assignmentRequiredForManager(identity: WorkflowIdentity): boolean {
+  return workflowForManager(identity)?.assignmentRequired ?? false;
+}
+
+// How many staff may be assigned to a SINGLE requested row for this request kind - mirrors
+// the backend's MAX_ASSIGNEES_PER_ROW (workflow/constants.py), which is the actual enforcement;
+// this copy only drives the picker's UI (single- vs multi-select), never a security decision.
+// null = unlimited (Logistics/Photography/Sound & Light/Campus Tour can each need several
+// people on one row); Transportation is capped at 1 - one row is one vehicle, one driver.
+const MAX_ASSIGNEES_PER_ROW: Readonly<Partial<Record<DepartmentRequestKind, number | null>>> = {
+  logistics: null,
+  transportation: 1,
+  photoVideo: null,
+  soundLight: null,
+  campusTour: null,
+};
+
+export function maxAssigneesPerRow(requestKind: DepartmentRequestKind): number | null {
+  return MAX_ASSIGNEES_PER_ROW[requestKind] ?? null;
+}
+
+// Which departments require staff to wait until the task's scheduled day to start it, vs. being
+// able to start early. Per spec: Transportation/Photo-Video/Campus Tour (and, separately, Food
+// Request via its own cafeteria queue — not a DepartmentRequestKind, so not listed here) are
+// same-day-only; Logistics and Sound & Light are unrestricted and can start any time.
+const SAME_DAY_START_ONLY: ReadonlySet<DepartmentRequestKind> = new Set(['transportation', 'photoVideo', 'campusTour']);
+
+export function requiresSameDayStart(requestKind: DepartmentRequestKind): boolean {
+  return SAME_DAY_START_ONLY.has(requestKind);
+}
+
 // A unit's staff members share the SAME unitCode as their head — callers that need "the staff
 // role string for this manager" just need the manager's own unitCode.
 export function staffUnitCodeForManager(identity: WorkflowIdentity): string | undefined {

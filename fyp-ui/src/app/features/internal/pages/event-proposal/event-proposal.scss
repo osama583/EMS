@@ -1,18 +1,12 @@
 :host { display: block; }
 
-// The page is a flex row so the drawer is a real layout sibling of .proposal-page__main (not an
-// overlay) — opening it shrinks the main column via flex-basis, which is what pushes the main
-// content instead of covering it.
-//
-// .internal-workspace__content (the shared page shell, _internal-layout.scss) applies its own
-// right padding around everything it wraps, .proposal-page included. That padding is exactly
-// the "gray gap" between the open drawer and the true viewport edge — $shell-content-inline-
-// padding mirrors that value so the drawer can cancel it with a matching negative margin and
-// reach the real edge, while `padding-right` on the drawer's own inner content puts that
-// breathing room back for the comment cards instead of the empty page shell.
-$shell-content-inline-padding: clamp(1.5rem, 4vw, 3rem);
+// The page is a flex row so app-reviewer-comments-drawer's drawer element is a real layout
+// sibling of .proposal-page__main (not an overlay) — opening it shrinks the main column via
+// flex-basis, which is what pushes the main content instead of covering it. The drawer's own
+// ribbon/panel styling now lives in shared/components/reviewer-comments-drawer/ — only the
+// layout-shrinking side of the relationship (owned by this page, not the shared component)
+// stays here.
 $comments-drawer-width: min(22rem, 85vw);
-$comments-drawer-width-mobile: min(20rem, 90vw);
 
 .proposal-page {
   position: relative;
@@ -31,120 +25,9 @@ $comments-drawer-width-mobile: min(20rem, 90vw);
 }
 .proposal-page--drawer-open .proposal-page__main { flex-basis: calc(100% - #{$comments-drawer-width}); }
 
-// Toggle ribbon: a solid blue vertical side tab pinned to the right edge, text reading
-// bottom-to-top — matches the site's "Apply Now! / Enquire Now!" edge-tab pattern. `position:
-// fixed` so it overlays the sticky .internal-topbar (z-index 30) instead of sitting below it in
-// the stacking order. Hidden while the drawer is open (see the @if in the template).
-.comments-ribbon {
-  position: fixed;
-  z-index: 31;
-  top: calc(var(--header-height, 7rem) + 1.25rem);
-  right: 0;
-  padding: 1rem .55rem;
-  border: 0;
-  border-radius: 0 .4rem .4rem 0;
-  background: var(--apu-blue-600);
-  color: var(--apu-white);
-  font-size: .82rem;
-  font-weight: 700;
-  letter-spacing: .02em;
-  white-space: nowrap;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  cursor: pointer;
-  box-shadow: .15rem -.2rem .75rem rgb(5 24 48 / 15%);
-  transition: background var(--motion-control) var(--ease-standard);
-}
-.comments-ribbon:hover,
-.comments-ribbon:focus-visible { background: var(--apu-blue-700); }
-
-.comments-drawer {
-  flex: 0 0 auto;
-  width: 0;
-  overflow: hidden;
-  align-self: stretch;
-  margin-right: calc(-1 * #{$shell-content-inline-padding});
-  border-left: 0 solid var(--apu-border);
-  background: var(--apu-white);
-  transition: width var(--motion-control) var(--ease-standard);
-}
-.comments-drawer--open {
-  width: calc(#{$comments-drawer-width} + #{$shell-content-inline-padding});
-  margin-left: 1.75rem;
-  border-left-width: 1px;
-}
-.comments-drawer__inner {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: var(--space-3);
-  width: calc(#{$comments-drawer-width} + #{$shell-content-inline-padding});
-  height: 100%;
-  padding: var(--space-4) $shell-content-inline-padding var(--space-4) var(--space-4);
-  background: var(--apu-white);
-}
-.comments-drawer__header { display: flex; align-items: flex-start; gap: .5rem; }
-.comments-drawer__header > .material-symbols-rounded { flex-shrink: 0; color: var(--apu-blue-600); }
-.comments-drawer__header > div { flex: 1 1 auto; min-width: 0; }
-.comments-drawer__header h3 { margin: 0; color: var(--apu-blue-600); font-size: 1.05rem; }
-.comments-drawer__subtitle { margin: .15rem 0 0; color: var(--apu-text-muted); font-size: .78rem; line-height: 1.4; }
-.comments-drawer__close {
-  flex-shrink: 0;
-  display: flex;
-  width: 2rem;
-  height: 2rem;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: var(--apu-surface-muted);
-  color: var(--apu-text-muted);
-  line-height: 0;
-  cursor: pointer;
-}
-.comments-drawer__close .material-symbols-rounded { line-height: 1; }
-.comments-drawer__list { display: grid; align-content: start; gap: .75rem; list-style: none; margin: 0; padding: 0 .1rem .1rem 0; overflow-y: auto; min-height: 0; }
-.comments-drawer__entry { display: flex; gap: .7rem; align-items: flex-start; }
-.comments-drawer__avatar { flex-shrink: 0; display: grid; width: 2rem; height: 2rem; place-items: center; border-radius: 50%; background: linear-gradient(135deg, var(--apu-blue-600) 0%, var(--apu-blue-700) 100%); color: #fff; font-size: .68rem; font-weight: 800; letter-spacing: .03em; }
-.comments-drawer__entry-body { display: grid; gap: .3rem; flex: 1 1 auto; min-width: 0; padding: .7rem .85rem; border: 1px solid var(--apu-border); border-radius: 0 .65rem .65rem .65rem; background: var(--apu-surface-muted); }
-.comments-drawer__entry-meta { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
-.comments-drawer__entry-meta strong { min-width: 0; overflow-wrap: anywhere; font-size: .8rem; color: var(--apu-navy-900); }
-.comments-drawer__entry-stage { flex-shrink: 0; font-size: .7rem; color: var(--apu-text-muted); font-weight: 500; }
-.comments-drawer__entry-text { margin: 0; overflow-wrap: anywhere; font-size: .82rem; color: var(--apu-navy-800); line-height: 1.55; white-space: pre-line; }
-
-// Mobile: the drawer stops being a pushed layout sibling and becomes a centered, near-full-screen
-// popup overlay with a backdrop — a side-by-side push has no room to work with on a small
-// viewport, so this switches the same markup to fixed positioning instead of resizing in place.
 @media (max-width: 48rem) {
-  .comments-ribbon { top: auto; bottom: calc(4.5rem + var(--space-4)); right: var(--space-3); padding: .6rem .9rem; border-radius: var(--radius-pill); writing-mode: horizontal-tb; }
   .proposal-page { flex-direction: column; }
   .proposal-page--drawer-open .proposal-page__main { flex-basis: auto; }
-  .comments-drawer {
-    position: fixed;
-    z-index: 90;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    width: auto;
-    margin-right: 0;
-    background: rgb(5 24 48 / 45%);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--motion-control) var(--ease-standard);
-  }
-  .comments-drawer--open {
-    width: auto;
-    border-left-width: 0;
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .comments-drawer__inner {
-    width: min(#{$comments-drawer-width-mobile}, calc(100vw - 2rem));
-    max-height: calc(100dvh - 4rem);
-    padding: var(--space-4);
-    border-radius: var(--radius-container);
-    box-shadow: var(--shadow-overlay);
-  }
 }
 .proposal-form,.proposal-step { display: grid; gap: var(--form-section-gap); }
 .proposal-step > header { display: flex; align-items: center; gap: var(--space-3); }

@@ -3,27 +3,28 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { environment } from '../../../../../environments/environment';
-import { PublishedEvent } from '../../../../core/events/published-event.models';
+import { EventSearchResponse, PublishedEvent } from '../../../../core/events/published-event.models';
 import { ExploreEventsComponent } from './explore-events';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { testRole, testTokens, testUser } from '../../../../core/auth/auth.test-fixtures';
 
-// Mirrors the variety of the old hardcoded 8-event fixture (titles/categories/schools/cost) so
-// this spec's pre-existing assertions (search matches, school filter options, a single
-// Sports & Wellness + Paid combination, 6/2-per-page pagination) still hold once the card grid is
-// driven by a real HTTP-fetched `PublishedEvent[]` instead of a literal array.
-const MOCK_EVENT_FIXTURES: readonly { title: string; category: PublishedEvent['categories'][number]; school: string; isFree: boolean }[] = [
+// Both variants (public landing page, internal Explore Events) are driven by the SAME server
+// search — GET /events/search — there is no separate client-side filtering path to keep in sync
+// with the backend's. See explore-events.ts's buildSearchParams()/load(). The internal-variant
+// suite lives in explore-events-internal.spec.ts (kept in a separate file: Angular's TestBed
+// cannot be reconfigured across a second describe() block in the same file).
+export const SEARCH_URL = `${environment.apiBaseUrl}/events/search`;
+
+export const MOCK_EVENT_FIXTURES: readonly { title: string; category: PublishedEvent['categories'][number]; school: string; isFree: boolean }[] = [
   { title: 'Startup Pitch Night', category: 'Academic & Career', school: 'School of Technology', isFree: true },
   { title: 'Career Connect Fair', category: 'Academic & Career', school: 'School of Business', isFree: true },
   { title: 'Community Green Day', category: 'Volunteering', school: 'Student Affairs', isFree: true },
   { title: 'Future Forward: Tech Expo', category: 'Workshops & Training', school: 'School of Technology', isFree: true },
   { title: 'One World Cultural Night', category: 'Culture & Community', school: 'Student Affairs', isFree: true },
   { title: 'APU Esports Showdown', category: 'Entertainment & Social', school: 'School of Computing', isFree: true },
-  { title: 'Campus After Dark', category: 'Entertainment & Social', school: 'Student Affairs', isFree: false },
-  { title: 'Wellness Run & Community Day', category: 'Sports & Wellness', school: 'School of Psychology', isFree: false },
 ];
 
-const MOCK_PUBLISHED_EVENTS: readonly PublishedEvent[] = MOCK_EVENT_FIXTURES.map((fixture, index) => ({
+export const MOCK_PUBLISHED_EVENTS: readonly PublishedEvent[] = MOCK_EVENT_FIXTURES.map((fixture, index) => ({
   id: `evt-${index + 1}`,
   eventTitle: fixture.title,
   shortIntroduction: 'Mock introduction.',
@@ -47,9 +48,12 @@ const MOCK_PUBLISHED_EVENTS: readonly PublishedEvent[] = MOCK_EVENT_FIXTURES.map
   isFree: fixture.isFree,
 }));
 
-describe('ExploreEventsComponent', () => {
+export function searchResponse(items: readonly PublishedEvent[]): EventSearchResponse {
+  return { items, total: items.length, page: 1, pageSize: items.length };
+}
+
+describe('ExploreEventsComponent (public variant)', () => {
   let fixture: ComponentFixture<ExploreEventsComponent>;
-  let component: ExploreEventsComponent;
   let httpMock: HttpTestingController;
 
   beforeEach(async () => {
@@ -61,11 +65,9 @@ describe('ExploreEventsComponent', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(ExploreEventsComponent);
-    component = fixture.componentInstance;
     httpMock = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
-    httpMock.expectOne(`${environment.apiBaseUrl}/events`).flush(MOCK_PUBLISHED_EVENTS);
-    httpMock.match((request) => request.url.startsWith(`${environment.apiBaseUrl}/catalog`)).forEach((request) => request.flush([]));
+    httpMock.expectOne((req) => req.url === SEARCH_URL).flush(searchResponse(MOCK_PUBLISHED_EVENTS));
     fixture.detectChanges();
   });
 
@@ -76,169 +78,93 @@ describe('ExploreEventsComponent', () => {
     document.body.classList.remove('filters-open');
   });
 
-  it('renders the discovery controls and the first six detailed event cards', () => {
+  it('renders the discovery controls and no filter button (public has no filter UI)', () => {
     const element = fixture.nativeElement as HTMLElement;
     const cards = element.querySelectorAll('.explore-card');
-    const detailLabels = [...element.querySelectorAll('.explore-card__details dt')].map((label) =>
-      label.textContent?.trim(),
-    );
 
-    expect(element.querySelector('#explore-events-title')?.textContent).toContain(
-      'Discover Your Campus',
-    );
+    expect(element.querySelector('#explore-events-title')?.textContent).toContain('Discover Your Campus');
     expect(element.querySelector('input[type="search"]')).not.toBeNull();
-    expect(element.querySelector('app-filter-button button')).not.toBeNull();
+    expect(element.querySelector('app-filter-button button')).toBeNull();
     expect(cards).toHaveLength(6);
-    expect(element.querySelectorAll('.explore-card__action')).toHaveLength(6);
-    expect(detailLabels).toContain('Date');
-    expect(detailLabels).toContain('Time');
-    expect(detailLabels).toContain('Venue');
   });
 
-  it('toggles clear saved and unsaved states', () => {
+  it('scopes every search request to Public visibility only, with no other filters', () => {
+    const input = fixture.nativeElement.querySelector('input[type="search"]') as HTMLInputElement;
+    input.value = 'career';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const request = httpMock.expectOne((req) => req.url === SEARCH_URL);
+    expect(request.request.params.getAll('visibility')).toEqual(['Public']);
+    expect(request.request.params.get('q')).toBe('career');
+    expect(request.request.params.has('category')).toBe(false);
+    request.flush(searchResponse([MOCK_PUBLISHED_EVENTS[1]]));
+  });
+
+  it('turns the heart blue the instant it is clicked, before the PUT resolves', () => {
     TestBed.inject(AuthService).establishSession(testUser(
       [testRole('student', 'school_of_computing', 'School of Computing')],
-      { email: 'applicant@demo.apu.edu.my', displayName: 'Demo Applicant', username: 'applicant' },
+      { email: 'applicant@demo.apu.edu.my', displayName: 'Demo Applicant' },
     ), testTokens());
     const saveButton = fixture.nativeElement.querySelector('.save-event') as HTMLButtonElement;
 
     expect(saveButton.getAttribute('aria-pressed')).toBe('false');
+    expect(saveButton.classList.contains('save-event--saved')).toBe(false);
+
     saveButton.click();
     fixture.detectChanges();
 
-    httpMock.expectOne((req) => req.method === 'POST' && req.url === `${`${environment.apiBaseUrl}/events/me`}/saved`)
-      .flush({ eventId: 'evt-1', saved: true });
-    fixture.detectChanges();
-
+    // Optimistic: already blue before the request behind it is flushed — a page reload must
+    // never be the thing that makes this true.
     expect(saveButton.getAttribute('aria-pressed')).toBe('true');
     expect(saveButton.classList.contains('save-event--saved')).toBe(true);
 
+    httpMock.expectOne((req) => req.method === 'PUT' && req.url === `${environment.apiBaseUrl}/events/me/saved/evt-1`)
+      .flush({ eventId: 'evt-1', saved: true });
+    fixture.detectChanges();
+    expect(saveButton.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('turns the heart gray the instant a saved event is unsaved, before the DELETE resolves', () => {
+    TestBed.inject(AuthService).establishSession(testUser(
+      [testRole('student', 'school_of_computing', 'School of Computing')],
+      { email: 'applicant@demo.apu.edu.my', displayName: 'Demo Applicant' },
+    ), testTokens());
+    const saveButton = fixture.nativeElement.querySelector('.save-event') as HTMLButtonElement;
+
+    saveButton.click();
+    fixture.detectChanges();
+    httpMock.expectOne((req) => req.method === 'PUT').flush({ eventId: 'evt-1', saved: true });
+    fixture.detectChanges();
+    expect(saveButton.getAttribute('aria-pressed')).toBe('true');
+
     saveButton.click();
     fixture.detectChanges();
 
-    httpMock.expectOne((req) => req.method === 'DELETE' && req.url.startsWith(`${`${environment.apiBaseUrl}/events/me`}/saved/`))
+    expect(saveButton.getAttribute('aria-pressed')).toBe('false');
+    expect(saveButton.classList.contains('save-event--saved')).toBe(false);
+
+    httpMock.expectOne((req) => req.method === 'DELETE' && req.url === `${environment.apiBaseUrl}/events/me/saved/evt-1`)
       .flush({ eventId: 'evt-1', saved: false });
     fixture.detectChanges();
-
     expect(saveButton.getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('searches events and presents an empty state when nothing matches', () => {
-    const input = fixture.nativeElement.querySelector('input[type="search"]') as HTMLInputElement;
-    input.value = 'an event that does not exist';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
-    expect(component.matchingEvents()).toHaveLength(0);
-    expect(fixture.nativeElement.querySelector('.explore-empty')).not.toBeNull();
-
-    input.value = 'career';
-    input.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-    expect(component.matchingEvents().length).toBeGreaterThan(0);
-  });
-
-  it('supports multi-select filters, a live result count, and removable applied chips', () => {
-    component.openFilters();
-    component.toggleDraftFilter('category', 'Sports & Wellness');
-    component.toggleDraftFilter('cost', 'Paid');
-    fixture.detectChanges();
-
-    expect(component.filterOpen()).toBe(true);
-    expect(document.body.classList.contains('filters-open')).toBe(true);
-    expect(component.draftResultCount()).toBe(1);
-
-    component.applyFilters();
-    fixture.detectChanges();
-
-    expect(component.filterOpen()).toBe(false);
-    expect(component.matchingEvents()).toHaveLength(1);
-    expect(component.appliedFilterChips()).toHaveLength(2);
-    expect(fixture.nativeElement.querySelectorAll('.applied-filter')).toHaveLength(2);
-
-    component.removeAppliedFilter('cost', 'Paid');
-    expect(component.appliedFilterChips()).toHaveLength(1);
-  });
-
-  it('paginates the event cards across pages', () => {
-    expect(component.pagedEvents()).toHaveLength(6);
-    expect(component.totalPages()).toBe(2);
-
-    component.goToPage(2);
-    fixture.detectChanges();
-
-    expect(component.currentPage()).toBe(2);
-    expect(component.pagedEvents()).toHaveLength(2);
-  });
-
-  it('loads school and department filters from the available event data', () => {
-    const schoolGroup = component.filterGroups().find((group) => group.key === 'school');
-
-    expect(schoolGroup?.options).toEqual(component.schoolOptions());
-    expect(schoolGroup?.options).toContain('School of Technology');
-    expect(schoolGroup?.options).toContain('Student Affairs');
-  });
-});
-
-// Public events must be visible to every visitor; Private/Club Only events are APU-community
-// content and must only reach a signed-in user, both server- and client-side.
-const MIXED_VISIBILITY_EVENTS: readonly PublishedEvent[] = [
-  { ...MOCK_PUBLISHED_EVENTS[0], id: 'evt-public', eventTitle: 'Open Campus Fair', eventVisibility: 'Public' },
-  { ...MOCK_PUBLISHED_EVENTS[0], id: 'evt-private', eventTitle: 'Internal Staff Briefing', eventVisibility: 'Private' },
-  { ...MOCK_PUBLISHED_EVENTS[0], id: 'evt-club', eventTitle: 'Club Only Social', eventVisibility: 'Club Only' },
-];
-
-describe('ExploreEventsComponent visibility filtering', () => {
-  let fixture: ComponentFixture<ExploreEventsComponent>;
-  let httpMock: HttpTestingController;
-
-  afterEach(() => {
-    httpMock.verify();
-    fixture.destroy();
-    TestBed.resetTestingModule();
-  });
-
-  it('hides Private and Club Only events from a guest (not signed in)', () => {
-    localStorage.removeItem('apu-ems-auth-user');
-    TestBed.configureTestingModule({
-      imports: [ExploreEventsComponent],
-      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
-    });
-    fixture = TestBed.createComponent(ExploreEventsComponent);
-    httpMock = TestBed.inject(HttpTestingController);
-    fixture.detectChanges();
-    httpMock.expectOne(`${environment.apiBaseUrl}/events`).flush(MIXED_VISIBILITY_EVENTS);
-    httpMock.match((request) => request.url.startsWith(`${environment.apiBaseUrl}/catalog`)).forEach((request) => request.flush([]));
-    fixture.detectChanges();
-
-    const titles = fixture.componentInstance.events().map((event) => event.title);
-    expect(titles).toEqual(['Open Campus Fair']);
-  });
-
-  it('shows Public, Private and Club Only events to a signed-in user', () => {
-    TestBed.configureTestingModule({
-      imports: [ExploreEventsComponent],
-      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
-    });
+  it('rolls the heart back if the server rejects the save', () => {
     TestBed.inject(AuthService).establishSession(testUser(
       [testRole('student', 'school_of_computing', 'School of Computing')],
-      { email: 'applicant@demo.apu.edu.my', displayName: 'Demo Applicant', username: 'applicant' },
+      { email: 'applicant@demo.apu.edu.my', displayName: 'Demo Applicant' },
     ), testTokens());
-    fixture = TestBed.createComponent(ExploreEventsComponent);
-    httpMock = TestBed.inject(HttpTestingController);
+    const saveButton = fixture.nativeElement.querySelector('.save-event') as HTMLButtonElement;
+
+    saveButton.click();
     fixture.detectChanges();
-    httpMock.expectOne(`${environment.apiBaseUrl}/events`).flush(MIXED_VISIBILITY_EVENTS);
-    httpMock.match((request) => request.url.startsWith(`${environment.apiBaseUrl}/catalog`)).forEach((request) => request.flush([]));
+    expect(saveButton.getAttribute('aria-pressed')).toBe('true');
+
+    httpMock.expectOne((req) => req.method === 'PUT' && req.url === `${environment.apiBaseUrl}/events/me/saved/evt-1`)
+      .flush('Server error', { status: 500, statusText: 'Server Error' });
     fixture.detectChanges();
 
-    const titles = fixture.componentInstance.events().map((event) => event.title);
-    expect(titles).toEqual(['Open Campus Fair', 'Internal Staff Briefing', 'Club Only Social']);
-
-    // Signed-in-only side effects that confirm all three (not just the Public one) were treated
-    // as visible: per-event "my registration" lookups plus the saved-events fetch.
-    httpMock.expectOne((req) => req.url === `${`${environment.apiBaseUrl}/events`}/evt-public/registrations/mine`).flush(null);
-    httpMock.expectOne((req) => req.url === `${`${environment.apiBaseUrl}/events`}/evt-private/registrations/mine`).flush(null);
-    httpMock.expectOne((req) => req.url === `${`${environment.apiBaseUrl}/events`}/evt-club/registrations/mine`).flush(null);
-    httpMock.expectOne((req) => req.url.startsWith(`${`${environment.apiBaseUrl}/events/me`}/saved`)).flush({ items: [] });
+    expect(saveButton.getAttribute('aria-pressed')).toBe('false');
   });
 });

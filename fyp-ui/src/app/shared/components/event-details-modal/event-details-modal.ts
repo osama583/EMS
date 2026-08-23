@@ -6,6 +6,7 @@ import { PAYMENT_PROOF_UPLOAD_API, PaymentProofUploadApi } from '../../../core/e
 import { FormFieldComponent } from '../form-controls/form-field';
 import { FormModalComponent } from '../form-modal/form-modal';
 import { ValidationMessageComponent } from '../validation-message/validation-message';
+import { EVENT_IMAGE_PLACEHOLDER } from '../../event-image-placeholder';
 
 @Component({
   selector: 'app-event-details-modal',
@@ -17,7 +18,7 @@ import { ValidationMessageComponent } from '../validation-message/validation-mes
       [title]="event()?.eventTitle || 'Event details'"
       primaryLabel="Register"
       [loading]="registering()"
-      [disabled]="!emailValid()"
+      [disabled]="!emailValid() || (!isLoggedIn() && !name().trim())"
       [hidePrimary]="!!alreadyRegistered()"
       (close)="close.emit()"
       (cancel)="close.emit()"
@@ -32,7 +33,7 @@ import { ValidationMessageComponent } from '../validation-message/validation-mes
             [attr.aria-label]="'Open a larger preview of ' + item.eventTitle"
             (click)="openImagePreview()"
           >
-            <img [src]="item.eventImage.url" [alt]="item.eventTitle" />
+            <img [src]="item.eventImage?.url || placeholder" [alt]="item.eventTitle" />
             <span class="event-details__image-overlay" aria-hidden="true">
               <span class="material-symbols-rounded">zoom_out_map</span>
               Expand image
@@ -72,13 +73,18 @@ import { ValidationMessageComponent } from '../validation-message/validation-mes
           } @else {
             @if (isPaidEvent(item)) {
               <section class="event-details__payment" aria-labelledby="event-payment-title">
-                <h3 id="event-payment-title">Payment Required</h3>
+                <header class="event-details__payment-head">
+                  <span class="material-symbols-rounded" aria-hidden="true">payments</span>
+                  <div>
+                    <h3 id="event-payment-title">Payment Required</h3>
+                    <p class="event-details__payment-subtitle">This event has a cost — your registration is confirmed only after the organizer reviews your proof of payment.</p>
+                  </div>
+                </header>
                 <dl>
                   <div><dt>Cost</dt><dd>RM {{ item.cost!.toFixed(2) }}</dd></div>
                   @if (item.bankAccountName) { <div><dt>Account Name</dt><dd>{{ item.bankAccountName }}</dd></div> }
                   @if (item.bankAccountNumber) { <div><dt>Account Number</dt><dd>{{ item.bankAccountNumber }}</dd></div> }
                 </dl>
-                <p>Transfer the amount above, then upload your payment proof. The organizer will review it before confirming your registration.</p>
 
                 <input
                   #paymentProofInput
@@ -89,23 +95,45 @@ import { ValidationMessageComponent } from '../validation-message/validation-mes
                   (change)="selectPaymentProof($event)"
                 />
 
-                @if (paymentProof(); as proof) {
-                  <div class="event-details__payment-proof">
-                    <span class="material-symbols-rounded" aria-hidden="true">description</span>
-                    <strong>{{ proof.fileName }}</strong>
-                    <button type="button" class="table-control" [disabled]="uploadingProof()" (click)="choosePaymentProof()">Replace</button>
-                  </div>
-                } @else {
-                  <button type="button" class="table-control" [disabled]="uploadingProof()" (click)="choosePaymentProof()">
-                    <span class="material-symbols-rounded" aria-hidden="true">upload_file</span>
-                    {{ uploadingProof() ? 'Preparing file…' : 'Upload payment proof' }}
-                  </button>
-                }
-
-                @if (paymentProofError()) {
-                  <app-validation-message controlId="event-payment-proof-file" [message]="paymentProofError()" />
-                }
+                <div class="event-details__payment-proof-field">
+                  <span class="event-details__payment-proof-label">
+                    Payment proof
+                    <span class="event-details__payment-required" aria-hidden="true">*</span>
+                    <span class="visually-hidden">required</span>
+                  </span>
+                  @if (paymentProof(); as proof) {
+                    <div class="event-details__payment-proof event-details__payment-proof--attached">
+                      <span class="material-symbols-rounded" aria-hidden="true">check_circle</span>
+                      <strong>{{ proof.fileName }}</strong>
+                      <button type="button" class="table-control" [disabled]="uploadingProof()" (click)="choosePaymentProof()">Replace</button>
+                    </div>
+                  } @else {
+                    <button type="button" class="event-details__payment-upload" [class.event-details__payment-upload--invalid]="!!paymentProofError()" [disabled]="uploadingProof()" (click)="choosePaymentProof()">
+                      <span class="material-symbols-rounded" aria-hidden="true">upload_file</span>
+                      <span>
+                        <strong>{{ uploadingProof() ? 'Preparing file…' : 'Upload payment proof' }}</strong>
+                        <small>PNG, JPG, WebP or PDF · up to {{ maxProofFileSizeMb }} MB</small>
+                      </span>
+                    </button>
+                  }
+                  @if (paymentProofError()) {
+                    <app-validation-message controlId="event-payment-proof-file" [message]="paymentProofError()" />
+                  }
+                </div>
               </section>
+            }
+
+            @if (!isLoggedIn()) {
+              <app-form-field
+                controlId="event-registration-name"
+                label="Full Name"
+                type="text"
+                placeholder="Your name"
+                [required]="true"
+                [value]="name()"
+                [error]="nameError()"
+                (valueChange)="setName($event)"
+              />
             }
 
             <app-form-field
@@ -160,7 +188,7 @@ import { ValidationMessageComponent } from '../validation-message/validation-mes
         (keydown.escape)="closeImagePreview($event)"
       >
         <figure (click)="$event.stopPropagation()">
-          <img [src]="item.eventImage.url" [alt]="item.eventTitle" />
+          <img [src]="item.eventImage?.url || placeholder" [alt]="item.eventTitle" />
           <figcaption>{{ item.eventTitle }}</figcaption>
           <button type="button" aria-label="Close image preview" (click)="closeImagePreview()">
             <span class="material-symbols-rounded" aria-hidden="true">close</span>
@@ -173,6 +201,7 @@ import { ValidationMessageComponent } from '../validation-message/validation-mes
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EventDetailsModalComponent {
+  readonly placeholder = EVENT_IMAGE_PLACEHOLDER;
   private readonly auth = inject(AuthService);
   private readonly service = inject(PublishedEventService);
   private readonly paymentProofUploadApi = inject(PaymentProofUploadApi);
@@ -187,6 +216,11 @@ export class EventDetailsModalComponent {
 
   readonly email = signal('');
   readonly emailError = signal('');
+  // Only asked of an anonymous visitor — a signed-in caller registers under their own account
+  // identity, same as before; see register()'s guest branch.
+  readonly name = signal('');
+  readonly nameError = signal('');
+  readonly isLoggedIn = () => !!this.auth.user();
   readonly message = signal('');
   readonly imagePreviewOpen = signal(false);
   readonly resultTone = signal<'success' | 'error'>('success');
@@ -204,12 +238,12 @@ export class EventDetailsModalComponent {
   readonly paymentProof = signal<{ url: string; fileName: string } | null>(null);
   readonly uploadingProof = signal(false);
   readonly paymentProofError = signal('');
-  // Events with registrationMode 'Approval Required' collect a short reason the organizer reads
+  // Events with registrationMode 'Manual' collect a short reason the organizer reads
   // in their Inbox before approving (system specification §6).
   readonly reasonMaxLength = 100;
   readonly reason = signal('');
   readonly reasonError = signal('');
-  readonly needsReason = computed(() => this.event()?.registrationMode === 'Approval Required');
+  readonly needsReason = computed(() => this.event()?.registrationMode === 'Manual');
   readonly maxProofFileSizeMb = 5;
   private readonly allowedProofTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'application/pdf']);
 
@@ -222,6 +256,8 @@ export class EventDetailsModalComponent {
       if (this.open()) {
         this.email.set(this.auth.user()?.email ?? '');
         this.emailError.set('');
+        this.name.set(this.auth.user()?.displayName ?? '');
+        this.nameError.set('');
         this.message.set('');
         this.paymentProof.set(null);
         this.paymentProofError.set('');
@@ -260,10 +296,9 @@ export class EventDetailsModalComponent {
 
   private loadMyRegistration(): void {
     const item = this.event();
-    const userEmail = this.auth.user()?.email;
     this.myRegistrationStatus.set(null);
-    if (!item || !userEmail) return;
-    this.service.getMyRegistration(item.id, userEmail).subscribe({
+    if (!item || !this.auth.user()) return;
+    this.service.getMyRegistration(item.id).subscribe({
       next: (registration) => this.myRegistrationStatus.set(registration?.status ?? null),
       error: () => this.myRegistrationStatus.set(null),
     });
@@ -286,6 +321,11 @@ export class EventDetailsModalComponent {
     if (this.emailValid()) this.emailError.set('');
   }
 
+  setName(value: string): void {
+    this.name.set(value);
+    if (this.name().trim()) this.nameError.set('');
+  }
+
   setReason(value: string): void {
     this.reason.set(value.slice(0, this.reasonMaxLength));
     if (this.reason().trim()) this.reasonError.set('');
@@ -300,6 +340,11 @@ export class EventDetailsModalComponent {
       return;
     }
 
+    if (!this.isLoggedIn() && !this.name().trim()) {
+      this.nameError.set('Enter your name to register.');
+      return;
+    }
+
     if (this.needsReason() && !this.reason().trim()) {
       this.reasonError.set('Tell the organizer why you would like to attend.');
       return;
@@ -311,7 +356,8 @@ export class EventDetailsModalComponent {
     }
 
     this.registering.set(true);
-    this.service.registerForEvent(item.id, this.email(), this.paymentProof() ?? undefined, this.reason().trim() || undefined).subscribe({
+    const guest = this.isLoggedIn() ? undefined : { name: this.name().trim(), email: this.email().trim() };
+    this.service.registerForEvent(item.id, this.paymentProof() ?? undefined, this.reason().trim() || undefined, guest).subscribe({
       next: (result) => {
         this.registering.set(false);
         this.message.set(result.message);

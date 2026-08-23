@@ -8,6 +8,7 @@
 @use './styles/internal-data-page';
 @use './styles/form-controls';
 @use './styles/tabs';
+@use './styles/task-calendar-toggle';
 @use './app/shared/components/form-modal/form-modal';
 
 // Internal navigation styles are loaded globally so the floating shell can

@@ -15,6 +15,9 @@ import {
   InternalRowAction,
   InternalRowActionEvent,
   InternalSearchConfig,
+  InternalSortChange,
+  InternalSortOrder,
+  InternalSortState,
   InternalTableColumn,
 } from './internal-data-page.models';
 
@@ -27,7 +30,12 @@ import {
         <p>{{ config().description }}</p>
       </div>
       <div class="shared-page-header__actions">
-        @if (config().countLabel) { <span class="shared-page-header__count">{{ config().countLabel }}</span> }
+        @if (config().countLabel) {
+          <span class="shared-page-header__count">
+            <span class="material-symbols-rounded" aria-hidden="true">{{ config().countIcon ?? 'inbox' }}</span>
+            {{ config().countLabel }}
+          </span>
+        }
         <!-- Card/Table toggle and any page-specific header buttons sit HERE, on the same row as the
              title + description (title left, controls right) rather than in their own strip below
              the header or inside the search/filter card. -->
@@ -136,8 +144,20 @@ export class InternalResetButtonComponent {
       <thead>
         <tr>
           @for (column of columns(); track column.key) {
-            <th scope="col" [attr.data-actions]="column.actions ? '' : null" [style.width]="column.width ?? null">
-              {{ column.label }}
+            <th
+              scope="col"
+              [attr.data-actions]="column.actions ? '' : null"
+              [attr.aria-sort]="ariaSortFor(column)"
+              [style.width]="column.width ?? null"
+            >
+              @if (column.sortKey) {
+                <button type="button" class="shared-data-table__sort" (click)="toggleSort(column)">
+                  {{ column.label }}
+                  <span class="material-symbols-rounded" aria-hidden="true">{{ sortIconFor(column) }}</span>
+                </button>
+              } @else {
+                {{ column.label }}
+              }
             </th>
           }
         </tr>
@@ -215,10 +235,30 @@ export class InternalDataTableComponent {
   readonly columns = input.required<readonly InternalTableColumn[]>();
   readonly records = input.required<readonly InternalDataRecord[]>();
   readonly actions = input.required<readonly InternalRowAction[]>();
+  // undefined when the page doesn't sort server-side — every sortKey-less column ignores this.
+  readonly sort = input<InternalSortState | undefined>(undefined);
   readonly actionSelect = output<InternalRowActionEvent>();
   readonly cellClick = output<InternalCellClickEvent>();
+  readonly sortChange = output<InternalSortChange>();
   visibleActions(record: InternalDataRecord): readonly InternalRowAction[] {
     return record.actionKeys ? this.actions().filter((action) => record.actionKeys!.includes(action.key)) : this.actions();
+  }
+  private isActive(column: InternalTableColumn): boolean {
+    return !!column.sortKey && this.sort()?.key === column.sortKey;
+  }
+  ariaSortFor(column: InternalTableColumn): 'ascending' | 'descending' | null {
+    if (!this.isActive(column)) return null;
+    return this.sort()!.order === 'asc' ? 'ascending' : 'descending';
+  }
+  sortIconFor(column: InternalTableColumn): string {
+    if (!this.isActive(column)) return 'unfold_more';
+    return this.sort()!.order === 'asc' ? 'arrow_upward' : 'arrow_downward';
+  }
+  // First click on a column sorts ascending; clicking the already-active column flips order.
+  toggleSort(column: InternalTableColumn): void {
+    if (!column.sortKey) return;
+    const next: InternalSortOrder = this.isActive(column) && this.sort()!.order === 'asc' ? 'desc' : 'asc';
+    this.sortChange.emit({ key: column.sortKey, order: next });
   }
 }
 
@@ -289,19 +329,21 @@ export class InternalPageStateComponent {
             }
           </span>
         </button>
-        <details class="shared-mobile-card__menu">
-          <summary [attr.aria-label]="'Actions for ' + record.mobile.title">
-            <span class="material-symbols-rounded" aria-hidden="true">more_horiz</span>
-          </summary>
-          <div>
-            @for (action of visibleActions(record); track action.key) {
-              <button type="button" (click)="actionSelect.emit({ action, record })">
-                <span class="material-symbols-rounded" aria-hidden="true">{{ action.icon }}</span>
-                {{ action.label }}
-              </button>
-            }
-          </div>
-        </details>
+        @if (visibleActions(record).length > 0) {
+          <details class="shared-mobile-card__menu">
+            <summary [attr.aria-label]="'Actions for ' + record.mobile.title">
+              <span class="material-symbols-rounded" aria-hidden="true">more_horiz</span>
+            </summary>
+            <div>
+              @for (action of visibleActions(record); track action.key) {
+                <button type="button" (click)="actionSelect.emit({ action, record })">
+                  <span class="material-symbols-rounded" aria-hidden="true">{{ action.icon }}</span>
+                  {{ action.label }}
+                </button>
+              }
+            </div>
+          </details>
+        }
       </article>
     }
   `,

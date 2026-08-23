@@ -27,18 +27,29 @@
   // attributes/styles win over an inherited `fill: currentColor` on just the root <svg>, so every
   // descendant is forced to currentColor (!important) here — the whole icon renders as one solid
   // color (the app's primary blue via NavIconComponent's usage sites) no matter what colors the
-  // file itself shipped with.
+  // file itself shipped with. Except fill="none", own or INHERITED: a stroke-only icon commonly
+  // sets fill="none" once on a wrapping <g> (e.g. every "line-md"-style icon) rather than
+  // repeating it on each <path> — forcing currentColor onto those children paints solid blobs
+  // over what should be open line art, so both cases are excluded here the same way stroke="none"
+  // already is below.
   ::ng-deep svg,
-  ::ng-deep svg * {
+  ::ng-deep svg :not([fill="none"]):not(:where([fill="none"]) *) {
     fill: currentColor !important;
+  }
+  ::ng-deep svg * {
     stroke: none !important;
   }
 
   // Icons drawn with stroke outlines rather than fills (e.g. exported from icon sets that default
   // to stroke-based paths) still need to render in the same color — force stroke too, but only on
-  // elements that actually use one (a real fill="none" [stroke] path), so filled shapes don't grow
-  // an unwanted 1px outline.
-  ::ng-deep svg [stroke]:not([stroke="none"]) {
+  // elements that actually use one, so filled shapes don't grow an unwanted 1px outline. `stroke`
+  // is an inherited SVG presentation attribute: a multi-path icon commonly sets it once on a
+  // wrapping <g> (e.g. every "line-md"-style animated icon) rather than repeating it on each
+  // <path>. Matching only [stroke] on the element itself missed every such child — stuck at the
+  // blanket stroke:none above with nothing to re-enable it — so this also matches any descendant
+  // of a stroke-carrying, non-"none" ancestor.
+  ::ng-deep svg [stroke]:not([stroke="none"]),
+  ::ng-deep svg :where([stroke]:not([stroke="none"])) * {
     stroke: currentColor !important;
   }
 

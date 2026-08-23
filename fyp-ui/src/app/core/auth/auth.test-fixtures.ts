@@ -9,7 +9,6 @@ import { AuthTokens } from './token-store';
 export interface TestUserOptions {
   readonly email?: string;
   readonly displayName?: string;
-  readonly username?: string;
   readonly accountType?: 'internal' | 'external';
   readonly roleLabel?: string;
   readonly department?: string;
@@ -41,7 +40,6 @@ export function testUser(roles: readonly AuthUserRole[], options: TestUserOption
     id: options.id ?? '1',
     email: options.email ?? 'test.user@demo.apu.edu.my',
     displayName: options.displayName ?? 'Test User',
-    username: options.username ?? 'test.user',
     accountType: options.accountType ?? (roles.some((r) => r.roleCode === 'external-user') ? 'external' : 'internal'),
     roles,
     roleLabel: options.roleLabel ?? (primary ? (primary.unitDescription ? `${primary.roleName} — ${primary.unitDescription}` : primary.roleName) : 'Unassigned'),
@@ -55,29 +53,29 @@ export function testUser(roles: readonly AuthUserRole[], options: TestUserOption
 
 // Ready-made identities the specs reach for repeatedly.
 export const TEST_STUDENT = testUser([testRole('student', 'school_of_computing', 'School of Computing')], {
-  email: 'applicant@demo.apu.edu.my', displayName: 'Demo Applicant', username: 'applicant',
+  email: 'applicant@demo.apu.edu.my', displayName: 'Demo Applicant',
 });
 export const TEST_HEAD_OF_SCHOOL = testUser([testRole('head-of-school', 'school_of_computing', 'School of Computing')], {
-  email: 'hoshod@demo.apu.edu.my', displayName: 'HOS / HOD Demo', username: 'hoshod',
+  email: 'hoshod@demo.apu.edu.my', displayName: 'HOS / HOD Demo',
 });
 export const TEST_FMB_HEAD = testUser([testRole('head-of-department', 'food_beverage_services', 'Food & Beverage Services')], {
-  email: 'fmb@demo.apu.edu.my', displayName: 'F&B Demo', username: 'fmb',
+  email: 'fmb@demo.apu.edu.my', displayName: 'F&B Demo',
 });
 export const TEST_LOGISTICS_STAFF = testUser([testRole('staff', 'logistics_and_facilities', 'Logistics and Facilities')], {
-  email: 'logistics.staff@demo.apu.edu.my', displayName: 'Ahmad', username: 'logistics.staff',
+  email: 'logistics.staff@demo.apu.edu.my', displayName: 'Ahmad',
 });
 export const TEST_CAFETERIA_MANAGER = testUser([testRole('cafeteria-manager', 'cafeteria__atrium_cafeteria', 'Atrium Cafeteria')], {
-  email: 'cafeteria.manager@demo.apu.edu.my', displayName: 'Cafeteria Manager', username: 'cafeteria.manager',
+  email: 'cafeteria.manager@demo.apu.edu.my', displayName: 'Cafeteria Manager',
   cafeteriaCode: 'cafeteria__atrium_cafeteria',
 });
 export const TEST_CFO = testUser([testRole('cfo')], {
-  email: 'cfo@demo.apu.edu.my', displayName: 'CFO Demo', username: 'cfo',
+  email: 'cfo@demo.apu.edu.my', displayName: 'CFO Demo',
 });
 export const TEST_SYSTEM_ADMIN = testUser([testRole('system-admin')], {
-  email: 'system.admin@demo.apu.edu.my', displayName: 'System Admin', username: 'system.admin',
+  email: 'system.admin@demo.apu.edu.my', displayName: 'System Admin',
 });
 export const TEST_EXTERNAL_USER = testUser([testRole('external-user')], {
-  email: 'guest@example.com', displayName: 'Guest User', username: 'guest',
+  email: 'guest@example.com', displayName: 'Guest User',
 });
 
 

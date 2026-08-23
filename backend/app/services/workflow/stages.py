@@ -236,7 +236,7 @@ def send_back(cur, request_id: int, principal: Principal, comment: str) -> dict:
     return load_request(cur, request_id)
 
 
-def applicant_resubmit(cur, request_id: int, principal: Principal) -> dict:
+def applicant_resubmit(cur, request_id: int, principal: Principal, comment: str | None = None) -> dict:
     """The applicant returns work that was sent back. Two distinct cases.
 
     Case 1 - a reviewer stage sent the whole proposal back: status is
@@ -248,7 +248,10 @@ def applicant_resubmit(cur, request_id: int, principal: Principal) -> dict:
     is untouched.
 
     Content is saved separately (see services/proposals.py) so this function
-    owns the transition alone.
+    owns the transition alone. `comment` is the applicant's reply, recorded
+    alongside the transition so it joins the same per-partner conversation as
+    the reviewer's/department's original send-back comment (see
+    history.conversations_for).
     """
     request = load_request(cur, request_id)
     assert_proposal_owner(cur, request_id, principal.user_id)
@@ -272,6 +275,7 @@ def applicant_resubmit(cur, request_id: int, principal: Principal) -> dict:
                 actor_role="applicant",
                 request_task_id=task["request_task_id"],
                 requirement_id=task["requirement_id"],
+                comment=comment,
                 previous_status="resubmitted",
                 new_status="pending",
             )
@@ -288,6 +292,7 @@ def applicant_resubmit(cur, request_id: int, principal: Principal) -> dict:
         action="applicant-resubmit",
         actor_user_id=principal.user_id,
         actor_role="applicant",
+        comment=comment,
         previous_status=RESUBMISSION_REQUIRED,
         new_status=resume_status,
     )

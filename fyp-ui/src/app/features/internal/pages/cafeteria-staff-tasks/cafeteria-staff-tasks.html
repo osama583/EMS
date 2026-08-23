@@ -1,0 +1,69 @@
+@if (error()) { <app-feedback-banner tone="error" [message]="error()" /> }
+
+<div class="staff-tasks-calendar-bar">
+  <div class="staff-tasks-calendar-toggle">
+    <button
+      type="button"
+      class="staff-tasks-calendar-toggle__btn"
+      [class.staff-tasks-calendar-toggle__btn--active]="!isDefaultDateFilter()"
+      [attr.aria-expanded]="calendarOpen()"
+      (click)="toggleCalendar()"
+    >
+      <span class="material-symbols-rounded" aria-hidden="true">calendar_month</span>
+      <span>{{ calendarButtonLabel() }}</span>
+      @if (!isDefaultDateFilter()) { <span class="staff-tasks-calendar-toggle__dot" aria-hidden="true"></span> }
+      <span class="material-symbols-rounded staff-tasks-calendar-toggle__chevron" aria-hidden="true">{{ calendarOpen() ? 'expand_less' : 'expand_more' }}</span>
+    </button>
+    @if (calendarOpen()) {
+      <div class="staff-tasks-calendar-toggle__panel" role="dialog" aria-label="Filter by date">
+        <app-task-calendar [taskDates]="taskDates()" [selection]="dateFilter()" (selectionChange)="setDateFilter($event)" />
+        @if (!isDefaultDateFilter()) {
+          <button type="button" class="staff-tasks-calendar-toggle__clear" (click)="clearDateFilter()">Clear date filter</button>
+        }
+      </div>
+    }
+  </div>
+</div>
+
+<app-internal-data-page [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()" [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()" (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()" (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)" (recordOpen)="openRecord($event)" />
+
+<app-form-modal
+  [open]="modalOpen()"
+  [title]="isDeliveryStep() ? 'Confirm delivery' : 'Order details'"
+  [primaryLabel]="isDeliveryStep() ? 'Confirm Delivered' : 'Close'"
+  [secondaryLabel]="'Cancel'"
+  [showSecondary]="isDeliveryStep()"
+  [disabled]="isDeliveryStep() && !deliveryPhoto()"
+  [loading]="saving()"
+  [fixedSize]="true"
+  (close)="closeModal()"
+  (cancel)="closeModal()"
+  (submit)="confirm()"
+>
+  @if (selected(); as order) {
+    @if (isDeliveryStep()) {
+      <p class="task-confirmation">Take a photo of the order as proof of delivery for <strong>{{ order.eventTitle }}</strong>. The order is not marked delivered until a photo is attached.</p>
+      <app-camera-capture label="Order Image" [value]="deliveryPhoto()" (valueChange)="deliveryPhoto.set($event)" />
+    }
+    <dl class="task-details">
+      <div><dt>Event</dt><dd>{{ order.eventTitle }} · {{ order.requestCode }}</dd></div>
+      <div><dt>Order</dt><dd>{{ order.menuItemLabel }}</dd></div>
+      <div><dt>Quantity</dt><dd>{{ order.quantity }}</dd></div>
+      <div><dt>Cafeteria</dt><dd>{{ order.cafeteriaName }}</dd></div>
+      <div><dt>Serve Time</dt><dd>{{ order.serveDate }} · {{ order.serveTime.slice(0, 5) }}</dd></div>
+      @if (order.notes) { <div><dt>Notes</dt><dd>{{ order.notes }}</dd></div> }
+    </dl>
+  }
+</app-form-modal>
+
+<app-confirm-dialog
+  [open]="pendingAction() !== null"
+  [title]="pendingActionCopy().title"
+  [message]="pendingActionCopy().message"
+  [confirmLabel]="pendingActionCopy().confirmLabel"
+  cancelLabel="Cancel"
+  [danger]="false"
+  [loading]="saving()"
+  (confirm)="confirmPendingAction()"
+  (cancel)="closePendingAction()"
+/>

@@ -1,10 +1,12 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import { DepartmentRequestKind } from '../../../core/departments/department-workflow.config';
+import { ProposalConversation } from '../../../core/proposals/proposal-conversation.models';
 import { ProposalReviewRecord } from '../../../core/proposals/proposal-review.models';
-import { ProposalStage, ReviewerCommentEntry, reviewerCommentEntry, stageLabel } from '../../../core/proposals/proposal-status.models';
+import { DEPARTMENT_LABELS, ProposalStage, ReviewerCommentEntry, initialsFor, reviewerCommentEntry, stageLabel } from '../../../core/proposals/proposal-status.models';
 import { ProposalWorkflowService } from '../../../core/proposals/proposal-workflow.service';
+import { ConversationThreadComponent } from '../conversation-thread/conversation-thread';
 import { EditableRow } from '../form-controls/form-controls.models';
 import { FormModalComponent } from '../form-modal/form-modal';
 import { ProposalFieldComponent } from '../proposal-field/proposal-field';
@@ -71,7 +73,7 @@ function parseEventDate(rawStr: string): Date | null {
 
 @Component({
   selector: 'app-proposal-reviewer-view',
-  imports: [ProposalTableComponent, FormModalComponent, ProposalKpiBarComponent, ProposalSectionComponent, ProposalFieldComponent],
+  imports: [ProposalTableComponent, FormModalComponent, ProposalKpiBarComponent, ProposalSectionComponent, ProposalFieldComponent, ConversationThreadComponent],
   templateUrl: './proposal-reviewer-view.html',
   styleUrl: './proposal-reviewer-view.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -101,6 +103,63 @@ export class ProposalReviewerViewComponent {
   readonly rejectCommentError = signal(false);
   readonly comment = signal('');
   readonly commentValidationError = signal(false);
+
+  // Per-partner conversation threads, already scoped server-side to what the CURRENT viewer may
+  // see — an authority gets back only their own thread (length 1), the applicant/co-owner gets
+  // every thread on the proposal (length may be > 1), which is what decides list-vs-single-thread
+  // rendering below, with no separate "am I the applicant" input needed.
+  readonly conversations = signal<readonly ProposalConversation[]>([]);
+  readonly activeConversationId = signal<string | null>(null);
+
+  readonly conversationSummaries = computed(() =>
+    this.conversations().map((conversation) => {
+      const partnerName = conversation.conversationId.startsWith('task:')
+        ? (DEPARTMENT_LABELS[conversation.partnerName] ?? conversation.partnerName)
+        : conversation.partnerName;
+      const lastMsg = conversation.messages[conversation.messages.length - 1];
+      return {
+        conversationId: conversation.conversationId,
+        partnerName,
+        partnerRoleLabel: conversation.partnerRoleLabel,
+        initials: initialsFor(partnerName),
+        lastMessage: lastMsg?.text ?? '',
+        lastMessageAt: lastMsg ? this.formatListTime(lastMsg.createdAt) : '',
+      };
+    }),
+  );
+
+  // Matches reviewer-comments-drawer.ts's own formatListTime — same "time today, date otherwise"
+  // stamp for a conversation-list row, kept local since neither side is currently shared.
+  protected formatListTime(iso: string): string {
+    const date = new Date(iso);
+    if (isNaN(date.getTime())) return '';
+    const isToday = date.toDateString() === new Date().toDateString();
+    return isToday
+      ? date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+      : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  }
+
+  readonly activeConversation = computed(() => {
+    const id = this.activeConversationId() ?? (this.conversations().length === 1 ? this.conversations()[0].conversationId : null);
+    return id ? this.conversations().find((c) => c.conversationId === id) ?? null : null;
+  });
+
+  readonly activeSummary = computed(() => {
+    const active = this.activeConversation();
+    return active ? this.conversationSummaries().find((c) => c.conversationId === active.conversationId) ?? null : null;
+  });
+
+  constructor() {
+    effect(() => {
+      const proposal = this.proposal();
+      this.activeConversationId.set(null);
+      if (!proposal) { this.conversations.set([]); return; }
+      this.workflow.getConversations(proposal.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: (conversations) => this.conversations.set(conversations),
+        error: () => this.conversations.set([]),
+      });
+    });
+  }
 
   readonly stage = computed<ProposalStage | null>(() => this.proposal()?.workflow.stage ?? null);
   readonly stageLabel = computed(() => this.stage() ? stageLabel(this.stage()!) : '');
@@ -169,13 +228,22 @@ export class ProposalReviewerViewComponent {
     return Date.now() <= deadline.getTime();
   });
 
+  // `readOnly` only suppresses the reviewer actions (approve/reject/resubmit) above — it's set
+  // whenever an applicant opens their own proposal from Ongoing (they own no reviewer stage
+  // there), which must not also hide their own, unrelated ability to cancel their application.
+  // Approved/Rejected/Cancelled are all terminal for cancellation server-side (authorize_cancel
+  // in authorization.py) — once fully approved, the applicant can no longer self-cancel.
   readonly canCancel = computed(() => {
     const proposal = this.proposal();
     if (!proposal) return false;
-    if (proposal.workflow.stage === ProposalStage.Cancelled || proposal.workflow.stage === ProposalStage.Rejected) {
+    if (
+      proposal.workflow.stage === ProposalStage.Cancelled
+      || proposal.workflow.stage === ProposalStage.Rejected
+      || proposal.workflow.stage === ProposalStage.Approved
+    ) {
       return false;
     }
-    return !this.readOnly() && this.isSubmitterOrCoOwner() && this.isWithinCancellationWindow();
+    return this.isSubmitterOrCoOwner() && this.isWithinCancellationWindow();
   });
 
   readonly commentRequired = computed(() =>

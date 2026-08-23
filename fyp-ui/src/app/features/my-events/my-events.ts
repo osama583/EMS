@@ -15,9 +15,20 @@ export class MyEventsComponent {
   readonly publicLayout = !this.router.url.startsWith('/app/');
   readonly basePath = this.publicLayout ? '/my-events' : '/app/events/my-events';
 
-  readonly tabs = [
+  private static readonly publicTabs = [
     { key: 'saved', label: 'Saved Events', path: 'saved', icon: 'bookmark' },
+    { key: 'pending', label: 'Pending Events', path: 'pending', icon: 'hourglass_top' },
     { key: 'registered', label: 'Registered Events', path: 'registered', icon: 'how_to_reg' },
     { key: 'history', label: 'History', path: 'history', icon: 'history' },
   ] as const;
+
+  // Internal users track pending/history centrally under /app/ongoing/events and
+  // /app/history/events, so those two tabs are hidden here to avoid a duplicate home for the
+  // same data — only external users (public layout, no Inbox/Ongoing/History shell) see them.
+  private static readonly internalTabs = [
+    { key: 'saved', label: 'Saved Events', path: 'saved', icon: 'bookmark' },
+    { key: 'registered', label: 'Registered Events', path: 'registered', icon: 'how_to_reg' },
+  ] as const;
+
+  readonly tabs = this.publicLayout ? MyEventsComponent.publicTabs : MyEventsComponent.internalTabs;
 }

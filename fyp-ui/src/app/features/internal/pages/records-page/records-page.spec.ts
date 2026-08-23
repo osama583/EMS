@@ -18,7 +18,7 @@ const DRAFT_PROPOSALS: readonly ProposalReviewRecord[] = [
 
 function loginAsDraftOwner(): void {
   TestBed.inject(AuthService).establishSession(testUser([testRole('staff', 'student_affairs', 'Student Affairs')], {
-    email: DRAFT_APPLICANT_EMAIL, displayName: 'Jordan Lee', username: 'jordan.lee',
+    email: DRAFT_APPLICANT_EMAIL, displayName: 'Jordan Lee',
     nav: [testNavPage('drafts', 'Drafts')],
   }), testTokens());
 }
@@ -36,11 +36,19 @@ describe('RecordsPageComponent', () => {
 
   afterEach(() => httpMock.verify());
 
+  // Drafts also loads its filter dropdowns' options (status-labels/categories, scoped to
+  // bucket=drafts) alongside the page of records itself — flush both or httpMock.verify() fails.
+  function flushDraftFilterOptions(): void {
+    httpMock.expectOne((req) => req.url === `${environment.apiBaseUrl}/proposals/status-labels`).flush([]);
+    httpMock.expectOne((req) => req.url === `${environment.apiBaseUrl}/proposals/categories`).flush([]);
+  }
+
   it('renders the shared data-page system with real draft records for the logged-in applicant', () => {
     loginAsDraftOwner();
     const fixture = TestBed.createComponent(RecordsPageComponent);
     fixture.detectChanges();
     httpMock.expectOne((req) => req.url === `${environment.apiBaseUrl}/proposals`).flush({ items: DRAFT_PROPOSALS, page: 1, pageSize: 200, total: DRAFT_PROPOSALS.length, totalPages: 1 });
+    flushDraftFilterOptions();
     fixture.detectChanges();
 
     const element = fixture.nativeElement as HTMLElement;
@@ -50,11 +58,12 @@ describe('RecordsPageComponent', () => {
     expect(element.querySelectorAll('.shared-mobile-card')).toHaveLength(2);
   });
 
-  it('filters shared records dynamically', () => {
+  it('filters shared records dynamically', async () => {
     loginAsDraftOwner();
     const fixture = TestBed.createComponent(RecordsPageComponent);
     fixture.detectChanges();
     httpMock.expectOne((req) => req.url === `${environment.apiBaseUrl}/proposals`).flush({ items: DRAFT_PROPOSALS, page: 1, pageSize: 200, total: DRAFT_PROPOSALS.length, totalPages: 1 });
+    flushDraftFilterOptions();
     fixture.detectChanges();
 
     const input = fixture.nativeElement.querySelector('input[type="search"]') as HTMLInputElement;
@@ -62,19 +71,31 @@ describe('RecordsPageComponent', () => {
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.filteredRecords()).toHaveLength(1);
+    // Search is server-side (debounced 300ms) for drafts — the debounced request re-fetches
+    // filtered by `q`, rather than filtering a client-held array.
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    fixture.detectChanges();
+
+    const filtered = DRAFT_PROPOSALS.filter((record) => record.eventTitle.includes('Winter Charity Drive'));
+    httpMock.expectOne((req) => req.url === `${environment.apiBaseUrl}/proposals` && req.params.get('q') === 'Winter Charity Drive')
+      .flush({ items: filtered, page: 1, pageSize: 200, total: filtered.length, totalPages: 1 });
+    fixture.detectChanges();
+
     expect((fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr')).toHaveLength(1);
   });
 
   it('excludes drafts that belong to a different applicant', () => {
     TestBed.inject(AuthService).establishSession(testUser([testRole('staff', 'student_affairs', 'Student Affairs')], {
-      email: 'someone.else@student.apu.edu.my', displayName: 'Someone Else', username: 'someone.else',
+      email: 'someone.else@student.apu.edu.my', displayName: 'Someone Else',
     }), testTokens());
     const fixture = TestBed.createComponent(RecordsPageComponent);
     fixture.detectChanges();
-    httpMock.expectOne((req) => req.url === `${environment.apiBaseUrl}/proposals`).flush({ items: DRAFT_PROPOSALS, page: 1, pageSize: 200, total: DRAFT_PROPOSALS.length, totalPages: 1 });
+    // The server already scopes drafts to the caller, so a request for this user's own drafts
+    // returns none of the other applicant's rows in the first place.
+    httpMock.expectOne((req) => req.url === `${environment.apiBaseUrl}/proposals`).flush({ items: [], page: 1, pageSize: 200, total: 0, totalPages: 1 });
+    flushDraftFilterOptions();
     fixture.detectChanges();
 
-    expect(fixture.componentInstance.filteredRecords()).toHaveLength(0);
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr')).toHaveLength(0);
   });
 });

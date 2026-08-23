@@ -1,8 +1,9 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject, Observable, shareReplay, switchMap, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AssignableCafeteriaUser, Cafeteria, CafeteriaAssignment, CafeteriaAssignmentDraft, CafeteriaDraft, CafeteriaStaffAccountDraft } from './cafeteria.models';
+import { CafeteriaStaffAuditEntry, CafeteriaStaffAuditQuery, Page } from './cafeteria-audit-log.models';
 import { Archived } from '../admin-directory/admin-directory.models';
 
 @Injectable({ providedIn: 'root' })
@@ -67,6 +68,21 @@ export class CafeteriaService {
   }
   removeAssignment(assignmentId: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/assignments/${encodeURIComponent(assignmentId)}`).pipe(tap(() => this.refresh()));
+  }
+
+  // Server-side searched/filtered/sorted/paginated audit trail of staff create/edit/suspend/
+  // restore/remove actions — GET /catalog/cafeterias/staff-requests-history. Nothing here is
+  // filtered or paginated client-side; the server already scopes rows to what the caller may see
+  // (Admin: every cafeteria; Manager: their own outlet only).
+  staffAuditLog(query: CafeteriaStaffAuditQuery): Observable<Page<CafeteriaStaffAuditEntry>> {
+    let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
+    if (query.q) params = params.set('q', query.q);
+    if (query.cafeteriaCode) params = params.set('cafeteriaCode', query.cafeteriaCode);
+    if (query.action) params = params.set('action', query.action);
+    if (query.actorRole) params = params.set('actorRole', query.actorRole);
+    if (query.sort) params = params.set('sort', query.sort);
+    if (query.order) params = params.set('order', query.order);
+    return this.http.get<Page<CafeteriaStaffAuditEntry>>(`${this.baseUrl}/staff-requests-history`, { params });
   }
 
   refresh(): void { this.refreshRequests.next(); }

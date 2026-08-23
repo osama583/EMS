@@ -1,0 +1,113 @@
+<section class="club-page">
+  <app-feedback-banner [message]="errorMessage()" tone="error" />
+
+  <app-internal-page-header [config]="headerConfig()">
+    <app-view-toggle headerTrailing [mode]="viewMode()" (modeChange)="setViewMode($event)" />
+  </app-internal-page-header>
+
+  <section class="internal-table-workspace__controls club-page__controls">
+    <div workspaceControls class="shared-page-controls">
+      <app-internal-search-field
+        workspaceControlWide
+        [config]="{ ariaLabel: 'Search requests', placeholder: 'Search club name' }"
+        [value]="search()"
+        (valueChange)="setSearch($event)"
+      />
+      <div workspaceControlRight class="shared-page-controls__right">
+        <app-internal-filter-controls [filters]="filters()" (filterChange)="setFilter($event)" />
+        <div class="shared-page-controls__actions">
+          <app-internal-reset-button (reset)="reset()" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  @if (viewMode() === 'card') {
+    @if (loading()) {
+      <div class="club-page__grid-loading" role="status" aria-label="Loading request history">
+        @for (line of [1, 2, 3]; track line) { <span></span> }
+      </div>
+    } @else if (visibleEntries().length === 0) {
+      <div class="club-page__empty">
+        <span class="material-symbols-rounded" aria-hidden="true">inbox</span>
+        <h2>No resolved requests yet</h2>
+        <p>Resolved club join requests — yours or ones you decided as President — will show up here.</p>
+      </div>
+    } @else {
+      <ul class="club-page__grid">
+        @for (entry of visibleEntries(); track (entry.requester + ':' + entry.request.id)) {
+          <li class="club-page__card">
+            <div class="club-page__image">
+              <span class="material-symbols-rounded" aria-hidden="true">groups</span>
+            </div>
+            <div class="club-page__body">
+              <h2>{{ entry.request.clubName }}</h2>
+              <span class="club-page__direction-chip">{{ requesterLabel(entry) }}</span>
+              <span class="club-page__outcome" [attr.data-status]="entry.request.status">
+                <span class="material-symbols-rounded" aria-hidden="true">{{ entry.request.status === 'approved' ? 'check_circle' : 'cancel' }}</span>
+                {{ entry.request.status === 'approved' ? 'Approved' : 'Rejected' }}
+              </span>
+            </div>
+            <div class="club-page__footer">
+              <button type="button" class="club-page__status club-page__status--action" (click)="openDetails(entry)">
+                <span class="material-symbols-rounded" aria-hidden="true">visibility</span>
+                View details
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <app-internal-data-page
+      [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+      [hideHeader]="true"
+      [hideControls]="true"
+      (filterChange)="setFilter($event)"
+      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+      (recordOpen)="handleAction({ action: { key: 'view', label: 'View details', icon: 'visibility' }, record: $event })"
+    />
+  }
+</section>
+
+<app-form-modal
+  [open]="detailsTarget() !== null" [title]="detailsTarget()?.request?.clubName ?? 'Request details'"
+  [hidePrimary]="true" secondaryLabel="Close"
+  (close)="closeDetails()" (cancel)="closeDetails()" (submit)="closeDetails()"
+>
+  @if (detailsTarget(); as entry) {
+    <article class="club-request-history__details">
+      <span class="club-page__direction-chip">{{ requesterLabel(entry) }}</span>
+      <span class="club-request-history__status club-request-history__status--large" [attr.data-status]="entry.request.status">
+        <span class="material-symbols-rounded" aria-hidden="true">{{ entry.request.status === 'approved' ? 'check_circle' : 'cancel' }}</span>
+        {{ entry.request.status === 'approved' ? 'Approved' : 'Rejected' }}
+      </span>
+
+      <section>
+        <h3>{{ entry.requester === 'me' ? 'Why you wanted to join' : 'Their reason for joining' }}</h3>
+        <p>{{ entry.request.reason || 'No reason provided.' }}</p>
+      </section>
+
+      @if (entry.request.status === 'rejected') {
+        <section>
+          <h3>Reason for rejection</h3>
+          <p>{{ entry.request.comment || 'No reason provided.' }}</p>
+        </section>
+      }
+
+      <dl>
+        <div>
+          <dt>Requested</dt>
+          <dd>{{ formatDate(entry.request.createdAt) }}</dd>
+        </div>
+        @if (entry.request.resolvedAt) {
+          <div>
+            <dt>{{ entry.request.status === 'approved' ? 'Approved' : 'Rejected' }}</dt>
+            <dd>{{ formatDate(entry.request.resolvedAt) }}</dd>
+          </div>
+        }
+      </dl>
+    </article>
+  }
+</app-form-modal>

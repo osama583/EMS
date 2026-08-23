@@ -12,6 +12,17 @@ export interface ClubCategoryRecord {
   readonly createdAt: string;
 }
 
+/** The server's paginated envelope — mirrors row-assignment.models.ts's Page<T>. */
+export interface ClubCategoryPage {
+  readonly items: readonly ClubCategoryRecord[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly totalPages: number;
+}
+
+export type ClubSortKey = 'name' | 'president' | 'members' | 'createdAt';
+
 export interface ClubRecord {
   readonly id: string;
   readonly name: string;
@@ -30,6 +41,15 @@ export interface ClubRecord {
   readonly viewerIsMember?: boolean;
   readonly viewerHasPendingRequest?: boolean;
   readonly viewerIsPresident?: boolean;
+}
+
+/** Mirrors ClubCategoryPage — the envelope for the server-paginated /clubs/search list. */
+export interface ClubPage {
+  readonly items: readonly ClubRecord[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly totalPages: number;
 }
 
 export interface ClubDraft {
@@ -52,6 +72,7 @@ export interface ClubJoinRequestRecord {
   readonly id: string;
   readonly clubId: string;
   readonly clubName: string;
+  readonly clubImageUrl: string | null;
   readonly requester: ClubUserSummary;
   // Why the requester wants to join — required at submission, so the President has something to
   // base approve/reject on.
@@ -67,4 +88,40 @@ export interface ClubJoinRequestRecord {
 export interface ClubMyStatus {
   readonly isClubAdmin: boolean;
   readonly presidentOfClubIds: readonly string[];
+}
+
+export type PresidentChangeRequestStatus = 'pending' | 'approved' | 'rejected';
+export type PresidentChangeRequestSortKey = 'createdAt' | 'resolvedAt' | 'club' | 'status';
+
+// A club President's request to hand the role to someone else — the only path off being
+// President, since DELETE /clubs/{id}/members/{userId} always blocks removing/self-removing one.
+export interface PresidentChangeRequestRecord {
+  readonly id: string;
+  readonly clubId: string;
+  readonly clubName: string;
+  readonly currentPresident: ClubUserSummary;
+  readonly requestedPresident: ClubUserSummary;
+  readonly status: PresidentChangeRequestStatus;
+  // The Club Admin's reason for rejecting (required, >= 20 characters) — empty until resolved.
+  readonly comment: string;
+  readonly createdAt: string;
+  readonly resolvedAt: string | null;
+  readonly resolvedBy: ClubUserSummary | null;
+}
+
+/** Mirrors ClubPage — the envelope for the server-paginated president-change-request endpoints. */
+export interface PresidentChangeRequestPage {
+  readonly items: readonly PresidentChangeRequestRecord[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly totalPages: number;
+}
+
+export interface PresidentChangeRequestQuery {
+  readonly q?: string;
+  readonly sort: PresidentChangeRequestSortKey;
+  readonly order: 'asc' | 'desc';
+  readonly page: number;
+  readonly pageSize: number;
 }

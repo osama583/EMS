@@ -1,11 +1,13 @@
-@if (showTasksTab() || showRequestsTab() || showClubRequestsTab() || showRegistrationsTab()) {
+@if (showProposalsTab() || showTasksTab() || showRequestsTab() || showClubRequestsTab() || showRegistrationsTab() || showClubsTab() || showEventsTab() || showPresidentChangeTab()) {
   <nav class="shared-tabs" aria-label="{{ title }} sections">
-    <a class="shared-tabs__tab" routerLink="proposals" routerLinkActive="shared-tabs__tab--active">
-      <span class="material-symbols-rounded" aria-hidden="true">description</span>
-      Proposals
-    </a>
+    @if (showProposalsTab()) {
+      <a class="shared-tabs__tab" routerLink="proposals" routerLinkActive="shared-tabs__tab--active">
+        <span class="material-symbols-rounded" aria-hidden="true">description</span>
+        Proposals
+      </a>
+    }
     @if (showTasksTab()) {
-      <a class="shared-tabs__tab" routerLink="tasks" routerLinkActive="shared-tabs__tab--active">
+      <a class="shared-tabs__tab" [routerLink]="tasksRoute()" routerLinkActive="shared-tabs__tab--active">
         <span class="material-symbols-rounded" aria-hidden="true">task</span>
         Tasks
       </a>
@@ -18,14 +20,32 @@
     }
     @if (showRegistrationsTab()) {
       <a class="shared-tabs__tab" routerLink="registrations" routerLinkActive="shared-tabs__tab--active">
-        <span class="material-symbols-rounded" aria-hidden="true">how_to_reg</span>
-        Registrations
+        <span class="material-symbols-rounded" aria-hidden="true">event</span>
+        Events
       </a>
     }
     @if (showClubRequestsTab()) {
       <a class="shared-tabs__tab" routerLink="club-requests" routerLinkActive="shared-tabs__tab--active">
-        <span class="material-symbols-rounded" aria-hidden="true">how_to_reg</span>
-        Club Requests
+        <span class="material-symbols-rounded" aria-hidden="true">groups</span>
+        Clubs
+      </a>
+    }
+    @if (showClubsTab()) {
+      <a class="shared-tabs__tab" routerLink="clubs" routerLinkActive="shared-tabs__tab--active">
+        <span class="material-symbols-rounded" aria-hidden="true">groups</span>
+        Clubs
+      </a>
+    }
+    @if (showEventsTab()) {
+      <a class="shared-tabs__tab" routerLink="events" routerLinkActive="shared-tabs__tab--active">
+        <span class="material-symbols-rounded" aria-hidden="true">event</span>
+        Events
+      </a>
+    }
+    @if (showPresidentChangeTab()) {
+      <a class="shared-tabs__tab" routerLink="president-change-request" routerLinkActive="shared-tabs__tab--active">
+        <span class="material-symbols-rounded" aria-hidden="true">swap_horiz</span>
+        President Change Requests
       </a>
     }
   </nav>

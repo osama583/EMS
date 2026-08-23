@@ -1,0 +1,83 @@
+// The host itself must participate in the caller's grid row (e.g.
+// .comments-drawer__inner's `grid-template-rows: auto 1fr`) and scroll internally,
+// not just the <ol> inside it.
+:host { display: grid; min-height: 0; }
+
+.convo-thread {
+  display: grid;
+  align-content: start;
+  gap: .75rem;
+  list-style: none;
+  margin: 0;
+  padding: 0 .1rem .1rem 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.convo-thread__row {
+  display: flex;
+  gap: .7rem;
+  align-items: flex-start;
+}
+
+// Applicant messages mirror to the right, WhatsApp-style, so the two sides of the
+// conversation are visually distinct without relying on color alone.
+.convo-thread__row--applicant {
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.convo-thread__avatar {
+  flex-shrink: 0;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--apu-blue-600) 0%, var(--apu-blue-700) 100%);
+  color: #fff;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .03em;
+}
+
+.convo-thread__row--applicant .convo-thread__avatar {
+  background: linear-gradient(135deg, var(--apu-navy-800) 0%, var(--apu-navy-900) 100%);
+}
+
+.convo-thread__bubble {
+  display: grid;
+  gap: .3rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 85%;
+  padding: .7rem .85rem;
+  border: 1px solid var(--apu-border);
+  border-radius: 0 .65rem .65rem .65rem;
+  background: var(--apu-surface-muted);
+}
+
+.convo-thread__row--applicant .convo-thread__bubble {
+  border-radius: .65rem 0 .65rem .65rem;
+  background: color-mix(in srgb, var(--apu-blue-200) 35%, var(--apu-white));
+  border-color: var(--apu-blue-200);
+}
+
+.convo-thread__meta {
+  display: flex;
+  align-items: baseline;
+  gap: .4rem;
+  flex-wrap: wrap;
+}
+
+.convo-thread__row--applicant .convo-thread__meta { justify-content: flex-end; }
+
+.convo-thread__meta strong { min-width: 0; overflow-wrap: anywhere; font-size: .85rem; color: var(--apu-navy-900); }
+// The department/role rides right after the name on the same top line (e.g. "Benjamin Davis ·
+// Logistics"), not as a separate badge — only the avatar circle and the time below the message
+// carry any other identity/metadata.
+.convo-thread__role { flex-shrink: 0; font-size: .74rem; color: var(--apu-text-muted); font-weight: 500; }
+.convo-thread__role::before { content: '·'; margin-right: .4rem; }
+.convo-thread__text { margin: 0; overflow-wrap: anywhere; font-size: .85rem; color: var(--apu-navy-800); line-height: 1.55; white-space: pre-line; }
+.convo-thread__time { justify-self: end; font-size: .68rem; color: var(--apu-text-muted); }
+.convo-thread__row--applicant .convo-thread__time { justify-self: start; }

@@ -75,8 +75,9 @@ export interface ReviewerCommentEntry {
 }
 
 // Human labels for the department a request_task is routed to — used when a DEPARTMENT (rather
-// than a single-actor reviewer) asks the applicant for changes.
-const DEPARTMENT_LABELS: Readonly<Record<string, string>> = {
+// than a single-actor reviewer) asks the applicant for changes. Exported for hub-proposals.ts,
+// which needs the same labels on its own split inbox rows when >1 department pushes back at once.
+export const DEPARTMENT_LABELS: Readonly<Record<string, string>> = {
   logistics: 'Logistics',
   transportation: 'Transportation',
   photoVideo: 'Photography / Videography',
@@ -87,6 +88,12 @@ const DEPARTMENT_LABELS: Readonly<Record<string, string>> = {
   fundingPurchase: 'Funding / Purchase',
 };
 
+// Shared by every place that turns a display name/label into an avatar's initials -
+// ReviewerCommentEntry.initials, ProposalConversation's avatar rendering, etc.
+export function initialsFor(label: string): string {
+  return label.split(/[\s/&]+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+}
+
 // Every comment the applicant needs to answer: the single-actor reviewer stage's comment (when
 // the whole proposal was sent back) plus one entry per department that asked for changes while
 // department review continues in parallel.
@@ -94,13 +101,13 @@ export function allCommentEntries(state: ProposalWorkflowState): readonly Review
   const entries: ReviewerCommentEntry[] = [];
   const reviewer = reviewerCommentEntry(state);
   if (reviewer) entries.push(reviewer);
-  for (const confirmation of state.departmentConfirmations) {
+  for (const confirmation of state.departmentConfirmations ?? []) {
     if (confirmation.status !== 'resubmitted' || !confirmation.comment) continue;
     const label = DEPARTMENT_LABELS[confirmation.department] ?? confirmation.department;
     entries.push({
       stage: 'Department review',
       reviewer: label,
-      initials: label.split(/[\s/&]+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase(),
+      initials: initialsFor(label),
       text: confirmation.comment,
     });
   }
@@ -115,6 +122,5 @@ export function reviewerCommentEntry(state: ProposalWorkflowState): ReviewerComm
   const roleLabel = (state.resumeStage && STAGE_ROLE_LABELS[state.resumeStage])
     ?? ROLE_LABELS[state.rejectedBy ?? '']
     ?? 'Reviewer';
-  const initials = roleLabel.split(/[\s/&]+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
-  return { stage: stageLabel(state.stage), reviewer: roleLabel, initials, text: state.reviewerComment };
+  return { stage: stageLabel(state.stage), reviewer: roleLabel, initials: initialsFor(roleLabel), text: state.reviewerComment };
 }

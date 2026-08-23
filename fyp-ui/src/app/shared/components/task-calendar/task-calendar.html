@@ -1,0 +1,39 @@
+<div class="task-calendar">
+  <div class="task-calendar__mode">
+    <button type="button" class="task-calendar__mode-btn" [class.task-calendar__mode-btn--active]="mode() === 'single'" (click)="setMode('single')">Single day</button>
+    <button type="button" class="task-calendar__mode-btn" [class.task-calendar__mode-btn--active]="mode() === 'range'" (click)="setMode('range')">Date range</button>
+  </div>
+
+  <div class="task-calendar__header">
+    <button type="button" class="task-calendar__nav" aria-label="Previous month" (click)="navigate(-1)">
+      <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+    </button>
+    <span class="task-calendar__month">{{ monthLabel() }}</span>
+    <button type="button" class="task-calendar__nav" aria-label="Next month" (click)="navigate(1)">
+      <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+    </button>
+    <button type="button" class="task-calendar__today" (click)="goToToday()">Today</button>
+  </div>
+
+  <div class="task-calendar__weekdays">
+    @for (label of weekDayLabels; track $index) {
+      <span>{{ label }}</span>
+    }
+  </div>
+
+  <div class="task-calendar__grid">
+    @for (day of days(); track day.key) {
+      <button
+        type="button"
+        class="task-calendar__day"
+        [class.task-calendar__day--muted]="!day.isCurrentMonth"
+        [class.task-calendar__day--today]="day.isToday"
+        [class.task-calendar__day--selected]="day.isSelected"
+        (click)="selectDay(day.key)"
+      >
+        {{ day.dayNumber }}
+        @if (day.hasTasks) { <span class="task-calendar__dot" aria-hidden="true"></span> }
+      </button>
+    }
+  </div>
+</div>

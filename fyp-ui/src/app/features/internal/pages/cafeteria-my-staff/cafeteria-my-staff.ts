@@ -3,8 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { CafeteriaService } from '../../../../core/cafeterias/cafeteria.service';
-import { AssignableCafeteriaUser, CafeteriaAssignment } from '../../../../core/cafeterias/cafeteria.models';
-import { CafeteriaStaffRequestService } from '../../../../core/cafeterias/cafeteria-staff-request.service';
+import { CafeteriaAssignment } from '../../../../core/cafeterias/cafeteria.models';
 import { FeedbackBannerComponent } from '../../../../shared/components/feedback-banner/feedback-banner';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
 import { FormFieldComponent } from '../../../../shared/components/form-controls/form-field';
@@ -14,12 +13,12 @@ import { InternalDataPageConfig, InternalDataRecord, InternalRowActionEvent } fr
 import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 
 // Cafeteria Manager's own staff-roster screen — scoped to their own cafeteria only (unlike
-// Cafeteria Admin's cross-cafeteria Staff Assignments page). Every add/edit/remove goes through
-// CafeteriaStaffRequestService.submit() instead of CafeteriaService directly — nothing here
-// mutates user_unit_roles; it only ever creates a pending request for Cafeteria Admin to review
-// (see server/routes/cafeterias.routes.js's /staff-requests section). See the History page for
-// the manager's own request outcomes.
+// Cafeteria Admin's cross-cafeteria Staff Assignments page). Every add/edit/suspend/remove writes
+// user_unit_roles directly via CafeteriaService, the same mechanism the Admin's Staff Assignments
+// page uses — there is no approval step; the backend scopes the write to this Manager's own
+// cafeteria and to the 'cafeteria-staff' role (see cafeterias.py's _assert_may_staff).
 const PASSWORD_MIN_LENGTH = 8;
+const ROLE_CODE = 'cafeteria-staff' as const;
 
 @Component({
   selector: 'app-cafeteria-my-staff',
@@ -32,23 +31,19 @@ export class CafeteriaMyStaffComponent {
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
   private readonly cafeterias = inject(CafeteriaService);
-  private readonly requests = inject(CafeteriaStaffRequestService);
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly ownCafeteriaCode = this.auth.user()?.cafeteriaCode;
 
   readonly staff = signal<readonly CafeteriaAssignment[]>([]);
-  readonly assignableUsers = signal<readonly AssignableCafeteriaUser[]>([]);
   readonly loading = signal(true);
   readonly search = signal('');
   readonly page = signal(1);
   readonly pageSize = signal(10);
 
   readonly modalOpen = signal(false);
-  readonly submitting = signal(false);
+  readonly saving = signal(false);
   readonly editingAssignment = signal<CafeteriaAssignment | null>(null);
-  readonly selectedUserId = signal('');
-  readonly selectedUserLabel = signal('');
   readonly errorMessage = signal('');
 
   readonly removeTarget = signal<CafeteriaAssignment | null>(null);
@@ -56,8 +51,6 @@ export class CafeteriaMyStaffComponent {
   readonly statusTarget = signal<CafeteriaAssignment | null>(null);
   readonly changingStatus = signal(false);
 
-  // The account being proposed (add) or amended (edit). The Manager fills these in; nothing is
-  // written until the Cafeteria Admin approves.
   readonly draft = signal<Record<string, string | boolean>>({});
 
   readonly isEditing = computed(() => this.editingAssignment() !== null);
@@ -77,7 +70,7 @@ export class CafeteriaMyStaffComponent {
     return this.isEditing() ? 'Leave blank to keep the current password.' : 'Leave blank to create the account without a password.';
   });
 
-  readonly myStaff = computed(() => this.staff().filter((a) => a.cafeteriaCode === this.ownCafeteriaCode && a.roleCode === 'cafeteria-staff'));
+  readonly myStaff = computed(() => this.staff().filter((a) => a.cafeteriaCode === this.ownCafeteriaCode && a.roleCode === ROLE_CODE));
   readonly filteredStaff = computed(() => {
     const search = this.search().trim().toLowerCase();
     return this.myStaff().filter((a) => !search || `${a.displayName} ${a.email}`.toLowerCase().includes(search));
@@ -88,12 +81,9 @@ export class CafeteriaMyStaffComponent {
     ariaLabel: 'My cafeteria staff', paginationLabel: 'Staff pages', rowsPerPageLabel: 'Staff per page', mobileListLabel: 'Staff cards',
     header: {
       title: 'My Staff',
-      // No "edit" here: an assignment's only editable field is its role, and a Manager may only
-      // ever request Cafeteria Staff (the server rejects anything else), so an edit they could
-      // raise would always be staff -> staff. Changing someone's role is the Admin's to make.
-      description: 'Add or remove staff at your cafeteria. Changes are sent to Cafeteria Admin for approval.',
+      description: 'Add, edit, suspend/restore, or remove staff at your cafeteria.',
       countLabel: `${this.filteredStaff().length} staff member${this.filteredStaff().length === 1 ? '' : 's'}`,
-      primaryActionLabel: 'Request new staff',
+      primaryActionLabel: 'Add staff',
     },
     search: { ariaLabel: 'Search staff', placeholder: 'Search name or email' },
     columns: [
@@ -102,11 +92,11 @@ export class CafeteriaMyStaffComponent {
       { key: 'actions', label: 'Actions', actions: true },
     ],
     actions: [
-      { key: 'edit', label: 'Request edit', icon: 'edit' },
-      { key: 'status', label: 'Request suspend / restore', icon: 'toggle_on' },
-      { key: 'remove', label: 'Request removal', icon: 'delete' },
+      { key: 'edit', label: 'Edit staff', icon: 'edit' },
+      { key: 'status', label: 'Suspend / restore', icon: 'toggle_on' },
+      { key: 'remove', label: 'Remove staff', icon: 'delete' },
     ],
-    emptyTitle: 'No staff yet', emptyDescription: 'Request a new staff member to get started.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No staff yet', emptyDescription: 'Add a staff member to get started.', pageSizeOptions: [5, 10, 25],
   }));
 
   readonly records = computed<readonly InternalDataRecord[]>(() =>
@@ -145,7 +135,7 @@ export class CafeteriaMyStaffComponent {
   openAdd(): void {
     this.clearMessages();
     this.editingAssignment.set(null);
-    this.draft.set({ displayName: '', username: '', email: '', password: '', active: true });
+    this.draft.set({ displayName: '', email: '', password: '', active: true });
     this.modalOpen.set(true);
   }
 
@@ -154,7 +144,6 @@ export class CafeteriaMyStaffComponent {
     this.editingAssignment.set(assignment);
     this.draft.set({
       displayName: assignment.displayName,
-      username: assignment.username ?? '',
       email: assignment.email,
       // Never pre-filled: the stored value is a hash, so there is nothing to show, and a blank
       // field correctly means "leave the password alone".
@@ -164,34 +153,42 @@ export class CafeteriaMyStaffComponent {
     this.modalOpen.set(true);
   }
 
-  closeModal(): void { if (!this.submitting()) this.modalOpen.set(false); }
+  closeModal(): void { if (!this.saving()) this.modalOpen.set(false); }
   setDraft(key: string, value: string | boolean): void {
     this.draft.update((draft) => ({ ...draft, [key]: value }));
   }
   value(key: string): string { return String(this.draft()[key] ?? ''); }
 
-  submitAdd(): void {
-    if (!this.formValid()) return;
+  save(): void {
+    if (!this.formValid() || !this.ownCafeteriaCode) return;
     const d = this.draft();
     const editing = this.editingAssignment();
-    this.submitting.set(true); this.clearMessages();
+    this.saving.set(true); this.clearMessages();
 
-    const draft = {
-      requestedByUserId: this.auth.user()!.id!,
-      action: (editing ? 'edit' : 'add') as 'edit' | 'add',
-      ...(editing ? { targetAssignmentId: editing.assignmentId } : {}),
+    const account = {
       displayName: String(d['displayName']).trim(),
-      username: String(d['username'] ?? '').trim() || undefined,
       email: String(d['email']).trim(),
       password: String(d['password'] ?? '') || undefined,
-      active: d['active'] !== false,
-      roleCode: 'cafeteria-staff',
     };
-    this.requests.submit(draft)
-      .pipe(finalize(() => this.submitting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-        next: () => { this.modalOpen.set(false); this.toast.success('Request sent to Cafeteria Admin for approval'); },
-        error: (err) => this.toast.error('The request could not be sent', apiErrorMessage(err, 'Please try again.')),
-      });
+    const request = editing
+      ? this.cafeterias.updateAssignment(editing.assignmentId, {
+          cafeteriaCode: this.ownCafeteriaCode,
+          roleCode: ROLE_CODE,
+          ...account,
+          userActive: d['active'] !== false,
+        })
+      : this.cafeterias.assignNewAccount({
+          ...account,
+          displayName: account.displayName,
+          email: account.email,
+          active: d['active'] !== false,
+          cafeteriaCode: this.ownCafeteriaCode,
+          roleCode: ROLE_CODE,
+        });
+    request.pipe(finalize(() => this.saving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.modalOpen.set(false); this.toast.success(editing ? 'Staff member updated.' : 'Staff member added.'); },
+      error: (err) => this.toast.error(err?.error?.message || `The staff member could not be ${editing ? 'updated' : 'added'}.`),
+    });
   }
 
   handleAction(event: InternalRowActionEvent): void {
@@ -202,22 +199,20 @@ export class CafeteriaMyStaffComponent {
     if (event.action.key === 'remove') this.removeTarget.set(assignment);
   }
 
-  // Suspend/restore is the same request either way — which one it is follows from the assignment's
-  // current state, so the Manager cannot ask to suspend someone already suspended.
+  // Suspend/restore is the same action either way — which one it is follows from the assignment's
+  // current state, so the Manager cannot suspend someone already suspended.
   statusActionLabel(): string { return this.statusTarget()?.active === false ? 'restore' : 'suspend'; }
   cancelStatus(): void { if (!this.changingStatus()) this.statusTarget.set(null); }
   confirmStatus(): void {
     const target = this.statusTarget();
     if (!target) return;
+    const next = target.active === false;
     this.changingStatus.set(true); this.clearMessages();
-    this.requests.submit({
-      requestedByUserId: this.auth.user()!.id!,
-      action: target.active === false ? 'restore' : 'suspend',
-      targetAssignmentId: target.assignmentId,
-    }).pipe(finalize(() => this.changingStatus.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.statusTarget.set(null); this.toast.success('Request sent to Cafeteria Admin for approval'); },
-      error: (err) => { this.statusTarget.set(null); this.toast.error('The request could not be sent', apiErrorMessage(err, 'Please try again.')); },
-    });
+    this.cafeterias.setAssignmentActive(target.assignmentId, next)
+      .pipe(finalize(() => this.changingStatus.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: () => { this.statusTarget.set(null); this.toast.success(`${target.displayName} is now ${next ? 'active' : 'suspended'}.`); },
+        error: (err) => { this.statusTarget.set(null); this.toast.error('The status could not be changed', apiErrorMessage(err, 'Please try again.')); },
+      });
   }
 
   cancelRemove(): void { if (!this.removing()) this.removeTarget.set(null); }
@@ -225,10 +220,10 @@ export class CafeteriaMyStaffComponent {
     const target = this.removeTarget();
     if (!target) return;
     this.removing.set(true); this.clearMessages();
-    this.requests.submit({ requestedByUserId: this.auth.user()!.id!, action: 'remove', targetAssignmentId: target.assignmentId })
+    this.cafeterias.removeAssignment(target.assignmentId)
       .pipe(finalize(() => this.removing.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-        next: () => { this.removeTarget.set(null); this.toast.success('Removal request sent to Cafeteria Admin for approval'); },
-        error: (err) => { this.removeTarget.set(null); this.toast.error('The request could not be sent', apiErrorMessage(err, 'Please try again.')); },
+        next: () => { this.removeTarget.set(null); this.toast.success('Staff member removed.'); },
+        error: (err) => { this.removeTarget.set(null); this.toast.error('The staff member could not be removed', apiErrorMessage(err, 'Please try again.')); },
       });
   }
 

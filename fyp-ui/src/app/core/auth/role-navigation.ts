@@ -56,6 +56,11 @@ export function roleCanAccess(user: AuthUser, url: string): boolean {
   // role) — no separate bypass needed, unlike the two exceptions above, which are truly
   // universal and outside Page Visibility's page catalog entirely.
   if (cleanUrl.startsWith('/app/proposals/review/')) return true;
+  // Same reasoning as proposals/review/ above: which SPECIFIC proposal (and which department's
+  // task on it) a user may open here is an instance-level question the backend already enforces
+  // (assert_proposal_owner + the task's own 'resubmitted' status), not a sidebar-page question —
+  // there is no standalone nav_page for "resubmit a department's request" to grant.
+  if (cleanUrl.startsWith('/app/proposals/department-resubmit/')) return true;
   const allowedRoutes = flattenRoutes(user.nav || []);
   return allowedRoutes.some((route) => cleanUrl === route || cleanUrl.startsWith(`${route}/`));
 }

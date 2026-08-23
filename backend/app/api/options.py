@@ -45,6 +45,7 @@ from ..errors import BadRequest, Conflict, Forbidden, NotFound
 from ..logging_setup import audit
 from ..security import require_auth, require_internal
 from ..security.principal import current_principal
+from ..services.workflow.constants import COMPLETED_APPROVED, DEPARTMENT_REVIEW
 from ._helpers import body, flag, required
 
 bp = Blueprint("options", __name__, url_prefix="/options")
@@ -744,8 +745,15 @@ def logistics_availability(option_id: int):
     """How many of this item remain free for a date/time window.
 
     Computed server-side by subtracting quantities already committed to
-    overlapping bookings on live proposals. Cancelled and rejected proposals do
-    not hold stock.
+    overlapping bookings on OTHER proposals. A booking only holds stock once
+    it has actually cleared its last reviewer gate - department_review or
+    completed_approved, which is reached the same way on both approval
+    routes: short (HOS/HOD only) advances straight to department_review,
+    long (HOS/HOD -> F&B -> CFO) only reaches department_review once the CFO
+    approves. Anything still earlier (draft, under review, resubmission
+    required) is not yet committed and must not block anyone else. A holding
+    row releases the stock once its own window has passed (its date/end_time
+    is in the past) or the proposal is cancelled/rejected.
     """
     from flask import request as flask_request
 
@@ -772,9 +780,10 @@ def logistics_availability(option_id: int):
                  JOIN request r ON r.request_id = rl.request_id
                 WHERE rl.option_id = %s
                   AND rl."date" = %s
-                  AND r.status NOT IN ('draft', 'cancelled', 'completed_rejected')
+                  AND r.status IN (%s, %s)
+                  AND (rl."date" + rl.end_time) >= now()
                   AND rl.start_time < %s AND rl.end_time > %s''',
-            (option_id, date, end, start),
+            (option_id, date, DEPARTMENT_REVIEW, COMPLETED_APPROVED, end, start),
         )["total"]
 
     total = option["available_quantity"] or 0

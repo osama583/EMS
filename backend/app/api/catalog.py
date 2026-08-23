@@ -18,7 +18,7 @@ from flask import Blueprint, jsonify
 from ..db import fetch_all, fetch_one, query, transaction
 from ..errors import BadRequest, Conflict, NotFound
 from ..logging_setup import audit
-from ..security import require_admin, require_auth
+from ..security import authenticate_optional, require_admin, require_auth
 from ..security.principal import current_principal
 from ._helpers import body, flag, required
 
@@ -184,8 +184,11 @@ def _blockers(cur, catalogue: _Catalogue, entry_id: int) -> list[str]:
 
 
 @bp.get("/<resource>")
-@require_auth
 def list_catalogue(resource: str):
+    """Public: the Explore Events filters (category/format) need this list
+    before a guest has signed in, same tier as the published events they
+    filter - see authenticate_optional() on GET /events for the same reasoning."""
+    authenticate_optional()
     catalogue = _catalogue(resource)
     sql = _projection(catalogue) + " WHERE archived_at IS NULL"
     # The client sends ?active=true; activeOnly is accepted as well so the
@@ -378,13 +381,11 @@ def purge_catalogue_entry(resource: str, entry_id: int):
 # The pre-migration paths. Kept so anything still calling them keeps working;
 # both delegate to the parameterised list above rather than repeating its SQL.
 @bp.get("/event-categories")
-@require_auth
 def event_categories():
     return list_catalogue("categories")
 
 
 @bp.get("/event-formats")
-@require_auth
 def event_formats():
     return list_catalogue("formats")
 

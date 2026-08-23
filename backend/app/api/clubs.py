@@ -7,11 +7,19 @@
     GET                    /clubs/join-requests               mine, or my inbox
     POST                   /clubs/join-requests/{id}/decision approve | reject
     GET/POST/PATCH/DELETE  /clubs/categories[/{id}]
+    POST                   /clubs/{id}/president-change-requests       President submits
+    GET                    /clubs/president-change-requests/inbox      Club Admin: pending
+    GET                    /clubs/president-change-requests/mine       President: own history
+    GET                    /clubs/president-change-requests/history    Club Admin: all decided
+    POST                   /clubs/president-change-requests/{id}/approve | /reject
 
 Two distinct authorities, easy to confuse:
   Club Admin  - a flat role. Creates and deactivates any club, manages categories.
   President   - NOT a role. A data fact: clubs.user_id. One per club, and only
-                they decide their own club's join requests.
+                they decide their own club's join requests. To stop being
+                President, they submit a president-change-request instead of
+                leaving directly (see remove_member() below) - a Club Admin
+                approves/rejects it, same as a join request.
 
 The directory itself is open to any authenticated user. The listing carries
 server-computed viewer flags (am I a member, do I have a request pending) rather
@@ -26,7 +34,7 @@ from ..errors import BadRequest, Conflict, Forbidden, NotFound
 from ..logging_setup import audit
 from ..security import require_auth, require_internal
 from ..security.principal import current_principal
-from ._helpers import body, flag, required
+from ._helpers import body, flag, pagination, paged, required
 
 bp = Blueprint("clubs", __name__, url_prefix="/clubs")
 
@@ -132,6 +140,77 @@ def list_clubs():
     return jsonify(_shape_clubs(rows))
 
 
+_CLUB_SORT_COLUMNS = {
+    "name": "c.club_name",
+    "president": "p.full_name",
+    "members": '"memberCount"',
+    "createdAt": "c.created_at",
+}
+
+
+@bp.get("/search")
+@require_internal
+def search_clubs():
+    """Server-side searched/filtered/sorted/paginated club list for the /app/clubs/manage
+    management page - search, status, category, sort, LIMIT/OFFSET and the total count all
+    happen in SQL rather than shipping the whole table to the browser. Mirrors
+    search_categories() below; list_clubs() above stays unpaginated for the club directory
+    and My Clubs, which both render every (active) club at once."""
+    _assert_club_admin()
+    principal = current_principal()
+
+    where = ["1 = 1"]
+    params: dict = {"viewer": principal.user_id}
+
+    status = (request.args.get("status") or "all").strip()
+    if status == "active":
+        where.append("c.active")
+    elif status == "inactive":
+        where.append("NOT c.active")
+
+    search = (request.args.get("q") or "").strip()
+    if search:
+        where.append(
+            "(c.club_name ILIKE %(q)s OR c.description ILIKE %(q)s OR p.full_name ILIKE %(q)s)"
+        )
+        params["q"] = f"%{search}%"
+
+    category_id = (request.args.get("categoryId") or "").strip()
+    if category_id:
+        where.append(
+            "EXISTS (SELECT 1 FROM club_category_links l "
+            "WHERE l.club_id = c.club_id AND l.club_category_id = %(category)s)"
+        )
+        try:
+            params["category"] = int(category_id)
+        except ValueError:
+            raise BadRequest("categoryId must be numeric.")
+
+    where_sql = " AND ".join(where)
+
+    sort_key = request.args.get("sort", "name")
+    sort_column = _CLUB_SORT_COLUMNS.get(sort_key, "c.club_name")
+    order = "ASC" if request.args.get("order", "asc") == "asc" else "DESC"
+
+    with transaction() as cur:
+        total = fetch_one(
+            cur,
+            f"SELECT count(*) AS c FROM clubs c "
+            f"LEFT JOIN users p ON p.user_id = c.user_id WHERE {where_sql}",
+            params,
+        )["c"]
+        limit, offset = pagination()
+        params["limit"] = limit
+        params["offset"] = offset
+        rows = fetch_all(
+            cur,
+            f"{_CLUB_SELECT} WHERE {where_sql} "
+            f"ORDER BY {sort_column} {order}, c.club_id {order} LIMIT %(limit)s OFFSET %(offset)s",
+            params,
+        )
+    return jsonify(paged(_shape_clubs(rows), total))
+
+
 # --- Categories -----------------------------------------------------------
 # Their own top-level resource: a category exists independently of any club,
 # and the client manages them from their own screen.
@@ -166,6 +245,40 @@ def list_categories():
         row.pop("archived_at", None)
         row["id"] = str(row["id"])
     return jsonify(rows)
+
+
+@categories_bp.get("/search")
+@require_internal
+def search_categories():
+    """Server-side filtered/paginated categories for the /app/club-category management
+    page - search, status, LIMIT/OFFSET and the total count all happen in SQL rather than
+    shipping the whole table to the browser. Defaults to active-only (the same "don't load
+    what you're not viewing" rule the deleted-categories tab already follows by being its own
+    endpoint); pass ?includeInactive=true to also see deactivated-but-not-deleted categories."""
+    _assert_club_admin()
+    where = ["archived_at IS NULL"]
+    params: list = []
+    search = (request.args.get("q") or "").strip()
+    if search:
+        where.append("name ILIKE %s")
+        params.append(f"%{search}%")
+    if not flag("includeInactive"):
+        where.append("active")
+    where_sql = " AND ".join(where)
+    with transaction() as cur:
+        total = fetch_one(
+            cur, f"SELECT count(*) AS c FROM club_categories WHERE {where_sql}", params
+        )["c"]
+        limit, offset = pagination()
+        rows = fetch_all(
+            cur,
+            f"{_CATEGORY_SELECT} WHERE {where_sql} ORDER BY name LIMIT %s OFFSET %s",
+            [*params, limit, offset],
+        )
+    for row in rows:
+        row.pop("archived_at", None)
+        row["id"] = str(row["id"])
+    return jsonify(paged(rows, total))
 
 
 @categories_bp.get("/deleted")
@@ -619,6 +732,7 @@ def request_to_join(club_id: int):
 
 _JOIN_REQUEST_SELECT = """
     SELECT j.club_join_request_id AS id, j.club_id AS "clubId", c.club_name AS "clubName",
+           c.image_url AS "clubImageUrl",
            u.user_id AS requester_id, u.full_name AS requester_name, u.email AS requester_email,
            j.reason, j.status, COALESCE(j.comment, '') AS comment,
            j.created_at AS "createdAt", j.resolved_at AS "resolvedAt"
@@ -658,6 +772,21 @@ def join_requests_inbox():
     rows = query(
         _JOIN_REQUEST_SELECT + " WHERE c.user_id = %s AND j.status = 'pending' "
         "ORDER BY j.created_at",
+        (principal.user_id,),
+    )
+    return jsonify(_shape_join_requests(rows))
+
+
+@bp.get("/join-requests/decided")
+@require_internal
+def join_requests_decided():
+    """Requests the caller has already RESOLVED as President - the other half
+    of join_requests_inbox() (which is pending-only). Feeds the History tab's
+    "decided by me" direction."""
+    principal = current_principal()
+    rows = query(
+        _JOIN_REQUEST_SELECT + " WHERE c.user_id = %s AND j.status <> 'pending' "
+        "ORDER BY j.resolved_at DESC",
         (principal.user_id,),
     )
     return jsonify(_shape_join_requests(rows))
@@ -761,12 +890,20 @@ def decide_join_request(join_request_id: int):
 @bp.get("/eligible-presidents")
 @require_internal
 def eligible_presidents():
-    """Students and lecturers - the only roles that may preside over a club."""
-    _assert_club_admin()
+    """Students only - the only role that may preside over a club.
+
+    Two legitimate callers: a Club Admin picking/reassigning a President when
+    creating or editing a club, and a sitting President naming a replacement
+    for a president-change-request. Anyone else is refused."""
+    principal = current_principal()
+    if not principal.is_admin and not principal.has_role("club-admin"):
+        is_a_president = query("SELECT 1 FROM clubs WHERE user_id = %s", (principal.user_id,))
+        if not is_a_president:
+            raise Forbidden("Only a Club Admin or a club President can view eligible Presidents.")
     rows = query(
         """SELECT DISTINCT u.user_id AS id, u.full_name AS "displayName", u.email
              FROM users u JOIN user_unit_roles uur ON uur.user_id = u.user_id
-            WHERE uur.role_code IN ('student', 'lecturer')
+            WHERE uur.role_code = 'student'
               AND u.is_active AND u.archived_at IS NULL
          ORDER BY u.full_name"""
     )
@@ -774,3 +911,232 @@ def eligible_presidents():
         row["id"] = str(row["id"])
         row["role"] = "Member"
     return jsonify(rows)
+
+
+# --- President Change Requests ---------------------------------------------
+# A President cannot leave their own club or be removed (remove_member() below
+# always blocks it) - the only way out is naming a replacement here for a Club
+# Admin to approve. Same request/decide/history shape as club_join_requests,
+# but paginated/filtered/sorted server-side (search_clubs()'s style) since
+# both the admin inbox and the President's own history need it.
+
+_PCR_SELECT = """
+    SELECT r.club_president_change_request_id AS id, r.club_id AS "clubId", c.club_name AS "clubName",
+           cp.user_id AS current_president_id, cp.full_name AS current_president_name, cp.email AS current_president_email,
+           np.user_id AS requested_president_id, np.full_name AS requested_president_name, np.email AS requested_president_email,
+           r.status, COALESCE(r.comment, '') AS comment,
+           r.created_at AS "createdAt", r.resolved_at AS "resolvedAt",
+           rb.user_id AS resolved_by_id, rb.full_name AS resolved_by_name, rb.email AS resolved_by_email
+      FROM club_president_change_requests r
+      JOIN clubs c ON c.club_id = r.club_id
+      JOIN users cp ON cp.user_id = r.current_president_user_id
+      JOIN users np ON np.user_id = r.requested_president_user_id
+ LEFT JOIN users rb ON rb.user_id = r.resolved_by_user_id
+"""
+
+_PCR_SORT_COLUMNS = {
+    "createdAt": "r.created_at",
+    "resolvedAt": "r.resolved_at",
+    "club": "c.club_name",
+    "status": "r.status",
+}
+
+
+def _shape_pcr(rows: list[dict]) -> list[dict]:
+    for row in rows:
+        row["currentPresident"] = _user_summary(
+            row.pop("current_president_id"), row.pop("current_president_name"), row.pop("current_president_email"),
+            "President",
+        )
+        row["requestedPresident"] = _user_summary(
+            row.pop("requested_president_id"), row.pop("requested_president_name"), row.pop("requested_president_email"),
+            "Member",
+        )
+        row["resolvedBy"] = _user_summary(
+            row.pop("resolved_by_id"), row.pop("resolved_by_name"), row.pop("resolved_by_email"), "Club Admin",
+        )
+        row["id"] = str(row["id"])
+        row["clubId"] = str(row["clubId"])
+    return rows
+
+
+def _pcr_response(request_id: int) -> dict:
+    rows = query(_PCR_SELECT + " WHERE r.club_president_change_request_id = %s", (request_id,))
+    if not rows:
+        raise NotFound("President change request not found.")
+    return _shape_pcr(rows)[0]
+
+
+@bp.post("/<int:club_id>/president-change-requests")
+@require_internal
+def request_president_change(club_id: int):
+    """Only the club's own President may submit this, naming an eligible
+    (student) replacement. One pending request per club at a time -
+    uq_pcr_pending_per_club enforces it; the check here gives a clearer
+    message."""
+    principal = current_principal()
+    payload = body()
+    (requested_president_user_id,) = required(payload, "requestedPresidentUserId")
+
+    with transaction() as cur:
+        club = fetch_one(cur, "SELECT user_id FROM clubs WHERE club_id = %s", (club_id,))
+        if club is None:
+            raise NotFound("Club not found.")
+        if club["user_id"] != principal.user_id:
+            raise Forbidden("Only this club's President can request a President change.")
+
+        try:
+            new_president_id = int(requested_president_user_id)
+        except (TypeError, ValueError):
+            raise BadRequest("requestedPresidentUserId must be numeric.")
+        if new_president_id == principal.user_id:
+            raise BadRequest("Choose someone other than yourself as the new President.")
+        eligible = fetch_one(
+            cur,
+            """SELECT 1 FROM users u JOIN user_unit_roles uur ON uur.user_id = u.user_id
+                WHERE u.user_id = %s AND uur.role_code = 'student'
+                  AND u.is_active AND u.archived_at IS NULL""",
+            (new_president_id,),
+        )
+        if not eligible:
+            raise BadRequest("The requested President must be an active student.")
+
+        pending = fetch_one(
+            cur,
+            "SELECT 1 FROM club_president_change_requests WHERE club_id = %s AND status = 'pending'",
+            (club_id,),
+        )
+        if pending:
+            raise Conflict("A President change request is already pending for this club.")
+
+        cur.execute(
+            """INSERT INTO club_president_change_requests
+                   (club_id, current_president_user_id, requested_president_user_id, status)
+               VALUES (%s, %s, %s, 'pending')
+               RETURNING club_president_change_request_id""",
+            (club_id, principal.user_id, new_president_id),
+        )
+        request_id = cur.fetchone()["club_president_change_request_id"]
+        audit("clubs.president_change_request.submitted", club_id=club_id, actor_user_id=principal.user_id)
+    return jsonify(_pcr_response(request_id)), 201
+
+
+def _pcr_paged(where: list[str], params: list, default_sort: str = "createdAt", default_order: str = "desc") -> dict:
+    where_sql = " AND ".join(where)
+    sort_key = request.args.get("sort", default_sort)
+    sort_column = _PCR_SORT_COLUMNS.get(sort_key, _PCR_SORT_COLUMNS[default_sort])
+    order = "ASC" if request.args.get("order", default_order) == "asc" else "DESC"
+
+    search = (request.args.get("q") or "").strip()
+    if search:
+        where_sql += " AND (c.club_name ILIKE %s OR cp.full_name ILIKE %s OR np.full_name ILIKE %s)"
+        like = f"%{search}%"
+        params = [*params, like, like, like]
+
+    with transaction() as cur:
+        total = fetch_one(
+            cur,
+            f"""SELECT count(*) AS c FROM club_president_change_requests r
+                  JOIN clubs c ON c.club_id = r.club_id
+                  JOIN users cp ON cp.user_id = r.current_president_user_id
+                  JOIN users np ON np.user_id = r.requested_president_user_id
+                 WHERE {where_sql}""",
+            params,
+        )["c"]
+        limit, offset = pagination()
+        rows = fetch_all(
+            cur,
+            f"{_PCR_SELECT} WHERE {where_sql} ORDER BY {sort_column} {order}, r.club_president_change_request_id {order} "
+            f"LIMIT %s OFFSET %s",
+            [*params, limit, offset],
+        )
+    return paged(_shape_pcr(rows), total)
+
+
+@bp.get("/president-change-requests/inbox")
+@require_internal
+def president_change_requests_inbox():
+    """Pending President change requests, for a Club Admin (or System Admin)
+    to decide - this is a flat authority, not scoped to particular clubs."""
+    _assert_club_admin()
+    return jsonify(_pcr_paged(["r.status = 'pending'"], []))
+
+
+@bp.get("/president-change-requests/mine")
+@require_internal
+def president_change_requests_mine():
+    """A President's own submitted requests, any status - their inbox view
+    while pending, and their history view once decided."""
+    principal = current_principal()
+    return jsonify(_pcr_paged(["r.current_president_user_id = %s"], [principal.user_id]))
+
+
+@bp.get("/president-change-requests/history")
+@require_internal
+def president_change_requests_history():
+    """Every decided (approved/rejected) request, for the History tab -
+    Club Admin/System Admin only."""
+    _assert_club_admin()
+    return jsonify(_pcr_paged(["r.status <> 'pending'"], [], default_sort="resolvedAt"))
+
+
+MIN_PCR_REJECTION_COMMENT = 20
+
+
+def _decide_president_change(request_id: int, decision: str, comment: str) -> dict:
+    _assert_club_admin()
+    if decision == "reject" and len(comment) < MIN_PCR_REJECTION_COMMENT:
+        raise BadRequest(
+            f"A rejection needs an explanation of at least {MIN_PCR_REJECTION_COMMENT} characters."
+        )
+    principal = current_principal()
+
+    with transaction() as cur:
+        pcr = fetch_one(
+            cur, "SELECT * FROM club_president_change_requests WHERE club_president_change_request_id = %s",
+            (request_id,),
+        )
+        if pcr is None:
+            raise NotFound("President change request not found.")
+        if pcr["status"] != "pending":
+            raise Conflict("This request has already been decided.")
+
+        cur.execute(
+            """UPDATE club_president_change_requests
+                  SET status = %s, comment = %s, resolved_at = now(), resolved_by_user_id = %s
+                WHERE club_president_change_request_id = %s""",
+            (
+                "approved" if decision == "approve" else "rejected",
+                comment or None,
+                principal.user_id,
+                request_id,
+            ),
+        )
+        if decision == "approve":
+            cur.execute(
+                "UPDATE clubs SET user_id = %s WHERE club_id = %s",
+                (pcr["requested_president_user_id"], pcr["club_id"]),
+            )
+            # The new President is now presiding, not merely a member - drop any
+            # stale club_members row so they don't also show up as "a member".
+            cur.execute(
+                "DELETE FROM club_members WHERE club_id = %s AND user_id = %s",
+                (pcr["club_id"], pcr["requested_president_user_id"]),
+            )
+        audit("clubs.president_change_request.decided", club_id=pcr["club_id"],
+              decision=decision, actor_user_id=principal.user_id)
+    return _pcr_response(request_id)
+
+
+@bp.post("/president-change-requests/<int:request_id>/approve")
+@require_internal
+def approve_president_change(request_id: int):
+    return jsonify(_decide_president_change(request_id, "approve", ""))
+
+
+@bp.post("/president-change-requests/<int:request_id>/reject")
+@require_internal
+def reject_president_change(request_id: int):
+    payload = body()
+    comment = str(payload.get("comment") or "").strip()
+    return jsonify(_decide_president_change(request_id, "reject", comment))

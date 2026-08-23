@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { DeletionMetadata, DeletionPreview } from '../../shared/models/deletion.models';
-import { ClubCategoryRecord, ClubDraft, ClubJoinRequestRecord, ClubMemberRecord, ClubMyStatus, ClubRecord, ClubUserSummary } from './club.models';
+import { ClubCategoryPage, ClubCategoryRecord, ClubDraft, ClubJoinRequestRecord, ClubMemberRecord, ClubMyStatus, ClubPage, ClubRecord, ClubSortKey, ClubUserSummary, PresidentChangeRequestPage, PresidentChangeRequestQuery } from './club.models';
 
 @Injectable({ providedIn: 'root' })
 export class ClubService {
@@ -17,6 +17,19 @@ export class ClubService {
     return this.http.get<readonly ClubRecord[]>(`${this.baseUrl}/clubs`, { params });
   }
   getClub(id: string): Observable<ClubRecord> { return this.http.get<ClubRecord>(`${this.baseUrl}/clubs/${encodeURIComponent(id)}`); }
+  // Server-side search/filter/sort/pagination for the /app/clubs/manage management page —
+  // same treatment as searchCategories() below. getClubs() above stays unpaginated for the
+  // club directory and My Clubs, which both render every (active) club at once.
+  searchClubs(options: { search?: string; status?: 'all' | 'active' | 'inactive'; categoryId?: string; sort: ClubSortKey; order: 'asc' | 'desc'; page: number; pageSize: number }): Observable<ClubPage> {
+    const params: Record<string, string> = {
+      page: String(options.page), pageSize: String(options.pageSize),
+      sort: options.sort, order: options.order,
+    };
+    if (options.search) params['q'] = options.search;
+    if (options.status && options.status !== 'all') params['status'] = options.status;
+    if (options.categoryId && options.categoryId !== 'all') params['categoryId'] = options.categoryId;
+    return this.http.get<ClubPage>(`${this.baseUrl}/clubs/search`, { params });
+  }
   getEligiblePresidents(): Observable<readonly ClubUserSummary[]> { return this.http.get<readonly ClubUserSummary[]>(`${this.baseUrl}/clubs/eligible-presidents`); }
   createClub(draft: ClubDraft, createdByUserId: string): Observable<ClubRecord> {
     return this.http.post<ClubRecord>(`${this.baseUrl}/clubs`, {
@@ -41,6 +54,14 @@ export class ClubService {
     const params: Record<string, string> = {};
     if (options?.activeOnly) params['activeOnly'] = 'true';
     return this.http.get<readonly ClubCategoryRecord[]>(`${this.baseUrl}/club-categories`, { params });
+  }
+  // Server-side search/pagination for the /app/club-category management page — filtering, the
+  // active/inactive split, and the page slice all happen in SQL, not in the browser.
+  searchCategories(options: { search?: string; includeInactive?: boolean; page: number; pageSize: number }): Observable<ClubCategoryPage> {
+    const params: Record<string, string> = { page: String(options.page), pageSize: String(options.pageSize) };
+    if (options.search) params['q'] = options.search;
+    if (options.includeInactive) params['includeInactive'] = 'true';
+    return this.http.get<ClubCategoryPage>(`${this.baseUrl}/club-categories/search`, { params });
   }
   createCategory(name: string, createdByUserId: string): Observable<ClubCategoryRecord> {
     return this.http.post<ClubCategoryRecord>(`${this.baseUrl}/club-categories`, { name, createdByUserId });
@@ -79,6 +100,11 @@ export class ClubService {
   getMyRequests(requesterUserId: string): Observable<readonly ClubJoinRequestRecord[]> {
     return this.http.get<readonly ClubJoinRequestRecord[]>(`${this.baseUrl}/clubs/join-requests/mine`, { params: { requesterUserId } });
   }
+  // Requests I have already approved/rejected as President — the resolved counterpart to
+  // getInbox(). Feeds History's "decided by me" direction.
+  getDecided(presidentUserId: string): Observable<readonly ClubJoinRequestRecord[]> {
+    return this.http.get<readonly ClubJoinRequestRecord[]>(`${this.baseUrl}/clubs/join-requests/decided`, { params: { presidentUserId } });
+  }
   approveJoinRequest(id: string, resolvedByUserId: string): Observable<ClubJoinRequestRecord> {
     return this.http.post<ClubJoinRequestRecord>(`${this.baseUrl}/clubs/join-requests/${encodeURIComponent(id)}/approve`, { resolvedByUserId });
   }
@@ -87,4 +113,37 @@ export class ClubService {
   }
 
   getMyStatus(userId: string): Observable<ClubMyStatus> { return this.http.get<ClubMyStatus>(`${this.baseUrl}/clubs/my-status/${encodeURIComponent(userId)}`); }
+
+  // President Change Requests — the only way a sitting President stops presiding (leaving/being
+  // removed directly is always blocked server-side). Every list here is server-paginated/
+  // filtered/sorted, unlike the older unpaginated join-request endpoints above.
+  requestPresidentChange(clubId: string, requestedPresidentUserId: string): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/clubs/${encodeURIComponent(clubId)}/president-change-requests`, { requestedPresidentUserId });
+  }
+  private presidentChangeRequests(path: string, query: PresidentChangeRequestQuery): Observable<PresidentChangeRequestPage> {
+    const params: Record<string, string> = {
+      page: String(query.page), pageSize: String(query.pageSize),
+      sort: query.sort, order: query.order,
+    };
+    if (query.q) params['q'] = query.q;
+    return this.http.get<PresidentChangeRequestPage>(`${this.baseUrl}/clubs/president-change-requests/${path}`, { params });
+  }
+  // Pending requests awaiting a Club Admin's decision.
+  getPresidentChangeInbox(query: PresidentChangeRequestQuery): Observable<PresidentChangeRequestPage> {
+    return this.presidentChangeRequests('inbox', query);
+  }
+  // A President's own submitted requests, any status.
+  getMyPresidentChangeRequests(query: PresidentChangeRequestQuery): Observable<PresidentChangeRequestPage> {
+    return this.presidentChangeRequests('mine', query);
+  }
+  // Every decided request, for the History tab (Club Admin/System Admin only).
+  getPresidentChangeHistory(query: PresidentChangeRequestQuery): Observable<PresidentChangeRequestPage> {
+    return this.presidentChangeRequests('history', query);
+  }
+  approvePresidentChange(id: string): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/clubs/president-change-requests/${encodeURIComponent(id)}/approve`, {});
+  }
+  rejectPresidentChange(id: string, comment: string): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/clubs/president-change-requests/${encodeURIComponent(id)}/reject`, { comment });
+  }
 }

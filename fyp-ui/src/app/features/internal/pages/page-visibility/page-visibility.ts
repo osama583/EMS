@@ -712,7 +712,7 @@ export class PageVisibilityComponent {
       .map((p) => ({ value: p.pageCode, label: p.label, description: p.pageCode }));
   });
   readonly grantModalPage = computed<AdminNavPageRecord | null>(() => {
-    const code = this.grantModalPageCode();
+    const code = this.effectiveGrantPageCode();
     return code ? this.navPages().find((p) => p.pageCode === code) ?? null : null;
   });
   // 'role' offers flat roles only (a unit-scoped role has no meaning without a unit — same rule
@@ -730,8 +730,16 @@ export class PageVisibilityComponent {
     return (this.grantEligibleRoles() ?? []).map((r) => ({ value: r.roleCode, label: r.roleName }));
   });
   readonly newGrantUnitOptions = computed<readonly SelectOption[]>(() => this.activeUnits().map((u) => ({ value: u.code, label: u.name })));
+  // The effective target page code: either the explicitly picked page, or — when only a folder is
+  // selected and no page is picked — the folder itself (folders need their own grants to be visible).
+  readonly effectiveGrantPageCode = computed(() => {
+    const page = this.grantModalPageCode();
+    if (page) return page;
+    const folder = this.grantModalFolderCode();
+    return folder !== STANDALONE_PAGES_VALUE ? folder : '';
+  });
   readonly newGrantValid = computed(() => {
-    if (!this.grantModalPageCode()) return false;
+    if (!this.effectiveGrantPageCode()) return false;
     const type = this.newGrantType();
     if (type === 'role' || type === 'cafeteria') return this.newGrantRoleCodes().length > 0;
     if (type === 'unit') return this.newGrantUnitCodes().length > 0;
@@ -824,7 +832,11 @@ export class PageVisibilityComponent {
       : this.service.addNavPageGrant(page.pageCode, grantDraft);
     request.pipe(finalize(() => this.grantSaving.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.grantModalOpen.set(false); this.toast.success(editingId ? 'Permission updated.' : 'Permission added.'); },
-      error: (err) => this.grantError.set(err?.error?.message || 'The permission could not be saved.'),
+      error: (err) => {
+        const message = apiErrorMessage(err, 'Please try again.');
+        this.grantError.set(message);
+        this.toast.error(editingId ? 'The permission could not be updated' : 'The permission could not be added', message);
+      },
     });
   }
 

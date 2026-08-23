@@ -169,6 +169,19 @@ def authorize_cancel(cur, request: dict, principal: Principal) -> None:
     assert_proposal_owner(cur, request["request_id"], principal.user_id)
 
 
+def can_view_department_task(cur, task: dict, user_id: int) -> bool:
+    """Non-raising sibling of authorize_department_task, for read-side
+    filtering where a 403 would be wrong (the caller may legitimately see the
+    proposal, just not this one department's task/conversation)."""
+    if task["assigned_unit_code"]:
+        return heads_unit(cur, user_id, task["assigned_unit_code"])
+    if task["assigned_role"] == "fmb":
+        return heads_unit(cur, user_id, FMB_UNIT_CODE)
+    if task["assigned_role"] == "cfo":
+        return has_role(cur, user_id, "cfo")
+    return False
+
+
 def authorize_department_task(cur, task: dict, user_id: int) -> None:
     """Only the head of the unit a task routed to may act on it.
 
@@ -176,19 +189,14 @@ def authorize_department_task(cur, task: dict, user_id: int) -> None:
     the client sent, so a manager cannot act on another department's task by
     naming it in the request body.
     """
-    if task["assigned_unit_code"]:
-        if not heads_unit(cur, user_id, task["assigned_unit_code"]):
+    if not task["assigned_unit_code"] and task["assigned_role"] not in ("fmb", "cfo"):
+        raise WorkflowError("This task has no recognised routing.")
+    if not can_view_department_task(cur, task, user_id):
+        if task["assigned_unit_code"]:
             raise Forbidden("You do not head the department this request is routed to.")
-        return
-    if task["assigned_role"] == "fmb":
-        if not heads_unit(cur, user_id, FMB_UNIT_CODE):
+        if task["assigned_role"] == "fmb":
             raise Forbidden("Only Food & Beverage Services can act on this request.")
-        return
-    if task["assigned_role"] == "cfo":
-        if not has_role(cur, user_id, "cfo"):
-            raise Forbidden("Only the CFO can act on this request.")
-        return
-    raise WorkflowError("This task has no recognised routing.")
+        raise Forbidden("Only the CFO can act on this request.")
 
 
 def is_cafeteria_staff_of(cur, user_id: int, unit_code: str) -> bool:

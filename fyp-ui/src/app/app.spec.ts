@@ -114,7 +114,6 @@ describe('App', () => {
       {
         email: 'applicant@demo.apu.edu.my',
         displayName: 'Demo Applicant',
-        username: 'applicant',
         nav: [testNavPage('how-it-works', 'How It Works')],
       },
     ), testTokens());

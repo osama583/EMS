@@ -5,14 +5,15 @@ import {
   DestroyRef,
   HostListener,
   computed,
+  effect,
   inject,
   input,
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { forkJoin } from 'rxjs';
-import { ProposalEventSchedule, PublishedEvent, RegistrationResult, RegistrationStatus, isEventVisibleTo } from '../../../../core/events/published-event.models';
-import { EventCategoryService, EventFormatService } from '../../../../core/event-catalog/event-catalog.service';
+import { Subject, debounceTime, switchMap } from 'rxjs';
+import { EventSearchParams, EventVisibility, PublishedEvent, RegistrationResult, RegistrationStatus } from '../../../../core/events/published-event.models';
+import { EventCatalogRepositoryImpl } from '../../../../core/event-catalog/event-catalog.repository';
 import { PublishedEventService } from '../../../../core/events/published-event.service';
 import { EventFavouriteService } from '../../../../core/events/event-favourite.service';
 import { AuthService } from '../../../../core/auth/auth.service';
@@ -39,28 +40,6 @@ type FilterKey =
 
 type FilterSelection = Record<FilterKey, readonly string[]>;
 
-interface ExploreEventDate {
-  readonly iso: string;
-  readonly display: string;
-}
-
-interface ExploreEvent {
-  readonly id: string;
-  readonly title: string;
-  readonly category: string;
-  readonly visibility: string;
-  readonly school: string;
-  readonly format: string;
-  readonly timePeriod: string;
-  readonly registration: string;
-  readonly cost: string;
-  readonly date: ExploreEventDate;
-  readonly daysFromNow: number;
-  readonly time: string;
-  readonly venue: string;
-  readonly image: string;
-}
-
 interface FilterGroup {
   readonly key: FilterKey;
   readonly label: string;
@@ -73,11 +52,12 @@ interface AppliedFilterChip {
   readonly value: string;
 }
 
-const INITIAL_VISIBLE_EVENTS = 6;
+const PUBLIC_PAGE_SIZE = 6;
+const INTERNAL_PAGE_SIZE = 9;
 
 @Component({
   selector: 'app-explore-events',
-  imports: [FormModalComponent, 
+  imports: [FormModalComponent,
     EventDetailsModalComponent,
     EventCardComponent,
     InternalPaginationComponent,
@@ -94,8 +74,7 @@ export class ExploreEventsComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
-  private readonly eventCategoryService = inject(EventCategoryService);
-  private readonly eventFormatService = inject(EventFormatService);
+  private readonly eventCatalogRepository = inject(EventCatalogRepositoryImpl);
   private readonly guestFlow = inject(GuestRegistrationFlowService);
   private readonly publishedEventService = inject(PublishedEventService);
   private readonly toast = inject(ToastService);
@@ -103,12 +82,12 @@ export class ExploreEventsComponent {
   readonly variant = input<'public' | 'internal'>('public');
   readonly registeringEventId = signal<string | null>(null);
 
-  // Populated from the SAME `getPublishedEvents()` fetch that fills `publishedEventsById` (see
-  // `loadPublishedEvents()`) — no second, redundant HTTP call. Each `PublishedEvent` is mapped to
-  // the local `ExploreEvent` shape the filter/search logic below expects; see the field-by-field
-  // mapping notes in `toExploreEvent()`.
-  readonly events = signal<readonly ExploreEvent[]>([]);
   readonly loading = signal(true);
+  // Only the FIRST load may replace the grid with a skeleton. Later loads (a filter, a search, a
+  // page change) keep the existing cards mounted and swap their data in place — tearing the grid
+  // down mid-session destroys every card's DOM, which is what made the heart appear to "reset".
+  readonly hasLoadedOnce = signal(false);
+  readonly showSkeleton = computed(() => this.loading() && !this.hasLoadedOnce());
   readonly loadError = signal('');
 
   readonly searchTerm = signal('');
@@ -121,10 +100,39 @@ export class ExploreEventsComponent {
   readonly draftCustomFrom = signal('');
   readonly draftCustomTo = signal('');
   readonly currentPage = signal(1);
-  readonly pageSize = signal(9);
+  // Writable — the internal variant's pagination control lets the user pick 9/18/27 (see
+  // changePageSize). Its per-variant DEFAULT is seeded reactively in the constructor (an effect
+  // keyed off variant(), not a one-time check) so it's still correct even if the variant input
+  // arrives after construction — e.g. TestBed's setInput(), or any binding path that resolves
+  // later than a static template attribute would. The public variant never exposes a page-size
+  // control, so this only ever changes there via that reactive default.
+  readonly pageSize = signal(INTERNAL_PAGE_SIZE);
 
-  private readonly publishedEventsById = signal<ReadonlyMap<string, PublishedEvent>>(new Map());
+  // The single source of truth for what's on screen, for BOTH variants — always the current
+  // page of GET /events/search results. There is no separate client-side filtering path: the
+  // public landing page is just this same server search, permanently scoped to Public-visibility
+  // events (see buildSearchParams), with no filter UI offered. One filter implementation, one
+  // place it can drift from the backend's (the backend's _list_events_filters already mirrors it).
+  private readonly pageEvents = signal<readonly PublishedEvent[]>([]);
+  readonly resultCount = signal(0);
+  readonly pagedPublishedEvents = computed(() => this.pageEvents());
+  private readonly publishedEventsById = computed(() => new Map(this.pagedPublishedEvents().map((event) => [event.id, event])));
   private readonly registrationStatusByEventId = signal<ReadonlyMap<string, RegistrationStatus | null>>(new Map());
+
+  // School options span every published event the caller can see, not just the current page —
+  // fetched once, independently of the paged search, the same way category/format catalogs are.
+  private readonly allSchools = signal<readonly string[]>([]);
+
+  // Category/format filter options — fetched active-only directly from the catalog (not via
+  // EventCategoryService/EventFormatService's shared entries(), which intentionally includes
+  // inactive rows for admin management and event-proposal's archived-format lookups).
+  private readonly activeCategoryNames = signal<readonly string[]>([]);
+  private readonly activeFormatNames = signal<readonly string[]>([]);
+
+  // Debounced live "Show N Results" preview while the filter dialog is open (internal variant only
+  // — the public variant offers no filter dialog at all, see draftResultCount below).
+  private readonly draftPreviewCount = signal<number | null>(null);
+  private readonly draftPreviewRequests = new Subject<void>();
 
   registrationCount(id: string): number { return this.publishedEventsById().get(id)?.confirmedRegistrationCount ?? 0; }
   publishedEvent(id: string): PublishedEvent | undefined { return this.publishedEventsById().get(id); }
@@ -136,8 +144,8 @@ export class ExploreEventsComponent {
   // behavior below so both entry points give the same confirmation UX.
   onModalRegistered(result: RegistrationResult): void {
     const eventTitle = this.selectedPublishedEvent()?.eventTitle ?? 'the event';
-    this.loadRegistrationStatuses([...this.publishedEventsById().values()]);
     this.closeEvent();
+    this.load();
     if (result.status === 'rejected' || result.status === 'duplicate') {
       this.toast.error('Registration not completed', result.message);
     } else {
@@ -145,8 +153,11 @@ export class ExploreEventsComponent {
     }
   }
 
+  // Events can carry a null/blank schoolDepartment, and a null in here used to throw
+  // (null.localeCompare) from inside a computed — which aborts Angular's whole change-detection
+  // pass, freezing every other binding on the page (the save-event heart included).
   readonly schoolOptions = computed(() =>
-    [...new Set(this.events().map((event) => event.school))].sort((a, b) => a.localeCompare(b)),
+    [...this.allSchools()].filter((name): name is string => !!name).sort((a, b) => a.localeCompare(b)),
   );
 
   // Only Students and Lecturers can ever be part of a club (as a member or as President — see
@@ -160,27 +171,20 @@ export class ExploreEventsComponent {
     return isSchoolStudentOrLecturer(user);
   });
 
+  // Filter groups only exist for the internal variant — the public landing page has no filter UI
+  // at all, just search (see explore-events.html).
   readonly filterGroups = computed<readonly FilterGroup[]>(() => [
-    // Guests must never be offered a filter implying they could see Private/Club Only events —
-    // the loaded event list already excludes those per `isEventVisibleTo`, but showing the option
-    // on the public landing page would still be misleading UI. "Club Only" itself is further
-    // restricted to Students and Club Presidents — only they can ever be club members, so no
-    // other internal role (staff, lecturer, HOS/HOD, etc.) can be part of a club at all.
-    ...(this.variant() === 'internal'
-      ? [
-          {
-            key: 'visibility' as const,
-            label: 'Event Visibility',
-            options: this.canSeeClubOnlyFilter()
-              ? ['Public', 'Private', 'Club Only']
-              : ['Public', 'Private'],
-          },
-        ]
-      : []),
+    {
+      key: 'visibility' as const,
+      label: 'Event Visibility',
+      options: this.canSeeClubOnlyFilter()
+        ? ['Public', 'Internal', 'Club Only']
+        : ['Public', 'Internal'],
+    },
     {
       key: 'category',
       label: 'Category',
-      options: this.eventCategoryService.activeEntries().map((c) => c.name),
+      options: this.activeCategoryNames(),
       wide: true,
     },
     {
@@ -192,7 +196,7 @@ export class ExploreEventsComponent {
     {
       key: 'format',
       label: 'Event Format',
-      options: this.eventFormatService.activeEntries().map((f) => f.name),
+      options: this.activeFormatNames(),
     },
     {
       key: 'date',
@@ -217,27 +221,11 @@ export class ExploreEventsComponent {
     },
   ]);
 
-  readonly matchingEvents = computed(() =>
-    this.getMatchingEvents(
-      this.appliedFilters(),
-      this.appliedCustomFrom(),
-      this.appliedCustomTo(),
-    ),
-  );
-  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.matchingEvents().length / this.pageSize())));
-  readonly pagedEvents = computed(() => {
-    const page = Math.min(this.currentPage(), this.totalPages());
-    const start = (page - 1) * this.pageSize();
-    return this.matchingEvents().slice(start, start + this.pageSize());
-  });
-  readonly draftResultCount = computed(
-    () =>
-      this.getMatchingEvents(
-        this.draftFilters(),
-        this.draftCustomFrom(),
-        this.draftCustomTo(),
-      ).length,
-  );
+  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.resultCount() / this.pageSize())));
+  // draftResultCount shows the live, debounced preview while the filter dialog is open (internal
+  // variant only); before the first preview response lands it falls back to the applied count so
+  // the button never shows a jarring 0.
+  readonly draftResultCount = computed(() => this.draftPreviewCount() ?? this.resultCount());
   readonly appliedFilterChips = computed<readonly AppliedFilterChip[]>(() =>
     (Object.entries(this.appliedFilters()) as [FilterKey, readonly string[]][]).flatMap(
       ([group, values]) => values.map((value) => ({ group, value })),
@@ -246,118 +234,137 @@ export class ExploreEventsComponent {
   readonly appliedFilterCount = computed(() => this.appliedFilterChips().length);
 
   constructor() {
-    if (this.variant() === 'public') {
-      this.pageSize.set(INITIAL_VISIBLE_EVENTS);
-    }
     this.destroyRef.onDestroy(() => {
       this.document.body.classList.remove('filters-open');
     });
-    this.loadPublishedEvents();
+
+    this.draftPreviewRequests
+      .pipe(
+        debounceTime(300),
+        switchMap(() => this.publishedEventService.searchEvents(this.buildSearchParams(this.draftFilters(), this.draftCustomFrom(), this.draftCustomTo(), 1, 1))),
+      )
+      .subscribe({
+        next: (response) => this.draftPreviewCount.set(response.total),
+        error: () => this.draftPreviewCount.set(null),
+      });
+
+    // variant() is a signal input, so it is not guaranteed to be readable at its final value the
+    // moment the constructor runs — a static template attribute (`variant="internal"`) resolves
+    // before construction, but other binding paths (TestBed's setInput(), a structural directive)
+    // resolve after. A one-time `if (this.variant() === ...)` check in the constructor body would
+    // silently lock the component onto whatever variant() happened to read at that instant. This
+    // effect instead reacts to variant() itself, seeding the per-variant page size once and
+    // firing the internal-only setup (school/catalog option fetches) once, whenever variant()
+    // actually resolves — construction-time or not.
+    let setupDoneFor: 'public' | 'internal' | null = null;
+    effect(() => {
+      const current = this.variant();
+      if (setupDoneFor === current) return;
+      setupDoneFor = current;
+      this.pageSize.set(current === 'public' ? PUBLIC_PAGE_SIZE : INTERNAL_PAGE_SIZE);
+      if (current === 'internal') {
+        this.loadSchoolOptions();
+        this.loadCatalogFilterOptions();
+      }
+    });
+
+    // Re-fetches whenever applied filters, search term, or pagination change — this IS the data
+    // load for both variants, not a client-side re-filter of an already-fetched list.
+    effect(() => {
+      this.appliedFilters();
+      this.appliedCustomFrom();
+      this.appliedCustomTo();
+      this.searchTerm();
+      this.currentPage();
+      this.pageSize();
+      this.load();
+    });
   }
 
-  private loadPublishedEvents(): void {
-    this.publishedEventService.getPublishedEvents().subscribe({
-      next: (allEvents) => {
-        const isAuthenticated = this.auth.authenticated();
-        const events = allEvents.filter((event) => isEventVisibleTo(event.eventVisibility, isAuthenticated));
-        this.publishedEventsById.set(new Map(events.map((event) => [event.id, event])));
-        this.events.set(events.map((event) => this.toExploreEvent(event)));
+  private load(): void {
+    this.loading.set(true);
+    this.loadError.set('');
+    const params = this.buildSearchParams(this.appliedFilters(), this.appliedCustomFrom(), this.appliedCustomTo(), this.currentPage(), this.pageSize());
+    this.publishedEventService.searchEvents(params).subscribe({
+      next: (response) => {
+        this.pageEvents.set(response.items);
+        this.resultCount.set(response.total);
         this.loading.set(false);
-        this.loadRegistrationStatuses(events);
+        this.hasLoadedOnce.set(true);
+        this.loadRegistrationStatuses(response.items);
       },
       error: () => {
-        this.publishedEventsById.set(new Map());
+        this.pageEvents.set([]);
+        this.resultCount.set(0);
         this.loadError.set('Events could not be loaded.');
         this.loading.set(false);
+        this.hasLoadedOnce.set(true);
       },
     });
   }
 
-  // Maps the real `PublishedEvent` server shape onto the local `ExploreEvent` shape this
-  // component's filter/search/date logic was already written against, per task-4.3-brief.md
-  // Step 3's field-by-field guidance:
-  private toExploreEvent(event: PublishedEvent): ExploreEvent {
-    const schedule = event.schedule[0];
+  private loadSchoolOptions(): void {
+    this.publishedEventService.getPublishedEvents().subscribe({
+      next: (events) => this.allSchools.set([...new Set(events.map((event) => event.schoolDepartment).filter((name): name is string => !!name))]),
+      error: () => this.allSchools.set([]),
+    });
+  }
+
+  private loadCatalogFilterOptions(): void {
+    this.eventCatalogRepository.getEntries('categories', true).subscribe({
+      next: (entries) => this.activeCategoryNames.set(entries.map((entry) => entry.name)),
+      error: () => this.activeCategoryNames.set([]),
+    });
+    this.eventCatalogRepository.getEntries('formats', true).subscribe({
+      next: (entries) => this.activeFormatNames.set(entries.map((entry) => entry.name)),
+      error: () => this.activeFormatNames.set([]),
+    });
+  }
+
+  private buildSearchParams(filters: FilterSelection, customFrom: string, customTo: string, page: number, pageSize: number): EventSearchParams {
+    // The public variant offers no filter UI, no auth-aware exclusion, and only ever wants
+    // Public-visibility events — everything else (category/school/format/date/time/
+    // registration/cost/visibility) is the internal variant's applied filters, which stay
+    // empty here since filterGroups/openFilters are never reachable on the public variant.
+    if (this.variant() === 'public') {
+      return {
+        q: this.searchTerm().trim() || undefined,
+        visibility: ['Public'],
+        page,
+        pageSize,
+      };
+    }
     return {
-      id: event.id,
-      title: event.eventTitle,
-      category: this.firstCategory(event.categories),
-      visibility: event.eventVisibility,
-      school: event.schoolDepartment,
-      format: event.eventFormat,
-      timePeriod: this.timePeriodFor(schedule),
-      registration: this.registrationLabel(event),
-      cost: event.isFree ? 'Free' : 'Paid',
-      date: this.eventDateFor(schedule),
-      daysFromNow: this.daysFromNowFor(schedule),
-      time: this.timeRangeFor(schedule),
-      venue: schedule?.location || 'To be confirmed',
-      image: event.eventImage.url,
+      q: this.searchTerm().trim() || undefined,
+      visibility: filters.visibility as readonly EventVisibility[],
+      category: filters.category,
+      school: filters.school,
+      format: filters.format,
+      time: filters.time as EventSearchParams['time'],
+      registration: filters.registration as EventSearchParams['registration'],
+      cost: filters.cost as EventSearchParams['cost'],
+      date: filters.date,
+      dateFrom: filters.date.includes('Custom Date Range') ? customFrom || undefined : undefined,
+      dateTo: filters.date.includes('Custom Date Range') ? customTo || undefined : undefined,
+      // Once a user has a confirmed or pending registration for an event, it drops out of Explore
+      // Events permanently (not just as a one-off post-register removal) — they can still manage
+      // it from My Events. Guests are unaffected (never registered for anything).
+      excludeRegistered: !!this.auth.user(),
+      page,
+      pageSize,
     };
   }
 
-  private firstCategory(categories: readonly string[]): string {
-    return categories[0] ?? '';
-  }
-
-  private registrationLabel(event: PublishedEvent): string {
-    if (event.registrationMode !== 'Automatic' && event.registrationMode !== 'Approval Required') return 'No Registration Required';
-    return 'Registration Required';
-  }
-
-  private timePeriodFor(schedule: ProposalEventSchedule | undefined): string {
-    const hour = Number(schedule?.start?.split(':')[0] ?? NaN);
-    if (Number.isNaN(hour)) return 'Morning';
-    if (hour < 12) return 'Morning';
-    if (hour < 17) return 'Afternoon';
-    return 'Evening';
-  }
-
-  private timeRangeFor(schedule: ProposalEventSchedule | undefined): string {
-    if (!schedule) return 'To be confirmed';
-    return `${this.formatTime(schedule.start)} – ${this.formatTime(schedule.end)}`;
-  }
-
-  private formatTime(value: string): string {
-    const [hours = '0', minutes = '00'] = value.split(':');
-    const hour = Number(hours);
-    const suffix = hour >= 12 ? 'PM' : 'AM';
-    return `${hour % 12 || 12}:${minutes} ${suffix}`;
-  }
-
-  private eventDateFor(schedule: ProposalEventSchedule | undefined): ExploreEventDate {
-    if (!schedule?.date) return { iso: new Date().toISOString(), display: 'To be confirmed' };
-    const date = new Date(`${schedule.date}T12:00:00`);
-    return {
-      iso: date.toISOString(),
-      display: new Intl.DateTimeFormat('en-MY', { weekday: 'short', day: 'numeric', month: 'short' }).format(date),
-    };
-  }
-
-  private daysFromNowFor(schedule: ProposalEventSchedule | undefined): number {
-    if (!schedule?.date) return 0;
-    const eventDate = new Date(`${schedule.date}T00:00:00`);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return Math.round((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  }
-
+  // The listing already excludes registered/pending events server-side (excludeRegistered) — this
+  // only powers the card/details-modal status badge for anything else (e.g. a past 'rejected').
+  // One batched request for the whole page instead of one getMyRegistration() call per event.
   private loadRegistrationStatuses(events: readonly PublishedEvent[]): void {
-    const email = this.auth.user()?.email;
-    if (!email || events.length === 0) {
+    if (!this.auth.user() || events.length === 0) {
       this.registrationStatusByEventId.set(new Map());
       return;
     }
-    forkJoin(
-      events.map((event) =>
-        this.publishedEventService.getMyRegistration(event.id, email),
-      ),
-    ).subscribe({
-      next: (registrations) => {
-        this.registrationStatusByEventId.set(
-          new Map(events.map((event, index) => [event.id, registrations[index]?.status ?? null])),
-        );
-      },
+    this.publishedEventService.getRegistrationStatuses(events.map((event) => event.id)).subscribe({
+      next: (statuses) => this.registrationStatusByEventId.set(statuses),
       error: () => this.registrationStatusByEventId.set(new Map()),
     });
   }
@@ -381,6 +388,7 @@ export class ExploreEventsComponent {
     this.draftFilters.set(this.cloneFilters(this.appliedFilters()));
     this.draftCustomFrom.set(this.appliedCustomFrom());
     this.draftCustomTo.set(this.appliedCustomTo());
+    this.draftPreviewCount.set(null);
     this.filterOpen.set(true);
     this.document.body.classList.add('filters-open');
   }
@@ -399,6 +407,7 @@ export class ExploreEventsComponent {
 
       return { ...filters, [group]: next };
     });
+    this.draftPreviewRequests.next();
   }
 
   isDraftSelected(group: FilterKey, value: string): boolean {
@@ -412,12 +421,14 @@ export class ExploreEventsComponent {
     } else {
       this.draftCustomTo.set(value);
     }
+    this.draftPreviewRequests.next();
   }
 
   resetDraftFilters(): void {
     this.draftFilters.set(this.emptyFilters());
     this.draftCustomFrom.set('');
     this.draftCustomTo.set('');
+    this.draftPreviewRequests.next();
   }
 
   applyFilters(): void {
@@ -456,15 +467,17 @@ export class ExploreEventsComponent {
   }
 
   toggleSaved(eventId: string): void { this.favourites.toggle(eventId); }
-  isSaved(eventId: string): boolean { return this.favourites.isSaved(eventId); }
 
+  // A method (not a template-bound signal expression) reading this component's OWN signal is
+  // still tracked correctly by zoneless change detection — unlike the old isSaved() wrapper this
+  // replaced, which read a signal owned by an INJECTED service and silently missed its updates
+  // (see explore-events.html's [saved] binding, now reading favourites.savedEventIds() directly).
   registrationStatus(eventId: string): RegistrationStatus | null {
     return this.registrationStatusByEventId().get(eventId) ?? null;
   }
 
   registerForEvent(eventId: string): void {
-    const user = this.auth.user();
-    if (!user) {
+    if (!this.auth.user()) {
       this.guestFlow.requestForEvent(eventId);
       void this.router.navigate(['/login'], { queryParams: { returnUrl: this.router.url } });
       return;
@@ -474,20 +487,19 @@ export class ExploreEventsComponent {
     // Manual-approval events need a reason for attending, and paid events need proof of payment.
     // Neither can be collected from a one-click card button, so open the details modal (which
     // owns both fields) instead of firing a registration the server would reject.
-    if (event && (event.registrationMode === 'Approval Required' || (event.cost != null && event.cost > 0))) {
+    if (event && (event.registrationMode === 'Manual' || (event.cost != null && event.cost > 0))) {
       this.openEvent(eventId);
       return;
     }
     this.registeringEventId.set(eventId);
     const eventTitle = event?.eventTitle ?? 'the event';
-    this.publishedEventService.registerForEvent(eventId, user.email).subscribe({
+    this.publishedEventService.registerForEvent(eventId).subscribe({
       next: (result) => {
         this.registeringEventId.set(null);
-        // Refreshing registration statuses is what actually drops this event out of
-        // matchingEvents (see getMatchingEvents' registrations.get(event.id) check) — the modal
-        // close below is separate, since registration can also happen from the quick-register
-        // button on a card with no modal open at all.
-        this.loadRegistrationStatuses([...this.publishedEventsById().values()]);
+        // Refreshing registration statuses is what actually drops this event out of the grid (the
+        // server's excludeRegistered filter) — the modal close below is separate, since
+        // registration can also happen from the quick-register button with no modal open.
+        this.load();
         if (this.selectedPublishedEvent()?.id === eventId) this.closeEvent();
         if (result.status === 'rejected' || result.status === 'duplicate') {
           this.toast.error('Registration not completed', result.message);
@@ -499,82 +511,6 @@ export class ExploreEventsComponent {
         this.registeringEventId.set(null);
         this.toast.error('Registration failed', 'Please try again.');
       },
-    });
-  }
-
-  private getMatchingEvents(
-    filters: FilterSelection,
-    customFrom: string,
-    customTo: string,
-  ): readonly ExploreEvent[] {
-    const query = this.searchTerm().trim().toLocaleLowerCase();
-    const registrations = this.registrationStatusByEventId();
-
-    return this.events().filter((event) => {
-      // Once a user has a confirmed or pending registration for an event, it drops out of
-      // Explore Events permanently (not just as a one-off post-register removal) — they can
-      // still manage it from My Events. Guests and users with no registration status for this
-      // event are unaffected.
-      const status = registrations.get(event.id);
-      if (status === 'confirmed' || status === 'pending') return false;
-      const searchable = [
-        event.title,
-        event.category,
-        event.venue,
-        event.school,
-        event.format,
-      ]
-        .join(' ')
-        .toLocaleLowerCase();
-
-      return (
-        (!query || searchable.includes(query)) &&
-        this.matches(filters.visibility, event.visibility) &&
-        this.matches(filters.category, event.category) &&
-        this.matches(filters.school, event.school) &&
-        this.matches(filters.format, event.format) &&
-        this.matchesDate(event, filters.date, customFrom, customTo) &&
-        this.matches(filters.time, event.timePeriod) &&
-        this.matches(filters.registration, event.registration) &&
-        this.matches(filters.cost, event.cost)
-      );
-    });
-  }
-
-  private matches(selected: readonly string[], value: string): boolean {
-    return selected.length === 0 || selected.includes(value);
-  }
-
-  private matchesDate(
-    event: ExploreEvent,
-    selected: readonly string[],
-    customFrom: string,
-    customTo: string,
-  ): boolean {
-    if (selected.length === 0) {
-      return true;
-    }
-
-    const eventDate = new Date(event.date.iso);
-    const today = new Date();
-    const isWeekend = eventDate.getDay() === 0 || eventDate.getDay() === 6;
-    const isThisMonth =
-      eventDate.getFullYear() === today.getFullYear() &&
-      eventDate.getMonth() === today.getMonth();
-
-    return selected.some((option) => {
-      if (option === 'Today') return event.daysFromNow === 0;
-      if (option === 'Tomorrow') return event.daysFromNow === 1;
-      if (option === 'This Week') return event.daysFromNow >= 0 && event.daysFromNow <= 7;
-      if (option === 'This Weekend') return event.daysFromNow <= 10 && isWeekend;
-      if (option === 'This Month') return isThisMonth;
-      if (option === 'Custom Date Range') {
-        const eventTime = eventDate.getTime();
-        const fromTime = customFrom ? new Date(`${customFrom}T00:00:00`).getTime() : -Infinity;
-        const toTime = customTo ? new Date(`${customTo}T23:59:59`).getTime() : Infinity;
-        return eventTime >= fromTime && eventTime <= toTime;
-      }
-      return false;
     });
   }
 

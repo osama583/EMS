@@ -16,6 +16,7 @@ import { EventDetailsModalComponent } from '../../../../shared/components/event-
 import { CtaLinkComponent } from '../../../../shared/components/cta-link/cta-link';
 import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
+import { EVENT_IMAGE_PLACEHOLDER } from '../../../../shared/event-image-placeholder';
 
 interface EventDate {
   readonly iso: string;
@@ -202,7 +203,7 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
       venue: schedule?.location || 'To be confirmed',
       time: schedule ? `${this.formatTime(schedule.start)} – ${this.formatTime(schedule.end)}` : 'To be confirmed',
       description: event.shortIntroduction,
-      image: event.eventImage.url,
+      image: event.eventImage?.url || EVENT_IMAGE_PLACEHOLDER,
       date: this.eventDateFor(schedule),
       daysFromNow: this.daysFromNowFor(schedule),
     };

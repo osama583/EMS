@@ -1,11 +1,14 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../../../core/auth/auth.service';
 import { ProposalReviewRecord } from '../../../../../core/proposals/proposal-review.models';
+import { ProposalSortKey, SortOrder } from '../../../../../core/proposals/proposal-workflow.repository';
 import { ProposalWorkflowService } from '../../../../../core/proposals/proposal-workflow.service';
-import { ProposalStage } from '../../../../../core/proposals/proposal-status.models';
-import { departmentAwaitingApplicant, proposalNeedsApplicantAction, proposalSectionForUser, userIsApplicantForProposal } from '../../../../../core/proposals/proposal-visibility';
+import { departmentsAwaitingApplicant, proposalNeedsApplicantAction, userIsApplicantForProposal } from '../../../../../core/proposals/proposal-visibility';
+import { ProposalStage, DEPARTMENT_LABELS } from '../../../../../core/proposals/proposal-status.models';
+import { DepartmentRequestKind } from '../../../../../core/departments/department-workflow.config';
 import { InternalDataPageComponent } from '../../../../../shared/components/internal-data-page/internal-data-page';
 import {
   InternalCellTone,
@@ -14,6 +17,8 @@ import {
   InternalFilterChange,
   InternalFilterConfig,
   InternalRowActionEvent,
+  InternalSortChange,
+  InternalSortState,
 } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
 import { RecordsHubBucket } from '../records-hub';
 
@@ -23,11 +28,14 @@ const BUCKET_COPY: Readonly<Record<RecordsHubBucket, { title: string; descriptio
   history: { title: 'Proposals', description: 'Completed proposals — approved, rejected, or cancelled.', empty: 'No proposal history found' },
 };
 
-// Reused for all 3 buckets — same data source (ProposalWorkflowService.list()) split by
-// proposalSectionForUser()'s existing 'inbox' | 'ongoing' | 'history' classification, which
-// already encodes "does this belong to this viewer, and is it waiting on them right now" per
-// proposal-visibility.ts. Replaces the old separate InboxProposalsComponent and
-// RecordsPageComponent's 'drafts'-free pending/history kinds.
+// Every list control here (search, status filter, sort, page, page size) is a real server query
+// param — GET /proposals?bucket=&q=&statusLabel=&sort=&order=&page=&pageSize= — computed by
+// proposals.py's list_proposals()/_BUCKET_SQL/_STATUS_LABEL_SQL. This used to fetch every visible
+// proposal in one 200-row request and filter/bucket/paginate it all in the browser (see git
+// history); that meant a fifth tab of proposals would silently stop being fetched at all past
+// page 1, and every navigation between Inbox/Ongoing/History re-fetched the same full set. Now
+// each keystroke/filter/sort/page change is its own scoped request for exactly what that page
+// needs to show.
 @Component({
   selector: 'app-hub-proposals',
   imports: [InternalDataPageComponent],
@@ -45,55 +53,92 @@ export class HubProposalsComponent {
   private readonly copy = BUCKET_COPY[this.bucket];
 
   readonly search = signal('');
+  private readonly debouncedSearch = signal('');
   readonly statusFilter = signal('All');
+  // History only: who the proposal belongs to, not who acted on it — 'mine' is the viewer's own
+  // submissions, 'other' is everyone else's (co-owned or reviewed/actioned). See
+  // proposals.py's ?requester= param.
+  readonly requesterFilter = signal<'All' | 'mine' | 'other'>('All');
   readonly page = signal(1);
   readonly pageSize = signal(10);
+  readonly sort = signal<InternalSortState>({ key: 'updatedAt', order: 'desc' });
 
   readonly items = signal<readonly ProposalReviewRecord[]>([]);
+  readonly total = signal(0);
+  readonly totalPages = signal(1);
   readonly loading = signal(true);
   readonly error = signal('');
 
+  readonly statusOptions = signal<readonly string[]>([]);
+
   constructor() {
-    this.service.list().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (items) => { this.items.set(items); this.loading.set(false); },
-      error: () => { this.error.set('Proposals could not be loaded.'); this.loading.set(false); },
+    // Debounces the search box only — every other control (filter/sort/page/pageSize) already
+    // changes at a human pace and should refetch immediately.
+    toObservable(this.search).pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe((value) => { this.debouncedSearch.set(value); this.page.set(1); });
+
+    toObservable(computed(() => ({
+      bucket: this.bucket,
+      q: this.debouncedSearch(),
+      statusLabel: this.statusFilter(),
+      requester: this.requesterFilter(),
+      page: this.page(),
+      pageSize: this.pageSize(),
+      sort: this.sort(),
+    })))
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        switchMap((query) => {
+          this.loading.set(true);
+          return this.service.listPage({
+            bucket: query.bucket,
+            page: query.page,
+            pageSize: query.pageSize,
+            sort: query.sort.key as ProposalSortKey,
+            order: query.sort.order as SortOrder,
+            q: query.q,
+            statusLabel: query.statusLabel,
+            requester: query.requester === 'All' ? undefined : query.requester,
+          });
+        }),
+      )
+      .subscribe({
+        next: (result) => {
+          this.items.set(result.items);
+          this.total.set(result.total);
+          this.totalPages.set(result.totalPages);
+          this.loading.set(false);
+          this.error.set('');
+        },
+        error: () => { this.error.set('Proposals could not be loaded.'); this.loading.set(false); },
+      });
+
+    this.service.listStatusLabels(this.bucket).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (labels) => this.statusOptions.set(labels),
+      error: () => this.statusOptions.set([]),
     });
   }
-
-  readonly bucketedItems = computed(() => {
-    const user = this.auth.user();
-    return this.items().filter((item) => proposalSectionForUser(user, item) === this.bucket);
-  });
-
-  readonly filteredItems = computed(() => {
-    const query = this.search().trim().toLocaleLowerCase();
-    const status = this.statusFilter();
-    return this.bucketedItems().filter((item) => {
-      const matchesQuery = query.length === 0 || `${item.proposalId} ${item.eventTitle} ${item.applicant}`.toLocaleLowerCase().includes(query);
-      const matchesStatus = status === 'All' || this.displayStatus(item) === status;
-      return matchesQuery && matchesStatus;
-    });
-  });
-
-  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filteredItems().length / this.pageSize())));
-  readonly currentPage = computed(() => Math.min(this.page(), this.totalPages()));
-  readonly visibleItems = computed(() => {
-    const start = (this.currentPage() - 1) * this.pageSize();
-    return this.filteredItems().slice(start, start + this.pageSize());
-  });
 
   readonly pageConfig = computed<InternalDataPageConfig>(() => ({
     ariaLabel: this.copy.title,
     paginationLabel: `${this.copy.title} pagination`,
     rowsPerPageLabel: 'Items per page',
     mobileListLabel: `${this.copy.title} cards`,
-    header: { title: this.copy.title, description: this.copy.description, countLabel: `${this.filteredItems().length} proposal${this.filteredItems().length === 1 ? '' : 's'}` },
+    header: { title: this.copy.title, description: this.copy.description, countLabel: `${this.total()} proposal${this.total() === 1 ? '' : 's'}` },
     search: { ariaLabel: 'Search proposals', placeholder: 'Proposal ID, event title, or applicant' },
-    columns: [
+    columns: this.bucket === 'history' ? [
+      { key: 'proposalId', label: 'Proposal ID', width: '9rem' },
+      { key: 'eventTitle', label: 'Event Title', width: '15rem' },
+      { key: 'requester', label: 'Requester', width: '13rem' },
+      { key: 'schedule', label: 'Event Schedule', width: '16rem', sortKey: 'schedule' },
+      { key: 'pax', label: 'Total Pax', width: '7rem' },
+      { key: 'status', label: 'Status', width: '11rem' },
+      { key: 'actions', label: 'Actions', actions: true, width: '9rem' },
+    ] : [
       { key: 'proposalId', label: 'Proposal ID', width: '9rem' },
       { key: 'eventTitle', label: 'Event Title', width: '17rem' },
       { key: 'applicant', label: 'Applicant', width: '13rem' },
-      { key: 'schedule', label: 'Event Schedule', width: '18rem' },
+      { key: 'schedule', label: 'Event Schedule', width: '18rem', sortKey: 'schedule' },
       { key: 'pax', label: 'Total Pax', width: '7rem' },
       { key: 'status', label: 'Status', width: '11rem' },
       { key: 'actions', label: 'Actions', actions: true, width: '9rem' },
@@ -107,71 +152,114 @@ export class HubProposalsComponent {
     pageSizeOptions: [5, 10, 25],
   }));
 
-  readonly filterConfigs = computed<readonly InternalFilterConfig[]>(() => {
-    const statuses = [...new Set(this.bucketedItems().map((item) => this.displayStatus(item)))];
-    return [{ key: 'status', ariaLabel: 'Status', value: this.statusFilter(), options: [{ value: 'All', label: 'All statuses' }, ...statuses.map((value) => ({ value, label: value }))] }];
-  });
+  readonly filterConfigs = computed<readonly InternalFilterConfig[]>(() => [
+    { key: 'status', ariaLabel: 'Status', value: this.statusFilter(), options: [{ value: 'All', label: 'All statuses' }, ...this.statusOptions().map((value) => ({ value, label: value }))] },
+    ...(this.bucket === 'history' ? [{
+      key: 'requester', ariaLabel: 'Filter by requester', value: this.requesterFilter(),
+      options: [{ value: 'All', label: 'All' }, { value: 'mine', label: 'Me' }, { value: 'other', label: 'Other people' }],
+    }] : []),
+  ]);
 
-  // A department push-back leaves request.status at 'Department review' (parallel independence),
-  // so the applicant-facing label has to come from the per-task status, not the proposal status.
-  private displayStatus(item: ProposalReviewRecord): string {
-    if (departmentAwaitingApplicant(item) && userIsApplicantForProposal(this.auth.user(), item)) return 'Changes requested';
-    return item.status;
+  // For the Inbox bucket specifically: an applicant with TWO OR MORE departments simultaneously
+  // asking for changes on the same proposal gets one visual row PER department here, not one row
+  // for the whole proposal — each department's pushback is answered independently on its own
+  // department-resubmit page (see openProposal() below), so each needs its own actionable row,
+  // the same way it would if these were genuinely separate proposals. This only ever expands a
+  // row into MORE rows; every other bucket/case (single department, reviewer send-back, any other
+  // role's row) renders exactly one row per proposal, unchanged. Pagination/`total` still count
+  // proposals, not these expanded display rows — this app's workflow makes >1 simultaneous
+  // department pushback rare, so the rare page showing a couple of extra rows costs nothing.
+  readonly sharedRecords = computed<readonly InternalDataRecord[]>(() => this.items().flatMap((item): readonly InternalDataRecord[] => {
+    const status = item.statusLabel ?? item.status;
+    const splitDepartments = this.bucket === 'inbox' && item.workflow.stage !== ProposalStage.ResubmissionRequired && userIsApplicantForProposal(this.auth.user(), item)
+      ? departmentsAwaitingApplicant(item)
+      : [];
+    if (splitDepartments.length < 2) {
+      return [this.toRecord(item, String(item.id), status)];
+    }
+    return splitDepartments.map((department) => this.toRecord(item, `${item.id}::${department}`, status, department));
+  }));
+
+  private toRecord(item: ProposalReviewRecord, id: string, status: string, department?: DepartmentRequestKind): InternalDataRecord {
+    const statusLabel = department ? `Changes requested — ${DEPARTMENT_LABELS[department] ?? department}` : status;
+    const isMine = userIsApplicantForProposal(this.auth.user(), item);
+    const requesterLabel = isMine ? `${item.applicant} (You)` : item.applicant;
+    return {
+      id,
+      emphasized: status === 'Revision required' || status === 'Changes requested',
+      cells: {
+        proposalId: { primary: item.proposalId },
+        eventTitle: { primary: item.eventTitle },
+        applicant: { primary: item.applicant },
+        requester: { primary: requesterLabel, badge: true, tone: isMine ? 'blue' : 'neutral' },
+        schedule: { primary: item.schedule },
+        pax: { primary: String(item.totalPax) },
+        status: { primary: statusLabel, badge: true, tone: this.statusTone(status) },
+      },
+      mobile: {
+        eyebrow: item.proposalId,
+        status: statusLabel,
+        title: item.eventTitle,
+        identity: this.bucket === 'history' ? requesterLabel : item.applicant,
+        initials: item.applicantInitials,
+        unread: status === 'Revision required' || status === 'Changes requested',
+        details: [
+          { icon: 'schedule', text: item.schedule },
+          { icon: 'groups', text: `${item.totalPax} expected pax` },
+        ],
+      },
+      actionKeys: ['view', 'print'],
+    };
   }
 
-  readonly sharedRecords = computed<readonly InternalDataRecord[]>(() => this.visibleItems().map((item): InternalDataRecord => ({
-    id: item.id,
-    emphasized: this.displayStatus(item) === 'Revision required' || this.displayStatus(item) === 'Changes requested',
-    cells: {
-      proposalId: { primary: item.proposalId },
-      eventTitle: { primary: item.eventTitle },
-      applicant: { primary: item.applicant },
-      schedule: { primary: item.schedule },
-      pax: { primary: String(item.totalPax) },
-      status: { primary: this.displayStatus(item), badge: true, tone: this.statusTone(this.displayStatus(item)) },
-    },
-    mobile: {
-      eyebrow: item.proposalId,
-      status: this.displayStatus(item),
-      title: item.eventTitle,
-      identity: item.applicant,
-      initials: item.applicantInitials,
-      unread: this.displayStatus(item) === 'Revision required' || this.displayStatus(item) === 'Changes requested',
-      details: [
-        { icon: 'schedule', text: item.schedule },
-        { icon: 'groups', text: `${item.totalPax} expected pax` },
-      ],
-    },
-    actionKeys: ['view', 'print'],
-  })));
-
-  updateSearchDraft(value: string): void { this.search.set(value); this.page.set(1); }
+  updateSearchDraft(value: string): void { this.search.set(value); }
   updateFilter(change: InternalFilterChange): void {
     if (change.key === 'status') this.statusFilter.set(change.value);
+    if (change.key === 'requester') this.requesterFilter.set(change.value as 'All' | 'mine' | 'other');
     this.page.set(1);
   }
+  updateSort(change: InternalSortChange): void { this.sort.set({ key: change.key, order: change.order }); this.page.set(1); }
   handleRowAction(event: InternalRowActionEvent): void {
-    if (event.action.key === 'view') this.openProposal(Number(event.record.id));
+    if (event.action.key === 'view') this.openProposal(String(event.record.id));
   }
-  openRecord(record: InternalDataRecord): void { this.openProposal(Number(record.id)); }
-  resetFilters(): void { this.search.set(''); this.statusFilter.set('All'); this.page.set(1); }
+  openRecord(record: InternalDataRecord): void { this.openProposal(String(record.id)); }
+  resetFilters(): void { this.search.set(''); this.debouncedSearch.set(''); this.statusFilter.set('All'); this.requesterFilter.set('All'); this.page.set(1); }
   updatePage(nextPage: number): void { this.page.set(nextPage); }
   updatePageSize(nextSize: number): void { this.pageSize.set(nextSize); this.page.set(1); }
 
-  private openProposal(id: number): void {
+  // `compositeId` is either a plain proposal id ("181") or, for a split multi-department inbox
+  // row (see sharedRecords above), "181::logistics" — the department half tells us exactly which
+  // pushback this specific row represents, so there's no need to re-derive it from the proposal.
+  private openProposal(compositeId: string): void {
+    const [idPart, splitDepartment] = compositeId.split('::');
+    const id = Number(idPart);
     const item = this.items().find((entry) => entry.id === id);
     if (!item) return;
-    // An applicant whose own proposal was sent back for changes edits it in the same form used to
-    // create it, not the reviewer-facing /proposals/review page — mirrors records-page.ts's
-    // openDraft() for the 'drafts' bucket. This covers BOTH ways a proposal comes back: a
-    // reviewer stage sending the whole thing back (ResubmissionRequired) and a single department
-    // asking for changes while the rest of department review carries on.
+    if (splitDepartment) {
+      void this.router.navigate(['/app/proposals/department-resubmit', id, splitDepartment]);
+      return;
+    }
     if (proposalNeedsApplicantAction(item) && userIsApplicantForProposal(this.auth.user(), item)) {
+      // Exactly one department asked for changes: the applicant only needs to fix and resend that
+      // ONE department's request, not touch the rest of an already-in-progress proposal — see
+      // department-resubmit.ts and proposals.py's resubmit_department_task(). Two or more
+      // departments waiting at once produce split rows instead (handled above); a reviewer stage
+      // sending the WHOLE proposal back (ResubmissionRequired) still goes to the full form below.
+      const awaitingDepartments = departmentsAwaitingApplicant(item);
+      if (item.workflow.stage !== ProposalStage.ResubmissionRequired && awaitingDepartments.length === 1) {
+        void this.router.navigate(['/app/proposals/department-resubmit', id, awaitingDepartments[0]]);
+        return;
+      }
+      // An applicant whose own proposal was sent back for changes edits it in the same form used
+      // to create it, not the reviewer-facing /proposals/review page — mirrors records-page.ts's
+      // openDraft() for the 'drafts' bucket.
       void this.router.navigate(['/app/forms/event-proposal'], { queryParams: { proposalId: id } });
       return;
     }
+    // proposal-review-page.ts always fetches the full record by id itself (list rows here are
+    // projected without children — requestRows/requests/coOwners/etc. — so they can't substitute
+    // for the detail view's data); no router state needs passing.
     void this.router.navigate(['/app/proposals/review', id], {
-      state: { proposal: item },
       queryParams: { returnTo: this.router.url, readOnly: this.bucket !== 'inbox' },
     });
   }

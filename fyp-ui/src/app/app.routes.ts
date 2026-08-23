@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, defaultRoleRouteGuard, externalUserGuard, loginGuard, publicLandingGuard, roleGuard } from './core/auth/auth.guards';
+import { authGuard, defaultRoleRouteGuard, externalUserGuard, loginGuard, publicLandingGuard, recordsHubDefaultTabGuard, roleGuard } from './core/auth/auth.guards';
 
 const dropdownSettingRoutes = [
   ['logistics', 'Logistics Items'],
@@ -42,6 +42,7 @@ export const routes: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'saved' },
       { path: 'saved', loadComponent: () => import('./features/my-events/my-events-tab/my-events-tab').then((module) => module.MyEventsTabComponent), data: { mode: 'saved' } },
+      { path: 'pending', loadComponent: () => import('./features/my-events/my-events-tab/my-events-tab').then((module) => module.MyEventsTabComponent), data: { mode: 'pending' } },
       { path: 'registered', loadComponent: () => import('./features/my-events/my-events-tab/my-events-tab').then((module) => module.MyEventsTabComponent), data: { mode: 'registered' } },
       { path: 'history', loadComponent: () => import('./features/my-events/my-events-tab/my-events-tab').then((module) => module.MyEventsTabComponent), data: { mode: 'history' } },
     ],
@@ -99,12 +100,17 @@ export const routes: Routes = [
         },
       },
       {
+        path: 'created-by-me',
+        loadComponent: () => import('./features/internal/pages/created-by-me/created-by-me').then((module) => module.CreatedByMeComponent),
+        title: 'Created by Me | APU Events',
+      },
+      {
         path: 'inbox',
         loadComponent: () => import('./features/internal/pages/records-hub/records-hub').then((module) => module.RecordsHubComponent),
         title: 'Inbox | APU Events',
         data: { bucket: 'inbox' },
         children: [
-          { path: '', pathMatch: 'full', redirectTo: 'proposals' },
+          { path: '', pathMatch: 'full', canActivate: [recordsHubDefaultTabGuard], loadComponent: placeholderPage },
           {
             path: 'proposals',
             loadComponent: () => import('./features/internal/pages/records-hub/hub-proposals/hub-proposals').then((module) => module.HubProposalsComponent),
@@ -113,6 +119,12 @@ export const routes: Routes = [
           {
             path: 'tasks',
             loadComponent: () => import('./features/internal/pages/staff-tasks/staff-tasks').then((module) => module.StaffTasksComponent),
+            title: 'Inbox | APU Events',
+            data: { taskPage: 'active' },
+          },
+          {
+            path: 'cafeteria-tasks',
+            loadComponent: () => import('./features/internal/pages/cafeteria-staff-tasks/cafeteria-staff-tasks').then((module) => module.CafeteriaStaffTasksComponent),
             title: 'Inbox | APU Events',
             data: { taskPage: 'active' },
           },
@@ -131,6 +143,12 @@ export const routes: Routes = [
             loadComponent: () => import('./features/internal/pages/records-hub/hub-registrations/hub-registrations').then((module) => module.HubRegistrationsComponent),
             title: 'Registrations | APU Events',
           },
+          {
+            path: 'president-change-request',
+            loadComponent: () => import('./features/internal/pages/records-hub/hub-president-change-requests/hub-president-change-requests').then((module) => module.HubPresidentChangeRequestsComponent),
+            title: 'President Change Requests | APU Events',
+            data: { bucket: 'inbox' },
+          },
         ],
       },
       {
@@ -139,7 +157,7 @@ export const routes: Routes = [
         title: 'Ongoing | APU Events',
         data: { bucket: 'ongoing' },
         children: [
-          { path: '', pathMatch: 'full', redirectTo: 'proposals' },
+          { path: '', pathMatch: 'full', canActivate: [recordsHubDefaultTabGuard], loadComponent: placeholderPage },
           {
             path: 'proposals',
             loadComponent: () => import('./features/internal/pages/records-hub/hub-proposals/hub-proposals').then((module) => module.HubProposalsComponent),
@@ -150,6 +168,17 @@ export const routes: Routes = [
             loadComponent: () => import('./features/internal/pages/records-hub/hub-requests/hub-requests').then((module) => module.HubRequestsComponent),
             title: 'Ongoing | APU Events',
           },
+          {
+            path: 'clubs',
+            loadComponent: () => import('./features/internal/pages/records-hub/hub-ongoing-clubs/hub-ongoing-clubs').then((module) => module.HubOngoingClubsComponent),
+            title: 'Ongoing | APU Events',
+          },
+          {
+            path: 'events',
+            loadComponent: () => import('./features/my-events/my-events-tab/my-events-tab').then((module) => module.MyEventsTabComponent),
+            title: 'Ongoing | APU Events',
+            data: { mode: 'pending', showHeader: true },
+          },
         ],
       },
       {
@@ -158,7 +187,7 @@ export const routes: Routes = [
         title: 'History | APU Events',
         data: { bucket: 'history' },
         children: [
-          { path: '', pathMatch: 'full', redirectTo: 'proposals' },
+          { path: '', pathMatch: 'full', canActivate: [recordsHubDefaultTabGuard], loadComponent: placeholderPage },
           {
             path: 'proposals',
             loadComponent: () => import('./features/internal/pages/records-hub/hub-proposals/hub-proposals').then((module) => module.HubProposalsComponent),
@@ -171,9 +200,31 @@ export const routes: Routes = [
             data: { taskPage: 'history' },
           },
           {
+            path: 'cafeteria-tasks',
+            loadComponent: () => import('./features/internal/pages/cafeteria-staff-tasks/cafeteria-staff-tasks').then((module) => module.CafeteriaStaffTasksComponent),
+            title: 'History | APU Events',
+            data: { taskPage: 'history' },
+          },
+          {
             path: 'requests',
             loadComponent: () => import('./features/internal/pages/records-hub/hub-requests/hub-requests').then((module) => module.HubRequestsComponent),
             title: 'History | APU Events',
+          },
+          {
+            path: 'clubs',
+            loadComponent: () => import('./features/internal/pages/records-hub/hub-history-clubs/hub-history-clubs').then((module) => module.HubHistoryClubsComponent),
+            title: 'History | APU Events',
+          },
+          {
+            path: 'events',
+            loadComponent: () => import('./features/internal/pages/records-hub/hub-history-events/hub-history-events').then((module) => module.HubHistoryEventsComponent),
+            title: 'History | APU Events',
+          },
+          {
+            path: 'president-change-request',
+            loadComponent: () => import('./features/internal/pages/records-hub/hub-president-change-requests/hub-president-change-requests').then((module) => module.HubPresidentChangeRequestsComponent),
+            title: 'President Change Requests | APU Events',
+            data: { bucket: 'history' },
           },
         ],
       },
@@ -199,6 +250,17 @@ export const routes: Routes = [
             (module) => module.ProposalReviewPageComponent,
           ),
         title: 'Proposal Review | APU Events',
+      },
+      {
+        // A single department's request sent back for changes - see resubmit_department_task()
+        // server-side and department-resubmit.ts's header comment for why this is a separate,
+        // narrower page from forms/event-proposal (the whole-proposal editor).
+        path: 'proposals/department-resubmit/:id/:department',
+        loadComponent: () =>
+          import('./features/internal/pages/department-resubmit/department-resubmit').then(
+            (module) => module.DepartmentResubmitComponent,
+          ),
+        title: 'Resubmit Request | APU Events',
       },
       {
         path: 'forms/event-proposal',
@@ -230,9 +292,11 @@ export const routes: Routes = [
               { path: '', pathMatch: 'full', redirectTo: 'saved' },
               { path: 'saved', loadComponent: () => import('./features/my-events/my-events-tab/my-events-tab').then((module) => module.MyEventsTabComponent), data: { mode: 'saved' } },
               { path: 'registered', loadComponent: () => import('./features/my-events/my-events-tab/my-events-tab').then((module) => module.MyEventsTabComponent), data: { mode: 'registered' } },
-              { path: 'history', loadComponent: () => import('./features/my-events/my-events-tab/my-events-tab').then((module) => module.MyEventsTabComponent), data: { mode: 'history' } },
             ],
           },
+          // Pending/history are centralized under /app/ongoing/events and /app/history/events.
+          { path: 'my-events/pending', pathMatch: 'full', redirectTo: '/app/ongoing/events' },
+          { path: 'my-events/history', pathMatch: 'full', redirectTo: '/app/history/events' },
           { path: 'saved-events', pathMatch: 'full', redirectTo: 'my-events/saved' },
         ],
       },
@@ -268,16 +332,6 @@ export const routes: Routes = [
         title: 'Manage Cafeterias | APU Events',
       },
       {
-        path: 'cafeterias/staff-requests',
-        loadComponent: () => import('./features/internal/pages/cafeteria-staff-requests/cafeteria-staff-requests').then((module) => module.CafeteriaStaffRequestsComponent),
-        title: 'Staff Requests | APU Events',
-      },
-      {
-        path: 'cafeterias/staff-requests-history',
-        loadComponent: () => import('./features/internal/pages/cafeteria-staff-requests-history/cafeteria-staff-requests-history').then((module) => module.CafeteriaStaffRequestsHistoryComponent),
-        title: 'Staff Request History | APU Events',
-      },
-      {
         path: 'cafeterias/staff-assignments',
         loadComponent: () => import('./features/internal/pages/cafeteria-staff-assignments/cafeteria-staff-assignments').then((module) => module.CafeteriaStaffAssignmentsComponent),
         title: 'Staff Assignments | APU Events',
@@ -293,9 +347,9 @@ export const routes: Routes = [
         title: 'My Staff | APU Events',
       },
       {
-        path: 'cafeterias/my-staff-history',
-        loadComponent: () => import('./features/internal/pages/cafeteria-my-staff-history/cafeteria-my-staff-history').then((module) => module.CafeteriaMyStaffHistoryComponent),
-        title: 'My Staff History | APU Events',
+        path: 'cafeterias/staff-requests-history',
+        loadComponent: () => import('./features/internal/pages/cafeteria-staff-requests-history/cafeteria-staff-requests-history').then((module) => module.CafeteriaStaffRequestsHistoryComponent),
+        title: 'Staff Action History | APU Events',
       },
       ...dropdownSettingRoutes.map(([optionKind, title]) => ({
         path: `dropdown-options/${optionKind}`,
@@ -315,6 +369,11 @@ export const routes: Routes = [
         title: 'Manage Clubs | APU Events',
       },
       {
+        path: 'club-category',
+        loadComponent: () => import('./features/internal/pages/club-category-management/club-category-management').then((module) => module.ClubCategoryManagementComponent),
+        title: 'Club Categories | APU Events',
+      },
+      {
         path: 'clubs/discover',
         loadComponent: () => import('./features/internal/pages/clubs/club-discover/club-discover').then((module) => module.ClubDiscoverComponent),
         title: 'Discover Clubs | APU Events',
@@ -331,18 +390,13 @@ export const routes: Routes = [
             loadComponent: () => import('./features/internal/pages/clubs/club-hub/hub-my-clubs/hub-my-clubs').then((module) => module.HubMyClubsComponent),
             title: 'My Clubs | APU Events',
           },
-          {
-            path: 'pending',
-            loadComponent: () => import('./features/internal/pages/clubs/club-hub/hub-pending/hub-pending').then((module) => module.HubPendingComponent),
-            title: 'Pending Requests | APU Events',
-          },
-          {
-            path: 'history',
-            loadComponent: () => import('./features/internal/pages/clubs/club-hub/hub-history/hub-history').then((module) => module.HubHistoryComponent),
-            title: 'Request History | APU Events',
-          },
         ],
       },
+      // Pending club requests moved to /app/ongoing/clubs, and request history (both directions)
+      // to /app/history/clubs — centralized under the shared Ongoing/History shell rather than a
+      // clubs-only tab strip. Old bookmarks still land somewhere useful instead of 404ing.
+      { path: 'clubs/pending', pathMatch: 'full', redirectTo: 'ongoing/clubs' },
+      { path: 'clubs/history', pathMatch: 'full', redirectTo: 'history/clubs' },
       { path: 'clubs/browse', pathMatch: 'full', redirectTo: 'clubs/discover' },
       // Three separate System Configuration pages, each its own sidebar entry under the
       // 'System Configuration' folder (see db.js's backfillSplitSystemConfigNavPages()/seedRoles())

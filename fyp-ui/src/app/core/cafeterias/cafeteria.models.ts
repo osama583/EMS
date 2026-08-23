@@ -17,7 +17,6 @@ export interface CafeteriaAssignment {
   readonly userId: string;
   readonly displayName: string;
   readonly email: string;
-  readonly username?: string;
   // Two independent flags: `active` is this posting (suspended staff keep their account),
   // `userActive` is the account itself.
   readonly active?: boolean;
@@ -42,7 +41,6 @@ export type CafeteriaAssignmentDraft = {
   readonly roleCode?: CafeteriaStaffRoleCode;
   // The person's own details, editable on the same form as their posting.
   readonly displayName?: string;
-  readonly username?: string;
   readonly email?: string;
   readonly password?: string;
   readonly userActive?: boolean;
@@ -52,7 +50,6 @@ export type CafeteriaAssignmentDraft = {
 // more often than an existing user changing jobs.
 export type CafeteriaStaffAccountDraft = {
   readonly displayName: string;
-  readonly username?: string;
   readonly email: string;
   readonly password?: string;
   readonly active: boolean;

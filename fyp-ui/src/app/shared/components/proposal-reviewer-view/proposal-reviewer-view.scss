@@ -289,23 +289,28 @@
 /* ─────────────────────────────────────────────
    Right sticky panel
    ───────────────────────────────────────────── */
+// The whole right column is pinned to the viewport (sticky + capped height) and scrolls
+// independently of .prv-main on the left — but it is ALSO its own flex column so that within it,
+// Workflow Actions keeps its natural height while the comments card below it absorbs whatever
+// space is left and scrolls its OWN messages internally (see .prv-panel-card--comments /
+// .prv-comments-list / app-conversation-thread below). Without this, a long conversation used to
+// just grow the whole panel, pushing Workflow Actions out of view along with it.
 .prv-panel {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
   position: sticky;
   top: 1.25rem;
   max-height: calc(100svh - 2.5rem);
   padding-bottom: 2rem;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgb(42 131 255 / 20%) transparent;
+  overflow: hidden;
 }
 
 .prv-panel-card {
   position: relative;
   display: grid;
   gap: 1rem;
+  flex-shrink: 0;
   padding: 1.2rem 1.25rem;
   border: 1px solid var(--apu-border);
   border-radius: var(--radius-card);
@@ -319,7 +324,35 @@
 
 .prv-panel-card--actions {
   border-color: rgb(42 131 255 / 14%);
+  // Its own scroll fallback for the rare case its content alone is taller than the viewport
+  // (e.g. a very long typed comment) — normally short enough that this never engages, but with
+  // .prv-panel no longer scrolling as a whole, something has to be able to reveal the rest.
+  min-height: 0;
+  overflow-y: auto;
 }
+
+// The comments card is the one flexible element: it takes whatever height Workflow Actions
+// didn't use, and clips its own contents so the conversation list / open thread scrolls inside
+// this card rather than growing it (and the whole sticky panel) without bound. Overrides the
+// shared .prv-panel-card's `display: grid; gap: 1rem` with an explicit two-row track (head fixed,
+// body flexible) — plain `grid-template-rows: auto` rows never shrink below their content, so
+// without this the list/thread would just keep growing the card instead of scrolling internally.
+.prv-panel-card--comments {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.prv-panel-card--comments .prv-panel-card__head { min-height: 0; }
+.prv-panel-card--comments .prv-comments-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(42 131 255 / 20%) transparent;
+}
+.prv-panel-card--comments app-conversation-thread { min-height: 0; overflow: hidden; }
 
 .prv-panel-card__head {
   display: flex;
@@ -352,6 +385,21 @@
   margin: 0.1rem 0 0;
   color: var(--apu-text-muted);
   font-size: 0.74rem;
+}
+
+.prv-panel-card__back {
+  flex-shrink: 0;
+  display: flex;
+  width: 2.1rem;
+  height: 2.1rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0.55rem;
+  background: rgb(42 131 255 / 9%);
+  color: var(--apu-blue-600);
+  cursor: pointer;
 }
 
 /* ─────────────────────────────────────────────
@@ -640,71 +688,64 @@
 }
 
 /* ─────────────────────────────────────────────
-   Reviewer comments list
+   Reviewer comments list — flat inbox rows (avatar, name/timestamp, one-line preview,
+   hairline separators), matching reviewer-comments-drawer.scss's design. Replaces the
+   earlier boxed-bubble-per-row look, which read as message bubbles rather than a list of
+   people/threads.
    ───────────────────────────────────────────── */
-.prv-comments-list {
-  display: grid;
-  gap: 0.75rem;
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.prv-comments-list { display: grid; gap: 0; list-style: none; margin: 0; padding: 0; }
+.prv-comments-list li { border-bottom: 1px solid var(--apu-border); }
+.prv-comments-list li:last-child { border-bottom: 0; }
+
+.prv-comment-entry { display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.7rem 0.1rem; }
+
+.prv-comment-entry--button {
+  width: 100%;
+  padding: 0.7rem 0.3rem;
+  border: 0;
+  border-radius: 0.4rem;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--internal-transition);
 }
 
-.prv-comment-entry {
-  display: flex;
-  gap: 0.7rem;
-  align-items: flex-start;
+.prv-comment-entry--button:hover,
+.prv-comment-entry--button:focus-visible { background: var(--apu-surface-muted); }
+
+.prv-comment-entry--button .prv-comment-entry__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
 }
 
 .prv-comment-entry__avatar {
   flex-shrink: 0;
   display: grid;
-  width: 2rem;
-  height: 2rem;
+  width: 2.25rem;
+  height: 2.25rem;
   place-items: center;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--apu-blue-600) 0%, var(--apu-blue-700) 100%);
   color: #fff;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.03em;
 }
 
-.prv-comment-entry__body {
-  display: grid;
-  gap: 0.3rem;
-  flex: 1;
-  min-width: 0;
-  padding: 0.7rem 0.85rem;
-  border: 1px solid var(--apu-border);
-  border-radius: 0 0.65rem 0.65rem 0.65rem;
-  background: var(--apu-surface-muted);
-}
+.prv-comment-entry__body { display: grid; gap: 0.2rem; flex: 1; min-width: 0; padding-top: 0.05rem; }
 
-.prv-comment-entry__meta {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
+.prv-comment-entry__row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.prv-comment-entry__row strong,
+.prv-comment-entry__meta strong { min-width: 0; overflow-wrap: anywhere; font-size: 0.86rem; color: var(--apu-navy-900); }
+.prv-comment-entry__time { flex-shrink: 0; font-size: 0.68rem; color: var(--apu-text-muted); }
 
-.prv-comment-entry__meta strong {
-  font-size: 0.8rem;
-  color: var(--apu-navy-900);
-}
+.prv-comment-entry__meta { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.prv-comment-entry__stage { font-size: 0.7rem; color: var(--apu-text-muted); font-weight: 500; }
 
-.prv-comment-entry__stage {
-  font-size: 0.7rem;
-  color: var(--apu-text-muted);
-  font-weight: 500;
-}
-
-.prv-comment-entry__text {
-  margin: 0;
-  font-size: 0.82rem;
-  color: var(--apu-navy-800);
-  line-height: 1.55;
-}
+.prv-comment-entry__text { margin: 0; overflow-wrap: anywhere; font-size: 0.8rem; color: var(--apu-text-muted); line-height: 1.4; }
 
 /* ─────────────────────────────────────────────
    Approval history timeline
@@ -801,7 +842,20 @@
   .prv-panel {
     position: static;
     max-height: none;
-    overflow-y: visible;
+    overflow: visible;
+  }
+
+  // The comments card's own internal scroll only makes sense while the panel itself is
+  // height-capped (desktop). Once the panel goes back to flowing with the page, let the card and
+  // its message list size to content and scroll with the page like everything else.
+  .prv-panel-card--comments {
+    display: grid;
+    grid-template-rows: none;
+    overflow: visible;
+  }
+  .prv-panel-card--comments .prv-comments-list,
+  .prv-panel-card--comments app-conversation-thread {
+    overflow: visible;
   }
 
   .prv-kpi-bar {

@@ -5,8 +5,9 @@
   [searchValue]="search()"
   [loading]="loading()"
   [totalPages]="totalPages()"
-  [page]="currentPage()"
+  [page]="page()"
   [pageSize]="pageSize()"
+  [sort]="sort()"
   (searchChange)="updateSearchDraft($event)"
   (filterChange)="updateFilter($event)"
   (reset)="resetFilters()"
@@ -14,4 +15,5 @@
   (pageSizeChange)="updatePageSize($event)"
   (rowAction)="handleRowAction($event)"
   (recordOpen)="openRecord($event)"
+  (sortChange)="updateSort($event)"
 />

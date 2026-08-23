@@ -1,13 +1,12 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { RouterOutlet } from '@angular/router';
 
-// Single shell for the 3 Clubs member-facing tabs (My Clubs / Pending Requests / Request
-// History) — each tab is still its own route (/app/clubs/my-clubs, /pending, /history) so deep
-// links and back/forward keep working; this shell only adds the tab strip + router-outlet, same
-// pattern as RecordsHubComponent.
+// Pending club requests and request history moved to /app/ongoing/clubs and /app/history/clubs
+// (see app.routes.ts) — this shell now only wraps My Clubs, kept as its own route/component so
+// /app/clubs/my-clubs stays a stable, bookmarkable, Page-Visibility-grantable URL.
 @Component({
   selector: 'app-club-hub',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [RouterOutlet],
   templateUrl: './club-hub.html',
   styleUrl: './club-hub.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

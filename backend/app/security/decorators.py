@@ -39,6 +39,26 @@ def authenticate() -> None:
     g.user_id = principal.user_id
 
 
+def authenticate_optional() -> None:
+    """Best-effort authenticate(): resolves a Principal onto `g` if a valid bearer
+    token is present, silently leaves it unset otherwise. For endpoints that are
+    public but personalise their response when the caller happens to be signed in
+    (e.g. excluding events the caller already registered for)."""
+    if getattr(g, "principal", None) is not None:
+        return
+    header = request.headers.get("Authorization", "")
+    scheme, _, token = header.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return
+    try:
+        claims = decode_token(token.strip(), expected_type=ACCESS)
+        principal = load_principal(claims["user_id"])
+    except Exception:
+        return
+    g.principal = principal
+    g.user_id = principal.user_id
+
+
 def require_auth(fn: Callable) -> Callable:
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):

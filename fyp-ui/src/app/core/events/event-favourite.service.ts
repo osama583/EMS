@@ -24,6 +24,9 @@ export class EventFavouriteService {
     const operation = this.savedEvents.isSaved(eventId)
       ? this.savedEvents.removeSavedEvent(user.email, eventId)
       : this.savedEvents.saveEvent(user.email, eventId);
-    operation.subscribe();
+    // The heart already flipped optimistically (see SavedEventsService). On failure it rolls
+    // back and reports itself here via the service's own error signal — this subscribe only
+    // needs an error callback so a failed request doesn't surface as an unhandled RxJS error.
+    operation.subscribe({ error: () => {} });
   }
 }

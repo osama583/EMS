@@ -1,0 +1,116 @@
+<section class="internal-page">
+  <header class="internal-page__header">
+    <h1>Created by Me</h1>
+    <span>Events you proposed that have been approved and published. Open one to see who has registered.</span>
+  </header>
+
+@if (loading()) {
+  <app-internal-page-state [loading]="true" [showClear]="false" />
+} @else if (error()) {
+  <app-internal-page-state icon="error" title="Unable to load events" [description]="error()" [showClear]="false" />
+} @else if (items().length === 0) {
+  <app-internal-page-state
+    icon="celebration"
+    title="No approved events yet"
+    description="Once one of your event proposals is approved and published, it will appear here."
+    [showClear]="false"
+  />
+} @else {
+  <section class="created-by-me__grid" aria-label="Events you created">
+    @for (event of items(); track event.id) {
+      <article class="created-by-me__card">
+        <img class="created-by-me__image" [src]="event.eventImage?.url || placeholder" [alt]="event.eventTitle" loading="lazy" />
+        <div class="created-by-me__body">
+          <h3>{{ event.eventTitle }}</h3>
+          <p class="created-by-me__schedule">{{ firstScheduleLabel(event) }}</p>
+          <p class="created-by-me__stat">{{ spotsLeftLabel(event) }}</p>
+          @if (event.pendingRegistrationCount > 0) {
+            <span class="created-by-me__pending-badge">{{ event.pendingRegistrationCount }} awaiting your decision</span>
+          }
+          <button type="button" class="created-by-me__info-btn" (click)="openInfo(event)">
+            <span class="material-symbols-rounded" aria-hidden="true">info</span>
+            View Info
+          </button>
+        </div>
+      </article>
+    }
+  </section>
+}
+
+</section>
+
+@if (infoTarget(); as event) {
+  <app-form-modal
+    [open]="true"
+    [title]="event.eventTitle"
+    [hidePrimary]="true"
+    secondaryLabel="Close"
+    (close)="closeInfo()"
+    (cancel)="closeInfo()"
+    (submit)="closeInfo()"
+  >
+    <section class="created-by-me-info__stats">
+      <article class="created-by-me-info__stat">
+        <span>Registered</span>
+        <strong>{{ confirmedCount() }}{{ event.maxPax != null ? ' / ' + event.maxPax : '' }}</strong>
+      </article>
+      @if (event.registrationMode === 'Manual') {
+        <article class="created-by-me-info__stat">
+          <span>Awaiting decision</span>
+          <strong>{{ pendingCount() }}</strong>
+        </article>
+        <article class="created-by-me-info__stat">
+          <span>Rejected</span>
+          <strong>{{ rejectedCount() }}</strong>
+        </article>
+      }
+      <article class="created-by-me-info__stat">
+        <span>Event type</span>
+        <strong>{{ event.isFree ? 'Free' : ('RM ' + event.cost) }}</strong>
+      </article>
+    </section>
+
+    <h3 class="created-by-me-info__section-title">Registrants</h3>
+
+    @if (registrationsLoading()) {
+      <app-internal-page-state [loading]="true" [showClear]="false" />
+    } @else if (registrationsError()) {
+      <app-internal-page-state icon="error" title="Unable to load registrants" [description]="registrationsError()" [showClear]="false" />
+    } @else if (visibleRegistrations().length === 0) {
+      <app-internal-page-state icon="group_off" title="No one has registered yet" [showClear]="false" />
+    } @else {
+      <div class="created-by-me-info__table-wrap">
+        <table class="created-by-me-info__table">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Email</th>
+              @if (event.registrationMode === 'Manual') { <th scope="col">Reason</th> }
+              <th scope="col">Status</th>
+              @if (!event.isFree) { <th scope="col">Payment</th> }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of visibleRegistrations(); track row.id) {
+              <tr>
+                <td>{{ row.name }}</td>
+                <td>{{ row.email }}</td>
+                @if (event.registrationMode === 'Manual') { <td>{{ row.reason || '—' }}</td> }
+                <td><span class="created-by-me-info__status" [attr.data-status]="row.status">{{ registrationStatusLabel(row.status) }}</span></td>
+                @if (!event.isFree) {
+                  <td>
+                    @if (row.paymentProofUrl) {
+                      <a [href]="row.paymentProofUrl" target="_blank" rel="noopener">{{ paymentStatusLabel(row.paymentStatus) || 'View proof' }}</a>
+                    } @else {
+                      {{ paymentStatusLabel(row.paymentStatus) || '—' }}
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </app-form-modal>
+}

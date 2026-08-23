@@ -3,16 +3,32 @@
 /* Re-export / include review dashboard layout & panel styles */
 @import '../proposal-reviewer-view/proposal-reviewer-view.scss';
 
-.proposal-department-view__assignment-controls {
-  display: grid;
-  gap: 0.75rem;
+.prv-row-assignment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 0.5rem;
 }
 
-.proposal-department-view__assignment-message {
-  margin: 0.25rem 0 0;
-  color: var(--apu-blue-700);
-  font-size: 0.8rem;
+.prv-row-assignment {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  border: 1px solid var(--apu-border);
+  border-radius: 0.65rem;
+  background: var(--apu-surface-muted);
+}
+
+.prv-row-assignment__label {
+  margin: 0;
+  font-size: 0.85rem;
   font-weight: 700;
+  color: var(--apu-navy-900);
+}
+
+.prv-row-assignment__label span {
+  font-weight: 500;
+  color: var(--apu-text-muted);
 }
 
 .prv-fmb-selections {
@@ -74,4 +90,164 @@
 .prv-fmb-selection__actions {
   display: flex;
   gap: 0.5rem;
+}
+
+.prv-orders-table {
+  overflow: hidden;
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-card);
+  background: var(--apu-white);
+}
+
+.prv-orders-table__scroll {
+  overflow-x: auto;
+  scrollbar-color: var(--apu-blue-300) var(--apu-surface-muted);
+  scrollbar-width: thin;
+}
+
+.prv-orders-table table {
+  width: 100%;
+  min-width: 40rem;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: var(--apu-navy-950);
+  font-size: 0.86rem;
+}
+
+.prv-orders-table th,
+.prv-orders-table td {
+  padding: 1rem 1.35rem;
+  text-align: left;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.prv-orders-table th {
+  background: #e4e4e4;
+  color: #111;
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.prv-orders-table tbody tr:nth-child(odd) { background: var(--apu-white); }
+.prv-orders-table tbody tr:nth-child(even) { background: #f7f8fa; }
+.prv-orders-table tbody tr { transition: background var(--motion-control) var(--ease-standard); }
+.prv-orders-table tbody tr:hover { background: rgb(42 131 255 / 5%); }
+.prv-orders-table tbody td { border-top: 1px solid rgb(15 35 60 / 8%); }
+
+.prv-orders-table__index { width: 3.5rem; color: var(--apu-text-muted); text-align: center !important; }
+.prv-orders-table__actions { width: 11rem; text-align: center !important; }
+.prv-orders-table__actions .table-control { width: 100%; white-space: nowrap; }
+
+.prv-orders-table__state {
+  display: grid;
+  min-height: 10rem;
+  padding: var(--space-5);
+  place-items: center;
+  align-content: center;
+  gap: 0.55rem;
+  color: var(--apu-text-muted);
+  text-align: center;
+}
+
+.prv-orders-table__state-icon { color: var(--apu-blue-300); font-size: 2.5rem; }
+
+// "N orders" trigger badge, replacing the old two-column placed/staged text list — one glance
+// tells F&B whether a row has anything on it at all; the popup (below) carries the detail.
+.prv-orders-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  border: 0;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--apu-blue-50, #eef4ff);
+  color: var(--apu-blue-700);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--motion-control) var(--ease-standard);
+
+  .material-symbols-rounded { font-size: 1.05rem; }
+  &:hover, &:focus-visible { outline: 0; background: rgb(42 131 255 / 18%); }
+}
+
+.prv-orders-empty {
+  color: var(--apu-text-muted);
+  font-size: 0.85rem;
+}
+
+// Contents of the orders popup (app-popover) opened from the badge above.
+.prv-orders-popover-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.prv-orders-popover-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.6rem;
+}
+
+.prv-orders-popover-item:hover { background: var(--apu-surface-muted); }
+
+.prv-orders-popover-item--staged .prv-orders-popover-item__meta { color: var(--apu-blue-700); }
+
+.prv-orders-popover-item__main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.prv-orders-popover-item__label {
+  overflow: hidden;
+  color: var(--apu-navy-950);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prv-orders-popover-item__meta {
+  color: var(--apu-text-muted);
+  font-size: 0.8rem;
+}
+
+.prv-orders-popover-item__actions {
+  display: flex;
+  flex: none;
+  gap: 0.15rem;
+}
+
+.prv-orders-popover-item__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--apu-text-muted);
+  cursor: pointer;
+  transition: background var(--motion-control) var(--ease-standard), color var(--motion-control) var(--ease-standard);
+
+  .material-symbols-rounded { font-size: 1.05rem; }
+  &:hover, &:focus-visible { outline: 0; background: var(--apu-surface-muted); color: var(--apu-navy-950); }
+}
+
+@media (max-width: 48rem) {
+  .prv-orders-table th, .prv-orders-table td { padding: 0.8rem 0.9rem; }
+  .prv-orders-table table { min-width: 32rem; }
 }

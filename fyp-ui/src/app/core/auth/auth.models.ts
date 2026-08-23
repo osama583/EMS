@@ -39,7 +39,6 @@ export interface AuthUser {
   readonly id?: string;
   readonly email: string;
   readonly displayName: string;
-  readonly username: string;
   readonly accountType: UserAccountType;
   // Every (roleCode, unitCode?) pair this user holds. A flat role (cfo/cafeteria-admin/
   // external-user/system-admin) has unitCode=null; a unit-scoped role
