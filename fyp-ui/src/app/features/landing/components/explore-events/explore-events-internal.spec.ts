@@ -28,7 +28,9 @@ describe('ExploreEventsComponent (internal variant)', () => {
     component = fixture.componentInstance;
     httpMock = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
-    httpMock.expectOne((req) => req.url === `${environment.apiBaseUrl}/events`).flush(MOCK_PUBLISHED_EVENTS);
+    // loadSchoolOptions() calls GET /events/schools directly (see explore-events.ts) rather than
+    // deriving schools from the full published-events list.
+    httpMock.expectOne((req) => req.url === `${environment.apiBaseUrl}/events/schools`).flush(['School of Technology', 'Student Affairs']);
     httpMock.match((request) => request.url.startsWith(`${environment.apiBaseUrl}/catalog`)).forEach((request) => request.flush([]));
     httpMock.expectOne((req) => req.url === SEARCH_URL).flush(searchResponse(MOCK_PUBLISHED_EVENTS));
     fixture.detectChanges();

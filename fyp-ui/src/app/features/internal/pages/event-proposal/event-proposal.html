@@ -277,17 +277,6 @@
       </div>
       <span class="proposal-actions__step" aria-live="polite">Step {{ currentStep() + 1 }} of {{ steps.length }}</span>
       <div class="proposal-actions__right">
-        @if (resubmitProposalId() !== null) {
-          <button type="button" class="table-control proposal-actions__button proposal-actions__button--draft" [disabled]="savingDraft()" (click)="saveEdits()">
-            <span class="material-symbols-rounded" aria-hidden="true">save</span>
-            {{ savingDraft() ? 'Saving…' : 'Save' }}
-          </button>
-        } @else {
-          <button type="button" class="table-control proposal-actions__button proposal-actions__button--draft" [disabled]="savingDraft()" (click)="saveDraft()">
-            <span class="material-symbols-rounded" aria-hidden="true">download</span>
-            {{ savingDraft() ? 'Saving…' : 'Save as Draft' }}
-          </button>
-        }
         @if (currentStep() < steps.length - 1) {
           <button type="button" class="table-control table-control--primary proposal-actions__button" (click)="next()">
             Next
@@ -297,6 +286,19 @@
           <button type="button" class="table-control table-control--primary proposal-actions__button" [disabled]="resubmitting()" (click)="submit()">
             {{ resubmitProposalId() !== null ? (resubmitting() ? 'Resubmitting…' : 'Resubmit Proposal') : 'Submit Proposal' }}
             <span class="material-symbols-rounded" aria-hidden="true">task_alt</span>
+          </button>
+        }
+      </div>
+      <div class="proposal-actions__draft">
+        @if (resubmitProposalId() !== null) {
+          <button type="button" class="table-control proposal-actions__button proposal-actions__button--draft" [disabled]="savingDraft()" (click)="saveEdits()">
+            <span class="material-symbols-rounded" aria-hidden="true">save</span>
+            {{ savingDraft() ? 'Saving…' : 'Save' }}
+          </button>
+        } @else {
+          <button type="button" class="table-control proposal-actions__button proposal-actions__button--draft" [disabled]="savingDraft()" (click)="saveDraft()">
+            <span class="material-symbols-rounded" aria-hidden="true">download</span>
+            {{ savingDraft() ? 'Saving…' : 'Save as Draft' }}
           </button>
         }
       </div>

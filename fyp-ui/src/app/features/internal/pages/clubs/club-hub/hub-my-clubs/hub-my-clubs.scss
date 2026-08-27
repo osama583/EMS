@@ -158,5 +158,25 @@
 }
 .club-page__status .material-symbols-rounded { font-size: 1.1rem; }
 
+// Below the desktop auto-fill breakpoint, step the grid down explicitly instead of letting
+// auto-fill collapse straight to one column: 2-up once a phone can carry it, 1-up only once it
+// truly can't.
 @media (max-width: 47.99rem) {
+  .club-page__grid, .club-page__grid-loading { grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
+  .club-page__image { height: 6.5rem; }
+  .club-page__image .material-symbols-rounded { font-size: 1.9rem; }
+  .club-page__grid-loading span { height: 11rem; }
+  .club-page__body { gap: .4rem; padding: var(--space-3); }
+  .club-page__body h2 { font-size: .92rem; }
+  .club-page__body p { font-size: .78rem; -webkit-line-clamp: 2; }
+  .club-page__category-chip { padding: .15rem .5rem; font-size: .68rem; }
+  .club-page__meta { font-size: .72rem; }
+  .club-page__footer { padding: 0 var(--space-3) var(--space-3); }
+  .club-page__status { min-height: 2.1rem; font-size: .74rem; }
+  .club-page__menu-trigger { width: 1.8rem; height: 1.8rem; }
+  .club-page__menu-trigger .material-symbols-rounded { font-size: 1.05rem; }
+}
+
+@media (max-width: 26rem) {
+  .club-page__grid, .club-page__grid-loading { grid-template-columns: 1fr; }
 }

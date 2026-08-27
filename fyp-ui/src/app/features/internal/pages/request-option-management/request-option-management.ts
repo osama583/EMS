@@ -145,7 +145,10 @@ export class RequestOptionManagementComponent {
       eyebrow: KIND_LABELS[option.kind], status: option.active ? 'Active' : 'Inactive', title: option.label,
       details: [{ icon: 'info', text: this.details(option) || 'No additional details' }],
     },
-    actionKeys: ['fmb', 'logistics', 'transportation'].includes(option.kind) ? ['edit', 'status', 'delete'] : ['edit', 'status'],
+    // Every option kind is dependency-gated on the server (app/services/soft_delete.py's
+    // DELETION_RULES covers all twelve catalogues), so delete belongs on every row here, not
+    // just the three kinds this used to allow-list.
+    actionKeys: ['edit', 'status', 'delete'],
   })));
   readonly menuCardData = computed<readonly OptionCardViewModel[]>(() =>
     this.visibleOptions().map((option) => this.toCardViewModel(option)),

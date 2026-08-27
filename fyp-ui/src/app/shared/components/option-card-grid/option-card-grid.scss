@@ -338,10 +338,19 @@
 }
 
 @media (max-width: 48rem) {
+  /*
+   * Two balanced cards per row on a phone.
+   *
+   * minmax(6rem, …) packed three-to-four ~96px cards across a 390px screen, so titles wrapped to
+   * several lines, the meta chips stacked, and the cards ended up tall, narrow slivers. A
+   * min(9.5rem, 47%) track fits exactly two per row on any phone (and still fills a wider
+   * viewport by auto-fill) with enough width for the title and chips to read normally.
+   */
   .menu-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
-    gap: 0.35rem;
+    grid-template-columns: repeat(auto-fill, minmax(min(9.5rem, 47%), 1fr));
+    gap: 0.6rem;
+    align-items: start;
   }
 
   .menu-card {
@@ -494,7 +503,7 @@
   }
 
   .menu-card-grid__loading {
-    grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(9.5rem, 47%), 1fr));
   }
 
   .menu-card-grid__loading span {

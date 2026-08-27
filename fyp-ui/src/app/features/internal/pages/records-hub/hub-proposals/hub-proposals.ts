@@ -3,6 +3,7 @@ import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../../../core/auth/auth.service';
+import { hasRole, isHeadOfAnyUnit } from '../../../../../core/auth/role-access';
 import { ProposalReviewRecord } from '../../../../../core/proposals/proposal-review.models';
 import { ProposalSortKey, SortOrder } from '../../../../../core/proposals/proposal-workflow.repository';
 import { ProposalWorkflowService } from '../../../../../core/proposals/proposal-workflow.service';
@@ -55,10 +56,20 @@ export class HubProposalsComponent {
   readonly search = signal('');
   private readonly debouncedSearch = signal('');
   readonly statusFilter = signal('All');
-  // History only: who the proposal belongs to, not who acted on it — 'mine' is the viewer's own
-  // submissions, 'other' is everyone else's (co-owned or reviewed/actioned). See
-  // proposals.py's ?requester= param.
-  readonly requesterFilter = signal<'All' | 'mine' | 'other'>('All');
+  // Who the proposal belongs to, not who acted on it — 'mine' is the viewer's own submissions,
+  // 'co-owned' is theirs as a co-owner (not the applicant), 'acted-on' is neither but the viewer
+  // reviewed/decided it (heads of school/department and CFO only — see showActedOnOption below).
+  // Available on all three buckets, not just History. See proposals.py's ?requester= param.
+  readonly requesterFilter = signal<'All' | 'mine' | 'co-owned' | 'acted-on'>('All');
+
+  // 'Acted On' only makes sense for roles that actually review/decide proposals rather than just
+  // author or co-own them — head-of-school/department and CFO (FMB head is a head-of-department
+  // on the food_beverage_services unit, already covered by isHeadOfAnyUnit). Everyone else never
+  // has a workflow_history row as an actor, so the option would always return zero rows for them.
+  private readonly showActedOnOption = computed(() => {
+    const user = this.auth.user();
+    return !!user && (isHeadOfAnyUnit(user) || hasRole(user, 'cfo'));
+  });
   readonly page = signal(1);
   readonly pageSize = signal(10);
   readonly sort = signal<InternalSortState>({ key: 'updatedAt', order: 'desc' });
@@ -154,10 +165,15 @@ export class HubProposalsComponent {
 
   readonly filterConfigs = computed<readonly InternalFilterConfig[]>(() => [
     { key: 'status', ariaLabel: 'Status', value: this.statusFilter(), options: [{ value: 'All', label: 'All statuses' }, ...this.statusOptions().map((value) => ({ value, label: value }))] },
-    ...(this.bucket === 'history' ? [{
+    {
       key: 'requester', ariaLabel: 'Filter by requester', value: this.requesterFilter(),
-      options: [{ value: 'All', label: 'All' }, { value: 'mine', label: 'Me' }, { value: 'other', label: 'Other people' }],
-    }] : []),
+      options: [
+        { value: 'All', label: 'All' },
+        { value: 'mine', label: 'My Proposals' },
+        { value: 'co-owned', label: 'Co-Owned' },
+        ...(this.showActedOnOption() ? [{ value: 'acted-on', label: 'Acted On' }] : []),
+      ],
+    },
   ]);
 
   // For the Inbox bucket specifically: an applicant with TWO OR MORE departments simultaneously
@@ -215,7 +231,7 @@ export class HubProposalsComponent {
   updateSearchDraft(value: string): void { this.search.set(value); }
   updateFilter(change: InternalFilterChange): void {
     if (change.key === 'status') this.statusFilter.set(change.value);
-    if (change.key === 'requester') this.requesterFilter.set(change.value as 'All' | 'mine' | 'other');
+    if (change.key === 'requester') this.requesterFilter.set(change.value as 'All' | 'mine' | 'co-owned' | 'acted-on');
     this.page.set(1);
   }
   updateSort(change: InternalSortChange): void { this.sort.set({ key: change.key, order: change.order }); this.page.set(1); }

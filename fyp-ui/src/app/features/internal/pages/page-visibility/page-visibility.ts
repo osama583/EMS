@@ -444,12 +444,26 @@ export class PageVisibilityComponent {
   // Deleted tab — "Delete forever" (purge), immediate and unrecoverable, alongside Restore above.
   // ---------------------------------------------------------------------------
   readonly purgeTargetCode = signal<string | null>(null);
+  readonly purgePreview = signal<DeletionPreview | null>(null);
+  readonly checkingPurge = signal(false);
   readonly purgingPage = signal(false);
   requestPurgePage(code: string): void {
     this.clearMessages();
     this.purgeTargetCode.set(code);
+    // Dependencies are re-checked server-side at purge time, so ask before offering the button.
+    this.purgePreview.set(null);
+    this.checkingPurge.set(true);
+    this.service.checkNavPageDeletion(code).pipe(
+      finalize(() => this.checkingPurge.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (preview) => this.purgePreview.set(preview),
+      error: () => this.toast.error('Could not check page', 'Please try again.'),
+    });
   }
-  cancelPurgePage(): void { if (!this.purgingPage()) this.purgeTargetCode.set(null); }
+  cancelPurgePage(): void {
+    if (!this.purgingPage()) { this.purgeTargetCode.set(null); this.purgePreview.set(null); }
+  }
   purgeTargetLabel(): string {
     const code = this.purgeTargetCode();
     const page = code ? this.deletedPages().find((p) => p.pageCode === code) : null;
@@ -460,7 +474,7 @@ export class PageVisibilityComponent {
     if (!code) return;
     this.purgingPage.set(true);
     this.service.purgeNavPage(code).pipe(finalize(() => this.purgingPage.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.purgeTargetCode.set(null); this.toast.success('Page permanently deleted'); this.loadDeleted(); },
+      next: () => { this.purgeTargetCode.set(null); this.purgePreview.set(null); this.toast.success('Page permanently deleted'); this.loadDeleted(); },
       error: (err) => this.toast.error('The page could not be permanently deleted', apiErrorMessage(err, 'Please try again.')),
     });
   }

@@ -53,8 +53,9 @@ export function roleCanUseSavedEvents(user: AuthUser): boolean {
   return unitCodesFor(user).length > 0;
 }
 
-// Student or lecturer — the only two roles eligible for club membership/presidency (mirrors the
-// server's club-identity.service.js's isEligibleForClub()).
+// Student or lecturer — used only for the "Club Only" event-visibility filter (explore-events.ts's
+// canSeeClubOnlyFilter). NOT a club-membership/presidency eligibility check: presidency is
+// student-only (see clubs.py's eligible_presidents()/create_club()/request_president_change()).
 export function isSchoolStudentOrLecturer(user: AuthUser): boolean {
   return hasAnyRole(user, ['student', 'lecturer']);
 }

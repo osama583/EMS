@@ -67,7 +67,31 @@
 }
 .shared-tabs__tab--active .shared-tabs__count { background: var(--apu-blue-50, #eef4ff); color: var(--apu-blue-700); }
 
+/*
+ * Tabs on a phone scroll horizontally instead of being crammed into equal-width grid columns.
+ * The old `grid-auto-flow: column; grid-auto-columns: 1fr` divided the viewport by the number of
+ * tabs, so a four- or five-tab strip truncated its labels ("Pr…") and the last tab fell off the
+ * edge. A scrolling flex row keeps every label whole and reachable, keeps the pill background
+ * continuous, and preserves touch-sized targets.
+ */
 @media (max-width: 34rem) {
-  .shared-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; width: 100%; }
-  .shared-tabs__tab { justify-content: center; }
+  .shared-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .shared-tabs::-webkit-scrollbar { display: none; }
+
+  .shared-tabs__tab {
+    flex: 0 0 auto;
+    justify-content: center;
+    min-height: 2.5rem;
+    scroll-snap-align: start;
+  }
 }

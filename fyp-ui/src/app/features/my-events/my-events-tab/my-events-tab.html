@@ -23,6 +23,13 @@
       />
     }
   </section>
+  @if (totalPages() > 1) {
+    <app-internal-pagination
+      paginationLabel="Event pages" rowsPerPageLabel="Events per page"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="9" [pageSizeOptions]="[9]"
+      (pageChange)="setPage($event)"
+    />
+  }
 }
 
 <app-event-details-modal [open]="!!selectedEvent()" [event]="selectedEvent()" (close)="selectedEvent.set(null)" (registered)="onModalRegistered($event)" />

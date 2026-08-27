@@ -63,6 +63,8 @@
 .events-history__outcome[data-status='rejected'] { background: rgb(220 38 38 / 10%); color: var(--apu-red-700, #b91c1c); }
 .events-history__outcome--large { padding: .4rem 1rem; font-size: .85rem; }
 
+.events-history__decider-role { color: var(--apu-text-muted); font-weight: 600; }
+
 .events-history__status-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: .4rem; width: 100%;
   min-height: 2.5rem; padding: 0 var(--space-3);

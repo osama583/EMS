@@ -298,44 +298,49 @@ body.calendar-filter-open {
   opacity: 0.75;
 }
 
-.calendar-event--academic,
-.week-event--academic {
+// Generic, name-agnostic color slots — event categories are an admin-managed catalog
+// (/app/admin/settings/categories) with no color field of their own, so the calendar assigns each
+// category a slot deterministically (by its position in the live catalog, see event-calendar.ts's
+// categoryClassFor()) rather than keying color off specific category names. A category renamed,
+// added, or removed by an admin is picked up automatically; nothing here hardcodes a category.
+.calendar-event--slot-1,
+.week-event--slot-1 {
   --event-bg: #e7f1ff;
   --event-ink: #1768c9;
 }
 
-.calendar-event--workshop,
-.week-event--workshop {
+.calendar-event--slot-2,
+.week-event--slot-2 {
   --event-bg: #e8f6f3;
   --event-ink: #167a69;
 }
 
-.calendar-event--culture,
-.week-event--culture {
+.calendar-event--slot-3,
+.week-event--slot-3 {
   --event-bg: #f4eafe;
   --event-ink: #7c42bd;
 }
 
-.calendar-event--sports,
-.week-event--sports {
+.calendar-event--slot-4,
+.week-event--slot-4 {
   --event-bg: #e9f6e8;
   --event-ink: #3b7e38;
 }
 
-.calendar-event--social,
-.week-event--social {
+.calendar-event--slot-5,
+.week-event--slot-5 {
   --event-bg: #fff0e7;
   --event-ink: #ba5e22;
 }
 
-.calendar-event--volunteer,
-.week-event--volunteer {
+.calendar-event--slot-6,
+.week-event--slot-6 {
   --event-bg: #fff6d9;
   --event-ink: #94700d;
 }
 
-.calendar-event--club,
-.week-event--club {
+.calendar-event--slot-7,
+.week-event--slot-7 {
   --event-bg: #edf0ff;
   --event-ink: #505bc6;
 }
@@ -563,36 +568,38 @@ body.calendar-filter-open {
   background: var(--apu-blue-600);
 }
 
-.legend-dot--academic,
-.agenda-event__dot--academic {
+.legend-dot--slot-1,
+.agenda-event__dot--slot-1 {
   background: var(--apu-blue-600);
 }
 
-.legend-dot--workshop,
-.agenda-event__dot--workshop {
+.legend-dot--slot-2,
+.agenda-event__dot--slot-2 {
   background: #1e9c85;
 }
 
-.legend-dot--culture,
-.agenda-event__dot--culture {
+.legend-dot--slot-3,
+.agenda-event__dot--slot-3 {
   background: #985ad2;
 }
 
-.legend-dot--sports,
-.agenda-event__dot--sports {
+.legend-dot--slot-4,
+.agenda-event__dot--slot-4 {
   background: #59a454;
 }
 
-.legend-dot--social,
-.agenda-event__dot--social {
+.legend-dot--slot-5,
+.agenda-event__dot--slot-5 {
   background: #e17a35;
 }
 
-.agenda-event__dot--volunteer {
+.legend-dot--slot-6,
+.agenda-event__dot--slot-6 {
   background: #d5a31a;
 }
 
-.agenda-event__dot--club {
+.legend-dot--slot-7,
+.agenda-event__dot--slot-7 {
   background: #6670d8;
 }
 
@@ -823,27 +830,27 @@ body.calendar-filter-open {
   background: var(--apu-blue-600);
 }
 
-.calendar-dialog__accent--workshop {
+.calendar-dialog__accent--slot-2 {
   background: #1e9c85;
 }
 
-.calendar-dialog__accent--culture {
+.calendar-dialog__accent--slot-3 {
   background: #985ad2;
 }
 
-.calendar-dialog__accent--sports {
+.calendar-dialog__accent--slot-4 {
   background: #59a454;
 }
 
-.calendar-dialog__accent--social {
+.calendar-dialog__accent--slot-5 {
   background: #e17a35;
 }
 
-.calendar-dialog__accent--volunteer {
+.calendar-dialog__accent--slot-6 {
   background: #d5a31a;
 }
 
-.calendar-dialog__accent--club {
+.calendar-dialog__accent--slot-7 {
   background: #6670d8;
 }
 
@@ -1079,14 +1086,115 @@ body.calendar-filter-open {
     display: none;
   }
 
+  /*
+   * A REAL calendar on a phone.
+   *
+   * The month grid used to be hidden outright below 48rem, leaving only the horizontal date
+   * strip — so the phone never actually showed a calendar, just a scrolling row of days. The
+   * genuine 7-column month grid is now kept and compacted to fit a phone: square-ish cells, the
+   * day number centred, and each day's events reduced to coloured dots (the full titles cannot
+   * fit in a ~45px cell and are read from the agenda list below after tapping a day).
+   */
   .calendar-month-view {
-    display: none;
+    display: block;
+    overflow: hidden;
   }
 
+  .calendar-weekdays span {
+    padding: 0.5rem 0.15rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.02em;
+  }
+
+  .calendar-day {
+    display: grid;
+    min-height: 0;
+    align-content: start;
+    justify-items: center;
+    gap: 0.15rem;
+    padding: 0.3rem 0.1rem;
+    aspect-ratio: 1 / 1;
+  }
+
+  .calendar-day > time {
+    width: 1.6rem;
+    height: 1.6rem;
+    margin-bottom: 0;
+    font-size: 0.72rem;
+    cursor: pointer;
+  }
+
+  /* The tap target covers the whole cell, not just the 1.6rem date circle, so selecting a day
+     is comfortable on touch while the visible highlight stays on the date itself. */
+  .calendar-day__date::after {
+    position: absolute;
+    inset: 0;
+    content: '';
+  }
+
+  .calendar-day__date--focused {
+    background: var(--apu-blue-600);
+    color: #fff;
+    box-shadow: 0 0.3rem 0.7rem rgb(42 131 255 / 28%);
+  }
+
+  /* today + focused: keep today's ring readable underneath the selection fill. */
+  .calendar-day--today > .calendar-day__date--focused {
+    outline: 2px solid var(--apu-blue-200);
+    outline-offset: 1px;
+  }
+
+  /* Events collapse to dots: the cell is far too narrow for a title + time block. They stay
+     above the cell-wide date overlay so a dot still opens its event. */
+  .calendar-day__events {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.15rem;
+    justify-content: center;
+    align-items: center;
+    max-width: 100%;
+  }
+
+  /* Reset the desktop chip entirely: its border-left accent, min-height and grid columns would
+     otherwise render each "dot" as a tall vertical bar. */
+  .calendar-day .calendar-event {
+    display: block;
+    width: 0.34rem;
+    height: 0.34rem;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--event-ink, var(--apu-blue-600));
+    overflow: hidden;
+    text-indent: -999em;
+  }
+
+  .calendar-day .calendar-event__title,
+  .calendar-day .calendar-event__time { display: none; }
+
+  /* "+N more" becomes a compact numeric hint rather than a full-width sentence. */
+  .calendar-day .calendar-more {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--apu-text-muted);
+    font-size: 0.55rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  /* The date strip is redundant now that the true grid is visible; the agenda list below it
+     still shows the selected day's events in full. */
   .calendar-mobile-agenda {
     display: block;
     padding: 1rem;
   }
+
+  .calendar-mobile-dates { display: none; }
 
   .calendar-mobile-dates {
     display: grid;
@@ -1358,13 +1466,15 @@ body.calendar-filter-open {
   }
 
   .calendar-filter-dialog__footer {
-    align-items: stretch;
-    flex-direction: column-reverse;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .55rem;
   }
 
   .calendar-filter-reset,
   .calendar-filter-apply {
-    width: 100%;
+    flex: 1 1 8rem;
+    min-width: 0;
   }
 }
 

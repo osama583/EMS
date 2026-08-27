@@ -8,16 +8,14 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { switchMap } from 'rxjs';
 import { ExpandableSearchComponent } from '../../../../shared/components/expandable-search/expandable-search';
 import { FilterButtonComponent } from '../../../../shared/components/filter-button/filter-button';
 import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
-import {
-  ProposalEventSchedule,
-  PublishedEvent,
-  isEventVisibleTo,
-} from '../../../../core/events/published-event.models';
+import { ProposalEventSchedule, PublishedEvent } from '../../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../../core/events/published-event.service';
-import { AuthService } from '../../../../core/auth/auth.service';
+import { EventCategoryService } from '../../../../core/event-catalog/event-catalog.service';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
 
 type CalendarView = 'month' | 'week' | 'agenda';
@@ -33,19 +31,14 @@ interface CalendarEvent {
   readonly description: string;
 }
 
-// Only these seven map to a styled `.calendar-event--*` / `.legend-dot--*` class in
-// _event-calendar.scss; anything else (or a missing category) falls back to 'academic' — category
-// names are now admin-managed/open-ended (Event Categories catalog), not a fixed compile-time set,
-// so custom admin-added categories routinely hit that fallback.
-const CATEGORY_CLASS_BY_NAME: Record<string, string> = {
-  'Academic & Career': 'academic',
-  'Workshops & Training': 'workshop',
-  'Sports & Wellness': 'sports',
-  'Culture & Community': 'culture',
-  'Clubs & Societies': 'club',
-  'Entertainment & Social': 'social',
-  Volunteering: 'volunteer',
-};
+// _event-calendar.scss ships this many styled `.calendar-event--slot-N` / `.legend-dot--slot-N` /
+// `.calendar-dialog__accent--slot-N` color slots. Categories are an admin-managed, open-ended
+// catalog (/app/admin/settings/categories) with no color field of their own, so a color is never
+// tied to a specific category NAME — it's assigned by the category's position in the live catalog
+// (see categoryClassFor() below), cycling through these slots if there are more categories than
+// slots. Renaming, adding, or removing a category in the admin catalog is picked up automatically
+// on next load; nothing here hardcodes a category.
+const CATEGORY_COLOR_SLOT_COUNT = 7;
 
 interface CalendarDay {
   readonly date: Date;
@@ -73,8 +66,26 @@ export class EventCalendarComponent {
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
   private readonly publishedEventService = inject(PublishedEventService);
-  private readonly auth = inject(AuthService);
+  private readonly categoryService = inject(EventCategoryService);
   private readonly today = this.startOfDay(new Date());
+
+  // Category name -> color slot, built once per catalog load from EventCategoryService's own
+  // GET /catalog/categories fetch (server order = alphabetical by name — see catalog.py's
+  // CATALOGUES config) rather than any name the calendar itself hardcodes. PublishedEvent.categories
+  // only carries a frozen category_name snapshot (no id/code), so the map is keyed by name; a
+  // category that gets renamed after an event was published simply falls back to the "unknown
+  // category" slot below rather than crashing, same tolerance the rest of the app gives a frozen
+  // snapshot that no longer matches the live catalog.
+  private readonly categorySlotByName = computed<ReadonlyMap<string, number>>(() => {
+    const map = new Map<string, number>();
+    this.categoryService.entries().forEach((entry, index) => map.set(entry.name, (index % CATEGORY_COLOR_SLOT_COUNT) + 1));
+    return map;
+  });
+
+  private categoryClassFor(categoryName: string): string {
+    const slot = this.categorySlotByName().get(categoryName);
+    return `slot-${slot ?? 1}`;
+  }
 
   readonly weekDayLabels = [
     'Sunday',
@@ -99,13 +110,38 @@ export class EventCalendarComponent {
   readonly loading = signal(true);
   readonly loadError = signal('');
 
-  readonly categoryOptions = computed(() =>
-    [...new Set(this.events().map((event) => event.category))].sort((a, b) => a.localeCompare(b)),
-  );
+  // Categories actually present in the currently-loaded (range-scoped) events — per spec, filter
+  // options reflect what's in the visible calendar period, not the whole admin catalog. Each
+  // option carries the same categoryClass already assigned in toCalendarEvents(), so the legend
+  // and the filter dialog render a color dot for exactly the category names on screen right now.
+  readonly categoryOptions = computed<readonly { readonly name: string; readonly categoryClass: string }[]>(() => {
+    const byName = new Map<string, string>();
+    for (const event of this.events()) byName.set(event.category, event.categoryClass);
+    return [...byName.entries()]
+      .map(([name, categoryClass]) => ({ name, categoryClass }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  });
   readonly appliedFilterCount = computed(() => this.appliedCategories().length);
   readonly draftResultCount = computed(
     () => this.events().filter((event) => this.eventMatches(event, this.draftCategories())).length,
   );
+
+  // The exact [start, end] the visible grid needs — a month view renders a fixed 6-week (42-day)
+  // grid that spills into the previous/next month at the edges, so the query range must cover
+  // that whole grid, not just the calendar month, or those spillover days would show no events.
+  // Week view only ever needs its own 7 days. Re-derived from currentMonth/focusedDate/viewMode,
+  // so switching months, switching weeks, or toggling month/week all naturally produce a new
+  // range for the effect below to react to.
+  readonly queryRange = computed<{ start: string; end: string }>(() => {
+    if (this.viewMode() === 'week') {
+      const focus = this.focusedDate();
+      const weekStart = this.addDays(focus, -focus.getDay());
+      return { start: this.dateKey(weekStart), end: this.dateKey(this.addDays(weekStart, 6)) };
+    }
+    const month = this.currentMonth();
+    const firstGridDay = this.addDays(month, -month.getDay());
+    return { start: this.dateKey(firstGridDay), end: this.dateKey(this.addDays(firstGridDay, 41)) };
+  });
 
   readonly monthDays = computed<readonly CalendarDay[]>(() => {
     const month = this.currentMonth();
@@ -189,30 +225,36 @@ export class EventCalendarComponent {
       this.document.body.classList.remove('calendar-dialog-open');
       this.document.body.classList.remove('calendar-filter-open');
     });
-    this.loadPublishedEvents();
-  }
 
-  private loadPublishedEvents(): void {
-    this.publishedEventService.getPublishedEvents().subscribe({
-      next: (allEvents) => {
-        const isAuthenticated = this.auth.authenticated();
-        const visibleEvents = allEvents.filter((event) =>
-          isEventVisibleTo(event.eventVisibility, isAuthenticated),
-        );
-        this.events.set(visibleEvents.flatMap((event) => this.toCalendarEvents(event)));
-        this.loading.set(false);
-      },
-      error: () => {
-        this.loadError.set('Events could not be loaded.');
-        this.loading.set(false);
-      },
-    });
+    // Re-fetch from GET /events/calendar every time the visible range changes (month navigated,
+    // week navigated, or month/week view toggled) instead of loading every published event once
+    // and filtering it client-side. switchMap cancels an in-flight request from the range the
+    // viewer just navigated away from.
+    toObservable(this.queryRange)
+      .pipe(
+        switchMap((range) => {
+          this.loading.set(true);
+          return this.publishedEventService.getEventsForRange(range.start, range.end);
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (events) => {
+          this.events.set(events.flatMap((event) => this.toCalendarEvents(event)));
+          this.loadError.set('');
+          this.loading.set(false);
+        },
+        error: () => {
+          this.loadError.set('Events could not be loaded.');
+          this.loading.set(false);
+        },
+      });
   }
 
   // One PublishedEvent can have multiple schedule entries (multi-day/session events); the
   // calendar shows one CalendarEvent per schedule entry so each date it occupies gets its own cell.
   private toCalendarEvents(event: PublishedEvent): readonly CalendarEvent[] {
-    const category = event.categories[0];
+    const category = event.categories[0] ?? 'Uncategorised';
     return event.schedule
       .filter((schedule) => schedule.date)
       .map((schedule, index) => ({
@@ -221,8 +263,8 @@ export class EventCalendarComponent {
         date: this.parseDate(schedule.date),
         time: this.timeRangeFor(schedule),
         venue: schedule.location || 'To be confirmed',
-        category: category ?? 'Academic & Career',
-        categoryClass: category ? (CATEGORY_CLASS_BY_NAME[category] ?? 'academic') : 'academic',
+        category,
+        categoryClass: this.categoryClassFor(category),
         description: event.shortIntroduction,
       }));
   }
@@ -360,6 +402,14 @@ export class EventCalendarComponent {
       month: 'long',
       year: 'numeric',
     });
+  }
+
+  // Whole-day granularity, same as the rest of the calendar's today/isToday handling (this.today
+  // is already start-of-day) - an event still showing today isn't "past" just because some of its
+  // sessions started earlier in the day. Only gates the "Explore Event" action in the dialog; the
+  // calendar grid itself still renders past days/events exactly as before.
+  isPastEvent(event: CalendarEvent): boolean {
+    return event.date < this.today;
   }
 
   private openDialog(): void {

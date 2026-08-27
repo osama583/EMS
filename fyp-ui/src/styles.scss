@@ -8,6 +8,7 @@
 @use './styles/internal-data-page';
 @use './styles/form-controls';
 @use './styles/tabs';
+@use './styles/ai-assistant-expanded';
 @use './styles/task-calendar-toggle';
 @use './app/shared/components/form-modal/form-modal';
 
@@ -60,6 +61,13 @@ body.menu-open {
   overflow: hidden;
 }
 
+/* AI assistant full-window mode (see ai-assistant.ts's toggleExpanded()) — the page behind the
+   expanded chat panel must stop scrolling while it's open, same convention as body.menu-open
+   above and body.filters-open in _explore-events.scss. */
+body.ai-chat-expanded {
+  overflow: hidden;
+}
+
 button,
 a {
   -webkit-tap-highlight-color: transparent;
@@ -102,18 +110,16 @@ button {
 
 .brand__text-frame {
   position: relative;
-  display: block;
+  display: flex;
   width: 8.7rem;
   height: 2.05rem;
+  align-items: center;
   overflow: hidden;
 }
 
 .brand__text {
-  position: absolute;
-  top: -1.41rem;
-  left: -2.18rem;
   display: block;
-  width: 12.95rem;
+  width: 100%;
   height: auto;
 }
 
@@ -228,6 +234,22 @@ button:focus-visible {
     font-size: var(--type-hero);
   }
 
+  /*
+   * The headline is pre-split into three fixed lines for the reveal animation, and each line is
+   * white-space: nowrap so it can slide up as one unbroken piece. On a phone "something
+   * happening" is wider than the viewport at any usable size, so the nowrap forced the whole
+   * landing page to scroll horizontally. Allow the lines to wrap on small screens — the reveal
+   * still plays per line, it just occupies two visual rows when it must.
+   */
+  .hero .headline-line {
+    overflow: visible;
+  }
+
+  .hero .headline-line__text {
+    white-space: normal;
+    overflow-wrap: break-word;
+  }
+
   .hero-support {
     max-width: 29rem;
     font-size: 1rem;
@@ -251,12 +273,6 @@ button:focus-visible {
   .brand__text-frame {
     width: 5.6rem;
     height: 1.3rem;
-  }
-
-  .brand__text {
-    top: -0.92rem;
-    left: -1.42rem;
-    width: 8.35rem;
   }
 }
 

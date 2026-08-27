@@ -44,6 +44,22 @@ export class ClubService {
     });
   }
   setClubActive(id: string, active: boolean): Observable<ClubRecord> { return this.http.patch<ClubRecord>(`${this.baseUrl}/clubs/${encodeURIComponent(id)}/status`, { active }); }
+
+  // Deleting a club follows the same dependency-gated lifecycle as every other admin entity:
+  // check first, soft-delete only when nothing references it, restorable for 7 days. A club with
+  // members or pending requests is never deleted — setClubActive(false) is the answer there.
+  checkClubDeletion(id: string): Observable<DeletionPreview> {
+    return this.http.get<DeletionPreview>(`${this.baseUrl}/clubs/${encodeURIComponent(id)}/deletion-check`);
+  }
+  deleteClub(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/clubs/${encodeURIComponent(id)}`);
+  }
+  restoreClub(id: string): Observable<ClubRecord> {
+    return this.http.post<ClubRecord>(`${this.baseUrl}/clubs/${encodeURIComponent(id)}/restore`, {});
+  }
+  getDeletedClubs(): Observable<readonly (ClubRecord & DeletionMetadata)[]> {
+    return this.http.get<readonly (ClubRecord & DeletionMetadata)[]>(`${this.baseUrl}/clubs/deleted`);
+  }
   // Self-service: the club's own President may change just its categories (1-3), not the name,
   // image, or President — that stays Club Admin-only via updateClub() above.
   setClubCategories(id: string, categoryIds: readonly string[], actingUserId: string): Observable<ClubRecord> {
@@ -120,21 +136,27 @@ export class ClubService {
   requestPresidentChange(clubId: string, requestedPresidentUserId: string): Observable<void> {
     return this.http.post<void>(`${this.baseUrl}/clubs/${encodeURIComponent(clubId)}/president-change-requests`, { requestedPresidentUserId });
   }
-  private presidentChangeRequests(path: string, query: PresidentChangeRequestQuery): Observable<PresidentChangeRequestPage> {
+  private presidentChangeRequests(path: string, query: PresidentChangeRequestQuery, scope?: 'pending' | 'decided'): Observable<PresidentChangeRequestPage> {
     const params: Record<string, string> = {
       page: String(query.page), pageSize: String(query.pageSize),
       sort: query.sort, order: query.order,
     };
     if (query.q) params['q'] = query.q;
+    if (scope) params['scope'] = scope;
     return this.http.get<PresidentChangeRequestPage>(`${this.baseUrl}/clubs/president-change-requests/${path}`, { params });
   }
   // Pending requests awaiting a Club Admin's decision.
   getPresidentChangeInbox(query: PresidentChangeRequestQuery): Observable<PresidentChangeRequestPage> {
     return this.presidentChangeRequests('inbox', query);
   }
-  // A President's own submitted requests, any status.
-  getMyPresidentChangeRequests(query: PresidentChangeRequestQuery): Observable<PresidentChangeRequestPage> {
-    return this.presidentChangeRequests('mine', query);
+  // A President's own submitted request still awaiting a Club Admin's decision — never
+  // actionable by the President themself, so it belongs in Ongoing, not Inbox.
+  getMyPendingPresidentChangeRequest(query: PresidentChangeRequestQuery): Observable<PresidentChangeRequestPage> {
+    return this.presidentChangeRequests('mine', query, 'pending');
+  }
+  // A President's own already-decided requests, for their History tab.
+  getMyDecidedPresidentChangeRequests(query: PresidentChangeRequestQuery): Observable<PresidentChangeRequestPage> {
+    return this.presidentChangeRequests('mine', query, 'decided');
   }
   // Every decided request, for the History tab (Club Admin/System Admin only).
   getPresidentChangeHistory(query: PresidentChangeRequestQuery): Observable<PresidentChangeRequestPage> {

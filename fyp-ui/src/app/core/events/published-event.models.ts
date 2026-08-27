@@ -81,6 +81,14 @@ export interface PendingEventRegistration extends EventRegistration {
   readonly eventTitle: string;
   readonly eventCode: string;
   readonly paymentRequired: boolean;
+  // Who approved/rejected this — absent while still pending. 'Owner' when the decider was the
+  // event's applicant, 'Co-owner' when it was a co-owner acting on the applicant's behalf.
+  readonly decidedByName?: string | null;
+  readonly decidedByRole?: 'Owner' | 'Co-owner' | null;
+  // Whether the CALLER themself is the decider — distinguishes "decided by me" from "decided by
+  // a different co-owner" when decidedByRole is 'Co-owner' (decidedByRole alone can't tell those
+  // apart, since it only says Owner-vs-any-co-owner, not which specific person).
+  readonly decidedByIsViewer?: boolean;
 }
 
 // Public events are visible to everyone; Club Only is APU-community-only. In practice this only

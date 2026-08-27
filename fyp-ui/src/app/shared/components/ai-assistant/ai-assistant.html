@@ -1,45 +1,237 @@
-<aside class="ai-assistant" [class.ai-assistant--open]="open()" aria-label="APU assistant">
+<aside class="ai-assistant" [class.ai-assistant--open]="open()" [class.ai-assistant--expanded]="open() && expanded()" aria-label="APU assistant">
+  <app-event-details-modal [open]="!!selectedCardEvent()" [event]="selectedCardEvent()" (close)="closeCardEvent()" (registered)="onCardEventRegistered($event)" />
   @if (open()) {
-    <section id="apu-ai-chat" class="ai-chat" role="dialog" aria-modal="false" aria-labelledby="ai-chat-title">
+    <section id="apu-ai-chat" class="ai-chat" [class.ai-chat--expanded]="expanded()" [class.ai-chat--sidebar-collapsed]="expanded() && sidebarCollapsed()" role="dialog" [attr.aria-modal]="expanded() ? 'true' : 'false'" aria-labelledby="ai-chat-title">
+      @if (expanded()) {
+        <!-- Standing sidebar (always visible in full-page mode, collapsible via sidebarCollapsed)
+             — a real "New chat" button plus the conversation list side-by-side with the messages,
+             matching a standard chat app layout, instead of the floating widget's
+             history-replaces-messages toggle below. -->
+        <nav class="ai-sidebar" [class.ai-sidebar--collapsed]="sidebarCollapsed()" aria-label="Conversations">
+          @if (sidebarCollapsed()) {
+            <!-- Collapsed: the sidebar shrinks to a thin icon rail (never fully disappears) and
+                 the logo itself takes over as the reopen control, top-left — swapping to the
+                 "open sidebar" icon on hover/focus so its purpose is discoverable without a
+                 separate floating button, matching the reference pattern. -->
+            <button type="button" class="ai-sidebar__brand ai-sidebar__brand--toggle" aria-label="Show sidebar" title="Show sidebar" (click)="toggleSidebar()">
+              <span class="ai-sidebar__brand-orb" aria-hidden="true">
+                <span class="ai-chat__mini-orb ai-sidebar__brand-icon ai-sidebar__brand-icon--orb"><i></i><i></i></span>
+                <span class="material-symbols-rounded ai-sidebar__brand-icon ai-sidebar__brand-icon--panel">left_panel_open</span>
+              </span>
+            </button>
+          } @else {
+            <!-- Open: the logo stays a plain, static logo (not a toggle) on the left, with its
+                 own dedicated collapse button to its right. -->
+            <div class="ai-sidebar__brand">
+              <span class="ai-chat__mini-orb" aria-hidden="true"><i></i><i></i></span>
+              <span class="ai-chat__heading ai-sidebar__brand-text"><strong>APU Assistant</strong><small>Event and proposal help</small></span>
+              <button type="button" class="ai-sidebar__collapse" aria-label="Collapse sidebar" title="Collapse sidebar" (click)="toggleSidebar()"><span class="material-symbols-rounded" aria-hidden="true">left_panel_close</span></button>
+            </div>
+          }
+          <button type="button" class="ai-sidebar__new-chat" aria-label="Start a new chat" title="New chat" (click)="newChat()">
+            <span class="material-symbols-rounded" aria-hidden="true">add_comment</span>
+            <span class="ai-sidebar__new-chat-label">New chat</span>
+          </button>
+          <div class="ai-sidebar__list" role="list" aria-label="Previous conversations">
+            @if (conversations().length === 0) {
+              <p class="ai-history__empty">No conversations yet.</p>
+            } @else {
+              @for (conversation of conversations(); track conversation.id) {
+                <button type="button" class="ai-history__item" [class.ai-history__item--active]="conversation.id === activeConversationId()" role="listitem" (click)="openConversation(conversation.id)">
+                  <span class="ai-history__preview">{{ lastMessagePreview(conversation) }}</span>
+                  <span class="ai-history__meta">
+                    <span class="ai-history__time">{{ relativeTime(conversation.updatedAt) }}</span>
+                    <span class="ai-history__delete" role="button" [attr.aria-label]="'Delete conversation'" (click)="deleteConversation($event, conversation.id)">
+                      <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+                    </span>
+                  </span>
+                </button>
+              }
+            }
+          </div>
+          <div class="ai-sidebar__retention">
+            <span class="material-symbols-rounded ai-sidebar__retention-icon" aria-hidden="true">schedule</span>
+            <p class="ai-sidebar__retention-text"><strong>24-hour history</strong>Chats are automatically deleted after 24 hours, or immediately when you log out.</p>
+          </div>
+        </nav>
+      }
+      <div class="ai-chat__main">
       <header class="ai-chat__header">
-        <span class="ai-chat__mini-orb" aria-hidden="true"><i></i><i></i></span>
-        <span class="ai-chat__heading"><strong id="ai-chat-title">APU Assistant</strong><small>Event and proposal help</small></span>
-        <button type="button" class="ai-chat__icon-btn" aria-label="Start a new chat" title="New chat" (click)="newChat()"><span class="material-symbols-rounded" aria-hidden="true">add_comment</span></button>
+        @if (!expanded()) {
+          <span class="ai-chat__mini-orb" aria-hidden="true"><i></i><i></i></span>
+          <span class="ai-chat__heading"><strong id="ai-chat-title">APU Assistant</strong><small>Event and proposal help</small></span>
+          <button type="button" class="ai-chat__icon-btn" [class.ai-chat__icon-btn--active]="showHistory()" aria-label="Chat history" title="Chat history" (click)="toggleHistory()"><span class="material-symbols-rounded" aria-hidden="true">history</span></button>
+          <button type="button" class="ai-chat__icon-btn" aria-label="Start a new chat" title="New chat" (click)="newChat()"><span class="material-symbols-rounded" aria-hidden="true">add_comment</span></button>
+        } @else {
+          <span class="ai-chat__heading ai-chat__heading--expanded" id="ai-chat-title"></span>
+        }
+        <button type="button" class="ai-chat__icon-btn" [attr.aria-label]="expanded() ? 'Back' : 'Open full page'" [attr.title]="expanded() ? 'Back' : 'Open full page'" (click)="toggleExpanded()"><span class="material-symbols-rounded" aria-hidden="true">{{ expanded() ? 'arrow_back' : 'open_in_full' }}</span></button>
         <button type="button" class="ai-chat__icon-btn" aria-label="Close assistant" (click)="closePanel()"><span class="material-symbols-rounded" aria-hidden="true">close</span></button>
       </header>
-      <div #messageArea class="ai-chat__messages" role="log" aria-live="polite" aria-relevant="additions">
-        @for (message of messages(); track message.id) { <p class="ai-chat__message" [class.ai-chat__message--user]="message.sender === 'user'">{{ message.text }}</p> }
-        @if (typing()) { <div class="ai-chat__typing" role="status" aria-label="Assistant is typing"><i></i><i></i><i></i></div> }
 
-        @if (!hasInteracted()) {
-          <div class="ai-suggestions" aria-label="Suggested questions">
-            <p class="ai-suggestions__label">What would you like to know?</p>
-            <div class="ai-suggestions__track">
-              @for (page of cardPages; track $index) {
-                <div class="ai-suggestions__page">
-                  @for (card of page; track card.title) {
-                    <button type="button" class="ai-suggestion-card" (click)="selectCard(card)">
-                      <span class="ai-suggestion-card__icon material-symbols-rounded" aria-hidden="true">{{ card.icon }}</span>
-                      <span class="ai-suggestion-card__title">{{ card.title }}</span>
-                      <span class="ai-suggestion-card__description">{{ card.description }}</span>
-                    </button>
-                  }
-                </div>
+      @if (showHistory() && !expanded()) {
+        <div class="ai-history" role="list" aria-label="Previous conversations">
+          @if (conversations().length === 0) {
+            <p class="ai-history__empty">No conversations yet. Conversations are kept for 24 hours, or until you log out.</p>
+          } @else {
+            @for (conversation of conversations(); track conversation.id) {
+              <button type="button" class="ai-history__item" role="listitem" (click)="openConversation(conversation.id)">
+                <span class="ai-history__preview">{{ lastMessagePreview(conversation) }}</span>
+                <span class="ai-history__meta">
+                  <span class="ai-history__time">{{ relativeTime(conversation.updatedAt) }}</span>
+                  <span class="ai-history__delete" role="button" [attr.aria-label]="'Delete conversation'" (click)="deleteConversation($event, conversation.id)">
+                    <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+                  </span>
+                </span>
+              </button>
+            }
+          }
+        </div>
+      } @else {
+        <div #messageArea class="ai-chat__messages" role="log" aria-live="polite" aria-relevant="additions">
+          @for (message of messages(); track message.id) {
+            <div class="ai-chat__message" [class.ai-chat__message--user]="message.sender === 'user'">
+              @for (segment of messageSegments(message.text); track $index) {
+                @if (segment.kind === 'text') {
+                  <p class="ai-chat__message-text">{{ segment.text }}</p>
+                } @else {
+                  <ul class="ai-chat__message-list">
+                    @for (item of segment.items; track $index) {
+                      <li>{{ item }}</li>
+                    }
+                  </ul>
+                }
               }
             </div>
-            <div class="ai-suggestions__dots" aria-hidden="true"><i></i><i></i></div>
-          </div>
-        }
-      </div>
+            @if (message.sender === 'assistant' && hasCardSources(message.sources)) {
+              <div class="ai-event-cards">
+                @for (source of message.sources; track source.eventId) {
+                  @if (isCardSource(source)) {
+                    <button type="button" class="ai-event-card" (click)="openEventFromCard(source.eventId)">
+                      <img class="ai-event-card__image" [src]="source.eventImageUrl" [alt]="source.eventTitle" loading="lazy" (error)="onCardImageError($event)" />
+                      <span class="ai-event-card__body">
+                        <span class="ai-event-card__title">{{ source.eventTitle }}</span>
+                        @if (source.category) { <span class="ai-event-card__category">{{ source.category }}</span> }
+                        <span class="ai-event-card__meta">
+                          @if (source.firstDate) { <span><span class="material-symbols-rounded" aria-hidden="true">event</span>{{ source.firstDate }}</span> }
+                          @if (source.startTime && source.endTime) { <span><span class="material-symbols-rounded" aria-hidden="true">schedule</span>{{ formatTime(source.startTime) }}&ndash;{{ formatTime(source.endTime) }}</span> }
+                          @if (source.location) { <span><span class="material-symbols-rounded" aria-hidden="true">place</span>{{ source.location }}</span> }
+                        </span>
+                      </span>
+                      <span class="material-symbols-rounded ai-event-card__go" aria-hidden="true">arrow_forward</span>
+                    </button>
+                  }
+                }
+              </div>
+            }
+            @if (message.sender === 'assistant' && message.clubs?.length) {
+              <div class="ai-event-cards">
+                @for (club of message.clubs; track club.clubId) {
+                  <button type="button" class="ai-event-card" (click)="openClubFromCard(club.clubId)">
+                    @if (club.imageUrl) {
+                      <img class="ai-event-card__image" [src]="club.imageUrl" [alt]="club.clubName" loading="lazy" (error)="onCardImageError($event)" />
+                    } @else {
+                      <span class="ai-event-card__image ai-event-card__image--placeholder material-symbols-rounded" aria-hidden="true">groups</span>
+                    }
+                    <span class="ai-event-card__body">
+                      <span class="ai-event-card__title">{{ club.clubName }}</span>
+                      @if (club.categories) { <span class="ai-event-card__category">{{ club.categories }}</span> }
+                      @if (club.description) { <span class="ai-event-card__meta"><span>{{ club.description }}</span></span> }
+                    </span>
+                    <span class="material-symbols-rounded ai-event-card__go" aria-hidden="true">arrow_forward</span>
+                  </button>
+                }
+              </div>
+            }
+            @if (message.sender === 'assistant' && message.proposals?.length) {
+              <div class="ai-event-cards">
+                @for (proposal of message.proposals; track proposal.requestId) {
+                  <button type="button" class="ai-event-card" (click)="openProposalFromCard(proposal)">
+                    <span class="ai-event-card__image ai-event-card__image--placeholder material-symbols-rounded" aria-hidden="true">description</span>
+                    <span class="ai-event-card__body">
+                      <span class="ai-event-card__title">{{ proposal.eventTitle }}</span>
+                      <span class="ai-event-card__category">{{ proposal.statusLabel }}</span>
+                      <span class="ai-event-card__meta"><span>{{ proposal.requestCode }}</span></span>
+                    </span>
+                    <span class="material-symbols-rounded ai-event-card__go" aria-hidden="true">arrow_forward</span>
+                  </button>
+                }
+              </div>
+            }
+            @if (message.sender === 'assistant' && message.navigation?.length) {
+              <!-- "Take me there" cards for a how-to the asker can actually reach. The backend only
+                   emits these when Page Visibility grants the page, so every card here is safe to
+                   click - no client-side permission check is needed or would be authoritative. -->
+              <div class="ai-event-cards">
+                @for (page of message.navigation; track page.pageCode) {
+                  <button type="button" class="ai-event-card" (click)="openPageFromCard(page)">
+                    <span class="ai-event-card__image ai-event-card__image--placeholder material-symbols-rounded" aria-hidden="true">open_in_new</span>
+                    <span class="ai-event-card__body">
+                      <span class="ai-event-card__title">{{ page.label }}</span>
+                      <span class="ai-event-card__category">Go to page</span>
+                    </span>
+                    <span class="material-symbols-rounded ai-event-card__go" aria-hidden="true">arrow_forward</span>
+                  </button>
+                }
+              </div>
+            }
+            @if (message.sender === 'assistant' && message.registrantsTable) {
+              <div class="ai-registrants-card">
+                <p class="ai-registrants-card__title">{{ message.registrantsTable.eventTitle }} &mdash; {{ message.registrantsTable.registrants.length }} registered</p>
+                @if (message.registrantsTable.registrants.length > 0) {
+                  <div class="ai-registrants-card__table-wrap">
+                    <table class="ai-registrants-card__table">
+                      <thead><tr><th>Name</th><th>Status</th></tr></thead>
+                      <tbody>
+                        @for (registrant of message.registrantsTable.registrants; track registrant.name + registrant.registeredAt) {
+                          <tr>
+                            <td>{{ registrant.name }}</td>
+                            <td><span class="ai-registrants-card__status" [class]="'ai-registrants-card__status--' + registrant.status">{{ registrantStatusLabel(registrant.status) }}</span></td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                } @else {
+                  <p class="ai-registrants-card__empty">No one has registered yet.</p>
+                }
+              </div>
+            }
+          }
+          @if (typing()) { <div class="ai-chat__typing" role="status" aria-label="Assistant is typing"><i></i><i></i><i></i></div> }
+
+          @if (!hasInteracted()) {
+            <div class="ai-suggestions" aria-label="Suggested questions">
+              <p class="ai-suggestions__label">What would you like to know?</p>
+              <div class="ai-suggestions__track">
+                @for (page of cardPages; track $index) {
+                  <div class="ai-suggestions__page">
+                    @for (card of page; track card.title) {
+                      <button type="button" class="ai-suggestion-card" (click)="selectCard(card)">
+                        <span class="ai-suggestion-card__icon material-symbols-rounded" aria-hidden="true">{{ card.icon }}</span>
+                        <span class="ai-suggestion-card__title">{{ card.title }}</span>
+                        <span class="ai-suggestion-card__description">{{ card.description }}</span>
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+              <div class="ai-suggestions__dots" aria-hidden="true"><i></i><i></i></div>
+            </div>
+          }
+        </div>
+      }
+
       <footer class="ai-chat__composer">
         <label><span class="visually-hidden">Message APU Assistant</span><textarea #composer rows="1" maxlength="500" placeholder="Ask a question…" [value]="draft()" (input)="updateDraft($event)" (keydown)="composerKeydown($event)"></textarea></label>
         <button type="button" class="ai-chat__send" aria-label="Send message" [disabled]="!draft().trim() || typing()" (click)="send()"><span class="material-symbols-rounded" aria-hidden="true">arrow_upward</span></button>
         @if (error()) { <p class="ai-chat__error" role="alert">{{ error() }}</p> }
       </footer>
+      </div>
     </section>
   }
 
-  <div class="ai-assistant__launcher-row">
+  <div class="ai-assistant__launcher-row" [class.ai-assistant__launcher-row--hidden]="open() && expanded()">
     @if (!open() && promptVisible() && phase() === 'visible') {
       <div class="ai-prompt" [class.ai-prompt--changing]="promptChanging()">
         <button type="button" class="ai-prompt__open" (click)="openPanel()"><span class="ai-prompt__text">{{ prompt() }}</span></button>

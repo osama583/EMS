@@ -4,6 +4,7 @@ import { combineLatest, finalize } from 'rxjs';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { CafeteriaService } from '../../../../core/cafeterias/cafeteria.service';
 import { AssignableCafeteriaUser, Cafeteria, CafeteriaAssignment, CafeteriaStaffRoleCode } from '../../../../core/cafeterias/cafeteria.models';
+import { DeletionMetadata, DeletionPreview } from '../../../../shared/models/deletion.models';
 import { FeedbackBannerComponent } from '../../../../shared/components/feedback-banner/feedback-banner';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog';
@@ -32,7 +33,7 @@ const ROLE_OPTIONS: readonly SelectOption[] = [
 // Users/Assignments screens are unaffected — a separate, general-purpose view over the same rows).
 @Component({
   selector: 'app-cafeteria-staff-assignments',
-  imports: [InternalDataPageComponent, FormModalComponent, FeedbackBannerComponent, DeleteConfirmDialogComponent, SearchableDropdownComponent, FormFieldComponent, StatusToggleComponent],
+  imports: [InternalDataPageComponent, FormModalComponent, FeedbackBannerComponent, DeleteConfirmDialogComponent, ConfirmDialogComponent, SearchableDropdownComponent, FormFieldComponent, StatusToggleComponent],
   templateUrl: './cafeteria-staff-assignments.html',
   styleUrl: './cafeteria-staff-assignments.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -65,7 +66,17 @@ export class CafeteriaStaffAssignmentsComponent {
   readonly errorMessage = signal('');
 
   readonly deleteTarget = signal<CafeteriaAssignment | null>(null);
+  readonly deletePreview = signal<DeletionPreview | null>(null);
+  readonly checkingDeletion = signal(false);
   readonly deleting = signal(false);
+
+  // Deleted tab — same page-level section switch as club-management.ts, only fetched the first
+  // time it's opened so a viewer who never looks at it never pays for the call.
+  readonly showDeleted = signal(false);
+  readonly deletedAssignments = signal<readonly (CafeteriaAssignment & DeletionMetadata)[]>([]);
+  readonly deletedLoading = signal(false);
+  readonly restoringId = signal<string | null>(null);
+  readonly restoreTarget = signal<CafeteriaAssignment | null>(null);
 
   // The account this posting is for — created with it when adding, amended when editing.
   readonly draft = signal<Record<string, string | boolean>>({});
@@ -140,6 +151,30 @@ export class CafeteriaStaffAssignmentsComponent {
   readonly filters = computed(() => [
     { key: 'role', ariaLabel: 'Filter by role', value: this.roleFilter(), options: [{ value: 'all', label: 'All roles' }, ...ROLE_OPTIONS] },
   ]);
+  readonly deletedConfig = computed<InternalDataPageConfig>(() => ({
+    ariaLabel: 'Deleted staff assignments', paginationLabel: 'Deleted assignment pages', rowsPerPageLabel: 'Rows per page', mobileListLabel: 'Deleted assignment cards',
+    header: {
+      title: 'Deleted Assignments',
+      description: 'Soft-deleted assignments are kept for 7 days before being permanently removed. Restore one any time within that window.',
+      countLabel: `${this.deletedAssignments().length} deleted`,
+    },
+    search: { ariaLabel: '', placeholder: '' },
+    columns: [{ key: 'user', label: 'User' }, { key: 'cafeteria', label: 'Cafeteria' }, { key: 'created', label: 'Deleted' }, { key: 'status', label: 'Permanent deletion' }, { key: 'actions', label: 'Actions', actions: true }],
+    actions: [{ key: 'restore', label: 'Restore', icon: 'restore_from_trash' }],
+    emptyTitle: 'No deleted assignments', emptyDescription: 'Assignments you remove will appear here for 7 days before being permanently removed.', pageSizeOptions: [5, 10, 25],
+  }));
+  readonly deletedRecords = computed<readonly InternalDataRecord[]>(() => this.deletedAssignments().map((a) => ({
+    id: a.assignmentId,
+    actionKeys: ['restore'],
+    cells: {
+      user: { primary: a.displayName, secondary: a.email },
+      cafeteria: { primary: a.cafeteriaName },
+      created: { primary: `Deleted ${this.formatDate(a.deletedAt)}` },
+      status: { primary: a.daysRemaining > 0 ? `${a.daysRemaining} day${a.daysRemaining === 1 ? '' : 's'} left` : 'Due for permanent deletion', badge: true, tone: a.daysRemaining <= 1 ? 'warning' : 'neutral' },
+      actions: { primary: '' },
+    },
+    mobile: { eyebrow: 'Deleted', status: `${a.daysRemaining}d left`, title: a.displayName, details: [{ icon: 'schedule', text: `Deleted ${this.formatDate(a.deletedAt)}` }] },
+  })));
 
   constructor() {
     combineLatest([this.service.assignments$, this.service.cafeterias$]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
@@ -252,16 +287,81 @@ export class CafeteriaStaffAssignmentsComponent {
   requestRemove(assignment: CafeteriaAssignment): void {
     this.clearMessages();
     this.deleteTarget.set(assignment);
+    // A posting with no dependents of its own can still belong to someone who has claimed
+    // orders or been assigned tasks at this outlet — that's what this checks, not the
+    // assignment row itself. See CafeteriaService.checkAssignmentDeletion().
+    this.deletePreview.set(null);
+    this.checkingDeletion.set(true);
+    this.service.checkAssignmentDeletion(assignment.assignmentId).pipe(
+      finalize(() => this.checkingDeletion.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (preview) => this.deletePreview.set(preview),
+      error: () => this.toast.error('Could not check assignment', 'Please try again.'),
+    });
   }
-  cancelRemove(): void { if (!this.deleting()) this.deleteTarget.set(null); }
+  cancelRemove(): void {
+    if (!this.deleting()) { this.deleteTarget.set(null); this.deletePreview.set(null); }
+  }
   confirmRemove(): void {
     const target = this.deleteTarget();
-    if (!target) return;
+    const preview = this.deletePreview();
+    if (!target || !preview || !preview.canDelete) return;
     this.deleting.set(true);
     this.service.removeAssignment(target.assignmentId).pipe(finalize(() => this.deleting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.deleteTarget.set(null); this.toast.success('Assignment removed'); },
-      error: (err) => { this.deleteTarget.set(null); this.toast.error('The assignment could not be removed', apiErrorMessage(err, 'Please try again.')); },
+      next: () => {
+        this.deleteTarget.set(null);
+        this.deletePreview.set(null);
+        this.toast.success('Assignment removed');
+      },
+      error: (err) => {
+        this.deleteTarget.set(null);
+        this.deletePreview.set(null);
+        this.toast.error('The assignment could not be removed', apiErrorMessage(err, 'Please try again.'));
+      },
     });
+  }
+
+  // Deleted tab — mirrors club-management.ts's identical section exactly.
+  setDeletedTab(deleted: boolean): void {
+    if (this.showDeleted() === deleted) return;
+    this.showDeleted.set(deleted);
+    this.clearMessages();
+    if (deleted) this.loadDeleted();
+  }
+  private loadDeleted(): void {
+    this.deletedLoading.set(true);
+    this.service.getDeletedAssignments().pipe(finalize(() => this.deletedLoading.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (assignments) => this.deletedAssignments.set(assignments),
+      error: () => this.errorMessage.set('The deleted assignments could not be loaded.'),
+    });
+  }
+  handleDeletedAction(event: InternalRowActionEvent): void {
+    if (event.action.key !== 'restore') return;
+    const assignment = this.deletedAssignments().find((item) => item.assignmentId === event.record.id);
+    if (assignment) this.restoreTarget.set(assignment);
+  }
+  readonly restoreMessage = computed(() => {
+    const target = this.restoreTarget();
+    return target ? `Restore "${target.displayName} · ${target.cafeteriaName}"? It comes back suspended, so it stays off the active roster until you switch it active again.` : '';
+  });
+  cancelRestore(): void { this.restoreTarget.set(null); }
+  confirmRestore(): void {
+    const target = this.restoreTarget();
+    this.restoreTarget.set(null);
+    if (target) this.restoreAssignment(target.assignmentId);
+  }
+  private restoreAssignment(id: string): void {
+    this.restoringId.set(id);
+    this.service.restoreAssignment(id).pipe(finalize(() => this.restoringId.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.toast.success('Assignment restored'); this.loadDeleted(); },
+      error: (err) => this.toast.error('Could not restore assignment', apiErrorMessage(err, 'Please try again.')),
+    });
+  }
+  private formatDate(iso: string): string {
+    if (!iso) return '—';
+    const date = new Date(iso);
+    return isNaN(date.getTime()) ? '—' : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
   private loadAssignableUsers(): void {

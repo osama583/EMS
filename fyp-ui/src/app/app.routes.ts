@@ -35,6 +35,20 @@ export const routes: Routes = [
     title: 'Sign In | APU Event Management System',
   },
   {
+    // The full-page assistant IS the same singleton <app-ai-assistant> mounted in app.html — this
+    // route exists only so the expand button gets a real URL (back/forward, refresh, deep link),
+    // not a second chat implementation. See ai-assistant.ts's toggleExpanded()/route effect.
+    path: 'assistant',
+    loadComponent: () => import('./shared/components/ai-assistant/ai-assistant-page/ai-assistant-page').then((module) => module.AiAssistantPageComponent),
+    title: 'APU Assistant | APU Events',
+  },
+  {
+    path: 'reset-password',
+    loadComponent: () =>
+      import('./features/auth/reset-password/reset-password').then((module) => module.ResetPasswordComponent),
+    title: 'Reset Password | APU Event Management System',
+  },
+  {
     path: 'my-events',
     canActivate: [externalUserGuard],
     loadComponent: () => import('./features/my-events/my-events').then((module) => module.MyEventsComponent),
@@ -178,6 +192,12 @@ export const routes: Routes = [
             loadComponent: () => import('./features/my-events/my-events-tab/my-events-tab').then((module) => module.MyEventsTabComponent),
             title: 'Ongoing | APU Events',
             data: { mode: 'pending', showHeader: true },
+          },
+          {
+            path: 'president-change-request',
+            loadComponent: () => import('./features/internal/pages/records-hub/hub-president-change-requests/hub-president-change-requests').then((module) => module.HubPresidentChangeRequestsComponent),
+            title: 'President Change Requests | APU Events',
+            data: { bucket: 'ongoing' },
           },
         ],
       },
@@ -444,6 +464,11 @@ export const routes: Routes = [
         path: 'admin/page-visibility',
         loadComponent: () => import('./features/internal/pages/page-visibility/page-visibility').then((module) => module.PageVisibilityComponent),
         title: 'Page Visibility | APU Events',
+      },
+      {
+        path: 'admin/ai-access-log',
+        loadComponent: () => import('./features/internal/pages/ai-access-log/ai-access-log').then((module) => module.AiAccessLogComponent),
+        title: 'AI Access Log | APU Events',
       },
       ...[
         ['reports', 'Operations', 'Reports', 'Review operational activity and service reporting.', 'analytics'],

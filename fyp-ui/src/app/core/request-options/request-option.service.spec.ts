@@ -133,7 +133,8 @@ describe('RequestOptionService', () => {
     const httpMock = TestBed.inject(HttpTestingController);
 
     const beforePromise = firstValueFrom(service.watchAll(['fmb']));
-    httpMock.expectOne((request) => request.url === `${environment.apiBaseUrl}/options`).flush(SEED_OPTIONS);
+    httpMock.expectOne((request) => request.url === `${environment.apiBaseUrl}/options` && request.params.get('kinds') === 'fmb')
+      .flush(SEED_OPTIONS.filter((option) => option.kind === 'fmb'));
     const before = await beforePromise;
     expect(before.some((option) => option.id === 'food-other')).toBe(true);
 
@@ -142,8 +143,8 @@ describe('RequestOptionService', () => {
     await deletePromise;
 
     const afterPromise = firstValueFrom(service.watchAll(['fmb']));
-    httpMock.expectOne((request) => request.url === `${environment.apiBaseUrl}/options`)
-      .flush(SEED_OPTIONS.filter((option) => option.id !== 'food-other'));
+    httpMock.expectOne((request) => request.url === `${environment.apiBaseUrl}/options` && request.params.get('kinds') === 'fmb')
+      .flush(SEED_OPTIONS.filter((option) => option.kind === 'fmb' && option.id !== 'food-other'));
     const after = await afterPromise;
     expect(after.some((option) => option.id === 'food-other')).toBe(false);
   });

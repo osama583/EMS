@@ -22,7 +22,7 @@
 .search-container > span { position: absolute; left: .75rem; color: var(--apu-text-soft); }
 .search-container input { width: 100%; min-height: 2.7rem; padding: .5rem .75rem .5rem 2.5rem; border: 1px solid var(--apu-border); border-radius: var(--radius-control); outline: 0; }
 .search-container input:focus { border-color: var(--apu-blue-600); box-shadow: var(--internal-focus-ring); }
-.options-list { display: grid; max-height: 15rem; margin-top: var(--space-1); overflow-y: auto; }
+.options-list { display: grid; max-height: 15rem; margin-top: var(--space-1); overflow-y: auto; overscroll-behavior: contain; }
 .options-list button { display: flex; width: 100%; padding: .7rem .75rem; align-items: center; justify-content: space-between; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--apu-navy-900); text-align: left; cursor: pointer; }
 .options-list button:hover,.options-list button.selected { background: rgb(42 131 255 / 9%); color: var(--apu-blue-700); }
 .options-list button strong,.options-list button small { display: block; }

@@ -1,0 +1,112 @@
+/*
+ * AI assistant — full-window (expanded) mode.
+ *
+ * Split out of ai-assistant.scss, which had grown past the 20 kB anyComponentStyle error
+ * budget in angular.json and was failing the production build. These rules target the
+ * full-page route (/assistant, /app/assistant) rather than the floating widget, and the
+ * expanded panel is rendered outside the component's own view encapsulation boundary
+ * concerns, so they live globally alongside the other shared layout partials.
+ *
+ * The floating widget's own styles (including its mobile sizing) stay in ai-assistant.scss.
+ */
+
+/* Full-page mode: a genuine full-bleed screen, not a modal — no backdrop, no rounded corners,
+   the chat panel itself fills the entire viewport. Reached via a real route (/assistant or
+   /app/assistant, see ai-assistant.ts's toggleExpanded()/syncToRoute()), so app chrome (header/
+   sidebar) is already gone because the router swapped out whatever page hosted it. */
+/* NOTE: the box/grid geometry of the expanded panel (.ai-assistant--expanded and
+   .ai-chat--expanded sizing, columns, borders) CANNOT live here. Those properties are also
+   declared by .ai-chat in the component stylesheet, where Angular's emulated encapsulation
+   appends an [_ngcontent-*] attribute and raises specificity to 0,2,0 — a plain global class
+   (0,1,0) always loses, so the full-page panel would keep the floating widget's 24rem
+   bottom-right box. They now live in ai-assistant.scss alongside .ai-chat. Only additive
+   styling with no component-sheet counterpart belongs in this file. */
+.ai-chat__heading--expanded { min-width: 0; }
+
+/* Standing sidebar — full-page mode only. A real "New chat" button plus the conversation list,
+   both always visible side-by-side with the messages (the standard chat-app layout the floating
+   widget's history-replaces-messages toggle can't offer in its small footprint). White, matching
+   the header/message area, rather than the floating widget's tinted list background — the sidebar
+   and the header now read as one continuous surface instead of two visually separate panels. */
+.ai-sidebar { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; min-height: 0; border-right: 1px solid var(--apu-border); background: var(--apu-white); }
+// Collapsed: everything below the brand button hides (no room to be legible at rail width) — the
+// rail shows only the logo/reopen control, same as the reference screenshot.
+.ai-sidebar--collapsed { grid-template-rows: auto 0 0 0; }
+.ai-sidebar--collapsed .ai-sidebar__new-chat,
+.ai-sidebar--collapsed .ai-sidebar__list,
+.ai-sidebar--collapsed .ai-sidebar__retention { opacity: 0; pointer-events: none; }
+
+// Open: a plain, static logo on the left plus its own dedicated collapse button to the right —
+// the logo itself is NOT a toggle in this state (see .ai-sidebar__brand--toggle below for the
+// collapsed state, where it is).
+.ai-sidebar__brand { display: flex; align-items: center; gap: .6rem; width: 100%; padding: 1.1rem 1.1rem .9rem; }
+.ai-sidebar__collapse { display: grid; flex: 0 0 auto; width: 2rem; height: 2rem; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--apu-text-muted); cursor: pointer; transition: background var(--motion-control) var(--ease-standard), color var(--motion-control) var(--ease-standard); }
+.ai-sidebar__collapse:hover, .ai-sidebar__collapse:focus-visible { background: var(--apu-surface-muted); color: var(--apu-navy-900); outline: 0; }
+.ai-sidebar__collapse span { font-size: 1.2rem; }
+
+// Collapsed: the logo itself becomes the reopen control, pinned top-left of the rail — swaps to
+// the "open sidebar" panel icon on hover/focus so its purpose as a toggle is discoverable.
+.ai-sidebar__brand--toggle { justify-content: flex-start; border: 0; background: transparent; cursor: pointer; }
+.ai-sidebar__brand-orb { position: relative; display: grid; width: 2.15rem; height: 2.15rem; flex: 0 0 auto; place-items: center; border-radius: 50%; }
+.ai-sidebar__brand-icon { position: absolute; inset: 0; display: grid; place-items: center; transition: opacity var(--motion-control) var(--ease-standard); }
+.ai-sidebar__brand-icon--orb.ai-chat__mini-orb { position: absolute; }
+.ai-sidebar__brand-icon--panel { border-radius: 50%; background: var(--apu-surface-muted); color: var(--apu-navy-900); font-size: 1.2rem; opacity: 0; }
+.ai-sidebar__brand--toggle:hover .ai-sidebar__brand-icon--orb, .ai-sidebar__brand--toggle:focus-visible .ai-sidebar__brand-icon--orb { opacity: 0; }
+.ai-sidebar__brand--toggle:hover .ai-sidebar__brand-icon--panel, .ai-sidebar__brand--toggle:focus-visible .ai-sidebar__brand-icon--panel { opacity: 1; }
+.ai-sidebar__brand--toggle:focus-visible { outline: 2px solid var(--apu-blue-300); outline-offset: 2px; }
+.ai-sidebar__brand-text { overflow: hidden; white-space: nowrap; }
+.ai-sidebar__new-chat { display: flex; align-items: center; gap: .5rem; margin: 0 .9rem .7rem; padding: .65rem .8rem; border: 1px solid var(--apu-border); border-radius: .75rem; background: var(--apu-surface-muted); color: var(--apu-navy-900); font-size: .82rem; font-weight: 650; cursor: pointer; white-space: nowrap; transition: border-color var(--motion-control) var(--ease-standard), box-shadow var(--motion-control) var(--ease-standard), opacity var(--motion-control) var(--ease-standard); }
+.ai-sidebar__new-chat:hover, .ai-sidebar__new-chat:focus-visible { border-color: var(--apu-blue-200); box-shadow: 0 .3rem .8rem rgb(42 131 255 / 10%); outline: 0; }
+.ai-sidebar__new-chat .material-symbols-rounded { color: var(--apu-blue-600); font-size: 1.1rem; }
+.ai-sidebar__list { display: flex; min-height: 0; flex-direction: column; gap: .35rem; padding: 0 .7rem .7rem; overflow-y: auto; transition: opacity var(--motion-control) var(--ease-standard); }
+.ai-sidebar .ai-history__item--active { border-color: var(--apu-blue-300); background: var(--apu-surface-muted); box-shadow: 0 .3rem .8rem rgb(42 131 255 / 12%); }
+
+// Retention notice — made deliberately prominent (a real card, not a small footnote): the user
+// specifically wants this to help fill out what otherwise felt like an empty sidebar, and to keep
+// the 24h-deletion behavior visible rather than buried in the empty-conversations-list copy.
+.ai-sidebar__retention { display: flex; align-items: flex-start; gap: .65rem; margin: 0 .9rem .9rem; padding: .9rem .95rem; border: 1px solid var(--apu-blue-200); border-radius: .9rem; background: linear-gradient(155deg, rgb(42 131 255 / 8%), rgb(42 131 255 / 3%)); transition: opacity var(--motion-control) var(--ease-standard); }
+.ai-sidebar__retention-icon { flex: 0 0 auto; color: var(--apu-blue-600); font-size: 1.3rem; }
+.ai-sidebar__retention-text { display: grid; gap: .2rem; margin: 0; color: var(--apu-navy-900); font-size: .78rem; line-height: 1.4; }
+.ai-sidebar__retention-text strong { color: var(--apu-navy-950); font-size: .82rem; font-weight: 700; }
+
+/* Conversation history list */
+.ai-history { display: flex; min-height: 0; flex-direction: column; gap: .4rem; padding: .7rem; overflow-y: auto; background: linear-gradient(180deg, #f8faff, var(--apu-surface-muted)); }
+.ai-history__empty { margin: 1.5rem .5rem; color: var(--apu-text-muted); font-size: .8rem; text-align: center; }
+.ai-history__item { display: grid; gap: .3rem; width: 100%; padding: .75rem .85rem; border: 1px solid var(--apu-border); border-radius: .85rem; background: var(--apu-white); color: inherit; cursor: pointer; text-align: left; transition: border-color var(--motion-control) var(--ease-standard), box-shadow var(--motion-control) var(--ease-standard); }
+.ai-history__item:hover, .ai-history__item:focus-visible { border-color: var(--apu-blue-200); box-shadow: 0 .3rem .8rem rgb(42 131 255 / 10%); outline: 0; }
+.ai-history__preview { overflow: hidden; color: var(--apu-navy-900); font-size: .8rem; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.ai-history__meta { display: flex; align-items: center; justify-content: space-between; color: var(--apu-text-muted); font-size: .68rem; }
+.ai-history__delete { display: grid; width: 1.6rem; height: 1.6rem; place-items: center; border-radius: 50%; color: var(--apu-text-muted); transition: background var(--motion-control) var(--ease-standard), color var(--motion-control) var(--ease-standard); }
+.ai-history__delete:hover { background: rgb(220 38 38 / 10%); color: #dc2626; }
+.ai-history__delete span { font-size: 1rem; }
+
+/*
+ * Full-page assistant on a phone.
+ *
+ * The expanded layout is a two-column grid (17.5rem sidebar + conversation). On a 390px screen
+ * that leaves the conversation about 100px wide, so the messages and composer were pushed off
+ * the viewport entirely. Below 48rem the sidebar collapses to its icon rail regardless of the
+ * sidebarCollapsed() state, and the message/composer gutters drop to phone padding — the
+ * centring `max(1.5rem, calc(50% - 26rem))` resolves to nearly half the screen at this width.
+ *
+ * The rail keeps the existing toggle, so a tap still opens the conversation list; when the user
+ * expands it, it overlays the conversation instead of squeezing it.
+ */
+@media (max-width: 48rem) {
+  /* Column widths, padding and the panel's own box are set in ai-assistant.scss's matching
+     48rem block — see the specificity note at the top of this file. */
+
+  /* Expanded sidebar overlays the conversation rather than stealing a column from it. */
+  .ai-chat--expanded .ai-sidebar:not(.ai-sidebar--collapsed) {
+    position: absolute;
+    z-index: 3;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(15rem, 78vw);
+    box-shadow: 0 0 0 100vmax rgb(3 19 39 / 45%);
+  }
+
+  .ai-sidebar__brand { padding: 0.8rem 0.7rem 0.6rem; }
+  .ai-sidebar__new-chat { margin-inline: 0.6rem; }
+}

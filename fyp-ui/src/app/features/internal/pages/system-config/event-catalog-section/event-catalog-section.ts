@@ -259,12 +259,26 @@ export class EventCatalogSectionComponent {
   }
 
   readonly purgeTargetId = signal<string | null>(null);
+  readonly purgePreview = signal<DeletionPreview | null>(null);
+  readonly checkingPurge = signal(false);
   readonly purging = signal(false);
   requestPurge(id: string): void {
     this.clearMessages();
     this.purgeTargetId.set(id);
+    // Dependencies are re-checked server-side at purge time, so ask before offering the button.
+    this.purgePreview.set(null);
+    this.checkingPurge.set(true);
+    this.service().checkDeletion(id).pipe(
+      finalize(() => this.checkingPurge.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (preview) => this.purgePreview.set(preview),
+      error: () => this.toast.error('Could not check entry', 'Please try again.'),
+    });
   }
-  cancelPurge(): void { if (!this.purging()) this.purgeTargetId.set(null); }
+  cancelPurge(): void {
+    if (!this.purging()) { this.purgeTargetId.set(null); this.purgePreview.set(null); }
+  }
   purgeTargetLabel(): string {
     const id = this.purgeTargetId();
     const entry = id ? this.service().deletedEntries().find((e) => e.id === id) : null;
@@ -277,6 +291,7 @@ export class EventCatalogSectionComponent {
     this.service().purge(id).pipe(finalize(() => this.purging.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.purgeTargetId.set(null);
+        this.purgePreview.set(null);
         this.toast.success(`${this.entityLabel()} permanently deleted.`);
       },
       error: (err) => this.toast.error(err?.error?.message || `The ${this.entityLabel().toLowerCase()} could not be permanently deleted.`),

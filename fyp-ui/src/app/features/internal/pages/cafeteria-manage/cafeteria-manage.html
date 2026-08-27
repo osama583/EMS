@@ -38,13 +38,13 @@
 
 <app-delete-confirm-dialog
   [open]="!!deleteTarget()" entityKind="Cafeteria" [entityLabel]="targetLabel()"
-  [deleting]="deleting()"
+  [checkingDependencies]="checkingDeletion()" [preview]="deletePreview()" [deleting]="deleting()"
   (confirm)="confirmDelete()" (cancel)="cancelDelete()"
 />
 
 <app-delete-confirm-dialog
   [open]="!!purgeTargetCode()" [permanent]="true" entityKind="Cafeteria" [entityLabel]="purgeTargetLabel()"
-  [preview]="{ canDelete: true, blockingReasons: [], entityLabel: purgeTargetLabel() }" [deleting]="purging()"
+  [checkingDependencies]="checkingPurge()" [preview]="purgePreview()" [deleting]="purging()"
   (confirm)="confirmPurge()" (cancel)="cancelPurge()"
 />
 

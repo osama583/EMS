@@ -49,9 +49,9 @@
       aria-label="Primary navigation"
       [class.site-nav--open]="menuOpen()"
     >
+      @if (!minimal()) {
       <div class="site-nav__links">
         @for (item of navItems; track item.href) {
-          @if (!isExternalUser() || item.label === 'Home' || item.label === 'Explore Events') {
           <a
             #firstNavLink
             class="nav-link"
@@ -62,21 +62,24 @@
           >
             {{ item.label }}
           </a>
-          }
         }
-        @if (isExternalUser()) {
-          <a class="nav-link" href="/my-events/saved" (click)="closeMenu()">My Events</a>
-        } @else {
+        @if (!isExternalUser()) {
           <a class="nav-link" [href]="savedEventsHref()" (click)="openSavedEvents($event)">Saved Events</a>
         }
       </div>
+      }
 
       @if (isExternalUser()) {
+      <div class="site-nav__actions">
+        @if (!minimal()) {
+          <a class="nav-login-link" href="/my-events/saved" (click)="closeMenu()">My Events</a>
+        }
         <button class="apply-link apply-link--logout" type="button" (click)="logout()">
           <span>Logout</span>
           <span class="apply-link__arrow material-symbols-rounded" aria-hidden="true">logout</span>
         </button>
-      } @else {
+      </div>
+      } @else if (!minimal()) {
       <div class="site-nav__actions">
         @if (showLoginButton()) {
           <a class="nav-login-link" href="/login" (click)="openLogin($event)">Login</a>
@@ -88,6 +91,10 @@
           [compact]="true"
           (activated)="openLogin($event, '/app/how-it-works')"
         />
+      </div>
+      } @else if (showLoginButton()) {
+      <div class="site-nav__actions">
+        <a class="nav-login-link" href="/login" (click)="openLogin($event)">Login</a>
       </div>
       }
     </nav>

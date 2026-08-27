@@ -231,6 +231,20 @@
     </div>
 
     <nav class="internal-sidebar__footer" aria-label="Account navigation">
+      @if (canRunPurgeSweep()) {
+        <button
+          type="button"
+          class="internal-nav__item"
+          [disabled]="purgingDeleted()"
+          title="Permanently remove Deleted records older than 7 days"
+          (click)="runPurgeSweep()"
+        >
+          <span class="internal-nav__icon material-symbols-rounded" aria-hidden="true">
+            {{ purgingDeleted() ? 'hourglass_top' : 'delete_sweep' }}
+          </span>
+          <span class="internal-nav__label">{{ purgingDeleted() ? 'Purging…' : 'Purge Deleted' }}</span>
+        </button>
+      }
       <a
         class="internal-nav__item"
         routerLink="/app/profile"

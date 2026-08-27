@@ -1,13 +1,32 @@
 <section class="cafeteria-staff-assignments">
   <app-feedback-banner [message]="errorMessage()" tone="error" />
 
-  <app-internal-data-page
-    [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
-    [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
-    (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
-    (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
-    (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit', icon: 'edit' }, record: $event })" (primaryAction)="openAdd()"
-  />
+  <nav class="shared-tabs" aria-label="Sections">
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="!showDeleted()" (click)="setDeletedTab(false)">
+      <span class="material-symbols-rounded" aria-hidden="true">badge</span>
+      Assignments
+    </button>
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="showDeleted()" (click)="setDeletedTab(true)">
+      <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+      Deleted
+    </button>
+  </nav>
+
+  @if (showDeleted()) {
+    <app-internal-data-page
+      [config]="deletedConfig()" [records]="deletedRecords()" [filters]="[]" [searchValue]="''" [loading]="deletedLoading()"
+      [totalPages]="1" [page]="1" [pageSize]="50" [hideControls]="true"
+      (rowAction)="handleDeletedAction($event)"
+    />
+  } @else {
+    <app-internal-data-page
+      [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+      (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
+      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+      (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit', icon: 'edit' }, record: $event })" (primaryAction)="openAdd()"
+    />
+  }
 </section>
 
 <app-form-modal [open]="modalOpen()" [title]="editingAssignmentId() ? 'Edit Assignment' : 'Add Assignment'" [primaryLabel]="editingAssignmentId() ? 'Save Changes' : 'Add Assignment'" [loading]="saving()" [disabled]="!formValid()" (close)="closeModal()" (cancel)="closeModal()" (submit)="save()">
@@ -34,7 +53,17 @@
 
 <app-delete-confirm-dialog
   [open]="!!deleteTarget()" entityKind="Assignment" [entityLabel]="targetLabel()"
-  [deleting]="deleting()"
+  [checkingDependencies]="checkingDeletion()" [preview]="deletePreview()" [deleting]="deleting()"
   (confirm)="confirmRemove()" (cancel)="cancelRemove()"
+/>
+
+<app-confirm-dialog
+  [open]="restoreTarget() !== null"
+  title="Restore assignment"
+  [message]="restoreMessage()"
+  confirmLabel="Restore"
+  [danger]="false"
+  (confirm)="confirmRestore()"
+  (cancel)="cancelRestore()"
 />
 

@@ -120,10 +120,19 @@ $comments-drawer-width: min(22rem, 85vw);
 .proposal-summary article span { color: var(--apu-text-muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; }
 .proposal-summary article strong { overflow-wrap: anywhere; white-space: pre-line; }
 .proposal-summary__wide { grid-column: span 3; }
-.proposal-actions { position: sticky; z-index: 10; bottom: var(--space-3); display: grid; min-height: 4.5rem; padding: var(--space-3) var(--space-4); grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--space-4); border: 1px solid var(--apu-border); border-radius: var(--radius-card); background: var(--apu-white); box-shadow: 0 .35rem 1.25rem rgb(5 24 48 / 7%); }
-.proposal-actions__previous { display: flex; justify-content: flex-start; }
-.proposal-actions__step { color: var(--apu-navy-950); font-size: .95rem; font-weight: 700; text-align: center; white-space: nowrap; }
-.proposal-actions__right { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.proposal-actions {
+  position: sticky; z-index: 10; bottom: var(--space-3); display: grid; min-height: 4.5rem;
+  padding: var(--space-3) var(--space-4);
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  grid-template-areas: 'previous step right draft';
+  align-items: center; gap: var(--space-4);
+  border: 1px solid var(--apu-border); border-radius: var(--radius-card); background: var(--apu-white);
+  box-shadow: 0 .35rem 1.25rem rgb(5 24 48 / 7%);
+}
+.proposal-actions__previous { grid-area: previous; display: flex; justify-content: flex-start; }
+.proposal-actions__step { grid-area: step; color: var(--apu-navy-950); font-size: .95rem; font-weight: 700; text-align: center; white-space: nowrap; }
+.proposal-actions__right { grid-area: right; display: flex; justify-content: flex-end; gap: var(--space-2); }
+.proposal-actions__draft { grid-area: draft; display: flex; justify-content: flex-end; }
 .proposal-actions__button--previous { border-color: var(--apu-border); background: var(--apu-surface-muted); color: var(--apu-text-muted); }
 .proposal-modal { position: fixed; z-index: 100; inset: 0; display: grid; padding: var(--space-4); place-items: center; background: rgb(3 19 39 / 62%); backdrop-filter: blur(6px); }
 .proposal-modal > section { width: min(60rem, 100%); max-height: min(48rem, calc(100dvh - 3rem)); overflow-y: auto; border-radius: var(--radius-container); background: var(--apu-white); box-shadow: var(--shadow-overlay); }
@@ -140,15 +149,125 @@ $comments-drawer-width: min(22rem, 85vw);
 @media(max-width:64rem){
   .proposal-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+/*
+ * Phone layout.
+ *
+ * Built for the screen rather than shrunk from the desktop grid: the page loses its desktop-only
+ * left indent and gets a symmetric gutter so the form sits centred, cards trade their generous
+ * container padding for a tighter card scale, and every multi-column grid collapses to one
+ * column. The intent is a form that reads as designed-for-phone, not a compacted desktop page.
+ */
 @media(max-width:48rem){
-  .proposal-page{padding-bottom:5.5rem}
+  /*
+   * The desktop page indents only on the left (padding-left) because the comments drawer sits to
+   * the right. With the drawer stacked below on a phone that asymmetry just pushes the form
+   * off-centre, so use one symmetric gutter and centre the column instead.
+   */
+  .proposal-page{padding-bottom:5.5rem;padding-inline:0}
+  .proposal-page__main{
+    width:100%;
+    max-width:34rem;
+    margin-inline:auto;
+    padding-left:0;
+    padding-inline:var(--space-3);
+    gap:var(--space-4);
+  }
+
+  /* Card chrome scales down as a set so the surfaces stay proportional to the smaller type,
+     rather than keeping desktop padding that eats the usable width. */
+  .proposal-card,.co-requesters-section{
+    padding:var(--space-3);
+    gap:var(--space-3);
+    border-radius:var(--radius-card);
+  }
+  .proposal-card__title h3,.co-requesters-section__header h3{font-size:1rem}
+  .proposal-card__title p,.co-requesters-section__header p{font-size:.8rem}
+
+  /* Step header: the 3rem icon tile and a clamped 2.4rem heading are desktop proportions. */
+  .proposal-step>header{gap:var(--space-2)}
+  .proposal-step>header>.material-symbols-rounded{width:2.5rem;height:2.5rem;font-size:1.35rem}
+  .proposal-step>header h2{font-size:1.35rem}
+
+  /* The add-row button stretches full width — a centred 10.5rem pill reads as a stray fragment
+     on a narrow card. */
+  .co-requesters-section__header{justify-items:stretch}
+  .co-requesters-section__header .table-control{width:100%;min-width:0}
+
   .proposal-grid,.proposal-grid--2,.requirement-grid,.proposal-summary{grid-template-columns:1fr}
   .proposal-grid--2>:first-child,.proposal-summary__wide{grid-column:auto}
-  .proposal-actions{bottom:.5rem;grid-template-columns:1fr auto;grid-template-areas:'step step' 'previous right';padding:var(--space-2);gap:var(--space-2)}
-  .proposal-actions__previous{grid-area:previous}
-  .proposal-actions__step{grid-area:step;font-size:.82rem;white-space:normal}
-  .proposal-actions__right{grid-area:right;gap:.35rem}
-  .proposal-actions__right .table-control{padding-inline:.65rem;font-size:.8rem}
+  .requirement-grid label{min-height:3.25rem;padding:var(--space-2)}
+
+  /*
+   * Action bar.
+   *
+   * Three labelled buttons never fit one phone row: `.table-control` is `flex: 0 0 auto`, and
+   * because each label is `white-space: nowrap`, shrinking the box with `min-width: 0` only made
+   * the TEXT spill past its own border. Fighting for a single row was the wrong goal.
+   *
+   * The footer is stacked into rows instead:
+   *
+   *   Step 1 of 6                     (context, centred)
+   *   [ ← Previous ][ Next → ]        (step navigation, sharing one row)
+   *   [ Save as Draft / Submit     ]  (the save/submit action, full width)
+   *
+   * Previous and Next/Submit are the pair someone taps every single step, so they get the
+   * thumb-reachable shared row; Save as Draft/Submit Proposal is the one-off action and reads
+   * clearer as its own full-width row than squeezed edge-to-edge with Previous.
+   */
+  .proposal-actions{
+    bottom:.5rem;
+    min-height:0;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    grid-template-areas:'step step' 'previous right' 'draft draft';
+    padding:var(--space-2);
+    gap:.5rem;
+    justify-items:stretch;
+    align-items:center;
+  }
+  .proposal-actions__step{
+    grid-area:step;
+    padding-bottom:.1rem;
+    font-size:.8rem;
+    white-space:normal;
+  }
+
+  .proposal-actions__previous{grid-area:previous;display:block;min-width:0}
+  .proposal-actions__right{grid-area:right;display:block;min-width:0}
+  .proposal-actions__draft{grid-area:draft;display:block;min-width:0}
+
+  /* `.table-control`'s own base rule is `display:inline-flex;flex:0 0 auto` (sized to its label,
+     for its normal inline use elsewhere) - inside this footer every wrapper above is now a plain
+     block, so `display:flex` + `width:100%` here is what actually stretches the button edge to
+     edge, overriding the inline-flex sizing rather than relying on grid/flex item stretch that a
+     nested `inline-flex` element does not automatically pick up from an ancestor. */
+  .proposal-actions .table-control{
+    display:flex;
+    width:100%;
+    min-width:0;
+    min-height:2.85rem;
+    padding-inline:.75rem;
+    font-size:.85rem;
+  }
+  /* Labels are allowed to shrink but never to overflow their button. */
+  .proposal-actions__button{overflow:hidden;text-overflow:ellipsis}
+  .proposal-actions__button>.material-symbols-rounded{flex:0 0 auto;font-size:1.05rem}
+
   .proposal-modal{padding:var(--space-2)}
-  .proposal-modal .proposal-summary{grid-template-columns:1fr}
+  .proposal-modal>section{max-height:calc(100dvh - 1.5rem);border-radius:var(--radius-card)}
+  .proposal-modal header,.proposal-modal footer{padding:var(--space-3)}
+  .proposal-modal header h2{font-size:1.1rem}
+  .proposal-modal header button{width:2.35rem;height:2.35rem}
+  .proposal-modal .proposal-summary{grid-template-columns:1fr;padding:var(--space-3)}
+  .proposal-modal footer .table-control{flex:1 1 0;min-width:0}
+
+  .proposal-toast{right:var(--space-3);left:var(--space-3);bottom:var(--space-3);text-align:center}
+}
+
+/*
+ * Very small phones: the stacked footer already fits (one full-width button per row), so nothing
+ * needs to collapse into an icon — only the type and padding tighten slightly.
+ */
+@media(max-width:23rem){
+  .proposal-actions .table-control{font-size:.8rem;padding-inline:.6rem}
+  .proposal-actions__step{font-size:.75rem}
 }

@@ -1,12 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
-import { map, of, switchMap } from 'rxjs';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, signal } from '@angular/core';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { finalize, switchMap } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import { PublishedEvent, RegistrationResult, RegistrationStatus } from '../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../core/events/published-event.service';
 import { SavedEventsService } from '../../../core/events/saved-events.service';
 import { EventCardComponent } from '../../../shared/components/event-card/event-card';
 import { EventDetailsModalComponent } from '../../../shared/components/event-details-modal/event-details-modal';
-import { InternalPageHeaderComponent, InternalPageStateComponent } from '../../../shared/components/internal-data-page/internal-data-page-parts';
+import { InternalPageHeaderComponent, InternalPageStateComponent, InternalPaginationComponent } from '../../../shared/components/internal-data-page/internal-data-page-parts';
 import { InternalPageHeaderConfig } from '../../../shared/components/internal-data-page/internal-data-page.models';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 
@@ -17,9 +18,15 @@ interface TabEntry {
   readonly status: RegistrationStatus | null;
 }
 
+const PAGE_SIZE = 9;
+
+// Every scope this component renders (saved/pending/registered/history) is now a real server
+// query: page/pageSize go straight through to events.py's search_saved()/my_registrations(),
+// which filter, count, and LIMIT/OFFSET in SQL - the browser only ever holds the one page of
+// events it's about to show, not the whole list sliced client-side.
 @Component({
   selector: 'app-my-events-tab',
-  imports: [EventCardComponent, EventDetailsModalComponent, InternalPageHeaderComponent, InternalPageStateComponent],
+  imports: [EventCardComponent, EventDetailsModalComponent, InternalPageHeaderComponent, InternalPageStateComponent, InternalPaginationComponent],
   templateUrl: './my-events-tab.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -33,6 +40,7 @@ export class MyEventsTabComponent {
   readonly savedEvents = inject(SavedEventsService);
   private readonly eventService = inject(PublishedEventService);
   private readonly toast = inject(ToastService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly mode = input.required<MyEventsTabMode>();
   // MyEventsComponent's own shell already renders an "My Events" <h1> above this tab's outlet
@@ -44,13 +52,17 @@ export class MyEventsTabComponent {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly entries = signal<readonly TabEntry[]>([]);
+  readonly total = signal(0);
+  readonly totalPages = signal(1);
+  readonly page = signal(1);
   readonly selectedEvent = signal<PublishedEvent | null>(null);
   readonly registeringEventId = signal<string | null>(null);
+
+  private readonly reloadTick = signal(0);
 
   readonly headerConfig = computed<InternalPageHeaderConfig>(() => ({
     title: 'Events',
     description: 'Events you have registered for, awaiting the organiser’s decision.',
-    countLabel: `${this.entries().length} pending`,
   }));
 
   readonly emptyIcon = computed(() => {
@@ -79,45 +91,62 @@ export class MyEventsTabComponent {
   });
 
   constructor() {
-    effect(() => { this.mode(); this.load(); });
+    toObservable(computed(() => ({ mode: this.mode(), page: this.page(), tick: this.reloadTick() })))
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        switchMap((query) => {
+          const user = this.auth.user();
+          if (!user) return [{ items: [] as readonly TabEntry[], total: 0, totalPages: 1 }];
+          this.loading.set(true);
+          this.error.set('');
+          return this.load(query.mode, user.email, query.page).pipe(finalize(() => this.loading.set(false)));
+        }),
+      )
+      .subscribe({
+        next: (result) => {
+          this.entries.set(result.items);
+          this.total.set(result.total);
+          this.totalPages.set(result.totalPages);
+        },
+        error: () => this.error.set('These events could not be loaded.'),
+      });
   }
 
-  private load(): void {
-    const user = this.auth.user();
-    if (!user) { this.loading.set(false); return; }
-    this.loading.set(true);
-    this.error.set('');
-
-    const request = this.mode() === 'saved'
-      ? this.savedEvents.getSavedEvents(user.email).pipe(switchMap((response) => {
-          if (response.items.length === 0) return of<readonly TabEntry[]>([]);
+  private load(mode: MyEventsTabMode, userEmail: string, page: number) {
+    if (mode === 'saved') {
+      return this.savedEvents.searchSavedEvents(page, PAGE_SIZE).pipe(
+        switchMap((response) => {
+          if (response.items.length === 0) {
+            return [{ items: [] as readonly TabEntry[], total: response.total, totalPages: response.totalPages }];
+          }
           return this.eventService.getRegistrationStatuses(response.items.map((item) => item.id)).pipe(
-            map((statuses) => response.items.map((item): TabEntry => ({ event: item, status: statuses.get(item.id) ?? null }))),
-            map((entries) => entries.filter((entry) => entry.status !== 'confirmed')),
+            switchMap((statuses) => {
+              const items = response.items
+                .map((item): TabEntry => ({ event: item, status: statuses.get(item.id) ?? null }))
+                .filter((entry) => entry.status !== 'confirmed');
+              return [{ items, total: response.total, totalPages: response.totalPages }];
+            }),
           );
-        }))
-      : this.mode() === 'pending'
-        ? this.eventService.getPendingApprovalRegistrations().pipe(map((response): readonly TabEntry[] =>
-            response.items.map((item) => ({ event: item.event, status: item.status }))))
-      : this.mode() === 'registered'
-        ? this.eventService.getActiveRegistrations().pipe(map((response): readonly TabEntry[] =>
-            response.items
-              .filter((item) => item.status === 'confirmed')
-              .map((item) => ({ event: item.event, status: item.status }))))
-        : this.eventService.getRegistrationHistory().pipe(map((response): readonly TabEntry[] =>
-            response.items.map((item) => ({ event: item.event, status: item.status }))));
-
-    request.subscribe({
-      next: (entries) => {
-        this.entries.set(entries);
-        this.loading.set(false);
-      },
-      error: () => {
-        this.error.set('These events could not be loaded.');
-        this.loading.set(false);
-      },
-    });
+        }),
+      );
+    }
+    const request = mode === 'pending'
+      ? this.eventService.getPendingApprovalRegistrations(page, PAGE_SIZE)
+      : mode === 'registered'
+        ? this.eventService.getActiveRegistrations(page, PAGE_SIZE)
+        : this.eventService.getRegistrationHistory(page, PAGE_SIZE);
+    return request.pipe(
+      switchMap((response) => [{
+        items: response.items.map((item): TabEntry => ({ event: item.event, status: item.status })),
+        total: response.total,
+        totalPages: response.totalPages,
+      }]),
+    );
   }
+
+  private triggerReload(): void { this.reloadTick.update((tick) => tick + 1); }
+
+  setPage(value: number): void { this.page.set(Math.max(1, Math.min(value, this.totalPages()))); }
 
   toggleSaved(eventId: string): void {
     const user = this.auth.user();
@@ -125,7 +154,7 @@ export class MyEventsTabComponent {
     const operation = this.savedEvents.isSaved(eventId)
       ? this.savedEvents.removeSavedEvent(user.email, eventId)
       : this.savedEvents.saveEvent(user.email, eventId);
-    operation.subscribe(() => { if (this.mode() === 'saved') this.load(); });
+    operation.subscribe(() => { if (this.mode() === 'saved') this.triggerReload(); });
   }
 
   registerForEvent(eventId: string): void {
@@ -143,7 +172,7 @@ export class MyEventsTabComponent {
     this.eventService.registerForEvent(eventId).subscribe({
       next: (result) => {
         this.registeringEventId.set(null);
-        this.load();
+        this.triggerReload();
         if (result.status === 'rejected' || result.status === 'duplicate') {
           this.toast.error('Registration not completed', result.message);
         } else {
@@ -160,7 +189,7 @@ export class MyEventsTabComponent {
   onModalRegistered(result: RegistrationResult): void {
     const eventTitle = this.selectedEvent()?.eventTitle ?? 'the event';
     this.selectedEvent.set(null);
-    this.load();
+    this.triggerReload();
     if (result.status === 'rejected' || result.status === 'duplicate') {
       this.toast.error('Registration not completed', result.message);
     } else {

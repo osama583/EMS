@@ -1,7 +1,15 @@
-import { ChangeDetectionStrategy, Component, ElementRef, HostListener, OnDestroy, afterNextRender, effect, inject, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListener, OnDestroy, afterNextRender, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router } from '@angular/router';
+import { Subscription, filter } from 'rxjs';
+import { AiAssistantClub, AiAssistantProposal, AiAssistantRegistrantsTable, AiAssistantService, AiAssistantSource } from '../../../core/ai-assistant/ai-assistant.service';
+import { AiChatMessage, AiConversation, AiConversationStore } from '../../../core/ai-assistant/ai-conversation-store.service';
+import { PublishedEvent, RegistrationResult } from '../../../core/events/published-event.models';
+import { PublishedEventService } from '../../../core/events/published-event.service';
+import { EVENT_IMAGE_PLACEHOLDER } from '../../event-image-placeholder';
+import { EventDetailsModalComponent } from '../event-details-modal/event-details-modal';
 import { AiOrbAwarenessService } from './ai-orb-awareness.service';
 
-interface ChatMessage { readonly id: number; readonly sender: 'assistant' | 'user'; readonly text: string; }
 interface SuggestionCard { readonly icon: string; readonly title: string; readonly description: string; readonly prompt: string; }
 
 const PROMPTS = ['Need help?', 'Have a question?', 'Want to create a request?', 'Questions about the process?'] as const;
@@ -18,14 +26,77 @@ const SUGGESTION_CARDS: readonly SuggestionCard[] = [
   { icon: 'groups', title: 'Department Responsibilities', description: 'Learn which departments are involved and what each department is responsible for.', prompt: 'Which departments are involved and what is each one responsible for?' },
 ];
 
+// Phone-width screens open the full-page assistant with its standing sidebar already collapsed to
+// the icon rail, so the conversation — not the history list — is what the user lands on. Guarded
+// for non-browser rendering, matching the `typeof document` checks used elsewhere in this file.
+function startsSidebarCollapsed(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia?.('(max-width: 48rem)').matches ?? false;
+}
+
 const CARDS_PER_PAGE = 4;
 const SUGGESTION_CARD_PAGES: readonly (readonly SuggestionCard[])[] = Array.from(
   { length: Math.ceil(SUGGESTION_CARDS.length / CARDS_PER_PAGE) },
   (_, page) => SUGGESTION_CARDS.slice(page * CARDS_PER_PAGE, page * CARDS_PER_PAGE + CARDS_PER_PAGE),
 );
 
-let messageAutoId = 1;
-const createGreeting = (): ChatMessage => ({ id: messageAutoId++, sender: 'assistant', text: GREETING });
+function newMessageId(): string { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
+
+// A message's text is plain, un-marked-up prose from the model — never HTML — so it was rendered
+// as one flat <p> with newlines collapsed by the browser. The system prompt already tells the
+// model to put each list item on its own "-"-prefixed line (see gemini.py's FORMATTING section),
+// but that convention only shows up correctly if the template actually respects line breaks and
+// groups consecutive "-" lines into a real list, rather than displaying real newlines as spaces
+// and burying a count/listing in one run-on sentence. Parsed once per message here rather than
+// with a CSS white-space rule, since consecutive "-" lines need to become an actual <ul> (with a
+// visible bullet/row per item), not just a paragraph that happens to wrap.
+export type AiMessageSegment =
+  | { readonly kind: 'text'; readonly text: string }
+  | { readonly kind: 'list'; readonly items: readonly string[] };
+
+function segmentMessageText(text: string): readonly AiMessageSegment[] {
+  const lines = text.split('\n');
+  const segments: AiMessageSegment[] = [];
+  let paragraphLines: string[] = [];
+  let listItems: string[] = [];
+
+  const flushParagraph = () => {
+    if (paragraphLines.length === 0) return;
+    segments.push({ kind: 'text', text: paragraphLines.join(' ').trim() });
+    paragraphLines = [];
+  };
+  const flushList = () => {
+    if (listItems.length === 0) return;
+    segments.push({ kind: 'list', items: listItems });
+    listItems = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    const listMatch = /^-\s+(.*)$/.exec(line);
+    if (listMatch) {
+      flushParagraph();
+      listItems.push(listMatch[1]);
+    } else if (line) {
+      flushList();
+      paragraphLines.push(line);
+    }
+    // A blank line ends whichever run is open, without starting a new empty paragraph.
+    else { flushParagraph(); flushList(); }
+  }
+  flushParagraph();
+  flushList();
+  return segments;
+}
+
+// Full-window mode has a real URL (/assistant) so it behaves like an actual page — refresh,
+// back/forward, and a bookmarkable link all work — rather than being a pure UI toggle. Kept as a
+// single TOP-LEVEL route (not also mirrored under /app) because /app's canActivateChild guard
+// (roleGuard) checks the URL against the caller's server-driven nav_page_grants, which has no
+// entry for a non-navigable utility route like this one and would bounce it to their default page.
+function isAssistantUrl(url: string): boolean {
+  return url.split(/[?#]/)[0] === '/assistant';
+}
 
 // --- Living-orb behavior tuning ------------------------------------------
 const INITIAL_VISIBLE_MS = 15_000; // fully visible for the first 15s on page load
@@ -42,17 +113,29 @@ function randomBetween(min: number, max: number): number { return min + Math.ran
 
 @Component({
   selector: 'app-ai-assistant',
+  imports: [EventDetailsModalComponent],
   templateUrl: './ai-assistant.html',
   styleUrl: './ai-assistant.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AiAssistantComponent implements OnDestroy {
   private readonly awareness = inject(AiOrbAwarenessService);
+  private readonly assistant = inject(AiAssistantService);
+  private readonly store = inject(AiConversationStore);
+  private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly publishedEventService = inject(PublishedEventService);
   readonly launcher = viewChild<ElementRef<HTMLButtonElement>>('launcher');
   readonly composer = viewChild<ElementRef<HTMLTextAreaElement>>('composer');
   readonly messageArea = viewChild<ElementRef<HTMLElement>>('messageArea');
   readonly orb = viewChild<ElementRef<HTMLElement>>('orb');
   readonly open = signal(false);
+  readonly expanded = signal(false); // full-window mode toggle
+  readonly showHistory = signal(false); // conversation list overlay
+  // Full-page mode's standing sidebar, user-toggled. It starts collapsed on phone-width screens:
+  // expanded it would overlay the conversation (see _ai-assistant-expanded.scss's 48rem block),
+  // so opening the assistant on a phone should land on the messages, not the conversation list.
+  readonly sidebarCollapsed = signal(startsSidebarCollapsed());
   readonly promptVisible = signal(true);
   readonly promptIndex = signal(0);
   readonly promptChanging = signal(false);
@@ -61,9 +144,29 @@ export class AiAssistantComponent implements OnDestroy {
   readonly error = signal('');
   readonly eyeX = signal(0);
   readonly eyeY = signal(0);
-  readonly messages = signal<readonly ChatMessage[]>([createGreeting()]);
-  readonly hasInteracted = signal(false);
   readonly cardPages = SUGGESTION_CARD_PAGES;
+  // Card click opens the event details modal on top of the chat (chat stays open) instead of
+  // navigating away — see openEventFromCard().
+  readonly selectedCardEvent = signal<PublishedEvent | null>(null);
+
+  // The active conversation drives everything the template renders — created
+  // lazily (see ensureConversationId()) so opening the panel for the first
+  // time never writes an empty conversation into localStorage. Not private:
+  // the full-page sidebar template highlights the active item in the list.
+  readonly activeConversationId = signal<string | null>(this.store.activeId());
+  readonly conversations = this.store.conversations;
+  private readonly storedMessages = computed<readonly AiChatMessage[]>(() => {
+    const id = this.activeConversationId();
+    return id ? (this.store.conversations().find((c) => c.id === id)?.messages ?? []) : [];
+  });
+  // The greeting is shown for an empty conversation but never itself written to
+  // the store/localStorage — it is not a real turn, so it must never appear in
+  // historyFor()'s Q&A pairing or count toward the 24h-retained message list.
+  readonly messages = computed<readonly AiChatMessage[]>(() => {
+    const stored = this.storedMessages();
+    return stored.length > 0 ? stored : [{ id: 'greeting', sender: 'assistant', text: GREETING, createdAt: Date.now() }];
+  });
+  readonly hasInteracted = computed(() => this.storedMessages().length > 0);
 
   // Living-orb state
   readonly phase = signal<OrbPhase>('visible');
@@ -74,7 +177,21 @@ export class AiAssistantComponent implements OnDestroy {
   private readonly reducedMotion: boolean;
   private readonly pointerTracking: boolean;
   private readonly promptTimer?: ReturnType<typeof setInterval>;
-  private responseTimer?: ReturnType<typeof setTimeout>;
+  private askSubscription?: Subscription;
+  // The user message bubble for whatever ask() call is currently in flight, if any — set right
+  // before the HTTP call in send() and cleared on both success and error. Lets the identity-switch
+  // effect below recover a request it has to cancel (see that effect's own comment) instead of
+  // just silently dropping the user's message. Kept as the whole message object (not just its
+  // text) so recovery can carry the SAME bubble into the new conversation - moving it, rather
+  // than appending a second copy with a new id/timestamp, is what keeps the cancel-and-resend
+  // invisible in the UI: one bubble throughout, never two identical ones stacked.
+  private pendingMessage: AiChatMessage | null = null;
+  // True only while a recovered question (see above) is itself in flight after being re-sent.
+  // Guards against a SECOND identity-version bump landing while that resend is still pending:
+  // without this, the effect would read pendingQuestion again (the resend set it back), cancel
+  // the resend, and re-send it once more - repeating for every further bump instead of exactly
+  // once per original message.
+  private recoveringQuestion = false;
   private hideTimer?: ReturnType<typeof setTimeout>;
   private restTimer?: ReturnType<typeof setTimeout>;
   private gestureScheduleTimer?: ReturnType<typeof setTimeout>;
@@ -114,7 +231,84 @@ export class AiAssistantComponent implements OnDestroy {
       });
     }
 
+    // Resets to the new user's own (or the guest) conversation the instant AiConversationStore
+    // switches storage buckets (login/logout/account switch without a full reload) - without
+    // this, activeConversationId would keep pointing at an id from the PREVIOUS user's now-
+    // replaced conversation list, and the panel could keep rendering their messages (or, worse,
+    // silently start appending the new user's replies into what was the old user's thread id if
+    // it happened to collide). Skipped on the very first run (identityVersion starts at 0 and
+    // this effect fires once immediately) since activeConversationId is already correctly
+    // initialised from the store above.
+    //
+    // The cancel below is NOT optional: appendMessage() writes into whatever bucket is CURRENT
+    // when the response lands, keyed only by conversationId, so letting an in-flight ask() from
+    // the OLD bucket run to completion here would land the previous identity's question/answer
+    // inside the NEW identity's conversation list - a cross-account leak (most concretely: a
+    // guest's question appearing in the account they just logged into). So the in-flight request
+    // is always cancelled on a real switch. What it must NOT do is silently drop the message the
+    // user was actually waiting on - a login completing right as someone sends their first
+    // question was observed cancelling that request with nothing shown for it, and a naive
+    // "just resend the text" recovery was observed appending a SECOND, visibly duplicate bubble
+    // (the original send()'s bubble was still sitting in the OLD bucket's conversation, the
+    // resend's own bubble landed in the NEW one, and both rendered in the same view once the
+    // switch settled). Recovered by moving the SAME user bubble (see pendingMessage) into the
+    // NEW identity's conversation instead of appending a fresh copy - one bubble throughout, not
+    // two - once the switch has actually happened, rather than resending into the bucket that is
+    // about to be replaced. The original OLD-bucket conversation is left behind as an orphaned,
+    // unanswered stray question in that bucket's own history (never shown in THIS view, and only
+    // reachable by signing back into that same identity) - not ideal, but strictly a private,
+    // self-expiring (24h retention) leftover, not a user-visible duplicate.
+    let firstIdentityRun = true;
+    effect(() => {
+      this.store.identityVersion();
+      if (firstIdentityRun) { firstIdentityRun = false; return; }
+      this.askSubscription?.unsubscribe();
+      // A bump landing while an already-recovered message is itself in flight must NOT trigger
+      // a second recovery - see recoveringQuestion's own comment. Only the ORIGINAL send's
+      // pendingMessage is ever eligible.
+      const recoveredMessage = this.recoveringQuestion ? null : this.pendingMessage;
+      this.pendingMessage = null;
+      this.typing.set(false);
+      this.error.set('');
+      this.showHistory.set(false);
+      this.activeConversationId.set(this.store.activeId());
+      // Deferred to a macrotask, outside this effect's own synchronous run: calling send()
+      // in-line here re-enters signal writes (typing/draft/pendingMessage) while Angular is
+      // still flushing THIS effect, which risks the effect being re-scheduled before the
+      // recovered request has a chance to complete - observed live as the same question being
+      // re-sent in a tight repeating burst instead of once. Zero-delay setTimeout is enough:
+      // it only needs to land after the current synchronous effect run (and this component's
+      // own signal writes above) has fully settled.
+      if (recoveredMessage) {
+        this.recoveringQuestion = true;
+        setTimeout(() => this.send(recoveredMessage), 0);
+      }
+    });
+
     afterNextRender(() => this.scrollMessages());
+
+    // Sync the panel to whatever /assistant or /app/assistant URL says on load and on every
+    // navigation (covers a hard refresh on the assistant URL, a direct link, and back/forward).
+    this.syncToRoute(this.router.url);
+    this.router.events
+      .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd), takeUntilDestroyed(this.destroyRef))
+      .subscribe((event) => this.syncToRoute(event.urlAfterRedirects));
+  }
+
+  private syncToRoute(url: string): void {
+    const shouldBeFullPage = isAssistantUrl(url);
+    if (!shouldBeFullPage && !isAssistantUrl(this.router.url)) this.preExpandUrl = url;
+    if (shouldBeFullPage === (this.open() && this.expanded())) return;
+    if (shouldBeFullPage) {
+      this.openPanel();
+      this.expanded.set(true);
+      if (typeof document !== 'undefined') document.body.classList.add('ai-chat-expanded');
+    } else if (this.expanded()) {
+      // Navigated away from /assistant while it was open in full-page mode (e.g. browser back) —
+      // collapse back to the floating widget rather than leaving it expanded with a stale route.
+      this.expanded.set(false);
+      if (typeof document !== 'undefined') document.body.classList.remove('ai-chat-expanded');
+    }
   }
 
   prompt(): string { return PROMPTS[this.promptIndex()]; }
@@ -132,9 +326,22 @@ export class AiAssistantComponent implements OnDestroy {
 
   closePanel(): void {
     if (!this.open()) return;
+    const wasFullPage = this.expanded();
     this.open.set(false);
+    this.expanded.set(false);
+    if (typeof document !== 'undefined') document.body.classList.remove('ai-chat-expanded');
+    this.showHistory.set(false);
     this.typing.set(false);
-    if (this.responseTimer) clearTimeout(this.responseTimer);
+    this.askSubscription?.unsubscribe();
+    // The event-details popup opened from a suggestion card (see openEventFromCard()) is a sibling
+    // of the chat panel, not a child of it — closing the panel alone leaves it rendered and its
+    // page-scroll-lock held (see FormModalComponent.lockPage()) with no visible way back to it,
+    // since the chat surface that owned the card is now hidden. The page then reads as frozen:
+    // no scroll, and clicks land on an invisible locked backdrop. Always close it together with the panel.
+    this.selectedCardEvent.set(null);
+    // Leaving full-page mode via the close button needs to actually navigate off /assistant —
+    // otherwise the URL still says /assistant while the panel has collapsed to the floating widget.
+    if (wasFullPage && isAssistantUrl(this.router.url)) void this.router.navigateByUrl(this.pageBeforeAssistant());
     setTimeout(() => this.launcher()?.nativeElement.focus(), 0);
     // Idle behavior only resumes a few seconds after the chat has been closed.
     if (this.restTimer) clearTimeout(this.restTimer);
@@ -146,34 +353,195 @@ export class AiAssistantComponent implements OnDestroy {
     }, this.reducedMotion ? 0 : REST_AFTER_CLOSE_MS);
   }
 
+  // Same body-scroll-lock convention explore-events.ts uses for its filter dialog
+  // (body.filters-open, see _explore-events.scss) — full-page mode takes over the whole
+  // viewport, so the page behind it must stop scrolling while it's open.
+  // Full-page mode is route-driven (see syncToRoute()) — navigating there/away is what flips
+  // `expanded`, keeping the URL and the panel's mode always in agreement.
+  toggleExpanded(): void {
+    if (this.expanded()) {
+      void this.router.navigateByUrl(this.pageBeforeAssistant());
+    } else {
+      this.preExpandUrl = this.router.url;
+      void this.router.navigateByUrl('/assistant');
+    }
+  }
+
+  private preExpandUrl = '/';
+  private pageBeforeAssistant(): string {
+    return isAssistantUrl(this.preExpandUrl) ? '/' : this.preExpandUrl;
+  }
+
   dismissPrompt(event: Event): void { event.stopPropagation(); this.promptVisible.set(false); }
 
-  selectCard(card: SuggestionCard): void { this.hasInteracted.set(true); this.draft.set(card.prompt); this.send(); }
+  selectCard(card: SuggestionCard): void { this.draft.set(card.prompt); this.send(); }
 
+  // --- Conversations (localStorage-backed, 24h retention — see AiConversationStore) ----------
   newChat(): void {
-    if (this.responseTimer) clearTimeout(this.responseTimer);
+    this.askSubscription?.unsubscribe();
     this.typing.set(false);
     this.error.set('');
     this.draft.set('');
-    this.hasInteracted.set(false);
-    this.messages.set([createGreeting()]);
+    this.showHistory.set(false);
+    this.activeConversationId.set(this.store.startNew().id);
     setTimeout(() => this.composer()?.nativeElement.focus(), 0);
   }
 
+  toggleHistory(): void { this.showHistory.update((value) => !value); }
+  toggleSidebar(): void { this.sidebarCollapsed.update((value) => !value); }
+
+  openConversation(id: string): void {
+    this.store.open(id);
+    this.activeConversationId.set(id);
+    this.showHistory.set(false);
+    this.scrollMessages();
+  }
+
+  deleteConversation(event: Event, id: string): void {
+    event.stopPropagation();
+    this.store.delete(id);
+    if (this.activeConversationId() === id) this.activeConversationId.set(this.store.activeId());
+  }
+
+  lastMessagePreview(conversation: AiConversation): string {
+    const last = conversation.messages[conversation.messages.length - 1];
+    return last ? last.text : 'New conversation';
+  }
+
+  relativeTime(epochMs: number): string {
+    const diffMs = Date.now() - epochMs;
+    const minutes = Math.round(diffMs / 60_000);
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.round(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return 'Yesterday';
+  }
+
+  /** Guarantees an active conversation exists without persisting an empty one
+   * — called right before the first message of a session is appended. */
+  private ensureConversationId(): string {
+    const existing = this.activeConversationId();
+    if (existing) return existing;
+    const created = this.store.startNew();
+    this.activeConversationId.set(created.id);
+    return created.id;
+  }
+
   composerKeydown(event: KeyboardEvent): void { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.send(); } }
-  send(): void {
-    const text = this.draft().trim();
+  // `recovered`, when passed, is an already-visible user bubble from a request the identity-switch
+  // effect had to cancel (see that effect's own comment) - carried into the new conversation
+  // instead of appending a second copy, so the login-triggered cancel-and-resend never shows two
+  // identical bubbles in the UI. A normal user-initiated send always omits it and appends fresh.
+  send(recovered?: AiChatMessage): void {
+    const text = recovered ? recovered.text : this.draft().trim();
     if (!text || this.typing()) { if (!text) this.error.set('Enter a question before sending.'); return; }
-    this.hasInteracted.set(true);
-    this.messages.update((items) => [...items, { id: messageAutoId++, sender: 'user', text }]);
-    this.draft.set(''); this.error.set(''); this.typing.set(true); this.scrollMessages();
-    this.responseTimer = setTimeout(() => {
-      this.messages.update((items) => [...items, { id: messageAutoId++, sender: 'assistant', text: this.responseFor(text) }]);
-      this.typing.set(false); this.scrollMessages();
-      // No-op while the panel is open (already fully visible with idle suspended) — kept
-      // for correctness if a background/notification-driven response path is added later.
-      if (!this.open()) this.wake({ restart: true, gesture: 'smile' });
-    }, this.reducedMotion ? 0 : 850);
+    const conversationId = this.ensureConversationId();
+    const message = recovered ?? { id: newMessageId(), sender: 'user' as const, text, createdAt: Date.now() };
+    this.store.appendMessage(conversationId, message);
+    this.draft.set(''); this.error.set(''); this.typing.set(true); this.pendingMessage = message; this.scrollMessages();
+
+    const history = this.store.historyFor(conversationId);
+    this.askSubscription = this.assistant.ask(text, history).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (response) => {
+        this.pendingMessage = null;
+        this.recoveringQuestion = false;
+        this.store.appendMessage(conversationId, {
+          id: newMessageId(), sender: 'assistant', text: response.answer, sources: response.sources,
+          registrantsTable: response.registrantsTable, clubs: response.clubs, proposals: response.proposals,
+          navigation: response.navigation, createdAt: Date.now(),
+        });
+        this.typing.set(false); this.scrollMessages();
+        // No-op while the panel is open (already fully visible with idle suspended) — kept
+        // for correctness if a background/notification-driven response path is added later.
+        if (!this.open()) this.wake({ restart: true, gesture: 'smile' });
+      },
+      error: () => {
+        this.pendingMessage = null;
+        this.recoveringQuestion = false;
+        this.store.appendMessage(conversationId, {
+          id: newMessageId(), sender: 'assistant',
+          text: "Sorry, I couldn't reach the assistant just now. Please try again in a moment.",
+          createdAt: Date.now(),
+        });
+        this.typing.set(false); this.scrollMessages();
+      },
+    });
+  }
+
+  messageSegments(text: string): readonly AiMessageSegment[] { return segmentMessageText(text); }
+
+  // A source only carries card fields (eventImageUrl/firstDate/location) when the matched event
+  // is still live — see backend's retrieval.card_info(). Sources without them render as a plain
+  // text mention instead of a card, rather than a broken/empty card.
+  isCardSource(source: AiAssistantSource): boolean { return !!source.eventImageUrl; }
+  hasCardSources(sources: readonly AiAssistantSource[] | undefined): boolean { return !!sources?.some((source) => this.isCardSource(source)); }
+
+  // No single-club detail route/deep-link exists yet (unlike events' ?event= param on
+  // explore-events) — Club Discover is the closest existing page, opened the same way a
+  // no-modal-available card click behaves elsewhere in this component.
+  // A navigation card from a how-to answer. The server already checked Page Visibility before
+  // emitting the card (see topic_access.page_card), and routePath comes from nav_page itself, so
+  // this just navigates — re-deriving the route here would risk drifting from the real nav tree.
+  openPageFromCard(page: { routePath: string }): void {
+    void this.router.navigateByUrl(page.routePath);
+    this.closePanel();
+  }
+
+  openClubFromCard(_clubId: string): void {
+    const underApp = this.router.url.startsWith('/app');
+    void this.router.navigate([underApp ? '/app/clubs/discover' : '/login']);
+    this.closePanel();
+  }
+  // Same route/query shape hub-proposals.ts's own row click uses: readOnly is true for any
+  // bucket other than 'inbox' (the only bucket where the reviewer/applicant can actually act) —
+  // see that file's onRowClick(). A 'drafts' proposal instead opens the proposal form itself,
+  // matching records-page.ts's openDraft(), since drafts have no review page to read-only view.
+  openProposalFromCard(proposal: AiAssistantProposal): void {
+    const underApp = this.router.url.startsWith('/app');
+    if (!underApp) { void this.router.navigate(['/login']); this.closePanel(); return; }
+    if (proposal.bucket === 'drafts') {
+      void this.router.navigate(['/app/forms/event-proposal'], { queryParams: { proposalId: proposal.requestId } });
+    } else {
+      void this.router.navigate(['/app/proposals/review', proposal.requestId], {
+        queryParams: { returnTo: this.router.url, readOnly: proposal.bucket !== 'inbox' },
+      });
+    }
+    this.closePanel();
+  }
+  // Seed/demo event images are frequently an external placeholder URL (placehold.co) that a
+  // browser extension, ad-blocker, or offline network can fail to load — same risk EventCardComponent
+  // guards against for a MISSING image (see EVENT_IMAGE_PLACEHOLDER); this additionally covers a
+  // present-but-unreachable URL, swapping in the same local inline-SVG placeholder rather than
+  // leaving a blank broken-image box in the chat.
+  onCardImageError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    if (img.src !== EVENT_IMAGE_PLACEHOLDER) img.src = EVENT_IMAGE_PLACEHOLDER;
+  }
+  // Backend sends Postgres TIME columns as "HH:MM:SS" — rendered as "1:00 PM" to match how time
+  // reads everywhere else in the app (see event-details-modal, event-card).
+  formatTime(value: string): string {
+    const [hoursStr, minutesStr] = value.split(':');
+    const hours = Number(hoursStr);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const twelveHour = hours % 12 === 0 ? 12 : hours % 12;
+    return `${twelveHour}:${minutesStr} ${period}`;
+  }
+  registrantStatusLabel(status: AiAssistantRegistrantsTable['registrants'][number]['status']): string {
+    return status === 'registered' ? 'Confirmed' : status === 'pending_approval' ? 'Pending' : 'Rejected';
+  }
+
+  openEventFromCard(eventId: string): void {
+    this.publishedEventService.getEventDetails(eventId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (event) => { if (event) this.selectedCardEvent.set(event); },
+      error: () => { /* Event no longer available (unpublished/cancelled) - nothing to open. */ },
+    });
+  }
+
+  closeCardEvent(): void { this.selectedCardEvent.set(null); }
+
+  onCardEventRegistered(_result: RegistrationResult): void {
+    this.closeCardEvent();
   }
 
   onOrbClick(): void {
@@ -249,24 +617,19 @@ export class AiAssistantComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     if (this.promptTimer) clearInterval(this.promptTimer);
-    if (this.responseTimer) clearTimeout(this.responseTimer);
     if (this.hideTimer) clearTimeout(this.hideTimer);
     if (this.restTimer) clearTimeout(this.restTimer);
     if (this.gestureScheduleTimer) clearTimeout(this.gestureScheduleTimer);
     if (this.gestureClearTimer) clearTimeout(this.gestureClearTimer);
     if (this.climbTimer) clearTimeout(this.climbTimer);
     if (this.wakeResetTimer) clearTimeout(this.wakeResetTimer);
-    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+      document.body.classList.remove('ai-chat-expanded');
+    }
   }
 
   private scrollMessages(): void { setTimeout(() => { const area = this.messageArea()?.nativeElement; if (area) area.scrollTop = area.scrollHeight; }, 0); }
-  private responseFor(question: string): string {
-    const value = question.toLowerCase();
-    if (value.includes('create') || value.includes('proposal')) return 'Open Forms → Proposal, complete each step, save a draft if needed, then submit it for approval.';
-    if (value.includes('track') || value.includes('status')) return 'You can track active requests from Ingoing or Ongoing Requests, depending on your role. Completed items appear in History.';
-    if (value.includes('after') || value.includes('submission')) return 'After submission, the proposal moves through the required approvers and department reviews. Your dashboard and Inbox will show updates.';
-    return 'I can help with event discovery, proposal steps, request status, and department services. Please ask a little more about what you need.';
-  }
 
   // --- Living-orb behavior --------------------------------------------
   //

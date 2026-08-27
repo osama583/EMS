@@ -17,7 +17,10 @@ import { FeedbackBannerComponent } from '../../../../../shared/components/feedba
 import { OptionCardGridComponent } from '../../../../../shared/components/option-card-grid/option-card-grid';
 import { OptionCardViewModel } from '../../../../../shared/components/option-card-grid/option-card-grid.models';
 import { ImageUploadFieldComponent } from '../../../../../shared/components/image-upload-field/image-upload-field';
-import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { ToastService, apiErrorMessage } from '../../../../../shared/components/toast/toast.service';
+import { DeleteConfirmDialogComponent } from '../../../../../shared/components/delete-confirm-dialog/delete-confirm-dialog';
+import { ConfirmDialogComponent } from '../../../../../shared/components/confirm-dialog/confirm-dialog';
+import { DeletionMetadata, DeletionPreview } from '../../../../../shared/models/deletion.models';
 import { ViewToggleComponent } from '../../../../../shared/components/view-toggle/view-toggle';
 
 type ViewMode = 'table' | 'card';
@@ -28,6 +31,7 @@ type ViewMode = 'table' | 'card';
     InternalDataPageComponent, FormModalComponent, FormFieldComponent, SearchableDropdownComponent, StatusToggleComponent,
     FeedbackBannerComponent, OptionCardGridComponent, InternalPageHeaderComponent,
     InternalSearchFieldComponent, InternalFilterControlsComponent, InternalResetButtonComponent, InternalPaginationComponent, ImageUploadFieldComponent,
+    DeleteConfirmDialogComponent, ConfirmDialogComponent,
   ],
   templateUrl: './club-management.html',
   styleUrl: './club-management.scss',
@@ -63,10 +67,21 @@ export class ClubManagementComponent {
   readonly imageUploading = signal(false);
   readonly errorMessage = signal('');
   readonly deleteTarget = signal<ClubRecord | null>(null);
+  readonly deletePreview = signal<DeletionPreview | null>(null);
+  readonly checkingDeletion = signal(false);
+  readonly deleting = signal(false);
   readonly deactivating = signal(false);
   readonly detailsTarget = signal<ClubRecord | null>(null);
   readonly detailsMembers = signal<readonly ClubMemberRecord[]>([]);
   readonly detailsMembersLoading = signal(false);
+
+  // Deleted tab — same page-level section switch as club-category-management.ts, only fetched
+  // the first time it's opened so a viewer who never looks at it never pays for the call.
+  readonly showDeleted = signal(false);
+  readonly deletedClubs = signal<readonly (ClubRecord & DeletionMetadata)[]>([]);
+  readonly deletedLoading = signal(false);
+  readonly restoringId = signal<string | null>(null);
+  readonly restoreTarget = signal<ClubRecord | null>(null);
 
   private readonly reloadTick = signal(0);
 
@@ -94,10 +109,26 @@ export class ClubManagementComponent {
       { key: 'status', label: 'Status' },
       { key: 'actions', label: 'Actions', actions: true },
     ],
-    actions: [{ key: 'edit', label: 'Edit club', icon: 'edit' }, { key: 'status', label: 'Change active status', icon: 'power_settings_new' }],
+    actions: [
+      { key: 'edit', label: 'Edit club', icon: 'edit' },
+      { key: 'status', label: 'Change active status', icon: 'power_settings_new' },
+      { key: 'delete', label: 'Delete club', icon: 'delete' },
+    ],
     emptyTitle: 'No clubs found', emptyDescription: 'Add a club or change the current search and filters.', pageSizeOptions: [5, 10, 25],
   }));
   readonly cardHeaderConfig = computed<InternalPageHeaderConfig>(() => ({ title: this.config().header.title, description: this.config().header.description, countLabel: this.config().header.countLabel }));
+  readonly deletedConfig = computed<InternalDataPageConfig>(() => ({
+    ariaLabel: 'Deleted clubs', paginationLabel: 'Deleted club pages', rowsPerPageLabel: 'Rows per page', mobileListLabel: 'Deleted club cards',
+    header: {
+      title: 'Deleted Clubs',
+      description: 'Soft-deleted clubs are kept for 7 days before being permanently removed. Restore a club any time within that window.',
+      countLabel: `${this.deletedClubs().length} deleted`,
+    },
+    search: { ariaLabel: '', placeholder: '' },
+    columns: [{ key: 'club', label: 'Club' }, { key: 'created', label: 'Deleted' }, { key: 'status', label: 'Permanent deletion' }, { key: 'actions', label: 'Actions', actions: true }],
+    actions: [{ key: 'restore', label: 'Restore', icon: 'restore_from_trash' }],
+    emptyTitle: 'No deleted clubs', emptyDescription: 'Clubs you delete will appear here for 7 days before being permanently removed.', pageSizeOptions: [5, 10, 25],
+  }));
   readonly filters = computed(() => [
     { key: 'status', ariaLabel: 'Filter clubs by status', value: this.statusFilter(), options: [{ value: 'all', label: 'All statuses' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }] },
     { key: 'category', ariaLabel: 'Filter clubs by category', value: this.categoryFilter(), options: [{ value: 'all', label: 'All categories' }, ...this.categories().map((category) => ({ value: category.id, label: category.name }))] },
@@ -116,6 +147,17 @@ export class ClubManagementComponent {
       eyebrow: club.president?.displayName ?? 'Unassigned', status: club.active ? 'Active' : 'Inactive', title: club.name,
       details: [{ icon: 'category', text: club.categories.map((category) => category.name).join(', ') || 'Uncategorized' }, { icon: 'group', text: `${club.memberCount} member${club.memberCount === 1 ? '' : 's'}` }, { icon: 'info', text: club.description || 'No description' }],
     },
+  })));
+  readonly deletedRecords = computed<readonly InternalDataRecord[]>(() => this.deletedClubs().map((club) => ({
+    id: club.id,
+    actionKeys: ['restore'],
+    cells: {
+      club: { primary: club.name, secondary: club.description || 'No description' },
+      created: { primary: `Deleted ${this.formatJoinDate(club.deletedAt)}` },
+      status: { primary: club.daysRemaining > 0 ? `${club.daysRemaining} day${club.daysRemaining === 1 ? '' : 's'} left` : 'Due for permanent deletion', badge: true, tone: club.daysRemaining <= 1 ? 'warning' : 'neutral' },
+      actions: { primary: '' },
+    },
+    mobile: { eyebrow: 'Deleted', status: `${club.daysRemaining}d left`, title: club.name, details: [{ icon: 'schedule', text: `Deleted ${this.formatJoinDate(club.deletedAt)}` }] },
   })));
   readonly cardData = computed<readonly OptionCardViewModel[]>(() => this.clubs().map((club) => ({
     id: club.id,
@@ -217,11 +259,55 @@ export class ClubManagementComponent {
     const club = this.clubs().find((item) => item.id === event.record.id);
     if (!club) return;
     if (event.action.key === 'edit') { this.editClub(club.id); return; }
+    if (event.action.key === 'delete') { this.requestDelete(club); return; }
     this.changeStatus(club);
+  }
+
+  // Delete follows the shared dependency-gated flow: the preview request runs while the dialog
+  // is already open, so a club that cannot be deleted says why (and offers deactivation instead)
+  // rather than failing after the click. Mirrors club-category-management's delete exactly.
+  requestDelete(club: ClubRecord): void {
+    this.deleteTarget.set(club);
+    this.deletePreview.set(null);
+    this.checkingDeletion.set(true);
+    this.clubService.checkClubDeletion(club.id).pipe(
+      finalize(() => this.checkingDeletion.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (preview) => this.deletePreview.set(preview),
+      error: () => this.toast.error('Could not check club', 'Please try again.'),
+    });
+  }
+  cancelDelete(): void { if (!this.deleting()) { this.deleteTarget.set(null); this.deletePreview.set(null); } }
+  confirmDelete(): void {
+    const club = this.deleteTarget();
+    const preview = this.deletePreview();
+    if (!club || !preview || !preview.canDelete) return;
+    this.deleting.set(true);
+    this.clubService.deleteClub(club.id).pipe(
+      finalize(() => this.deleting.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: () => {
+        this.deleteTarget.set(null); this.deletePreview.set(null);
+        this.toast.success('Club deleted', 'It can be restored within 7 days.');
+        this.triggerReload();
+      },
+      error: (err) => this.toast.error(
+        'Club could not be deleted',
+        apiErrorMessage(err, 'Deactivate it instead if it is still in use.'),
+      ),
+    });
   }
   toggleActiveById(id: string): void {
     const club = this.clubs().find((item) => item.id === id);
     if (club) this.changeStatus(club);
+  }
+  // The card grid emits an id; the table hands over the whole record. Both land on the same
+  // requestDelete() so the two views cannot drift apart.
+  requestDeleteById(id: string): void {
+    const club = this.clubs().find((item) => item.id === id);
+    if (club) this.requestDelete(club);
   }
   viewClubDetails(id: string): void {
     const club = this.clubs().find((item) => item.id === id);
@@ -292,4 +378,41 @@ export class ClubManagementComponent {
     });
   }
   private emptyDraft() { return { name: '', description: '', imageUrl: '', imageFileName: '', presidentUserId: '', categoryIds: [] as readonly string[], active: true }; }
+
+  // Deleted tab — mirrors club-category-management.ts's identical section exactly.
+  setDeletedTab(deleted: boolean): void {
+    if (this.showDeleted() === deleted) return;
+    this.showDeleted.set(deleted);
+    this.errorMessage.set('');
+    if (deleted) this.loadDeleted();
+  }
+  private loadDeleted(): void {
+    this.deletedLoading.set(true);
+    this.clubService.getDeletedClubs().pipe(finalize(() => this.deletedLoading.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (clubs) => this.deletedClubs.set(clubs),
+      error: () => this.errorMessage.set('The deleted clubs could not be loaded.'),
+    });
+  }
+  handleDeletedAction(event: InternalRowActionEvent): void {
+    if (event.action.key !== 'restore') return;
+    const club = this.deletedClubs().find((item) => item.id === event.record.id);
+    if (club) this.restoreTarget.set(club);
+  }
+  readonly restoreMessage = computed(() => {
+    const target = this.restoreTarget();
+    return target ? `Restore "${target.name}"? It comes back deactivated, so it stays hidden from members until you switch it active again.` : '';
+  });
+  cancelRestore(): void { this.restoreTarget.set(null); }
+  confirmRestore(): void {
+    const target = this.restoreTarget();
+    this.restoreTarget.set(null);
+    if (target) this.restoreClub(target.id);
+  }
+  private restoreClub(id: string): void {
+    this.restoringId.set(id);
+    this.clubService.restoreClub(id).pipe(finalize(() => this.restoringId.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => { this.toast.success('Club restored'); this.loadDeleted(); this.triggerReload(); },
+      error: (err) => this.toast.error('Could not restore club', apiErrorMessage(err, 'Please try again.')),
+    });
+  }
 }

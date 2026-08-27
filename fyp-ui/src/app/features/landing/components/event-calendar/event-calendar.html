@@ -51,12 +51,13 @@
         />
       </div>
 
-      <div class="calendar-top-legend" aria-label="Event category legend">
-        <span><i class="legend-dot legend-dot--academic"></i>Academic &amp; Career</span>
-        <span><i class="legend-dot legend-dot--workshop"></i>Workshops</span>
-        <span><i class="legend-dot legend-dot--culture"></i>Culture</span>
-        <span><i class="legend-dot legend-dot--sports"></i>Wellness</span>
-      </div>
+      @if (categoryOptions().length > 0) {
+        <div class="calendar-top-legend" aria-label="Event category legend">
+          @for (category of categoryOptions(); track category.name) {
+            <span><i [class]="'legend-dot legend-dot--' + category.categoryClass"></i>{{ category.name }}</span>
+          }
+        </div>
+      }
     </div>
 
     @if (loading()) {
@@ -80,7 +81,17 @@
               role="gridcell"
               [attr.aria-label]="formatFullDate(day.date)"
             >
-              <time [attr.datetime]="day.key">{{ day.dayNumber }}</time>
+              <!-- On a phone the grid cell itself is the date picker: tapping a day focuses it so
+                   the agenda section below lists that day's events in full (the cell is far too
+                   small to show event titles — see _event-calendar.scss's 48rem block, where the
+                   events collapse to dots). On desktop this is inert decoration as before. -->
+              <time
+                class="calendar-day__date"
+                [attr.datetime]="day.key"
+                [class.calendar-day__date--focused]="day.key === mobileFocusedDay().key"
+                (click)="selectMobileDate(day)"
+                >{{ day.dayNumber }}</time
+              >
               <div class="calendar-day__events">
                 @for (event of visibleEvents(day); track event.id) {
                   <button
@@ -258,18 +269,19 @@
     <fieldset>
       <legend>Event Category</legend>
       <div class="calendar-filter-options">
-        @for (category of categoryOptions(); track category) {
+        @for (category of categoryOptions(); track category.name) {
           <button
             type="button"
             class="calendar-filter-option"
-            [class.calendar-filter-option--selected]="isDraftCategorySelected(category)"
-            [attr.aria-pressed]="isDraftCategorySelected(category)"
-            (click)="toggleDraftCategory(category)"
+            [class.calendar-filter-option--selected]="isDraftCategorySelected(category.name)"
+            [attr.aria-pressed]="isDraftCategorySelected(category.name)"
+            (click)="toggleDraftCategory(category.name)"
           >
-            @if (isDraftCategorySelected(category)) {
+            <i [class]="'legend-dot legend-dot--' + category.categoryClass" aria-hidden="true"></i>
+            @if (isDraftCategorySelected(category.name)) {
               <span aria-hidden="true">&#10003;</span>
             }
-            {{ category }}
+            {{ category.name }}
           </button>
         }
       </div>
@@ -295,7 +307,9 @@
       <div><dt>Category</dt><dd>{{ event.category }}</dd></div>
     </dl>
     <p class="calendar-dialog__description">{{ event.description }}</p>
-    <a class="calendar-dialog__action" href="#explore-events" (click)="closeDialog()">Explore Event</a>
+    @if (!isPastEvent(event)) {
+      <a class="calendar-dialog__action" href="#explore-events" (click)="closeDialog()">Explore Event</a>
+    }
   } @else if (selectedDay(); as day) {
     <p class="calendar-dialog__category">Day agenda</p>
     <div class="day-dialog__events">

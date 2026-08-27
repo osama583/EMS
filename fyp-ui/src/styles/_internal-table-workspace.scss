@@ -82,35 +82,73 @@
   margin-left: auto;
 }
 
+/*
+ * A grid with an `auto` right column (the old layout here) sizes that column to its content's
+ * max-content width FIRST and only then gives the `1fr` search column whatever is left - with
+ * three filter selects + Reset on the right (e.g. Staff Action History's cafeteria/action/
+ * performed-by trio), that left the search field pinned near its `min-width` floor even on a
+ * wide desktop viewport, with visibly empty space between it and the filters (the exact
+ * "search is squeezed, everything else has room to spare" symptom this fixes).
+ *
+ * Flex instead, with search actually opted INTO growing (`flex-grow` below) rather than sized by
+ * a leftover grid track: search claims real space up to its own cap, and the filter+Reset group
+ * (`[workspaceControlRight]`) wraps onto its own row underneath the moment it no longer fits
+ * beside search - never the reverse (search should never be what visibly loses out to a
+ * still-comfortable filter row). `[workspaceControlRight]`'s own `flex-wrap: wrap` (further down)
+ * still applies for the case where even wrapped-to-its-own-row group has too many filters for
+ * ONE line by itself.
+ */
 .internal-table-workspace__controls > [workspaceControls]:has(> [workspaceControlRight]) {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: clamp(2rem, 6vw, 7rem);
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 2rem;
+  row-gap: 1rem;
   align-items: center;
 }
 
+/*
+ * Also matched via .shared-search-field (the search host's own class, see _internal-data-page.scss)
+ * so this beats that file's plain `.shared-search-field { width: 100% }` on specificity, not on
+ * import order - width:100% there would otherwise re-stretch the field to fill this flex row's
+ * FULL remaining space on its own (crowding the filter group back onto search's row) rather than
+ * respecting the max-width cap this rule sets.
+ */
 .internal-table-workspace__controls
   > [workspaceControls]:has(> [workspaceControlRight])
-  > [workspaceControlWide] {
-  width: min(100%, 40rem);
+  > [workspaceControlWide],
+.internal-table-workspace__controls
+  > [workspaceControls]:has(> [workspaceControlRight])
+  > [workspaceControlWide].shared-search-field {
+  width: auto;
   min-width: 16rem;
-  flex: none;
-  transition: width 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  max-width: 40rem;
+  flex: 1 1 24rem;
+  transition: flex-basis 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .internal-table-workspace__controls
   > [workspaceControls]:has(> [workspaceControlRight])
   > [workspaceControlWide]:focus-within {
-  width: min(100%, 50rem);
+  max-width: 50rem;
 }
 
+/*
+ * This group holds every filter select PLUS Reset, all as siblings with no `nowrap` escape
+ * hatch - a page with three dropdown filters does not fit this group's intrinsic width beside
+ * the search field at every desktop viewport, and `nowrap` (the flex default) let it silently
+ * overflow/crowd rather than drop onto a second line. `flex-wrap: wrap` here lets the WHOLE
+ * group drop below search first (`flex: 1 1 auto` - never forced onto search's row if there's
+ * no room), and lets its own children (the selects/Reset) wrap a second time within itself if
+ * even its own row is too narrow for all of them.
+ */
 .internal-table-workspace__controls > [workspaceControls] > [workspaceControlRight] {
   display: flex;
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: max-content;
+  flex-wrap: wrap;
   gap: 1rem;
   align-items: center;
   justify-content: flex-end;
-  justify-self: end;
 }
 
 .internal-table-workspace__controls > [workspaceControls] > [workspaceControlRight] > label {
@@ -472,29 +510,37 @@
   border: 0 !important;
 }
 
-@media (max-width: 72rem) {
-  .internal-table-workspace__controls > [workspaceControls]:has(> [workspaceControlRight]) {
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: 1rem;
-  }
-
-  .internal-table-workspace__controls
-    > [workspaceControls]:has(> [workspaceControlRight])
-    > [workspaceControlWide],
-  .internal-table-workspace__controls
-    > [workspaceControls]:has(> [workspaceControlRight])
-    > [workspaceControlWide]:focus-within {
-    width: min(100%, 50rem);
-  }
-
-  .internal-table-workspace__controls > [workspaceControls] > [workspaceControlRight] {
-    justify-self: end;
-  }
-}
-
 @media (max-width: 48rem) {
   .internal-table-workspace {
     gap: 1.5rem;
+  }
+
+  /*
+   * Phone overflow guard.
+   *
+   * Everything in this workspace is width-constrained EXCEPT the table, which is deliberately
+   * allowed to exceed the viewport and scroll sideways inside its own container. Any other
+   * child that ends up wider than the screen (a long unbroken string, a flex group that refuses
+   * to shrink, a control row that cannot wrap) silently pushes the whole page sideways, and the
+   * offending element is usually nowhere near where the damage shows up.
+   *
+   * Containing it here means a mistake degrades into a clipped element instead of a horizontally
+   * scrolling page, and `min-width: 0` removes the min-content floor that stops nested grid/flex
+   * children from shrinking in the first place — the single most common cause of this class of
+   * bug. The table card is exempt: its overflow is intentional.
+   */
+  .internal-table-workspace,
+  .internal-table-workspace__header,
+  .internal-table-workspace__controls,
+  .internal-table-workspace__pagination {
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  .internal-table-workspace__controls > *,
+  .internal-table-workspace__controls > [workspaceControls] > * {
+    min-width: 0;
   }
 
   .internal-table-workspace__header {
@@ -512,18 +558,30 @@
     width: 100%;
   }
 
+  /*
+   * Search + filter + action share a wrapping row on a phone. The search field keeps a sensible
+   * minimum and grows into whatever is left, so "Search" and "Status" stay beside each other
+   * while they fit and drop to their own lines only when the width truly runs out — rather than
+   * search claiming 100% and pushing every other control down unconditionally.
+   */
   .internal-table-workspace__controls > [workspaceControls] {
     display: flex;
-    gap: 0.85rem;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
   }
 
+  /* Search takes the full first row on a phone — it is the primary control and reads badly when
+     squeezed beside a select. The filters and Reset then share the row beneath it. */
   .internal-table-workspace__controls > [workspaceControls] > [workspaceControlWide] {
-    min-width: 100%;
-    flex-basis: 100%;
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
   }
 
   .internal-table-workspace__controls > [workspaceControls] > [workspaceControlFilter] {
-    min-width: min(11rem, 100%);
+    min-width: 0;
+    flex: 1 1 8rem;
   }
 
   .internal-table-workspace__controls > [workspaceControls] > [workspaceControlAction] {
@@ -531,8 +589,10 @@
   }
 
   .internal-table-workspace__controls > [workspaceControls]:has(> [workspaceControlRight]) {
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: 0.85rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem;
   }
 
   .internal-table-workspace__controls
@@ -543,27 +603,82 @@
     > [workspaceControlWide]:focus-within {
     width: 100%;
     min-width: 0;
+    flex: 1 1 100%;
   }
 
+  /*
+   * The right-hand group holds the filter selects AND the Reset button. `flex: 0 0 auto` locked
+   * it to its intrinsic width, and a flex item does not shrink below min-content — so on a phone
+   * the group stayed wider than the padded controls card and its last child (Reset) hung off the
+   * right edge, outside the frame.
+   *
+   * It now shrinks and wraps: `flex: 1 1 100%` lets it take the full row under the search field,
+   * `flex-wrap` lets the selects and Reset drop onto a second line when they cannot share one,
+   * and `min-width: 0` removes the automatic min-content floor that blocks shrinking entirely.
+   */
   .internal-table-workspace__controls > [workspaceControls] > [workspaceControlRight] {
     width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 0.6rem;
   }
 
   .internal-table-workspace__controls > [workspaceControls] > [workspaceControlRight] > label {
     width: auto;
     min-width: 0;
-    flex: 1 1 0;
+    flex: 1 1 8rem;
   }
 
   .internal-table-workspace__table-card {
     border-radius: var(--radius-card);
   }
 
-  .internal-table-workspace:has(> [workspaceMobile]) .internal-table-workspace__table-card {
+  /*
+   * The desktop card grid uses minmax(19rem, …), which overflows a 390px phone. Let cards fit
+   * two-up when the viewport genuinely allows it and fall back to one column below that,
+   * rather than forcing a fixed track width the screen cannot honour.
+   */
+  .internal-table-workspace[data-view='card'] > [workspaceMobile] > .shared-mobile-list {
+    grid-template-columns: repeat(auto-fill, minmax(min(13.5rem, 100%), 1fr));
+    gap: var(--space-3);
+  }
+
+  /* Tabular data on a phone scrolls sideways inside the card instead of reflowing. Keep the
+     columns from collapsing into unreadable slivers and hint that the region is swipeable.
+     
+     `max-content` alone is a trap here: it sizes each column to its UNWRAPPED content, and a
+     line-clamped description still reports its full single-line width as its max-content
+     contribution (clamping is a paint-time effect, it does not shrink intrinsic width). A
+     primary cell carrying a sentence of description therefore claimed ~30rem and shoved every
+     later column off-screen. The caps that fix this live in _internal-data-page.scss's 48rem
+     block, on `.shared-data-table` itself — NOT here: [workspaceTable] is the host element
+     <app-internal-data-table>, and the real <table> is a child inside it, so cell selectors
+     written against this scroll container never match. */
+  .internal-table-workspace__table-scroll > [workspaceTable] {
+    min-width: max-content;
+  }
+
+  .internal-table-workspace__table-scroll {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  /*
+   * A table view stays a table on a phone; a card view stays cards. Narrow viewports used to
+   * force every list into the card list regardless of the toggle, which meant the "Table" tab
+   * silently rendered cards on mobile. The toggle (data-view) is now authoritative at every
+   * width — the table simply scrolls horizontally inside its own container (see
+   * .internal-table-workspace__table-scroll), which is the correct responsive treatment for
+   * tabular data. Only the card view shows [workspaceMobile].
+   */
+  .internal-table-workspace[data-view='card']:has(> [workspaceMobile])
+    .internal-table-workspace__table-card {
     display: none;
   }
 
-  .internal-table-workspace > [workspaceMobile] {
+  .internal-table-workspace[data-view='card'] > [workspaceMobile] {
     display: grid;
   }
 

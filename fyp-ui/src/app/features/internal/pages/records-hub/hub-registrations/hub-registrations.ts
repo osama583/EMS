@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import { PendingEventRegistration } from '../../../../../core/events/published-event.models';
@@ -21,10 +21,53 @@ import { ToastService, apiErrorMessage } from '../../../../../shared/components/
   templateUrl: './hub-registrations.html',
   styles: `
     .proof-preview__meta { margin: 0 0 var(--space-3); color: var(--apu-text-muted); font-size: .9rem; }
-    .proof-preview__link { display: block; }
+    .proof-preview__link { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; }
     .proof-preview__image { display: block; width: 100%; max-height: 60vh; object-fit: contain; border: 1px solid var(--apu-border); border-radius: var(--radius-card); background: #f7f9fc; }
-    .proof-preview__open { display: inline-flex; align-items: center; gap: .4rem; margin-top: var(--space-2); color: var(--apu-blue-600); font-weight: 700; text-decoration: none; }
+    .proof-preview__open { display: inline-flex; align-items: center; gap: .4rem; margin-top: var(--space-2); border: 0; background: none; padding: 0; color: var(--apu-blue-600); font-weight: 700; cursor: pointer; }
     .proof-preview__open:hover { text-decoration: underline; }
+
+    .proof-image-lightbox {
+      position: fixed;
+      z-index: 1300;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: clamp(1rem, 4vw, 3rem);
+      background: rgb(2 14 29 / 88%);
+      backdrop-filter: blur(8px);
+      cursor: zoom-out;
+    }
+    .proof-image-lightbox figure {
+      position: relative;
+      display: grid;
+      max-width: min(72rem, 94vw);
+      max-height: 92vh;
+      margin: 0;
+      overflow: hidden;
+      border: 1px solid rgb(255 255 255 / 20%);
+      border-radius: var(--radius-container);
+      background: var(--apu-navy-950);
+      box-shadow: var(--shadow-overlay);
+      cursor: default;
+    }
+    .proof-image-lightbox img { display: block; max-width: 100%; max-height: min(80vh, 54rem); object-fit: contain; }
+    .proof-image-lightbox figcaption { padding: .9rem 1.1rem; color: #fff; font-weight: 700; }
+    .proof-image-lightbox button {
+      position: absolute;
+      top: .75rem;
+      right: .75rem;
+      display: grid;
+      width: 2.75rem;
+      height: 2.75rem;
+      place-items: center;
+      border: 1px solid rgb(255 255 255 / 24%);
+      border-radius: 50%;
+      background: rgb(3 19 39 / 72%);
+      color: #fff;
+      cursor: pointer;
+    }
+    .proof-image-lightbox button:hover,
+    .proof-image-lightbox button:focus-visible { background: var(--apu-blue-600); outline: 0; }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -49,6 +92,10 @@ export class HubRegistrationsComponent {
   // "Proof to review" used to be a static badge with nowhere to actually see the proof - clicking
   // it now opens the uploaded image so the approver can verify payment before deciding.
   readonly proofPreview = signal<PendingEventRegistration | null>(null);
+  // Full-size proof preview stays in-page (a lightbox over the form-modal) instead of navigating
+  // to /api/v1/uploads/... in a new tab — mirrors event-details-modal.ts's image lightbox.
+  readonly imageLightboxOpen = signal(false);
+  private readonly imageLightbox = viewChild<ElementRef<HTMLElement>>('imageLightbox');
 
   constructor() { this.load(); }
 
@@ -165,7 +212,13 @@ export class HubRegistrationsComponent {
     if (registration && this.hasViewableProof(registration)) this.proofPreview.set(registration);
   }
 
-  closeProofPreview(): void { this.proofPreview.set(null); }
+  closeProofPreview(): void { this.proofPreview.set(null); this.imageLightboxOpen.set(false); }
+
+  openImageLightbox(): void {
+    this.imageLightboxOpen.set(true);
+    queueMicrotask(() => this.imageLightbox()?.nativeElement.focus({ preventScroll: true }));
+  }
+  closeImageLightbox(): void { this.imageLightboxOpen.set(false); }
 
   hasViewableProof(row: PendingEventRegistration): boolean {
     return row.paymentStatus === 'pending_review' && !!row.paymentProofUrl;

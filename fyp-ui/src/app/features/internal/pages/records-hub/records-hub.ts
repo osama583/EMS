@@ -4,7 +4,7 @@ import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterLinkActive, Ro
 import { filter } from 'rxjs';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { AuthUser } from '../../../../core/auth/auth.models';
-import { hasRole } from '../../../../core/auth/role-access';
+import { hasRole, isHeadOfAnyUnit } from '../../../../core/auth/role-access';
 import { isClubPresident } from '../../../../core/auth/role-navigation';
 import { requestKindsForRole } from '../../../../core/departments/department-workflow.config';
 import { staffTaskRoutingKeyFor } from '../../../../core/staff-tasks/staff-task-routing';
@@ -63,9 +63,12 @@ export class RecordsHubComponent {
   // cafeteria-staff — see staff-task-routing.ts), and only for Inbox/History — tasks have no
   // separate "in progress but not actionable" state (StaffTasksComponent's own filtered() splits
   // strictly on status === 'completed' vs not), so there's nothing to show on Ongoing.
+  // Excludes heads-of-department/school: a head approves and assigns their unit's work, they are
+  // never an assignee themself (assignable-staff excludes them server-side too), so a head who
+  // also belongs to their own routed unit must not get a Tasks tab with nothing real to show.
   readonly showTasksTab = computed(() => {
     const user = this.auth.user();
-    return this.bucket !== 'ongoing' && !!user && staffTaskRoutingKeyFor(user) !== null;
+    return this.bucket !== 'ongoing' && !!user && staffTaskRoutingKeyFor(user) !== null && !isHeadOfAnyUnit(user);
   });
 
   // Cafeteria staff have their own queue page (row-level assignment's shared-pool model doesn't
@@ -99,20 +102,32 @@ export class RecordsHubComponent {
   readonly showRegistrationsTab = computed(() =>
     this.bucket === 'inbox' && !this.isCafeteriaStaffOnly() && this.auth.canAccess('/app/forms/event-proposal'));
 
+  // Club presidency is student-only (see clubs.py's eligible_presidents()) — hasRole check kept
+  // alongside isClubPresident() so a non-student can never see this tab even from stale
+  // presidentOfClubIds data.
   readonly showClubRequestsTab = computed(() => {
     const user = this.auth.user();
-    return this.bucket === 'inbox' && !this.isCafeteriaStaffOnly() && !!user && isClubPresident(user);
+    return this.bucket === 'inbox' && !this.isCafeteriaStaffOnly() && !!user && hasRole(user, 'student') && isClubPresident(user);
   });
 
-  // President Change Requests: Inbox/History only (Ongoing has no analogue — a pending request
-  // isn't something the President tracks progress on the way an ongoing club/event request is).
-  // Visible to whoever the tab actually serves: a Club Admin/System Admin decides requests here,
-  // and a sitting club President can see their own submitted request and its history (see
-  // hub-president-change-requests.ts's isClubAdmin/canDecide computeds for the per-role content).
+  // President Change Requests splits by role, not just by bucket, because "pending" means
+  // something different for each side of this workflow:
+  //   - Club Admin / System Admin actually DECIDE these — Inbox (their pending queue, actionable
+  //     right now) / History (everything they've decided). Never Ongoing for them.
+  //   - A sitting club President only ever submits one and waits — someone else decides it, so
+  //     it is never actionable by the President themself and does not belong in their Inbox. It
+  //     lives in Ongoing while pending, History once decided. Never Inbox for them.
+  // (see hub-president-change-requests.ts's isClubAdmin/canDecide computeds for the per-role
+  // content within each bucket).
+  private readonly isPresidentChangeAdmin = computed(() => {
+    const user = this.auth.user();
+    return !!user && (isClubAdminRole(user) || hasRole(user, 'system-admin'));
+  });
   readonly showPresidentChangeTab = computed(() => {
     const user = this.auth.user();
-    if (this.bucket === 'ongoing' || !user) return false;
-    return isClubAdminRole(user) || hasRole(user, 'system-admin') || isClubPresident(user);
+    if (!user) return false;
+    if (this.isPresidentChangeAdmin()) return this.bucket === 'inbox' || this.bucket === 'history';
+    return isClubPresident(user) && (this.bucket === 'ongoing' || this.bucket === 'history');
   });
 
   // Ongoing/History → Clubs and Events: any authenticated internal user can request to join a
@@ -124,10 +139,14 @@ export class RecordsHubComponent {
   // Cafeteria managers (identified by cafeteriaCode, same convention as request-option-management
   // and proposal-department-view) run a single cafeteria and never join clubs — Clubs is dropped
   // for them, and for cafeteria-staff too, so the tab strip only shows what's relevant to their role.
-  readonly showClubsTab = computed(() =>
-    (this.bucket === 'ongoing' || this.bucket === 'history')
-    && !!this.auth.user() && this.auth.user()?.cafeteriaCode === undefined
-    && !this.isCafeteriaStaffOnly());
+  // Club membership/joining is student-only — every non-student role (lecturer, heads of
+  // school/department, unit staff, cafeteria roles, admins, etc.) never joins a club, so
+  // Ongoing/History → Clubs is dropped for anyone who isn't a 'student'.
+  readonly showClubsTab = computed(() => {
+    const user = this.auth.user();
+    return (this.bucket === 'ongoing' || this.bucket === 'history')
+      && !!user && hasRole(user, 'student');
+  });
   readonly showEventsTab = computed(() => (this.bucket === 'ongoing' || this.bucket === 'history') && !!this.auth.user());
 
   readonly title = this.bucket === 'inbox' ? 'Inbox' : this.bucket === 'ongoing' ? 'Ongoing' : 'History';

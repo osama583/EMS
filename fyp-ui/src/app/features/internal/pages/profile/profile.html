@@ -23,7 +23,39 @@
             </div>
           }
         </dl>
+
+        <section class="profile-password" aria-labelledby="profile-password-title">
+          <h2 id="profile-password-title">Password</h2>
+
+          <form novalidate (submit)="$event.preventDefault(); submitPasswordChange()">
+            <div class="profile-password__fields">
+              <app-form-field
+                controlId="profile-old-password" label="Current password" type="password" autocomplete="current-password"
+                [required]="true" [value]="oldPassword()" [error]="oldPasswordError()" (valueChange)="setOldPassword($event)"
+              />
+              <app-form-field
+                controlId="profile-new-password" label="New password" type="password" autocomplete="new-password"
+                [required]="true" [value]="newPassword()" [error]="newPasswordError()" hint="Use at least 8 characters."
+                (valueChange)="setNewPassword($event)"
+              />
+            </div>
+
+            @if (passwordChangeMessage(); as message) {
+              <p class="profile-password__message" [class.profile-password__message--success]="passwordChangeSucceeded()" role="alert">{{ message }}</p>
+            }
+
+            <div class="profile-password__actions">
+              <button class="table-control table-control--primary" type="submit" [disabled]="changingPassword() || !passwordFormValid()">
+                @if (changingPassword()) { <span class="material-symbols-rounded profile-password__spinner" aria-hidden="true">progress_activity</span> }
+                {{ changingPassword() ? 'Updating…' : 'Update password' }}
+              </button>
+              <button type="button" class="profile-password__forgot" (click)="openForgotPassword()">Forgot your password?</button>
+            </div>
+          </form>
+        </section>
       </section>
     </article>
   }
 </section>
+
+<app-forgot-password-modal #forgotPasswordModal />

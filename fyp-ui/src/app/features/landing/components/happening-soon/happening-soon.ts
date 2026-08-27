@@ -9,9 +9,8 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { PublishedEvent, ProposalEventSchedule, RegistrationResult, isEventVisibleTo } from '../../../../core/events/published-event.models';
+import { PublishedEvent, ProposalEventSchedule, RegistrationResult } from '../../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../../core/events/published-event.service';
-import { AuthService } from '../../../../core/auth/auth.service';
 import { EventDetailsModalComponent } from '../../../../shared/components/event-details-modal/event-details-modal';
 import { CtaLinkComponent } from '../../../../shared/components/cta-link/cta-link';
 import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
@@ -35,9 +34,6 @@ export interface UpcomingEvent {
   readonly date: EventDate;
   readonly daysFromNow: number;
 }
-
-const HAPPENING_SOON_WINDOW_DAYS = 10;
-const MAX_HAPPENING_SOON_EVENTS = 5;
 
 interface EventCard {
   readonly event: UpcomingEvent;
@@ -76,7 +72,6 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly publishedEventService = inject(PublishedEventService);
-  private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
   private autoTimer?: ReturnType<typeof setTimeout>;
   private transitionTimers: ReturnType<typeof setTimeout>[] = [];
@@ -157,13 +152,14 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
     this.loadPublishedEvents();
   }
 
+  // GET /events/happening-soon already returns exactly the next-10-days window (falling back to
+  // the soonest events overall server-side when that window is empty), capped at 5 — no local
+  // filtering/slicing of the full published-events table needed here any more.
   private loadPublishedEvents(): void {
-    this.publishedEventService.getPublishedEvents().subscribe({
-      next: (allEvents) => {
-        const isAuthenticated = this.auth.authenticated();
-        const events = allEvents.filter((event) => isEventVisibleTo(event.eventVisibility, isAuthenticated));
+    this.publishedEventService.getHappeningSoon().subscribe({
+      next: (events) => {
         this.publishedEventsById.set(new Map(events.map((event) => [event.id, event])));
-        const upcoming = this.selectHappeningSoon(events);
+        const upcoming = events.map((event) => this.toUpcomingEvent(event));
         this.events.set(upcoming);
         this.queueIndexes.set(upcoming.slice(1).map((_, index) => index + 1));
         this.activeIndex.set(0);
@@ -177,21 +173,6 @@ export class HappeningSoonComponent implements AfterViewInit, OnDestroy {
         this.loading.set(false);
       },
     });
-  }
-
-  // Cards for "Happening soon" are the soonest published events within the next
-  // HAPPENING_SOON_WINDOW_DAYS (matches the "Next 10 days" label shown in the UI); falls back to
-  // the soonest upcoming events overall when nothing falls inside that window so the section
-  // never renders with fewer than the available upcoming events.
-  private selectHappeningSoon(events: readonly PublishedEvent[]): readonly UpcomingEvent[] {
-    const upcoming = events
-      .map((event) => this.toUpcomingEvent(event))
-      .filter((event) => event.daysFromNow >= 0)
-      .sort((a, b) => a.daysFromNow - b.daysFromNow);
-
-    const withinWindow = upcoming.filter((event) => event.daysFromNow <= HAPPENING_SOON_WINDOW_DAYS);
-    const selected = withinWindow.length > 0 ? withinWindow : upcoming;
-    return selected.slice(0, MAX_HAPPENING_SOON_EVENTS);
   }
 
   private toUpcomingEvent(event: PublishedEvent): UpcomingEvent {

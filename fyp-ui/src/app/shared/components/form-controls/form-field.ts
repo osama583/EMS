@@ -7,7 +7,7 @@ import { CharacterCounterComponent } from '../character-counter/character-counte
   selector: 'app-form-field',
   imports: [ValidationMessageComponent, CharacterCounterComponent],
   template: `
-    <label class="shared-form-field" [class.shared-form-field--invalid]="displayError()" [class.shared-form-field--filled]="value() !== ''" (focusout)="markBlurred($event)">
+    <label class="shared-form-field" [class.shared-form-field--invalid]="displayError()" [class.shared-form-field--valid]="valid() && !displayError()" [class.shared-form-field--filled]="value() !== ''" (focusout)="markBlurred($event)">
       <span class="shared-form-field__label">
         {{ label() }}
         @if (required() && showRequiredIndicator()) { <span aria-hidden="true">*</span> }
@@ -69,6 +69,9 @@ import { CharacterCounterComponent } from '../character-counter/character-counte
               <span class="material-symbols-rounded" aria-hidden="true">{{ passwordVisible() ? 'visibility_off' : 'visibility' }}</span>
             </button>
           }
+          @if (valid() && !displayError() && type() !== 'password') {
+            <span class="shared-form-field__valid-icon material-symbols-rounded" aria-hidden="true">check_circle</span>
+          }
         </span>
       }
       @if (hasCharacterLimit()) { <app-character-counter [value]="value()" [maxLength]="maxLength()" /> }
@@ -87,6 +90,10 @@ export class FormFieldComponent {
   readonly placeholder = input('');
   readonly hint = input('');
   readonly error = input('');
+  /** External "this value is confirmed good" signal (e.g. an async availability check)
+   * — separate from the field's own built-in validation, which only proves the value
+   * is well-formed, not that a server-side check has actually passed. */
+  readonly valid = input(false);
   readonly required = input(false);
   readonly showRequiredIndicator = input(true);
   readonly validateOnBlur = input(true);

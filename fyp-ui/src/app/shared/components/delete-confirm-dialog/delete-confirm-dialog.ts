@@ -15,7 +15,7 @@ import { DeletionPreview } from '../../models/deletion.models';
   template: `
     <app-form-modal
       [open]="open()" title="{{ permanent() ? 'Permanently Delete' : 'Delete' }} {{ entityKind() }}" primaryLabel="{{ permanent() ? 'Delete Forever' : 'Delete' }}" [danger]="true"
-      [loading]="deleting()" [disabled]="checkingDependencies() || !!preview() && !preview()!.canDelete"
+      [loading]="deleting()" [disabled]="checkingDependencies() || (!!preview() && !preview()!.canDelete) || (requirePreview() && !preview())"
       (close)="cancel.emit()" (cancel)="cancel.emit()" (submit)="confirm.emit()"
     >
       @if (checkingDependencies()) {
@@ -31,6 +31,9 @@ import { DeletionPreview } from '../../models/deletion.models';
               <li>{{ reason }}.</li>
             }
           </ul>
+          @if (blockedHint()) {
+            <p class="delete-confirm__hint">{{ blockedHint() }}</p>
+          }
         </div>
       } @else if (permanent()) {
         <p class="delete-confirm__message">
@@ -55,6 +58,7 @@ import { DeletionPreview } from '../../models/deletion.models';
     }
     .delete-confirm__blocked p { margin: 0; color: var(--apu-navy-950, #041f41); font-size: .9rem; }
     .delete-confirm__blocked ul { margin: 0; padding-left: 1.2rem; color: var(--apu-navy-900); font-size: .88rem; line-height: 1.5; }
+    .delete-confirm__hint { margin: 0; color: var(--apu-navy-900); font-size: .88rem; line-height: 1.5; }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -66,7 +70,22 @@ export class DeleteConfirmDialogComponent {
   readonly entityLabel = input('');
   readonly checkingDependencies = input(false);
   readonly preview = input<DeletionPreview | null>(null);
+  // Guards against a call site that opens this dialog without ever running the dependency
+  // check: with no preview the button would otherwise stay enabled and fire a delete the
+  // server is certain to refuse, so the user sees a red toast instead of the reasons. Delete
+  // stays disabled until a preview arrives. A purge confirmation that has already been gated
+  // elsewhere passes false.
+  readonly requirePreview = input(true);
   readonly deleting = input(false);
+  // Shown under the blocking reasons to name the way forward. Deletion is only ever refused
+  // because the record is already in use, and the answer is always the same — deactivate it —
+  // so this defaults to saying so rather than leaving every dialog to repeat it, and every
+  // entity gives the same explanation. Override for a kind with different advice; pass '' to
+  // show reasons alone.
+  readonly blockedHint = input(
+    'Records that have been used cannot be deleted, because other records depend on them. ' +
+      'Deactivate it instead to take it out of use while keeping that history intact.',
+  );
   // True for a "Delete forever" / purge confirmation (immediate, unrecoverable) rather than the
   // default 7-day-recoverable soft-delete this dialog otherwise confirms — swaps the title/body
   // copy accordingly. Existing soft-delete call sites don't pass this, so default false preserves

@@ -69,6 +69,8 @@ export class RolesComponent {
 
   // "Delete forever" (purge) — immediate and unrecoverable, alongside Restore in the Deleted tab.
   readonly purgeTargetCode = signal<string | null>(null);
+  readonly purgePreview = signal<DeletionPreview | null>(null);
+  readonly checkingPurge = signal(false);
   readonly purging = signal(false);
 
   readonly editingRole = computed(() => this.roles().find((role) => role.roleCode === this.editingCode()) ?? null);
@@ -290,14 +292,27 @@ export class RolesComponent {
   requestPurge(code: string): void {
     this.clearMessages();
     this.purgeTargetCode.set(code);
+    // The server re-checks dependencies at purge time, so a role archived while unused can
+    // still be blocked now. Ask, rather than letting the click fail with a bare toast.
+    this.purgePreview.set(null);
+    this.checkingPurge.set(true);
+    this.service.checkRoleDeletion(code).pipe(
+      finalize(() => this.checkingPurge.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (preview) => this.purgePreview.set(preview),
+      error: () => this.toast.error('Could not check role', 'Please try again.'),
+    });
   }
-  cancelPurge(): void { if (!this.purging()) this.purgeTargetCode.set(null); }
+  cancelPurge(): void {
+    if (!this.purging()) { this.purgeTargetCode.set(null); this.purgePreview.set(null); }
+  }
   confirmPurge(): void {
     const code = this.purgeTargetCode();
     if (!code) return;
     this.purging.set(true);
     this.service.purgeRole(code).pipe(finalize(() => this.purging.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.purgeTargetCode.set(null); this.toast.success('Role permanently deleted'); this.loadDeleted(); },
+      next: () => { this.purgeTargetCode.set(null); this.purgePreview.set(null); this.toast.success('Role permanently deleted'); this.loadDeleted(); },
       error: (err) => this.toast.error('The role could not be permanently deleted', apiErrorMessage(err, 'Please try again.')),
     });
   }

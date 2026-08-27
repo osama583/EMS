@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { BehaviorSubject, Observable, map, shareReplay, switchMap, tap } from 'rxjs';
+import { BehaviorSubject, Observable, switchMap, tap } from 'rxjs';
 import { SelectOption } from '../../shared/components/form-controls/form-controls.models';
 import { DeletionPreview } from '../../shared/models/deletion.models';
 import { REQUEST_OPTION_REPOSITORY } from './request-option.repository';
@@ -9,10 +9,12 @@ import { ArchivedRequestOption, RequestOption, RequestOptionDraft, RequestOption
 export class RequestOptionService {
   private readonly repository = inject(REQUEST_OPTION_REPOSITORY);
   private readonly refreshRequests = new BehaviorSubject<void>(undefined);
-  private readonly allOptions$ = this.refreshRequests.pipe(switchMap(() => this.repository.getOptions({})), shareReplay({ bufferSize: 1, refCount: true }));
 
+  // Every caller passes the kinds it actually needs, so the filter is applied in SQL (see
+  // GET /options?kinds=) rather than fetching all twelve catalogues and discarding most of the
+  // rows client-side.
   watchAll(kinds?: readonly RequestOptionKind[]): Observable<readonly RequestOption[]> {
-    return this.allOptions$.pipe(map((options) => !kinds?.length ? options : options.filter((option) => kinds.includes(option.kind))));
+    return this.refreshRequests.pipe(switchMap(() => this.repository.getOptions({ kinds })));
   }
 
   watchActive(kind: RequestOptionKind): Observable<readonly RequestOption[]> {

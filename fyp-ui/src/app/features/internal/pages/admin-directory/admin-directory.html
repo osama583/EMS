@@ -54,7 +54,9 @@
     @if (entity === 'users') {
       <app-form-field controlId="admin-user-name" label="Full Name" [required]="true" [value]="value('displayName')" (valueChange)="setDraft('displayName', $event)" />
       <app-form-field controlId="admin-user-email" label="Email" type="email" [required]="true" [value]="value('email')" [error]="fieldError('email')" (valueChange)="setDraft('email', $event)" />
-      <app-form-field controlId="admin-user-password" label="Password" type="password" [value]="value('password')" [error]="fieldError('password')" [hint]="passwordHint()" (valueChange)="setDraft('password', $event)" />
+      @if (!editingId()) {
+        <app-form-field controlId="admin-user-password" label="Password" type="password" [value]="value('password')" [error]="fieldError('password')" [hint]="passwordHint()" (valueChange)="setDraft('password', $event)" />
+      }
       <p class="admin-directory__form-hint">Role and unit assignment is managed from the Assignments tab after saving.</p>
       <app-status-toggle [active]="$any(draft()['active'])" label="Active user" description="Inactive users remain listed but cannot access the internal application." (activeChange)="setDraft('active', $event)" />
     } @else {
@@ -79,7 +81,7 @@
 
 <app-delete-confirm-dialog
   [open]="!!purgeTargetId()" [permanent]="true" [entityKind]="entityKindLabel()" [entityLabel]="purgeTargetLabel()"
-  [preview]="{ canDelete: true, blockingReasons: [], entityLabel: purgeTargetLabel() }" [deleting]="purging()"
+  [checkingDependencies]="checkingPurge()" [preview]="purgePreview()" [deleting]="purging()"
   (confirm)="confirmPurge()" (cancel)="cancelPurge()"
 />
 

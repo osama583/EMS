@@ -67,22 +67,30 @@ describe('event engagement mock services', () => {
     expect(saved.isSaved('evt-1')).toBe(false);
   });
 
-  it('creates an external session only after the development OTP is verified', async () => {
+  it('creates an external session only after the emailed OTP is verified', async () => {
     const auth = TestBed.inject(AuthService);
     const registration = TestBed.inject(ExternalRegistrationService);
-    const challenge = await firstValueFrom(registration.registerExternalUser({
+    const httpMock = TestBed.inject(HttpTestingController);
+
+    const challengePromise = firstValueFrom(registration.registerExternalUser({
       email: 'guest@example.com', firstName: 'Guest', lastName: 'User', age: 21, gender: 'Prefer not to say', password: 'Password1',
     }));
+    httpMock.expectOne(`${environment.apiBaseUrl}/auth/register/start`).flush({
+      challengeId: '1', status: 'otp-required', maskedEmail: 'gu***@example.com',
+    });
+    const challenge = await challengePromise;
 
     expect(auth.authenticated()).toBe(false);
-    // Verifying the (mock) OTP is what actually creates the account: it POSTs to the real
-    // /auth/register endpoint and establishes the returned session.
-    const httpMock = TestBed.inject(HttpTestingController);
-    const resultPromise = firstValueFrom(registration.verifyOtp({ challengeId: challenge.challengeId, otp: challenge.developmentOtp! }));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    httpMock.expectOne(`${environment.apiBaseUrl}/auth/register`).flush(sessionEnvelope(testUser([testRole('external-user')], {
-      email: 'guest@example.com', displayName: 'Guest User', accountType: 'external',
-    })));
+    // Verifying the OTP (emailed by the backend, never exposed to the client)
+    // is what actually creates the account.
+    const resultPromise = firstValueFrom(registration.verifyOtp({ challengeId: challenge.challengeId, otp: '123456' }));
+    httpMock.expectOne(`${environment.apiBaseUrl}/auth/register/verify`).flush({
+      status: 'verified',
+      message: 'Your account has been verified.',
+      ...sessionEnvelope(testUser([testRole('external-user')], {
+        email: 'guest@example.com', displayName: 'Guest User', accountType: 'external',
+      })),
+    });
     const result = await resultPromise;
     expect(result.status).toBe('verified');
     expect(auth.user()?.roles.some((role) => role.roleCode === 'external-user')).toBe(true);

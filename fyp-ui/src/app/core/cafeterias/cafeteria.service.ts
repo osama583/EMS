@@ -5,6 +5,7 @@ import { environment } from '../../../environments/environment';
 import { AssignableCafeteriaUser, Cafeteria, CafeteriaAssignment, CafeteriaAssignmentDraft, CafeteriaDraft, CafeteriaStaffAccountDraft } from './cafeteria.models';
 import { CafeteriaStaffAuditEntry, CafeteriaStaffAuditQuery, Page } from './cafeteria-audit-log.models';
 import { Archived } from '../admin-directory/admin-directory.models';
+import { DeletionMetadata, DeletionPreview } from '../../shared/models/deletion.models';
 
 @Injectable({ providedIn: 'root' })
 export class CafeteriaService {
@@ -30,6 +31,12 @@ export class CafeteriaService {
   setActive(code: string, active: boolean): Observable<Cafeteria> {
     return this.update(code, { active });
   }
+  // What still depends on this cafeteria. Run before opening the delete dialog so a cafeteria
+  // that is still staffed or has order history explains itself in the dialog, rather than the
+  // delete being refused by the server after the click.
+  checkDeletion(code: string): Observable<DeletionPreview> {
+    return this.http.get<DeletionPreview>(`${this.baseUrl}/${encodeURIComponent(code)}/deletion-check`);
+  }
   // Soft-delete — kept recoverable for 7 days, same lifecycle as every other Admin Settings
   // entity (see cafeterias.routes.js's GET /deleted, POST /:code/restore, DELETE /:code/purge).
   delete(code: string): Observable<Cafeteria> {
@@ -43,6 +50,13 @@ export class CafeteriaService {
   }
   purge(code: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/${encodeURIComponent(code)}/purge`).pipe(tap(() => this.refresh()));
+  }
+  // What this posting's holder has actually done at this outlet — orders claimed, tasks
+  // assigned. A staff/manager assignment has no FK children of its own (the schema treats it as
+  // a leaf), but that misses the point: the PERSON does real work while holding it, and removing
+  // the posting used to walk away from that work with no check at all.
+  checkAssignmentDeletion(assignmentId: string): Observable<DeletionPreview> {
+    return this.http.get<DeletionPreview>(`${this.baseUrl}/assignments/${encodeURIComponent(assignmentId)}/deletion-check`);
   }
 
   readonly assignments$ = this.refreshRequests.pipe(switchMap(() => this.getAssignments()), shareReplay({ bufferSize: 1, refCount: true }));
@@ -68,6 +82,17 @@ export class CafeteriaService {
   }
   removeAssignment(assignmentId: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/assignments/${encodeURIComponent(assignmentId)}`).pipe(tap(() => this.refresh()));
+  }
+  // Soft-delete — kept recoverable for 7 days, same lifecycle as every other soft-deletable
+  // entity (see cafeterias.py's list_deleted_assignments/restore_assignment/purge_assignment).
+  getDeletedAssignments(): Observable<readonly (CafeteriaAssignment & DeletionMetadata)[]> {
+    return this.http.get<readonly (CafeteriaAssignment & DeletionMetadata)[]>(`${this.baseUrl}/assignments/deleted`);
+  }
+  restoreAssignment(assignmentId: string): Observable<CafeteriaAssignment> {
+    return this.http.post<CafeteriaAssignment>(`${this.baseUrl}/assignments/${encodeURIComponent(assignmentId)}/restore`, {}).pipe(tap(() => this.refresh()));
+  }
+  purgeAssignment(assignmentId: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/assignments/${encodeURIComponent(assignmentId)}/purge`).pipe(tap(() => this.refresh()));
   }
 
   // Server-side searched/filtered/sorted/paginated audit trail of staff create/edit/suspend/

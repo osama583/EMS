@@ -13,6 +13,13 @@ import { ViewToggleComponent } from '../../../../../shared/components/view-toggl
 type ViewMode = 'table' | 'card';
 type Requester = 'me' | 'other';
 type Outcome = 'confirmed' | 'rejected';
+// Filter dimension for 'other' rows: who actually clicked approve/reject — the viewer themself
+// (as the event's Owner or a co-owner) or a DIFFERENT co-owner. Independent of `requester`: 'me'
+// rows (the viewer's own registration) never carry this, since nobody decided FOR them via this
+// axis. Options are only offered to users who can plausibly organise an event at all — see
+// showDecidedByFilter below — since a viewer who can only attend, never organise, can never be
+// party to a decided-by-me/co-owner split.
+type DecidedByFilter = 'all' | 'me' | 'co-owner';
 
 interface RegistrationHistoryEntry {
   readonly key: string;
@@ -28,6 +35,14 @@ interface RegistrationHistoryEntry {
   readonly registrantName?: string;
   readonly registrantEmail?: string;
   readonly reason?: string;
+  // Who approved/rejected this decided-by-someone-else row — absent on 'me' rows (the viewer's
+  // own registration, not a decision they made) and on any row from before migration 019.
+  readonly decidedByName?: string;
+  readonly decidedByRole?: 'Owner' | 'Co-owner';
+  // True when the viewer themself made the decision (whether as Owner or as a co-owner) — the
+  // decidedByFilter axis reads this, not decidedByRole, since Owner-vs-Co-owner alone can't tell
+  // "me" apart from "a different co-owner" once decidedByRole says 'Co-owner'.
+  readonly decidedByIsViewer?: boolean;
 }
 
 // History → Events: every resolved event registration decision — events the viewer registered for
@@ -55,14 +70,24 @@ export class HubHistoryEventsComponent {
   readonly viewMode = signal<ViewMode>('card');
   readonly search = signal('');
   readonly requesterFilter = signal<'all' | Requester>('all');
+  readonly decidedByFilter = signal<DecidedByFilter>('all');
   readonly page = signal(1);
   readonly pageSize = signal(10);
+
+  // The decided-by-me/co-owner split only means anything for someone who could plausibly BE an
+  // organiser at all — same "who can be an applicant" eligibility rule records-hub.ts's own
+  // showRegistrationsTab uses (auth.canAccess reads the already-loaded Page Visibility nav tree,
+  // no extra request). A pure attendee, who can never organise an event or decide someone else's
+  // registration, would see an option that always returns zero rows for them.
+  readonly showDecidedByFilter = computed(() => this.auth.canAccess('/app/forms/event-proposal'));
 
   readonly resolvedEntries = computed(() => {
     const search = this.search().trim().toLowerCase();
     const requester = this.requesterFilter();
+    const decidedBy = this.showDecidedByFilter() ? this.decidedByFilter() : 'all';
     return this.entries()
       .filter((entry) => requester === 'all' || entry.requester === requester)
+      .filter((entry) => decidedBy === 'all' || (entry.requester === 'other' && entry.decidedByIsViewer === (decidedBy === 'me')))
       .filter((entry) => !search || entry.eventTitle.toLowerCase().includes(search))
       .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime());
   });
@@ -80,10 +105,18 @@ export class HubHistoryEventsComponent {
       key: 'requester', ariaLabel: 'Filter by requester', value: this.requesterFilter(),
       options: [
         { value: 'all', label: 'All' },
-        { value: 'me', label: 'Me' },
+        { value: 'me', label: 'My Requests' },
         { value: 'other', label: 'Other people' },
       ],
     },
+    ...(this.showDecidedByFilter() ? [{
+      key: 'decidedBy', ariaLabel: 'Filter by who decided', value: this.decidedByFilter(),
+      options: [
+        { value: 'all', label: 'All decisions' },
+        { value: 'me', label: 'Decided by Me' },
+        { value: 'co-owner', label: 'Decided by Co-owner' },
+      ],
+    }] : []),
   ]);
 
   readonly config = computed<InternalDataPageConfig>(() => ({
@@ -127,7 +160,11 @@ export class HubHistoryEventsComponent {
     this.loading.set(true);
     const viewerEmail = this.auth.user()?.email?.trim().toLowerCase() ?? '';
     forkJoin({
-      history: this.events.getRegistrationHistory(),
+      // This page merges history with getDecidedRegistrations() and re-buckets by requester
+      // identity client-side (see the comment on the class above), so it still needs the whole
+      // set in one shot rather than one page - MAX_PAGE_SIZE (_helpers.py) is the server's own
+      // ceiling for "as many as a single request may ask for."
+      history: this.events.getRegistrationHistory(1, 200),
       decided: this.events.getDecidedRegistrations(),
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: ({ history, decided }) => {
@@ -159,6 +196,9 @@ export class HubHistoryEventsComponent {
               registrantName: item.name,
               registrantEmail: item.email,
               reason: item.reason,
+              decidedByName: item.decidedByName ?? undefined,
+              decidedByRole: item.decidedByRole ?? undefined,
+              decidedByIsViewer: item.decidedByIsViewer ?? undefined,
             };
           });
         this.entries.set([...registered, ...decidedEntries]);
@@ -170,8 +210,12 @@ export class HubHistoryEventsComponent {
 
   setViewMode(mode: ViewMode): void { this.viewMode.set(mode); }
   setSearch(value: string): void { this.search.set(value); this.page.set(1); }
-  setFilter(change: InternalFilterChange): void { if (change.key === 'requester') this.requesterFilter.set(change.value as 'all' | Requester); this.page.set(1); }
-  reset(): void { this.search.set(''); this.requesterFilter.set('all'); this.page.set(1); }
+  setFilter(change: InternalFilterChange): void {
+    if (change.key === 'requester') this.requesterFilter.set(change.value as 'all' | Requester);
+    if (change.key === 'decidedBy') this.decidedByFilter.set(change.value as DecidedByFilter);
+    this.page.set(1);
+  }
+  reset(): void { this.search.set(''); this.requesterFilter.set('all'); this.decidedByFilter.set('all'); this.page.set(1); }
   setPage(page: number): void { this.page.set(Math.max(1, Math.min(page, this.totalPages()))); }
   setPageSize(size: number): void { this.pageSize.set(size); this.page.set(1); }
 

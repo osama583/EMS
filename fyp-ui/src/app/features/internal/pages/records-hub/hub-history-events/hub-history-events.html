@@ -95,6 +95,12 @@
             <p>{{ entry.reason }}</p>
           </section>
         }
+        @if (entry.decidedByRole) {
+          <section>
+            <h3>Decided by</h3>
+            <p>{{ entry.decidedByName || 'Unknown' }} <span class="events-history__decider-role">({{ entry.decidedByRole }})</span></p>
+          </section>
+        }
       }
 
       <dl>

@@ -69,9 +69,11 @@ export interface ProposalListQuery {
   readonly statusLabel?: string;
   // Exact match on one of the proposal's event categories — see listCategories(). Drafts only.
   readonly category?: string;
-  // 'mine' = the caller is the applicant; 'other' = anyone else's proposal the caller can see
-  // (co-owner, reviewer/department who acted on it). Omit for both. History's Requester filter.
-  readonly requester?: 'mine' | 'other';
+  // 'mine' = the caller is the applicant. 'co-owned' = the caller is a co-owner, not the
+  // applicant. 'acted-on' = neither owner nor co-owner, but the caller reviewed/actioned it
+  // (head-of-school/department, FMB head, CFO, department staff) — only offered to those
+  // roles by hub-proposals.ts. Omit for all three. History's Requester filter.
+  readonly requester?: 'mine' | 'co-owned' | 'acted-on';
 }
 
 export type DepartmentRequestBucket = 'inbox' | 'ongoing' | 'history';

@@ -1,78 +1,90 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { Observable, catchError, delay, map, of } from 'rxjs';
+import { Observable, catchError, map, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthUser } from './auth.models';
 import { AuthService } from './auth.service';
 
 import {
+  EmailStatusResponse,
   ExternalRegistrationApi,
   ExternalUserRegistrationRequest,
   ExternalUserRegistrationResponse,
+  ResendOtpResponse,
   VerifyExternalOtpRequest,
   VerifyExternalOtpResponse,
 } from '../events/event-engagement.models';
 
-/** Registration returns the same envelope as login, so the guest is signed in at once. */
-interface RegistrationResponse {
-  readonly user: AuthUser;
-  readonly accessToken: string;
-  readonly refreshToken: string;
-  readonly expiresIn: number;
+interface StartRegistrationResponse {
+  readonly challengeId: string;
+  readonly status: 'otp-required';
+  readonly maskedEmail: string;
 }
 
-interface PendingChallenge { readonly request: ExternalUserRegistrationRequest; readonly otp: string; }
+/** Verification returns the same envelope as login, so a verified guest is signed in at once. */
+interface VerifyRegistrationResponse {
+  readonly status: 'verified' | 'invalid' | 'expired';
+  readonly message: string;
+  readonly user?: AuthUser;
+  readonly accessToken?: string;
+  readonly refreshToken?: string;
+  readonly expiresIn?: number;
+}
 
 @Injectable({ providedIn: 'root' })
 export class ExternalRegistrationService implements ExternalRegistrationApi {
   private readonly auth = inject(AuthService);
   private readonly http = inject(HttpClient);
-  private readonly challenges = new Map<string, PendingChallenge>();
 
-  // OTP delivery is still a dev-only mock (no email/SMS provider wired up) — this only stages
-  // the submitted form data locally and hands back a fixed code to display on-screen. The real
-  // account is NOT created here; it's created by verifyOtp() below, once the (mock) code is
-  // confirmed, via a real backend call — so a challenge that's never verified never becomes an
-  // account.
+  // Step 1: the backend stages the submitted form under a 6-digit code and
+  // emails it — no account exists yet. Step 2 (verifyOtp) checks the code and
+  // only then creates the account, so an abandoned or never-verified attempt
+  // never becomes a row in the database.
   registerExternalUser(request: ExternalUserRegistrationRequest): Observable<ExternalUserRegistrationResponse> {
-    const challengeId = `external-${Date.now()}`;
-    const otp = '246810';
-    this.challenges.set(challengeId, { request: { ...request, email: request.email.trim().toLowerCase() }, otp });
-    return of({
-      challengeId,
-      status: 'otp-required' as const,
-      maskedEmail: this.maskEmail(request.email),
-      developmentOtp: otp,
-    }).pipe(delay(260));
+    return this.http
+      .post<StartRegistrationResponse>(`${environment.apiBaseUrl}/auth/register/start`, request)
+      .pipe(
+        map((response) => ({
+          challengeId: response.challengeId,
+          status: response.status,
+          maskedEmail: response.maskedEmail,
+        })),
+      );
   }
 
   verifyOtp(request: VerifyExternalOtpRequest): Observable<VerifyExternalOtpResponse> {
-    const challenge = this.challenges.get(request.challengeId);
-    if (!challenge) return of<VerifyExternalOtpResponse>({ status: 'expired', message: 'This verification request has expired.' }).pipe(delay(180));
-    if (!/^\d{6}$/.test(request.otp.trim())) return of<VerifyExternalOtpResponse>({ status: 'invalid', message: 'The verification code is incorrect.' }).pipe(delay(180));
-    if (request.otp.trim() !== challenge.otp) return of<VerifyExternalOtpResponse>({ status: 'invalid', message: 'The verification code is incorrect.' }).pipe(delay(180));
-
-    const { email, firstName, lastName, age, gender, password } = challenge.request;
-    return this.http.post<RegistrationResponse>(`${environment.apiBaseUrl}/auth/register`, { email, firstName, lastName, age, gender, password }).pipe(
-      map((response) => {
-        this.challenges.delete(request.challengeId);
-        this.auth.establishSession(response.user, {
-          accessToken: response.accessToken,
-          refreshToken: response.refreshToken,
-          expiresAt: Date.now() + response.expiresIn * 1000,
-        });
-        return { status: 'verified' as const, user: response.user, message: 'Your account has been verified.' };
-      }),
-      catchError((err) => of<VerifyExternalOtpResponse>({
-        status: 'invalid',
-        message: err?.error?.error?.message || 'Registration could not be completed. Please try again.',
-      })),
-    );
+    return this.http
+      .post<VerifyRegistrationResponse>(`${environment.apiBaseUrl}/auth/register/verify`, request)
+      .pipe(
+        map((response) => {
+          if (response.status !== 'verified' || !response.user || !response.accessToken || !response.refreshToken) {
+            return { status: response.status, message: response.message };
+          }
+          this.auth.establishSession(response.user, {
+            accessToken: response.accessToken,
+            refreshToken: response.refreshToken,
+            expiresAt: Date.now() + (response.expiresIn ?? 0) * 1000,
+          });
+          return { status: 'verified' as const, user: response.user, message: response.message };
+        }),
+        catchError((err) => of<VerifyExternalOtpResponse>({
+          status: 'invalid',
+          message: err?.error?.error?.message || 'Verification could not be completed. Please try again.',
+        })),
+      );
   }
 
-  private maskEmail(email: string): string {
-    const [name = '', domain = ''] = email.trim().split('@');
-    return `${name.slice(0, 2)}${'*'.repeat(Math.max(2, name.length - 2))}@${domain}`;
+  resendOtp(challengeId: string): Observable<ResendOtpResponse> {
+    return this.http.post<ResendOtpResponse>(`${environment.apiBaseUrl}/auth/register/resend`, { challengeId });
+  }
+
+  /** Live email-field check: is this address free, and does it already have
+   * a pending (unexpired) signup the user could resume instead of starting over? */
+  checkEmailStatus(email: string): Observable<EmailStatusResponse> {
+    return this.http.get<EmailStatusResponse>(
+      `${environment.apiBaseUrl}/auth/register/email-status`,
+      { params: { email } },
+    );
   }
 }
 

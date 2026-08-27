@@ -10,7 +10,8 @@ import {
   input,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, debounceTime, switchMap } from 'rxjs';
 import { EventSearchParams, EventVisibility, PublishedEvent, RegistrationResult, RegistrationStatus } from '../../../../core/events/published-event.models';
 import { EventCatalogRepositoryImpl } from '../../../../core/event-catalog/event-catalog.repository';
@@ -73,6 +74,7 @@ export class ExploreEventsComponent {
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly auth = inject(AuthService);
   private readonly eventCatalogRepository = inject(EventCatalogRepositoryImpl);
   private readonly guestFlow = inject(GuestRegistrationFlowService);
@@ -238,6 +240,20 @@ export class ExploreEventsComponent {
       this.document.body.classList.remove('filters-open');
     });
 
+    // Deep link from anywhere that links to a specific event by id (currently
+    // the AI assistant's event-card sources — see ai-assistant.ts) — a
+    // ?event=<id> query param opens that event's details modal directly,
+    // fetching it on its own if the current page/filter happened not to
+    // include it rather than requiring the caller to already be on the page
+    // that lists it.
+    const eventId = this.route.snapshot.queryParamMap.get('event');
+    if (eventId) {
+      this.publishedEventService.getEventDetails(eventId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: (event) => { if (event) this.selectedPublishedEvent.set(event); },
+        error: () => { /* Event no longer available (unpublished/cancelled) - nothing to open. */ },
+      });
+    }
+
     this.draftPreviewRequests
       .pipe(
         debounceTime(300),
@@ -304,8 +320,8 @@ export class ExploreEventsComponent {
   }
 
   private loadSchoolOptions(): void {
-    this.publishedEventService.getPublishedEvents().subscribe({
-      next: (events) => this.allSchools.set([...new Set(events.map((event) => event.schoolDepartment).filter((name): name is string => !!name))]),
+    this.publishedEventService.getEventSchools().subscribe({
+      next: (schools) => this.allSchools.set(schools),
       error: () => this.allSchools.set([]),
     });
   }

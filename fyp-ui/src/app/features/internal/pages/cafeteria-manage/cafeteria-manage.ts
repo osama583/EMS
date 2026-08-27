@@ -4,6 +4,7 @@ import { finalize } from 'rxjs';
 import { CafeteriaService } from '../../../../core/cafeterias/cafeteria.service';
 import { Cafeteria } from '../../../../core/cafeterias/cafeteria.models';
 import { Archived } from '../../../../core/admin-directory/admin-directory.models';
+import { DeletionPreview } from '../../../../shared/models/deletion.models';
 import { FeedbackBannerComponent } from '../../../../shared/components/feedback-banner/feedback-banner';
 import { FormFieldComponent } from '../../../../shared/components/form-controls/form-field';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
@@ -54,6 +55,8 @@ export class CafeteriaManageComponent {
   readonly errorMessage = signal('');
 
   readonly deleteTarget = signal<Cafeteria | null>(null);
+  readonly deletePreview = signal<DeletionPreview | null>(null);
+  readonly checkingDeletion = signal(false);
   readonly deleting = signal(false);
 
   // Deleted tab
@@ -61,6 +64,8 @@ export class CafeteriaManageComponent {
   readonly deletedLoading = signal(false);
   readonly restoringCode = signal<string | null>(null);
   readonly purgeTargetCode = signal<string | null>(null);
+  readonly purgePreview = signal<DeletionPreview | null>(null);
+  readonly checkingPurge = signal(false);
   readonly purging = signal(false);
 
   readonly filteredCafeterias = computed(() => {
@@ -198,8 +203,19 @@ export class CafeteriaManageComponent {
   requestDelete(cafeteria: Cafeteria): void {
     this.clearMessages();
     this.deleteTarget.set(cafeteria);
+    this.deletePreview.set(null);
+    this.checkingDeletion.set(true);
+    this.service.checkDeletion(cafeteria.code).pipe(
+      finalize(() => this.checkingDeletion.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (preview) => this.deletePreview.set(preview),
+      error: () => this.toast.error('Could not check cafeteria', 'Please try again.'),
+    });
   }
-  cancelDelete(): void { if (!this.deleting()) this.deleteTarget.set(null); }
+  cancelDelete(): void {
+    if (!this.deleting()) { this.deleteTarget.set(null); this.deletePreview.set(null); }
+  }
   confirmDelete(): void {
     const target = this.deleteTarget();
     if (!target) return;
@@ -207,9 +223,14 @@ export class CafeteriaManageComponent {
     this.service.delete(target.code).pipe(finalize(() => this.deleting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.deleteTarget.set(null);
+        this.deletePreview.set(null);
         this.toast.success('Cafeteria deleted', 'It can be restored from the Deleted tab within 7 days.');
       },
-      error: (err) => { this.deleteTarget.set(null); this.toast.error('The cafeteria could not be deleted', apiErrorMessage(err, 'Please try again.')); },
+      error: (err) => {
+        this.deleteTarget.set(null);
+        this.deletePreview.set(null);
+        this.toast.error('The cafeteria could not be deleted', apiErrorMessage(err, 'Please try again.'));
+      },
     });
   }
 
@@ -244,15 +265,28 @@ export class CafeteriaManageComponent {
   requestPurge(code: string): void {
     this.clearMessages();
     this.purgeTargetCode.set(code);
+    // The server re-checks dependencies at purge time, so a cafeteria can be blocked here even
+    // though it was clean when it was archived. Ask first, for the same reason delete does.
+    this.purgePreview.set(null);
+    this.checkingPurge.set(true);
+    this.service.checkDeletion(code).pipe(
+      finalize(() => this.checkingPurge.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (preview) => this.purgePreview.set(preview),
+      error: () => this.toast.error('Could not check cafeteria', 'Please try again.'),
+    });
   }
-  cancelPurge(): void { if (!this.purging()) this.purgeTargetCode.set(null); }
+  cancelPurge(): void {
+    if (!this.purging()) { this.purgeTargetCode.set(null); this.purgePreview.set(null); }
+  }
   confirmPurge(): void {
     const code = this.purgeTargetCode();
     if (!code) return;
     this.purging.set(true);
     this.service.purge(code).pipe(finalize(() => this.purging.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.purgeTargetCode.set(null); this.toast.success('Cafeteria permanently deleted'); this.loadDeleted(); },
-      error: (err) => { this.purgeTargetCode.set(null); this.toast.error('The cafeteria could not be permanently deleted', apiErrorMessage(err, 'Please try again.')); },
+      next: () => { this.purgeTargetCode.set(null); this.purgePreview.set(null); this.toast.success('Cafeteria permanently deleted'); this.loadDeleted(); },
+      error: (err) => { this.purgeTargetCode.set(null); this.purgePreview.set(null); this.toast.error('The cafeteria could not be permanently deleted', apiErrorMessage(err, 'Please try again.')); },
     });
   }
 

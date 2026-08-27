@@ -78,6 +78,22 @@
   background: var(--apu-white);
 }
 
+.shared-form-field--valid :is(input, textarea, select) {
+  border-color: var(--form-success);
+  box-shadow: 0 0 0 0.22rem rgb(22 132 91 / 13%);
+  background: var(--apu-white);
+}
+
+.shared-form-field__valid-icon {
+  position: absolute;
+  top: 50%;
+  right: 0.85rem;
+  transform: translateY(-50%);
+  color: var(--form-success);
+  font-size: 1.25rem;
+  pointer-events: none;
+}
+
 .shared-editable-table {
   overflow: hidden;
   border: 1px solid var(--apu-border);

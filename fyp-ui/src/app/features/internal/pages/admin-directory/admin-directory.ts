@@ -118,6 +118,8 @@ export class AdminDirectoryComponent {
 
   // "Delete forever" (purge) — immediate and unrecoverable, alongside Restore in the Deleted tab.
   readonly purgeTargetId = signal<string | null>(null);
+  readonly purgePreview = signal<DeletionPreview | null>(null);
+  readonly checkingPurge = signal(false);
   readonly purgeTargetLabel = signal('');
   readonly purging = signal(false);
 
@@ -253,12 +255,9 @@ export class AdminDirectoryComponent {
     ] : []),
     { key: 'status', ariaLabel: `Filter ${this.entity} by status`, value: this.statusFilter(), options: [{ value: 'all', label: 'All statuses' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }] },
   ]);
-  // Same wording as the cafeteria staff forms: an empty box is never an error, it just means
-  // "don't set one" on create and "don't change it" on edit.
-  readonly passwordHint = computed(() =>
-    this.editingId()
-      ? 'Leave blank to keep the current password.'
-      : 'Leave blank to create the account without a password.');
+  // A password is set only at creation — the field itself is hidden entirely on edit (see the
+  // template), so this hint only ever needs its create-time wording.
+  readonly passwordHint = computed(() => 'Leave blank to create the account without a password.');
   readonly formValid = computed(() => {
     if (this.entity === 'users') {
       return ['displayName', 'email'].every((key) => String(this.draft()[key] ?? '').trim()) && !this.fieldError('email') && !this.fieldError('password');
@@ -514,8 +513,8 @@ export class AdminDirectoryComponent {
     if (event.action.key === 'edit') {
       this.editingId.set(record.id);
       this.draft.set(this.entity === 'users'
-        // Blank password means "leave it alone" — the stored value is a hash, so there is nothing to show.
-        ? { displayName: (record as AdminUserRecord).displayName, email: (record as AdminUserRecord).email, password: '', active: record.active }
+        // No password field on edit — see the template — so nothing to seed here.
+        ? { displayName: (record as AdminUserRecord).displayName, email: (record as AdminUserRecord).email, active: record.active }
         : { name: (record as AdminUnitRecord).name, description: (record as AdminUnitRecord).description ?? '', active: record.active, roleCodes: (record as AdminUnitRecord).roleCodes });
       this.modalOpen.set(true); this.clearMessages(); return;
     }
@@ -636,8 +635,24 @@ export class AdminDirectoryComponent {
     const record = this.entity === 'users' ? this.deletedUsers().find((u) => u.id === id) : this.deletedUnits().find((u) => u.id === id);
     this.purgeTargetLabel.set(record ? `"${this.entity === 'users' ? (record as Archived<AdminUserRecord>).displayName : (record as Archived<AdminUnitRecord>).name}"` : '');
     this.purgeTargetId.set(id);
+    // Dependencies are re-checked server-side at purge time, so a record archived while unused
+    // can still be blocked now. Ask first, the same way delete does.
+    this.purgePreview.set(null);
+    this.checkingPurge.set(true);
+    const check = this.entity === 'users'
+      ? this.service.checkUserDeletion(id)
+      : this.service.checkUnitDeletion(id);
+    check.pipe(
+      finalize(() => this.checkingPurge.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (preview) => this.purgePreview.set(preview),
+      error: () => this.toast.error('Could not check record', 'Please try again.'),
+    });
   }
-  cancelPurge(): void { if (!this.purging()) this.purgeTargetId.set(null); }
+  cancelPurge(): void {
+    if (!this.purging()) { this.purgeTargetId.set(null); this.purgePreview.set(null); }
+  }
   confirmPurge(): void {
     const id = this.purgeTargetId();
     if (!id) return;
@@ -646,6 +661,7 @@ export class AdminDirectoryComponent {
     request.pipe(finalize(() => this.purging.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.purgeTargetId.set(null);
+        this.purgePreview.set(null);
         this.toast.success(`${this.entityKindLabel()} permanently deleted.`);
         this.loadDeleted();
       },
@@ -657,8 +673,9 @@ export class AdminDirectoryComponent {
     return {
       displayName: this.value('displayName').trim(),
       email: this.value('email').trim().toLowerCase(),
-      // Omitted rather than sent blank: an empty string would be a password change to nothing.
-      password: this.value('password') || undefined,
+      // A password is set only at creation — never sent on an edit, since the field doesn't even
+      // render then (see the template) and the backend ignores it on update regardless.
+      password: this.editingId() ? undefined : (this.value('password') || undefined),
       active: Boolean(this.draft()['active']),
     };
   }

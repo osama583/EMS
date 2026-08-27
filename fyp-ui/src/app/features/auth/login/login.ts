@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, ViewChild, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { GuestRegistrationFlowService } from '../../../core/auth/external-registration.service';
@@ -9,6 +9,7 @@ import { SavedEventsService } from '../../../core/events/saved-events.service';
 import { roleCanUseSavedEvents } from '../../../core/auth/role-navigation';
 import { FormFieldComponent } from '../../../shared/components/form-controls/form-field';
 import { GuestRegistrationModalComponent } from '../../../shared/components/guest-registration-modal/guest-registration-modal';
+import { ForgotPasswordModalComponent } from '../../../shared/components/forgot-password-modal/forgot-password-modal';
 import { DevUser, DevUsersService } from '../../../core/auth/dev-users.service';
 
 // TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
@@ -16,12 +17,13 @@ interface DemoUserGroup { readonly label: string; readonly users: readonly DevUs
 
 @Component({
   selector: 'app-login',
-  imports: [FormFieldComponent, GuestRegistrationModalComponent],
+  imports: [FormFieldComponent, GuestRegistrationModalComponent, ForgotPasswordModalComponent],
   templateUrl: './login.html',
   styleUrl: './login.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LoginComponent implements OnDestroy {
+  @ViewChild('forgotPasswordModal') private readonly forgotPasswordModal?: ForgotPasswordModalComponent;
   private readonly document = inject(DOCUMENT);
   private readonly auth = inject(AuthService);
   private readonly guestFlow = inject(GuestRegistrationFlowService);
@@ -99,6 +101,7 @@ export class LoginComponent implements OnDestroy {
   }
 
   openRegister(): void { this.guestFlow.requestRegistration(); this.guestFlow.open.set(true); }
+  openForgotPassword(): void { this.forgotPasswordModal?.show(this.email().trim()); }
 
   submit(): void {
     const email = this.email().trim();

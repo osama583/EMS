@@ -81,8 +81,13 @@
 @keyframes form-modal-spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 48rem) {
+  /*
+   * Dialogs keep a real margin from the phone edges rather than becoming edge-to-edge sheets,
+   * and size to their content (the max-height cap keeps long forms scrolling INSIDE the body,
+   * which already owns overflow-y, instead of stretching the dialog past the viewport).
+   */
   .shared-form-modal__backdrop {
-    padding: .5rem;
+    padding: var(--space-3);
     place-items: center;
     touch-action: pan-y;
   }
@@ -90,38 +95,51 @@
   .shared-form-modal--fixed {
     width: 100%;
     max-width: 100%;
-    max-height: calc(100dvh - 1rem);
+    max-height: calc(100dvh - 2 * var(--space-3));
     height: auto;
-    border-radius: 1rem;
+    border-radius: var(--radius-card);
     box-sizing: border-box;
   }
   .shared-form-modal__header {
-    padding: .85rem 1rem;
+    padding: .9rem 1.1rem;
     box-sizing: border-box;
   }
   .shared-form-modal__header h2 {
     font-size: 1.15rem;
   }
   .shared-form-modal__body {
-    padding: 1rem;
+    padding: 1.1rem;
     box-sizing: border-box;
     max-width: 100%;
   }
+  /*
+   * Footer buttons sit side by side while the row fits — a Cancel/Confirm pair does, and stacking
+   * them was pure wasted vertical space. They wrap to full width only when the labels genuinely
+   * cannot share the row. Confirm stays on the right by keeping source order (no column-reverse).
+   */
   .shared-form-modal__footer {
-    padding: .75rem 1rem;
+    padding: .8rem 1.1rem;
     display: flex;
-    flex-direction: column-reverse;
-    gap: .5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: .55rem;
     width: 100%;
     box-sizing: border-box;
   }
   .shared-form-modal__footer .table-control,
   .shared-form-modal__footer button {
-    width: 100%;
+    flex: 1 1 8rem;
+    min-width: 0;
     justify-content: center;
     min-height: 2.65rem;
     box-sizing: border-box;
   }
+}
+
+/* Very narrow phones: one action per row, primary first. */
+@media (max-width: 23rem) {
+  .shared-form-modal__footer .table-control,
+  .shared-form-modal__footer button { flex: 1 1 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

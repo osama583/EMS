@@ -50,6 +50,6 @@
 
 <app-delete-confirm-dialog
   [open]="!!purgeTargetId()" [permanent]="true" [entityKind]="entityLabel()" [entityLabel]="purgeTargetLabel()"
-  [preview]="{ canDelete: true, blockingReasons: [], entityLabel: purgeTargetLabel() }" [deleting]="purging()"
+  [checkingDependencies]="checkingPurge()" [preview]="purgePreview()" [deleting]="purging()"
   (confirm)="confirmPurge()" (cancel)="cancelPurge()"
 />

@@ -1,7 +1,22 @@
 :host { --assistant-size: 3.5rem; --assistant-gap: 1.5rem; position: fixed; z-index: 80; right: max(var(--assistant-gap), env(safe-area-inset-right)); bottom: max(var(--assistant-gap), env(safe-area-inset-bottom)); pointer-events: none; }
+// Full-window mode: the HOST itself must fill the viewport, not just the inner .ai-assistant div —
+// otherwise the host stays pinned bottom-right (its normal launcher position) while only the
+// element inside it stretches, so the backdrop/panel paint in the right place but the host's own
+// box (which is what actually receives pointer events under CSS's normal event-target rules)
+// stays a small bottom-right rectangle. That mismatch is what let clicks "pass through" to the
+// page behind the backdrop, and let the page under the host keep scrolling.
+:host:has(.ai-assistant--expanded) { top: 0; right: 0; bottom: 0; left: 0; }
 .ai-assistant { display: grid; justify-items: end; gap: var(--space-2); pointer-events: none; }
 .ai-assistant :is(button, textarea) { font: inherit; }
 .ai-assistant__launcher-row { display: flex; align-items: center; justify-content: flex-end; gap: .65rem; pointer-events: auto; }
+// Full-window mode centers the backdrop+panel over the whole viewport; the launcher orb sits at
+// the host's original bottom-right corner and would otherwise render dimmed under the backdrop
+// (same box, no z-index of its own) — simplest fix is to hide it outright while expanded rather
+// than fight the backdrop for stacking order.
+// visibility:hidden alone would still reserve its row in .ai-assistant's grid (an invisible but
+// laid-out element still takes up space) — that reserved strip is what read as unwanted gray
+// space at the bottom of the full-page chat. display:none removes it from layout entirely.
+.ai-assistant__launcher-row--hidden { display: none; }
 
 /* Orb launcher — reduced footprint, still elegant, alive */
 .ai-orb-button { position: relative; width: var(--assistant-size); height: var(--assistant-size); flex: 0 0 var(--assistant-size); padding: 0; border: 0; border-radius: 50%; outline: 0; background: transparent; cursor: pointer; filter: drop-shadow(0 .5rem .85rem rgb(20 93 214 / 22%)); transform: translateY(0); transition: transform 620ms var(--ease-standard); }
@@ -40,9 +55,19 @@
 .ai-prompt__dismiss:focus-visible { outline: 2px solid var(--apu-blue-300); }
 .ai-prompt__dismiss span { font-size: .95rem; }
 
-/* Chat panel */
-.ai-chat { display: grid; width: min(24rem, calc(100vw - 2rem)); height: min(36rem, calc(100dvh - 9rem)); min-height: 25rem; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; border: 1px solid var(--apu-border); border-radius: var(--radius-container); background: var(--apu-white); box-shadow: var(--shadow-overlay); pointer-events: auto; animation: assistant-panel-in var(--motion-hover) var(--ease-standard); }
-.ai-chat__header { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: .6rem; padding: 1rem 1.1rem; border-bottom: 1px solid var(--apu-border); }
+/* Chat panel — .ai-chat's own direct children are just .ai-sidebar (full-page mode only, via
+   @if) and .ai-chat__main (always present); .ai-chat__main is what actually needs the 3-row
+   header/messages/composer grid, given unconditionally below (not only under .ai-chat--expanded)
+   so the floating widget's message list has a real bounded height to scroll within instead of
+   growing to its content height and getting clipped by .ai-chat's own `overflow: hidden` — that
+   mismatch (a 3-row grid on .ai-chat when it actually has ONE child in floating mode) was what
+   made the panel appear frozen/unscrollable with content missing below the fold. */
+.ai-chat { display: grid; width: min(24rem, calc(100vw - 2rem)); height: min(36rem, calc(100dvh - 9rem)); min-height: 25rem; grid-template-columns: 1fr; grid-template-rows: 100%; overflow: hidden; border: 1px solid var(--apu-border); border-radius: var(--radius-container); background: var(--apu-white); box-shadow: var(--shadow-overlay); pointer-events: auto; animation: assistant-panel-in var(--motion-hover) var(--ease-standard); }
+.ai-chat__main { display: grid; min-width: 0; min-height: 0; grid-template-rows: auto minmax(0, 1fr) auto; }
+.ai-chat__header { display: grid; grid-template-columns: auto 1fr auto auto auto auto; align-items: center; gap: .6rem; padding: 1rem 1.1rem; border-bottom: 1px solid var(--apu-border); }
+// Expanded mode's header only has the back/close buttons (branding moved into the sidebar) — a
+// simple 1fr-then-buttons track instead of the floating widget's 6-column one.
+.ai-chat--expanded .ai-chat__header { grid-template-columns: 1fr auto auto; }
 .ai-chat__heading { display: grid; min-width: 0; line-height: 1.3; }
 .ai-chat__header strong { color: var(--apu-navy-950); font-size: 1rem; }
 .ai-chat__header small { color: var(--apu-text-muted); font-size: .72rem; }
@@ -50,15 +75,75 @@
 .ai-chat__icon-btn:hover { background: var(--apu-surface-muted); color: var(--apu-navy-900); }
 .ai-chat__icon-btn:focus-visible { outline: 2px solid var(--apu-blue-300); }
 .ai-chat__icon-btn span { font-size: 1.2rem; }
+.ai-chat__icon-btn--active { background: var(--apu-surface-muted); color: var(--apu-blue-600); }
 .ai-chat__mini-orb { display: flex !important; width: 2.15rem; height: 2.15rem; place-content: center; align-items: center; justify-content: center; gap: .28rem; border-radius: 50%; background: linear-gradient(145deg, #6ccdf8, var(--apu-blue-600) 55%, #596ce9); box-shadow: 0 .25rem .65rem rgb(42 131 255 / 20%); }
 .ai-chat__mini-orb i { width: .2rem; height: .56rem; border-radius: var(--radius-pill); background: #fff; }
+
+/* Full-window (expanded) mode — the sidebar/history/retention styling lives in
+   src/styles/_ai-assistant-expanded.scss to keep this sheet under the 20 kB anyComponentStyle
+   budget, but the panel's GEOMETRY has to stay here.
+   Emulated encapsulation compiles `.ai-chat` above to `.ai-chat[_ngcontent-*]` (specificity
+   0,2,0); a plain `.ai-chat--expanded` in a global sheet is only 0,1,0 and loses on every
+   property both declare — width, height, grid-template-columns, border. Put there, the full-page
+   panel silently kept the floating widget's min(24rem) bottom-right box with a single 1fr column,
+   so the sidebar stacked above the messages on the right-hand side of an otherwise blank screen.
+   Anything that overrides a `.ai-chat` / `.ai-assistant` declaration must be written here. */
+.ai-assistant--expanded { position: fixed; inset: 0; z-index: 80; display: grid; place-items: stretch; pointer-events: auto; background: var(--apu-white); }
+.ai-chat--expanded { position: relative; display: grid; grid-template-columns: 17.5rem minmax(0, 1fr); grid-template-rows: 100%; width: 100%; height: 100%; max-width: none; max-height: none; min-height: 0; border: 0; border-radius: 0; transition: grid-template-columns var(--motion-hover) var(--ease-standard); }
+// Collapsed: the sidebar shrinks to a narrow icon rail (matches the reference pattern — it never
+// fully disappears, unlike an earlier version of this that collapsed the column to 0).
+.ai-chat--expanded.ai-chat--sidebar-collapsed { grid-template-columns: 3.75rem minmax(0, 1fr); }
+.ai-chat--expanded .ai-chat__messages { padding: 1.5rem max(1.5rem, calc(50% - 26rem)); }
+.ai-chat--expanded .ai-chat__composer { padding: 1rem max(1.5rem, calc(50% - 26rem)) 1.25rem; }
+.ai-chat--expanded .ai-event-cards { max-width: 40rem; }
+
 
 .ai-chat__messages { display: flex; min-height: 0; flex-direction: column; gap: .7rem; padding: 1rem; overflow-y: auto; overscroll-behavior: contain; background: linear-gradient(180deg, #f8faff, var(--apu-surface-muted)); }
 .ai-chat__message { width: fit-content; max-width: 84%; margin: 0; padding: .72rem .85rem; border: 1px solid var(--apu-border); border-radius: .35rem 1rem 1rem 1rem; background: var(--apu-white); color: var(--apu-navy-900); font-size: .82rem; line-height: 1.5; overflow-wrap: anywhere; animation: assistant-message-in var(--motion-hover) var(--ease-standard); }
 .ai-chat__message--user { align-self: flex-end; border-color: transparent; border-radius: 1rem .35rem 1rem 1rem; background: var(--apu-blue-600); color: #fff; }
+.ai-chat__message-text { margin: 0; }
+.ai-chat__message-text + .ai-chat__message-text,
+.ai-chat__message-text + .ai-chat__message-list,
+.ai-chat__message-list + .ai-chat__message-text,
+.ai-chat__message-list + .ai-chat__message-list { margin-top: .45rem; }
+// Each "-" line renders as its own row with a visible marker, matching the model's own
+// FORMATTING convention (see gemini.py) of one list item per line — never a run-on sentence.
+.ai-chat__message-list { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: .2rem; }
+.ai-chat__message-list li { padding-left: .15rem; }
 .ai-chat__typing { display: flex; width: fit-content; gap: .25rem; padding: .75rem .85rem; border: 1px solid var(--apu-border); border-radius: .35rem 1rem 1rem 1rem; background: #fff; }
 .ai-chat__typing i { width: .35rem; height: .35rem; border-radius: 50%; background: var(--apu-blue-600); animation: assistant-typing 1s ease-in-out infinite; }
 .ai-chat__typing i:nth-child(2) { animation-delay: 120ms; } .ai-chat__typing i:nth-child(3) { animation-delay: 240ms; }
+
+/* Event cards — a matched, still-visible event rendered as a clickable card under the assistant's
+   reply, rather than just naming it in text. Sized for the narrow floating panel; the expanded
+   full-window layout gets a wider card via .ai-chat--expanded (see media query below). */
+.ai-event-cards { display: grid; gap: .5rem; width: fit-content; max-width: 92%; margin: -.15rem 0 0; }
+.ai-event-card { display: grid; grid-template-columns: 3.4rem 1fr auto; align-items: center; gap: .6rem; width: 100%; padding: .5rem; border: 1px solid var(--apu-border); border-radius: .85rem; background: var(--apu-white); color: inherit; cursor: pointer; text-align: left; transition: border-color var(--motion-control) var(--ease-standard), box-shadow var(--motion-control) var(--ease-standard), transform var(--motion-control) var(--ease-standard); }
+.ai-event-card:hover, .ai-event-card:focus-visible { border-color: var(--apu-blue-200); box-shadow: 0 .4rem 1rem rgb(42 131 255 / 12%); transform: translateY(-.05rem); outline: 0; }
+.ai-event-card__image { width: 3.4rem; height: 3.4rem; border-radius: .6rem; object-fit: cover; background: var(--apu-surface-muted); }
+.ai-event-card__image--placeholder { display: grid; place-items: center; color: var(--apu-text-muted); font-size: 1.5rem; }
+.ai-event-card__body { display: grid; min-width: 0; gap: .15rem; }
+.ai-event-card__title { overflow: hidden; color: var(--apu-navy-950); font-size: .8rem; font-weight: 700; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
+.ai-event-card__category { overflow: hidden; color: var(--apu-blue-600); font-size: .66rem; font-weight: 650; letter-spacing: .01em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.ai-event-card__meta { display: flex; flex-wrap: wrap; gap: .5rem; color: var(--apu-text-muted); font-size: .68rem; }
+.ai-event-card__meta span { display: inline-flex; align-items: center; gap: .2rem; }
+.ai-event-card__meta .material-symbols-rounded { font-size: .85rem; }
+.ai-event-card__go { color: var(--apu-blue-600); font-size: 1.1rem; }
+
+/* Registrants table card — a live attendee list rendered as an actual table under the assistant's
+   reply, same "answer + concrete UI, not just text" pattern as the event cards above. */
+.ai-registrants-card { display: grid; gap: .5rem; width: fit-content; max-width: 92%; padding: .7rem .75rem; border: 1px solid var(--apu-border); border-radius: .85rem; background: var(--apu-white); }
+.ai-registrants-card__title { margin: 0; color: var(--apu-navy-950); font-size: .78rem; font-weight: 700; }
+.ai-registrants-card__empty { margin: 0; color: var(--apu-text-muted); font-size: .74rem; }
+.ai-registrants-card__table-wrap { max-height: 12rem; overflow: auto; }
+.ai-registrants-card__table { width: 100%; min-width: 14rem; border-collapse: collapse; font-size: .74rem; }
+.ai-registrants-card__table th { position: sticky; top: 0; padding: .3rem .5rem; border-bottom: 1px solid var(--apu-border); background: var(--apu-white); color: var(--apu-text-muted); font-weight: 650; text-align: left; text-transform: uppercase; letter-spacing: .02em; font-size: .62rem; }
+.ai-registrants-card__table td { padding: .35rem .5rem; border-bottom: 1px solid var(--apu-surface-muted); color: var(--apu-navy-900); }
+.ai-registrants-card__table tr:last-child td { border-bottom: 0; }
+.ai-registrants-card__status { display: inline-block; padding: .1rem .5rem; border-radius: var(--radius-pill); font-size: .64rem; font-weight: 650; }
+.ai-registrants-card__status--registered { background: rgb(22 163 74 / 12%); color: #15803d; }
+.ai-registrants-card__status--pending_approval { background: rgb(217 119 6 / 12%); color: #b45309; }
+.ai-registrants-card__status--rejected { background: rgb(220 38 38 / 10%); color: #dc2626; }
 
 /* Suggestion cards — 4 per page, horizontal scroll-snap for the second page */
 .ai-suggestions { display: grid; gap: .6rem; margin-top: .2rem; animation: assistant-message-in var(--motion-hover) var(--ease-standard); }
@@ -84,6 +169,7 @@
 @keyframes assistant-blink { 0%, 44%, 48%, 100% { transform: scaleY(1); } 46% { transform: scaleY(.08); } }
 @keyframes assistant-blink-strong { 0%, 100% { transform: scaleY(1); } 45% { transform: scaleY(.05); } }
 @keyframes assistant-panel-in { from { opacity: 0; transform: translateY(.7rem) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes assistant-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes assistant-message-in { from { opacity: 0; transform: translateY(.3rem); } to { opacity: 1; transform: none; } }
 @keyframes assistant-typing { 0%, 60%, 100% { opacity: .35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-.16rem); } }
 @keyframes assistant-wake-bounce { 0% { transform: translateY(calc(var(--assistant-gap) + var(--assistant-size) * 0.5)) scale(1); } 40% { transform: translateY(-.35rem) scale(1.04); } 70% { transform: translateY(.08rem) scale(.99); } 100% { transform: translateY(0) scale(1); } }
@@ -92,16 +178,82 @@
 @keyframes assistant-climb { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(-.5rem); } }
 @keyframes assistant-glow-pulse { 0%, 100% { opacity: .22; transform: rotate(-18deg) scale(1); } 45% { opacity: .4; transform: rotate(-18deg) scale(1.18); } }
 
+/*
+ * Phone chat panel — purpose-built, not a shrunken desktop popup.
+ *
+ * It used to be calc(100vw - 1.25rem) tall enough to swallow the screen, which read as an
+ * oversized full-bleed sheet. It now keeps a real inset from both edges, caps its height so the
+ * page behind stays visible, and tightens the header/messages/composer so the usable message
+ * area — not the chrome — gets the space.
+ */
 @media (max-width: 48rem) {
   :host { --assistant-size: 3rem; --assistant-gap: .9rem; }
-  .ai-chat { width: calc(100vw - 1.25rem); height: min(34rem, calc(100dvh - 6.5rem)); min-height: 22rem; }
+
+  /* The launcher host is pinned bottom-right; in full-page mode it must cover the viewport so
+     the expanded panel is not laid out inside that small corner box. */
+  :host:has(.ai-assistant--expanded) { inset: 0; }
+  .ai-assistant--expanded { width: 100%; height: 100%; }
+
+  .ai-chat {
+    width: min(21rem, calc(100vw - 1.75rem));
+    height: min(30rem, calc(100dvh - 7.5rem));
+    min-height: 18rem;
+    border-radius: var(--radius-card);
+  }
+
+  /* Full-page mode must override the floating panel's size/inset, otherwise the expanded chat
+     keeps the launcher's bottom-right box and renders as a small offset card. The two-column
+     desktop grid is unusable at phone width, so the sidebar is forced to its icon rail here
+     regardless of sidebarCollapsed() and overlays the conversation when opened (that overlay
+     rule lives in _ai-assistant-expanded.scss — it has no component-sheet counterpart). */
+  .ai-chat--expanded,
+  .ai-chat--expanded.ai-chat--sidebar-collapsed {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    min-height: 0;
+    border-radius: 0;
+    grid-template-columns: 3.25rem minmax(0, 1fr);
+  }
+
+  .ai-assistant--expanded { min-height: 100dvh; }
+  .ai-chat--expanded .ai-chat__messages { padding: .85rem .8rem; }
+  .ai-chat--expanded .ai-chat__composer { padding: .6rem .8rem .8rem; }
+  .ai-chat--expanded .ai-event-cards { max-width: 100%; }
+
+  /* Header: smaller type and tighter padding so it stops eating the panel. */
+  .ai-chat__header { gap: .45rem; padding: .7rem .8rem; }
+  .ai-chat__header strong { font-size: .9rem; }
+  .ai-chat__header small { font-size: .66rem; }
+  .ai-chat__icon-btn { width: 1.95rem; height: 1.95rem; }
+  .ai-chat__icon-btn span { font-size: 1.05rem; }
+  .ai-chat__mini-orb { width: 1.95rem; height: 1.95rem; }
+
+  /* Messages: keep bubbles readable but let them use more of the narrow width. */
+  .ai-chat__messages { gap: .55rem; padding: .7rem; }
+  .ai-chat__message { max-width: 90%; padding: .6rem .72rem; font-size: .8rem; }
+
+  /* Composer: input and send button stay on one row, both touch-sized. */
+  .ai-chat__composer { padding: .6rem .7rem .7rem; gap: .45rem; }
+
   .ai-prompt__text { font-size: .78rem; }
   .ai-suggestions__page { grid-template-columns: 1fr; }
+  .ai-suggestion-card { padding: .6rem .7rem; }
+
+  /* Event cards inside a phone-width panel: image + text only, no cramped third column. */
+  .ai-event-cards { max-width: 100%; }
+  .ai-event-card { grid-template-columns: 2.8rem 1fr; gap: .55rem; }
+  .ai-event-card__image { width: 2.8rem; height: 2.8rem; }
+}
+
+/* Very small phones: use the full inset width, the panel can no longer afford a fixed max. */
+@media (max-width: 23rem) {
+  .ai-chat { width: calc(100vw - 1.25rem); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ai-orb, .ai-orb__eyes i, .ai-chat__typing i, .ai-chat, .ai-chat__message, .ai-suggestions,
-  .ai-orb__face, .ai-orb__shine, .ai-orb-button--waking { animation: none; }
-  .ai-orb__eyes, .ai-orb__face, .ai-prompt, .ai-orb-button, .ai-orb, .ai-chat__icon-btn, .ai-suggestion-card { transition: none; }
+  .ai-orb__face, .ai-orb__shine, .ai-orb-button--waking, .ai-backdrop { animation: none; }
+  .ai-orb__eyes, .ai-orb__face, .ai-prompt, .ai-orb-button, .ai-orb, .ai-chat__icon-btn, .ai-suggestion-card, .ai-event-card, .ai-history__item { transition: none; }
   .ai-orb-button--peeking { transform: none; }
 }

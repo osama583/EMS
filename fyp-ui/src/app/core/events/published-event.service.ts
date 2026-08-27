@@ -10,11 +10,11 @@ export class PublishedEventService implements EventRegistrationApi {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiBaseUrl}/events`;
 
-  // The landing page renders several independent components (Happening Soon, Explore Events,
-  // the calendar) that each want the full published-events list — without this, every one of
-  // them fires its own GET /events on load. shareReplay(1) makes the first caller's request the
-  // only one that hits the network; every other caller (concurrent or later, until invalidated)
-  // replays that same response instead of firing a new request.
+  // Happening Soon, Explore Events (results + school facet), and the calendar each have their
+  // own scoped endpoint below (getHappeningSoon/searchEvents/getEventSchools/getEventsForRange)
+  // — nothing loads the full published-events table any more. Kept only for any future caller
+  // that genuinely needs every event; shareReplay(1) still applies so concurrent/repeat callers
+  // don't each refetch independently.
   private publishedEvents$: Observable<readonly PublishedEvent[]> | null = null;
 
   getPublishedEvents(): Observable<readonly PublishedEvent[]> {
@@ -56,6 +56,27 @@ export class PublishedEventService implements EventRegistrationApi {
     httpParams = httpParams.set('page', String(params.page ?? 1));
     httpParams = httpParams.set('pageSize', String(params.pageSize ?? 9));
     return this.http.get<EventSearchResponse>(`${this.baseUrl}/search`, { params: httpParams });
+  }
+
+  // Explore Events' school-filter facet — distinct schools/departments across published events,
+  // computed server-side (see events.py's list_event_schools()) rather than downloading every
+  // published event's full payload just to dedupe one column client-side.
+  getEventSchools(): Observable<readonly string[]> {
+    return this.http.get<readonly string[]>(`${this.baseUrl}/schools`);
+  }
+
+  // Happening Soon's own bounded feed — published events in the next 10 days, computed and
+  // capped server-side (see events.py's happening_soon()) rather than filtering the full
+  // getPublishedEvents() list in the component.
+  getHappeningSoon(): Observable<readonly PublishedEvent[]> {
+    return this.http.get<readonly PublishedEvent[]>(`${this.baseUrl}/happening-soon`);
+  }
+
+  // The events calendar's own range-scoped feed — published events with at least one schedule
+  // date inside [start, end] (see events.py's calendar_events()). Called once per visible
+  // month/week rather than loading every published event up front.
+  getEventsForRange(start: string, end: string): Observable<readonly PublishedEvent[]> {
+    return this.http.get<readonly PublishedEvent[]>(`${this.baseUrl}/calendar`, { params: { start, end } });
   }
 
   getEventDetails(id: string): Observable<PublishedEvent | undefined> { return this.http.get<PublishedEvent>(`${this.baseUrl}/${encodeURIComponent(id)}`); }
@@ -139,19 +160,22 @@ export class PublishedEventService implements EventRegistrationApi {
     return end.getTime() < Date.now();
   }
 
-  getActiveRegistrations(): Observable<RegisteredEventsResponse> {
-    return this.http.get<RegisteredEventsResponse>(`${this.baseUrl}/me/registrations`, { params: { scope: 'active' } });
+  // page/pageSize are real server query params (events.py's my_registrations()) - the server
+  // filters by scope, counts, and slices in SQL, so the browser only ever receives the one page
+  // of results it's about to render.
+  getActiveRegistrations(page: number, pageSize: number): Observable<RegisteredEventsResponse> {
+    return this.http.get<RegisteredEventsResponse>(`${this.baseUrl}/me/registrations`, { params: { scope: 'active', page: String(page), pageSize: String(pageSize) } });
   }
 
   // Events I registered for that use manual approval and are still awaiting the organiser's
   // decision (my own registration, not the organiser's approval queue - see pending-approvals
   // for that direction).
-  getPendingApprovalRegistrations(): Observable<RegisteredEventsResponse> {
-    return this.http.get<RegisteredEventsResponse>(`${this.baseUrl}/me/registrations`, { params: { scope: 'pending' } });
+  getPendingApprovalRegistrations(page: number, pageSize: number): Observable<RegisteredEventsResponse> {
+    return this.http.get<RegisteredEventsResponse>(`${this.baseUrl}/me/registrations`, { params: { scope: 'pending', page: String(page), pageSize: String(pageSize) } });
   }
 
-  getRegistrationHistory(): Observable<RegisteredEventsResponse> {
-    return this.http.get<RegisteredEventsResponse>(`${this.baseUrl}/me/registrations`, { params: { scope: 'history' } });
+  getRegistrationHistory(page: number, pageSize: number): Observable<RegisteredEventsResponse> {
+    return this.http.get<RegisteredEventsResponse>(`${this.baseUrl}/me/registrations`, { params: { scope: 'history', page: String(page), pageSize: String(pageSize) } });
   }
 
   // Events I proposed (or co-own) that are now published — my own organiser dashboard.

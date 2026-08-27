@@ -1,65 +1,85 @@
 <section class="club-management">
   <app-feedback-banner [message]="errorMessage()" tone="error" />
 
-  <app-internal-page-header [config]="cardHeaderConfig()" (primaryAction)="openAdd()">
-    <div headerTrailing class="club-management__header-actions">
-      <app-view-toggle [mode]="viewMode()" (modeChange)="setViewMode($event)" />
-      <button type="button" class="table-control table-control--primary club-management__add-desktop" (click)="openAdd()">
-        <span class="material-symbols-rounded" aria-hidden="true">add</span>
-        Add club
-      </button>
-    </div>
-  </app-internal-page-header>
+  <nav class="shared-tabs" aria-label="Sections">
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="!showDeleted()" (click)="setDeletedTab(false)">
+      <span class="material-symbols-rounded" aria-hidden="true">groups</span>
+      Clubs
+    </button>
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="showDeleted()" (click)="setDeletedTab(true)">
+      <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+      Deleted
+    </button>
+  </nav>
 
-  <section class="internal-table-workspace__controls club-management__controls">
-    <div workspaceControls class="shared-page-controls">
-      <app-internal-search-field
-        workspaceControlWide
-        [config]="{ ariaLabel: 'Search clubs', placeholder: 'Search club name, description, or president' }"
-        [value]="search()"
-        (valueChange)="setSearch($event)"
-      />
-      <div workspaceControlRight class="shared-page-controls__right">
-        <app-internal-filter-controls [filters]="filters()" (filterChange)="setFilter($event)" />
-        <div class="shared-page-controls__actions">
-          <button type="button" class="table-control table-control--primary club-management__add-mobile" (click)="openAdd()">
-            <span class="material-symbols-rounded" aria-hidden="true">add</span>
-            Add club
-          </button>
-          <app-internal-reset-button (reset)="reset()" />
-        </div>
-      </div>
-    </div>
-  </section>
-
-  @if (viewMode() === 'card') {
-    <app-option-card-grid
-      [items]="cardData()" [loading]="loading()"
-      emptyTitle="No clubs found" emptyDescription="Add a club or change the search and status filters."
-      (edit)="editClub($event)"
-      (toggleActive)="toggleActiveById($event)"
-      (viewDetails)="viewClubDetails($event)"
-    />
-    <!-- Cards are just as server-paginated as the table (clubs() is one page slice, not the
-         whole list) — the card grid has no pagination UI of its own, so drive the shared
-         pagination control directly rather than the whole table workspace. -->
-    <app-internal-pagination
-      [paginationLabel]="config().paginationLabel" [rowsPerPageLabel]="config().rowsPerPageLabel"
-      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
-      [pageSizeOptions]="config().pageSizeOptions ?? [5, 10, 25]"
-      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)"
+  @if (showDeleted()) {
+    <app-internal-data-page
+      [config]="deletedConfig()" [records]="deletedRecords()" [filters]="[]" [searchValue]="''" [loading]="deletedLoading()"
+      [totalPages]="1" [page]="1" [pageSize]="50" [hideControls]="true"
+      (rowAction)="handleDeletedAction($event)"
     />
   } @else {
-    <app-internal-data-page
-      [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
-      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()" [sort]="sort()"
-      [hideHeader]="true"
-      [hideControls]="true"
-      (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
-      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (sortChange)="setSort($event)" (rowAction)="handleAction($event)"
-      (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit club', icon: 'edit' }, record: $event })"
-      (primaryAction)="openAdd()"
-    />
+    <app-internal-page-header [config]="cardHeaderConfig()" (primaryAction)="openAdd()">
+      <div headerTrailing class="club-management__header-actions">
+        <app-view-toggle [mode]="viewMode()" (modeChange)="setViewMode($event)" />
+        <button type="button" class="table-control table-control--primary club-management__add-desktop" (click)="openAdd()">
+          <span class="material-symbols-rounded" aria-hidden="true">add</span>
+          Add club
+        </button>
+      </div>
+    </app-internal-page-header>
+
+    <section class="internal-table-workspace__controls club-management__controls">
+      <div workspaceControls class="shared-page-controls">
+        <app-internal-search-field
+          workspaceControlWide
+          [config]="{ ariaLabel: 'Search clubs', placeholder: 'Search club name, description, or president' }"
+          [value]="search()"
+          (valueChange)="setSearch($event)"
+        />
+        <div workspaceControlRight class="shared-page-controls__right">
+          <app-internal-filter-controls [filters]="filters()" (filterChange)="setFilter($event)" />
+          <div class="shared-page-controls__actions">
+            <button type="button" class="table-control table-control--primary club-management__add-mobile" (click)="openAdd()">
+              <span class="material-symbols-rounded" aria-hidden="true">add</span>
+              Add club
+            </button>
+            <app-internal-reset-button (reset)="reset()" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    @if (viewMode() === 'card') {
+      <app-option-card-grid
+        [items]="cardData()" [loading]="loading()"
+        emptyTitle="No clubs found" emptyDescription="Add a club or change the search and status filters."
+        (edit)="editClub($event)"
+        (toggleActive)="toggleActiveById($event)"
+        (viewDetails)="viewClubDetails($event)"
+        (delete)="requestDeleteById($event)"
+      />
+      <!-- Cards are just as server-paginated as the table (clubs() is one page slice, not the
+           whole list) — the card grid has no pagination UI of its own, so drive the shared
+           pagination control directly rather than the whole table workspace. -->
+      <app-internal-pagination
+        [paginationLabel]="config().paginationLabel" [rowsPerPageLabel]="config().rowsPerPageLabel"
+        [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+        [pageSizeOptions]="config().pageSizeOptions ?? [5, 10, 25]"
+        (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)"
+      />
+    } @else {
+      <app-internal-data-page
+        [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
+        [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()" [sort]="sort()"
+        [hideHeader]="true"
+        [hideControls]="true"
+        (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
+        (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (sortChange)="setSort($event)" (rowAction)="handleAction($event)"
+        (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit club', icon: 'edit' }, record: $event })"
+        (primaryAction)="openAdd()"
+      />
+    }
   }
 </section>
 
@@ -152,3 +172,19 @@
     </div>
   </app-form-modal>
 }
+
+<app-delete-confirm-dialog
+  [open]="!!deleteTarget()" entityKind="Club" [entityLabel]="deleteTarget()?.name ?? ''"
+  [checkingDependencies]="checkingDeletion()" [preview]="deletePreview()" [deleting]="deleting()"
+  (confirm)="confirmDelete()" (cancel)="cancelDelete()"
+/>
+
+<app-confirm-dialog
+  [open]="restoreTarget() !== null"
+  title="Restore club"
+  [message]="restoreMessage()"
+  confirmLabel="Restore"
+  [danger]="false"
+  (confirm)="confirmRestore()"
+  (cancel)="cancelRestore()"
+/>

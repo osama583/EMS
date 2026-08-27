@@ -27,6 +27,16 @@ interface LoginResponse {
 
 export type LoginResult = { success: true; user: AuthUser } | { success: false; message: string };
 
+interface MessageResponse {
+  readonly message: string;
+}
+
+export type PasswordResetConfirmResult =
+  | { status: 'reset'; message: string }
+  | { status: 'invalid'; message: string };
+
+export type ChangePasswordResult = { success: true } | { success: false; message: string };
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly document = inject(DOCUMENT);
@@ -102,6 +112,54 @@ export class AuthService {
           this.refreshing.set(false);
           this.refreshDone.next(result !== null);
         }),
+      );
+  }
+
+  /**
+   * Forgot-password step 1: always resolves to the same generic message,
+   * whether or not the email is registered — the backend deliberately gives
+   * an identical response either way (see api/auth.py request_password_reset).
+   */
+  requestPasswordReset(email: string): Observable<string> {
+    return this.http
+      .post<MessageResponse>(`${environment.apiBaseUrl}/auth/password-reset/request`, {
+        email: email.trim().toLowerCase(),
+      })
+      .pipe(
+        map((response) => response.message),
+        catchError(() => of('If that email address is registered, a reset link has been sent.')),
+      );
+  }
+
+  /** Forgot-password step 2: the token from the emailed link, plus a new password. */
+  confirmPasswordReset(token: string, password: string): Observable<PasswordResetConfirmResult> {
+    return this.http
+      .post<{ status: 'reset' | 'invalid'; message: string }>(
+        `${environment.apiBaseUrl}/auth/password-reset/confirm`,
+        { token, password },
+      )
+      .pipe(
+        catchError((error: HttpErrorResponse) =>
+          of({
+            status: 'invalid' as const,
+            message: error.error?.error?.message ?? 'This reset link could not be used. Please request a new one.',
+          }),
+        ),
+      );
+  }
+
+  /** Profile page's password-change form: current password + new password. */
+  changeOwnPassword(oldPassword: string, newPassword: string): Observable<ChangePasswordResult> {
+    return this.http
+      .post<MessageResponse>(`${environment.apiBaseUrl}/auth/me/password`, { oldPassword, newPassword })
+      .pipe(
+        map(() => ({ success: true }) as const),
+        catchError((error: HttpErrorResponse) =>
+          of({
+            success: false,
+            message: error.error?.error?.message ?? 'Something went wrong. Please try again.',
+          } as const),
+        ),
       );
   }
 

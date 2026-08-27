@@ -42,13 +42,34 @@
   >
     <p class="proof-preview__meta">{{ registration.name || registration.email }} · {{ registration.eventTitle }}</p>
     @if (registration.paymentProofUrl) {
-      <a [href]="registration.paymentProofUrl" target="_blank" rel="noopener" class="proof-preview__link">
+      <button type="button" class="proof-preview__link" (click)="openImageLightbox()">
         <img class="proof-preview__image" [src]="registration.paymentProofUrl" [alt]="'Payment proof from ' + (registration.name || registration.email)" />
-      </a>
-      <a [href]="registration.paymentProofUrl" target="_blank" rel="noopener" class="proof-preview__open">
-        <span class="material-symbols-rounded" aria-hidden="true">open_in_new</span>
-        Open full size
-      </a>
+      </button>
+      <button type="button" class="proof-preview__open" (click)="openImageLightbox()">
+        <span class="material-symbols-rounded" aria-hidden="true">zoom_in</span>
+        View full size
+      </button>
     }
   </app-form-modal>
+}
+
+@if (imageLightboxOpen() && proofPreview(); as registration) {
+  <div
+    #imageLightbox
+    class="proof-image-lightbox"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Payment proof preview"
+    tabindex="-1"
+    (click)="closeImageLightbox()"
+    (keydown.escape)="closeImageLightbox()"
+  >
+    <figure (click)="$event.stopPropagation()">
+      <img [src]="registration.paymentProofUrl" [alt]="'Payment proof from ' + (registration.name || registration.email)" />
+      <figcaption>{{ registration.name || registration.email }} · {{ registration.eventTitle }}</figcaption>
+      <button type="button" aria-label="Close image preview" (click)="closeImageLightbox()">
+        <span class="material-symbols-rounded" aria-hidden="true">close</span>
+      </button>
+    </figure>
+  </div>
 }

@@ -31,11 +31,16 @@ const STATUS_TONES: Record<PresidentChangeRequestRecord['status'], InternalCellT
 
 // Single tab that serves both sides of the President Change Request workflow, scoped entirely by
 // the server per role (clubs.py's president_change_requests_inbox/mine/history):
-//   - Club Admin / System Admin, Inbox bucket:   pending requests, decide (approve/reject).
+//   - Club Admin / System Admin, Inbox bucket:   pending requests, decide (approve/reject) — this
+//                                                  is genuinely actionable for them, so Inbox is
+//                                                  the right place.
 //   - Club Admin / System Admin, History bucket: every decided request, read-only.
-//   - Club President, any bucket:                their own submitted requests (any status),
-//                                                  read-only — they can see the request and its
-//                                                  history, but only a Club Admin decides it.
+//   - Club President, Ongoing bucket:             their own PENDING submitted request, read-only —
+//                                                  someone else (Club Admin) decides it, so it is
+//                                                  never actionable for the President themself and
+//                                                  does not belong in their Inbox (see records-hub
+//                                                  .ts's showPresidentChangeTab split).
+//   - Club President, History bucket:             their own DECIDED requests, read-only.
 // Mirrors cafeteria-staff-requests-history.ts's server-driven toObservable/switchMap pagination
 // pipeline rather than hub-club-requests.ts's older client-side filtered/paginated pattern, since
 // this page must be server-paginated/filtered/sorted per the spec.
@@ -52,9 +57,11 @@ export class HubPresidentChangeRequestsComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
 
-  // Which bucket ('inbox' | 'history') this instance is mounted under — same route-data
-  // convention as staff-tasks.ts's `taskPage`, read from the parent RecordsHubComponent's data.
-  readonly bucket = (this.route.snapshot.data['bucket'] as 'inbox' | 'history' | undefined) ?? 'inbox';
+  // Which bucket ('inbox' | 'ongoing' | 'history') this instance is mounted under — same
+  // route-data convention as staff-tasks.ts's `taskPage`, read from the parent RecordsHubComponent's
+  // data. 'ongoing' only ever applies to a non-admin President (see records-hub.ts's
+  // showPresidentChangeTab) — Club/System Admin never route here.
+  readonly bucket = (this.route.snapshot.data['bucket'] as 'inbox' | 'ongoing' | 'history' | undefined) ?? 'inbox';
 
   readonly rejectionCommentMinLength = PCR_REJECTION_COMMENT_MIN_LENGTH;
 
@@ -85,13 +92,14 @@ export class HubPresidentChangeRequestsComponent {
   readonly config = computed<InternalDataPageConfig>(() => {
     const admin = this.isClubAdmin();
     const inbox = this.bucket === 'inbox';
+    const ongoing = this.bucket === 'ongoing';
     return {
       ariaLabel: 'President change requests', paginationLabel: 'Request pages', rowsPerPageLabel: 'Requests per page', mobileListLabel: 'Request cards',
       header: {
         title: 'President Change Requests',
         description: admin
           ? (inbox ? 'Requests from club Presidents to hand their role to someone else, awaiting your decision.' : 'Every President change request that has been decided.')
-          : 'President change requests you have submitted, and their outcome.',
+          : (ongoing ? 'Your request to hand the President role to someone else, awaiting a Club Admin’s decision.' : 'President change requests you have submitted, and their outcome.'),
         countLabel: `${this.total()} request${this.total() === 1 ? '' : 's'}`,
       },
       search: { ariaLabel: 'Search requests', placeholder: 'Search club or president name' },
@@ -106,10 +114,10 @@ export class HubPresidentChangeRequestsComponent {
       actions: admin && inbox
         ? [{ key: 'approve', label: 'Approve request', icon: 'task_alt' }, { key: 'reject', label: 'Reject request', icon: 'do_not_disturb_on' }]
         : [],
-      emptyTitle: inbox ? 'No pending requests' : 'No decided requests yet',
+      emptyTitle: inbox ? 'No pending requests' : (ongoing ? 'No pending request' : 'No decided requests yet'),
       emptyDescription: admin
         ? (inbox ? 'Requests to change a club President will appear here for you to decide.' : 'Decided President change requests will appear here.')
-        : 'Requests you submit to change your club’s President will appear here.',
+        : (ongoing ? 'A request you submit to change your club’s President will appear here while it awaits a decision.' : 'Requests you submit to change your club’s President will appear here.'),
       pageSizeOptions: [10, 25, 50],
     };
   });
@@ -159,7 +167,11 @@ export class HubPresidentChangeRequestsComponent {
             page: query.page,
             pageSize: query.pageSize,
           };
-          if (!query.admin) return this.clubService.getMyPresidentChangeRequests(options);
+          if (!query.admin) {
+            return this.bucket === 'ongoing'
+              ? this.clubService.getMyPendingPresidentChangeRequest(options)
+              : this.clubService.getMyDecidedPresidentChangeRequests(options);
+          }
           return this.bucket === 'inbox' ? this.clubService.getPresidentChangeInbox(options) : this.clubService.getPresidentChangeHistory(options);
         }),
       )

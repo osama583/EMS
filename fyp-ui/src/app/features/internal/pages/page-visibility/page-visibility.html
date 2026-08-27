@@ -189,13 +189,13 @@
 
 <app-delete-confirm-dialog
   [open]="!!deleteGrantTarget()" entityKind="Permission" [entityLabel]="deleteGrantTarget()?.label ?? ''"
-  [checkingDependencies]="false" [preview]="{ canDelete: true, blockingReasons: [], entityLabel: deleteGrantTarget()?.label ?? '' }" [deleting]="deletingGrant()"
+  [requirePreview]="false" [deleting]="deletingGrant()"
   (confirm)="confirmRemoveGrant()" (cancel)="cancelRemoveGrant()"
 />
 
 <app-delete-confirm-dialog
   [open]="!!purgeTargetCode()" [permanent]="true" entityKind="Page" [entityLabel]="purgeTargetLabel()"
-  [preview]="{ canDelete: true, blockingReasons: [], entityLabel: purgeTargetLabel() }" [deleting]="purgingPage()"
+  [checkingDependencies]="checkingPurge()" [preview]="purgePreview()" [deleting]="purgingPage()"
   (confirm)="confirmPurgePage()" (cancel)="cancelPurgePage()"
 />
 

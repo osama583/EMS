@@ -1,9 +1,11 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  HostListener,
   computed,
   input,
   output,
+  signal,
 } from '@angular/core';
 import {
   InternalCellClickEvent,
@@ -330,19 +332,26 @@ export class InternalPageStateComponent {
           </span>
         </button>
         @if (visibleActions(record).length > 0) {
-          <details class="shared-mobile-card__menu">
-            <summary [attr.aria-label]="'Actions for ' + record.mobile.title">
+          <div class="shared-mobile-card__menu">
+            <button
+              type="button"
+              [attr.aria-label]="'Actions for ' + record.mobile.title"
+              [attr.aria-expanded]="menuOpenFor() === record.id"
+              (click)="toggleMenu(record.id, $event)"
+            >
               <span class="material-symbols-rounded" aria-hidden="true">more_horiz</span>
-            </summary>
-            <div>
-              @for (action of visibleActions(record); track action.key) {
-                <button type="button" (click)="actionSelect.emit({ action, record })">
-                  <span class="material-symbols-rounded" aria-hidden="true">{{ action.icon }}</span>
-                  {{ action.label }}
-                </button>
-              }
-            </div>
-          </details>
+            </button>
+            @if (menuOpenFor() === record.id) {
+              <div role="menu" (click)="$event.stopPropagation()">
+                @for (action of visibleActions(record); track action.key) {
+                  <button type="button" role="menuitem" (click)="closeMenu(); actionSelect.emit({ action, record })">
+                    <span class="material-symbols-rounded" aria-hidden="true">{{ action.icon }}</span>
+                    {{ action.label }}
+                  </button>
+                }
+              </div>
+            }
+          </div>
         }
       </article>
     }
@@ -355,9 +364,28 @@ export class InternalMobileRecordListComponent {
   readonly actions = input.required<readonly InternalRowAction[]>();
   readonly open = output<InternalDataRecord>();
   readonly actionSelect = output<InternalRowActionEvent>();
+
+  // Only one card's menu open at a time, closed by an outside click or Escape — matches the
+  // hand-rolled menu in hub-my-clubs.ts. The previous <details>/<summary> version had neither:
+  // any number of cards could be expanded simultaneously, and closing one required clicking its
+  // own trigger again rather than just clicking elsewhere.
+  readonly menuOpenFor = signal<string | number | null>(null);
+
   visibleActions(record: InternalDataRecord): readonly InternalRowAction[] {
     return record.actionKeys ? this.actions().filter((action) => record.actionKeys!.includes(action.key)) : this.actions();
   }
+
+  toggleMenu(recordId: string | number, event: Event): void {
+    event.stopPropagation();
+    this.menuOpenFor.set(this.menuOpenFor() === recordId ? null : recordId);
+  }
+  closeMenu(): void { this.menuOpenFor.set(null); }
+
+  @HostListener('document:click')
+  onDocumentClick(): void { this.closeMenu(); }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void { this.closeMenu(); }
 }
 
 interface PaginationPageItem {

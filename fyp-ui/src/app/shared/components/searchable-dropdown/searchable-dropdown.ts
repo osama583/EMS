@@ -75,14 +75,25 @@ export class SearchableDropdownComponent {
     // Scroll events don't bubble, so a plain (bubbling) listener never sees a modal body or any
     // other ancestor scrolling underneath the trigger — capture-phase is required to catch those
     // and keep the floating panel's position in sync instead of drifting away from the trigger.
+    // rAF-throttled: a scrollable modal body can fire dozens of scroll events per second, and
+    // measuring+re-rendering the floating panel on every single one (rather than once per frame)
+    // is what made the panel visibly judder/"shake" while scrolling underneath it.
+    let scrollFrame: number | null = null;
     const onScroll = (event: Event) => {
       if (!this.open()) return;
       const panel = this.host.nativeElement.querySelector('.dropdown-panel');
       if (panel && event.target instanceof Node && panel.contains(event.target)) return;
-      this.measurePanelPosition();
+      if (scrollFrame !== null) return;
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = null;
+        this.measurePanelPosition();
+      });
     };
     document.addEventListener('scroll', onScroll, { capture: true, passive: true });
-    this.destroyRef.onDestroy(() => document.removeEventListener('scroll', onScroll, { capture: true }));
+    this.destroyRef.onDestroy(() => {
+      document.removeEventListener('scroll', onScroll, { capture: true });
+      if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
+    });
   }
 
   toggle(): void {
@@ -91,11 +102,22 @@ export class SearchableDropdownComponent {
     if (this.open()) this.measurePanelPosition();
   }
   close(): void { this.open.set(false); this.query.set(''); this.panelPosition.set(null); }
+  // Opens below the trigger by default, but flips above it when there isn't enough room left in
+  // the viewport — otherwise a trigger near the bottom of a scrollable modal (e.g. "Page" in the
+  // Add Permission dialog) renders its panel partly off-screen / overlapping the modal footer.
   private measurePanelPosition(): void {
     const trigger = this.host.nativeElement.querySelector('.dropdown-trigger');
     if (!trigger) return;
     const rect = trigger.getBoundingClientRect();
-    this.panelPosition.set({ top: rect.bottom + 6, left: rect.left, width: rect.width });
+    const panel = this.host.nativeElement.querySelector('.dropdown-panel') as HTMLElement | null;
+    const estimatedHeight = panel?.offsetHeight || 280;
+    const gap = 6;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openAbove = spaceBelow < estimatedHeight + gap && rect.top > spaceBelow;
+    const top = openAbove
+      ? Math.max(gap, rect.top - estimatedHeight - gap)
+      : rect.bottom + gap;
+    this.panelPosition.set({ top, left: rect.left, width: rect.width });
   }
   setQuery(event: Event): void { const value = (event.target as HTMLInputElement).value; this.query.set(value); this.searchChange.emit(value); }
   isSelected(value: string): boolean { return this.selectedOptions().some((option) => option.value === value); }

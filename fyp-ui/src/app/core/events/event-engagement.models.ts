@@ -15,7 +15,10 @@ export interface SavedEventMutationResponse {
 
 export interface SavedEventsResponse {
   readonly items: readonly PublishedEvent[];
+  readonly page: number;
+  readonly pageSize: number;
   readonly total: number;
+  readonly totalPages: number;
 }
 
 export interface RegisteredEventEntry {
@@ -25,7 +28,10 @@ export interface RegisteredEventEntry {
 
 export interface RegisteredEventsResponse {
   readonly items: readonly RegisteredEventEntry[];
+  readonly page: number;
+  readonly pageSize: number;
   readonly total: number;
+  readonly totalPages: number;
 }
 
 export interface NotificationPreference {
@@ -48,7 +54,6 @@ export interface ExternalUserRegistrationResponse {
   readonly challengeId: string;
   readonly status: 'otp-required';
   readonly maskedEmail: string;
-  readonly developmentOtp?: string;
 }
 
 export interface VerifyExternalOtpRequest {
@@ -62,6 +67,17 @@ export interface VerifyExternalOtpResponse {
   readonly message: string;
 }
 
+export interface ResendOtpResponse {
+  readonly status: 'sent' | 'expired';
+  readonly message: string;
+}
+
+export interface EmailStatusResponse {
+  readonly available: boolean;
+  readonly hasPendingChallenge: boolean;
+  readonly challengeId: string | null;
+}
+
 export interface SavedEventsApi {
   getSavedEvents(userEmail: string): import('rxjs').Observable<SavedEventsResponse>;
   saveEvent(userEmail: string, eventId: string): import('rxjs').Observable<SavedEventMutationResponse>;
@@ -72,11 +88,13 @@ export interface SavedEventsApi {
 
 /** The acting user is resolved server-side from the bearer token. */
 export interface EventRegistrationApi {
-  getActiveRegistrations(): import('rxjs').Observable<RegisteredEventsResponse>;
-  getRegistrationHistory(): import('rxjs').Observable<RegisteredEventsResponse>;
+  getActiveRegistrations(page: number, pageSize: number): import('rxjs').Observable<RegisteredEventsResponse>;
+  getRegistrationHistory(page: number, pageSize: number): import('rxjs').Observable<RegisteredEventsResponse>;
 }
 
 export interface ExternalRegistrationApi {
   registerExternalUser(request: ExternalUserRegistrationRequest): import('rxjs').Observable<ExternalUserRegistrationResponse>;
   verifyOtp(request: VerifyExternalOtpRequest): import('rxjs').Observable<VerifyExternalOtpResponse>;
+  resendOtp(challengeId: string): import('rxjs').Observable<ResendOtpResponse>;
+  checkEmailStatus(email: string): import('rxjs').Observable<EmailStatusResponse>;
 }

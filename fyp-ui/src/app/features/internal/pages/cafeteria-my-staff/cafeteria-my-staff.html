@@ -1,13 +1,32 @@
 <section class="cafeteria-my-staff">
   <app-feedback-banner [message]="errorMessage()" tone="error" />
 
-  <app-internal-data-page
-    [config]="config()" [records]="records()" [filters]="[]" [searchValue]="search()" [loading]="loading()"
-    [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
-    (searchChange)="setSearch($event)" (reset)="reset()"
-    (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
-    (primaryAction)="openAdd()"
-  />
+  <nav class="shared-tabs" aria-label="Sections">
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="!showDeleted()" (click)="setDeletedTab(false)">
+      <span class="material-symbols-rounded" aria-hidden="true">groups</span>
+      My Staff
+    </button>
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="showDeleted()" (click)="setDeletedTab(true)">
+      <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+      Deleted
+    </button>
+  </nav>
+
+  @if (showDeleted()) {
+    <app-internal-data-page
+      [config]="deletedConfig()" [records]="deletedRecords()" [filters]="[]" [searchValue]="''" [loading]="deletedLoading()"
+      [totalPages]="1" [page]="1" [pageSize]="50" [hideControls]="true"
+      (rowAction)="handleDeletedAction($event)"
+    />
+  } @else {
+    <app-internal-data-page
+      [config]="config()" [records]="records()" [filters]="[]" [searchValue]="search()" [loading]="loading()"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+      (searchChange)="setSearch($event)" (reset)="reset()"
+      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+      (primaryAction)="openAdd()"
+    />
+  }
 </section>
 
 <app-form-modal
@@ -36,8 +55,18 @@
   </div>
 </app-form-modal>
 
-<app-form-modal [open]="!!removeTarget()" title="Remove Staff" primaryLabel="Remove" [danger]="true" [loading]="removing()" (close)="cancelRemove()" (cancel)="cancelRemove()" (submit)="confirmRemove()">
-  <div class="cafeteria-my-staff__form">
-    <p>Remove <strong>{{ removeTarget()?.displayName }}</strong> from your cafeteria?</p>
-  </div>
-</app-form-modal>
+<app-delete-confirm-dialog
+  [open]="!!removeTarget()" entityKind="Staff member" [entityLabel]="removeTarget()?.displayName ?? ''"
+  [checkingDependencies]="checkingRemoval()" [preview]="removePreview()" [deleting]="removing()"
+  (confirm)="confirmRemove()" (cancel)="cancelRemove()"
+/>
+
+<app-confirm-dialog
+  [open]="restoreTarget() !== null"
+  title="Restore from Deleted"
+  [message]="restoreMessage()"
+  confirmLabel="Restore"
+  [danger]="false"
+  (confirm)="confirmRestore()"
+  (cancel)="cancelRestore()"
+/>

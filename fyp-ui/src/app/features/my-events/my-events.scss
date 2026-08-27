@@ -2,12 +2,17 @@
 .my-events-page { min-height: 100svh; padding: calc(var(--site-header-compact-height) + var(--space-7)) var(--layout-gutter) var(--section-block); background: var(--apu-light-section-background); }
 .my-events-page--internal { min-height: auto; padding: 0; background: transparent; }
 .my-events-page__inner { display: grid; width: min(100%, var(--layout-max)); margin-inline: auto; gap: var(--space-5); }
-.my-events-page__header { padding: 0; }
+// .shared-tabs (styles/_tabs.scss) is inline-flex internally, so its tab BUTTONS already
+// shrink-wrap - but as a grid item here it still stretches to the full grid-column width by
+// default (justify-self: stretch), which pushed the pill's own border/background edge-to-edge
+// while the tab labels stayed left-aligned inside it. Shrink the container itself to match.
+.my-events-page__inner > .shared-tabs { justify-self: start; }
+// Same plain title-left/description-left treatment as every other page's header (Inbox,
+// Proposals, ...) - the public (guest) layout previously wrapped this in its own centered white
+// card/border/shadow container, which was the odd one out; no other page's title sits in a box.
+.my-events-page__header { padding: 0; text-align: left; }
 .my-events-page__header h1 { margin: 0; color: var(--apu-blue-600); font-size: clamp(2.25rem, 4vw, 3.5rem); font-weight: var(--weight-heading); letter-spacing: -.045em; line-height: 1.05; }
 .my-events-page__header span { display: block; max-width: 42rem; margin-top: var(--space-3); color: var(--apu-text-muted); font-size: var(--type-body); line-height: 1.65; }
-.my-events-page--internal .my-events-page__header { text-align: left; }
-.my-events-page:not(.my-events-page--internal) .my-events-page__header { display: grid; place-items: center; padding: var(--space-5); border: 1px solid var(--apu-border); border-radius: var(--radius-container); background: var(--apu-white); box-shadow: var(--internal-card-shadow); text-align: center; }
-.my-events-page:not(.my-events-page--internal) .my-events-page__header span { margin-inline: auto; }
 
 
 @media (max-width: 48rem) {

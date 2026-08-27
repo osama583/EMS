@@ -14,7 +14,11 @@ import { filter } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import { AuthNavigationSection } from '../../../core/auth/auth.models';
 import { FALLBACK_NAVIGATION } from '../../../core/auth/role-navigation';
+import { isSystemAdmin } from '../../../core/auth/role-access';
 import { NavIconComponent } from '../../../shared/components/nav-icon/nav-icon';
+import { PurgeSweepService } from '../../../core/admin-directory/purge-sweep.service';
+import { ToastService, apiErrorMessage } from '../../../shared/components/toast/toast.service';
+import { finalize } from 'rxjs';
 
 @Component({
   selector: 'app-internal-layout',
@@ -28,6 +32,8 @@ export class InternalLayoutComponent {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(AuthService);
+  private readonly purgeSweep = inject(PurgeSweepService);
+  private readonly toast = inject(ToastService);
   private readonly expandedSectionKey = 'apu-internal-expanded-section';
   private readonly pinnedKey = 'apu-internal-sidebar-pinned';
   private readonly activeRouteKey = 'apu-internal-active-route';
@@ -49,6 +55,14 @@ export class InternalLayoutComponent {
   // its own clearly-named signal rather than reusing "manuallyExpanded" everywhere.
   readonly mobileNavOpen = computed(() => this.manuallyExpanded());
   readonly currentUserName = computed(() => this.auth.user()?.displayName ?? '');
+  // The 7-day retention sweep (see PurgeSweepService) has no server to schedule it on yet, so a
+  // System Admin triggers it here on demand instead of it running automatically. Restricted to
+  // system-admin the same way every purge/purge-adjacent backend endpoint already is.
+  readonly canRunPurgeSweep = computed(() => {
+    const user = this.auth.user();
+    return !!user && isSystemAdmin(user);
+  });
+  readonly purgingDeleted = signal(false);
 
   // No more UserRole to default to for a not-yet-resolved/unauthenticated session — the shared
   // FALLBACK_NAVIGATION stands in until the real one loads (same constant navigationFor() itself
@@ -169,6 +183,31 @@ export class InternalLayoutComponent {
 
   onNavigate(): void {
     this.closeMobileDrawer();
+  }
+
+  runPurgeSweep(): void {
+    if (this.purgingDeleted()) return;
+    if (!this.document.defaultView?.confirm(
+      'Permanently remove everything that has sat in a Deleted bin for more than 7 days? '
+        + 'Anything still referenced elsewhere is skipped and left in the bin. This cannot be undone.',
+    )) {
+      return;
+    }
+    this.purgingDeleted.set(true);
+    this.purgeSweep.run().pipe(
+      finalize(() => this.purgingDeleted.set(false)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (result) => {
+        this.toast.success(
+          'Purge sweep complete',
+          result.totalPurged
+            ? `${result.totalPurged} record(s) permanently removed${result.totalBlocked ? `, ${result.totalBlocked} left in the bin (still referenced elsewhere)` : ''}.`
+            : 'Nothing was due for permanent removal.',
+        );
+      },
+      error: (err) => this.toast.error('The purge sweep could not run', apiErrorMessage(err, 'Please try again.')),
+    });
   }
 
   toggleMobileNav(): void {

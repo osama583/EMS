@@ -34,6 +34,13 @@ export class SavedEventsService implements SavedEventsApi {
     return this.http.get<SavedEventsResponse>(`${this.baseUrl}/saved`, { params: { email: userEmail.trim().toLowerCase() } });
   }
 
+  // Server-side paginated counterpart to getSavedEvents() above, for the /my-events/saved list
+  // view - getSavedEvents() itself stays unpaginated because it also drives the app-wide "is this
+  // saved" heart-icon state (SavedEventsService.refresh()), which needs the complete id set.
+  searchSavedEvents(page: number, pageSize: number): Observable<SavedEventsResponse> {
+    return this.http.get<SavedEventsResponse>(`${this.baseUrl}/saved/search`, { params: { page: String(page), pageSize: String(pageSize) } });
+  }
+
   // Optimistic: the heart flips the instant you click it, not after the PUT/DELETE round-trips —
   // that's what "click and it updates" means. Flip first, then fire the request; roll the signal
   // back only if the server actually rejects it, so a slow network never reads as "did nothing".

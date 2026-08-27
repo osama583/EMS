@@ -1,0 +1,28 @@
+<section class="ai-access-log-page">
+  <app-feedback-banner [message]="errorMessage()" tone="error" />
+
+  <app-internal-data-page
+    [config]="config()"
+    [records]="records()"
+    [filters]="[]"
+    [searchValue]="search()"
+    [loading]="loading()"
+    [totalPages]="totalPages()"
+    [page]="page()"
+    [pageSize]="pageSize()"
+    (searchChange)="setSearch($event)"
+    (reset)="reset()"
+    (pageChange)="setPage($event)"
+    (primaryAction)="openClear()"
+  />
+</section>
+
+<app-confirm-dialog
+  [open]="clearOpen()"
+  title="Clear the access log?"
+  message="Every recorded denial will be permanently removed. This cannot be undone, and it does not change anyone's access."
+  confirmLabel="Clear log"
+  [loading]="clearing()"
+  (confirm)="confirmClear()"
+  (cancel)="closeClear()"
+/>
