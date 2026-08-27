@@ -1,0 +1,54 @@
+:host { display: block; width: 100%; min-width: 0; }
+
+.viz-meters { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+
+.viz-meter__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+}
+
+.viz-meter__name { font-weight: 600; color: var(--viz-ink-secondary); }
+.viz-meter__value { font-weight: 700; font-variant-numeric: proportional-nums; }
+
+/* The unfilled track is a lighter step of the same ramp, so the state reads
+   across the whole bar rather than only where the fill stops. */
+.viz-meter__track {
+  position: relative;
+  height: 0.85rem;
+  border-radius: var(--radius-pill);
+  background: var(--viz-seq-100);
+  overflow: hidden;
+}
+
+.viz-meter__fill {
+  display: block;
+  height: 100%;
+  border: 0;
+  border-radius: var(--radius-pill);
+  padding: 0;
+  cursor: pointer;
+
+  &:focus-visible { outline: none; box-shadow: var(--internal-focus-ring); }
+}
+
+.viz-meter__limit {
+  position: absolute;
+  inset-block: -0.15rem;
+  width: 2px;
+  background: var(--viz-ink-secondary);
+}
+
+.viz-meter__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  margin-top: 0.2rem;
+  font-size: 0.6875rem;
+  color: var(--viz-ink-muted);
+}
+
+.viz-meter__empty { font-size: 0.8125rem; color: var(--viz-ink-muted); padding: var(--space-3); text-align: center; }

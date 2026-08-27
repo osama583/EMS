@@ -1,0 +1,231 @@
+<!--
+  Five bands. Bands 1, 3, 4 and 5 share a skeleton across all ten roles; band 2
+  is the role's own instrument and is the widest, tallest element on the page.
+
+  On a phone the order changes rather than the columns collapsing — alerts
+  first, then the hero, then three role-chosen KPI tiles, then the quick
+  actions, then the signature panel, then band 3 collapsed. That is the job a
+  head on a phone is actually doing.
+-->
+<section class="dash" [class.dash--refetching]="refetching()">
+  <p class="dash__sr-live" role="status" aria-live="polite">{{ announcement() }}</p>
+
+  @if (loading()) {
+    <div class="dash__loading">
+      <app-loading-state variant="grid" [count]="6" label="Loading your dashboard…" />
+    </div>
+  } @else if (noAccess()) {
+    <!-- Fail closed (R1). Never a blank dashboard, and never a filter applied
+         on top of a default-visible panel. -->
+    <div class="dash-card dash__no-access">
+      <span class="material-symbols-rounded" aria-hidden="true">lock</span>
+      <h2>No dashboard for your roles</h2>
+      <p>{{ document()?.message || 'Dashboards are built for department heads, school heads, the CFO and cafeteria managers.' }}</p>
+    </div>
+  } @else if (document(); as doc) {
+    <!-- Page header -->
+    <header class="dash__header">
+      <div class="dash__identity">
+        <p class="dash__eyebrow">{{ doc.profile?.eyebrow }}</p>
+        <h1 class="dash__title">{{ doc.profile?.title }}</h1>
+      </div>
+
+      <div class="dash__scope">
+        @if (switchable().length) {
+          <label class="dash__select">
+            <span class="dash__select-label">Dashboard</span>
+            <select [value]="doc.profile?.id" (change)="setProfile($event)">
+              @for (option of switchable(); track option.id) {
+                <option [value]="option.id">{{ option.title }}</option>
+              }
+            </select>
+          </label>
+        }
+        @if (outlets().length) {
+          <label class="dash__select">
+            <span class="dash__select-label">Outlet</span>
+            <select [value]="doc.profile?.activeOutlet" (change)="setOutlet($event)">
+              <option value="all">All my outlets</option>
+              @for (outlet of outlets(); track outlet.code) {
+                <option [value]="outlet.code">{{ outlet.label }}</option>
+              }
+            </select>
+          </label>
+        }
+        <button type="button" class="dash__refresh" (click)="refresh()" [disabled]="refetching()">
+          <span class="material-symbols-rounded" aria-hidden="true">refresh</span>
+          <span class="dash__refresh-time">{{ generatedLabel() }}</span>
+        </button>
+      </div>
+    </header>
+
+    @if (error()) {
+      <p class="dash__banner dash__banner--error" role="status">
+        <span class="material-symbols-rounded" aria-hidden="true">cloud_off</span>
+        {{ error() }}
+        <button type="button" (click)="retry()">Try again</button>
+      </p>
+    }
+
+    <!-- Filter row · above everything it scopes -->
+    <div class="dash__filters">
+      <div class="dash__periods" role="group" aria-label="Reporting period">
+        @for (option of periods; track option.key) {
+          <button
+            type="button"
+            class="dash__period"
+            [class.dash__period--on]="period() === option.key"
+            [attr.aria-pressed]="period() === option.key"
+            [title]="option.label"
+            (click)="setPeriod(option.key)"
+          >
+            {{ option.short }}
+          </button>
+        }
+      </div>
+      <p class="dash__period-note">
+        {{ doc.period.label }} · compared with the {{ doc.period.comparedTo.label }}
+      </p>
+    </div>
+
+    <!-- Alerts rail · first on a phone, band 4 on a desktop -->
+    @if (isNarrow() && alerts(); as rail) {
+      <div class="dash__band dash__band--mobile-alerts">
+        <div class="dash-col-12">
+          <app-chart-panel [panel]="rail" [exportHref]="exportHref(rail)" (drill)="navigate($event)" (retry)="retry()" />
+        </div>
+      </div>
+    }
+
+    <!-- Band 1 · Signal. The hero takes four columns and full band height so
+         it reads as the page's lead rather than a larger tile; the KPI tiles
+         share the remaining eight and flow, because roles carry four, five or
+         six of them and a fixed span would strand one on its own row. -->
+    <div class="dash__band">
+      @if (hero(); as heroStat) {
+        <div class="dash-col-4 dash-col--hero">
+          <app-stat-tile [stat]="heroStat" (drill)="onStat($event)" />
+        </div>
+      }
+      <div class="dash-col-8 dash__kpis">
+        @for (kpi of kpis(); track kpi.id) {
+          <app-stat-tile [stat]="kpi" (drill)="onStat($event)" />
+        }
+      </div>
+    </div>
+
+    <!-- Quick actions · promoted above the charts on a phone, since acting is
+         the whole point of the visit -->
+    @if (isNarrow() && quickActions().length) {
+      <nav class="dash__actions dash__actions--mobile" aria-label="Quick actions">
+        @for (action of quickActions(); track action.key) {
+          <button type="button" class="dash__action" (click)="onQuickAction(action)">
+            <span class="material-symbols-rounded" aria-hidden="true">{{ action.icon }}</span>
+            {{ action.label }}
+            @if (action.badge) { <span class="dash__action-badge">{{ action.badge }}</span> }
+          </button>
+        }
+      </nav>
+    }
+
+    <!-- Band 2 · Signature panel — the role's own instrument -->
+    @if (signature(); as signaturePanel) {
+      <div class="dash__band">
+        <div class="dash-col-12">
+          <app-chart-panel
+            [panel]="signaturePanel"
+            [exportHref]="exportHref(signaturePanel)"
+            [suppressed]="doc.meta.suppressedBuckets"
+            (drill)="navigate($event)"
+            (retry)="retry()"
+          />
+        </div>
+      </div>
+    }
+
+    <!-- Band 3 · Analysis -->
+    <div class="dash__band">
+      @for (panel of panels(); track panel.id; let index = $index) {
+        <div [class]="spanFor(index)">
+          @if (isNarrow()) {
+            <!-- Collapsed on a phone: title plus a one-line summary, expanding
+                 on tap. Scroll cost is the thing being spent here. -->
+            <section class="dash-card dash-panel--collapsible" [class.dash-panel--collapsed]="!isExpanded(panel)">
+              <button type="button" class="dash-panel__toggle" [attr.aria-expanded]="isExpanded(panel)" (click)="togglePanel(panel)">
+                <span class="dash-panel__toggle-text">
+                  <span class="dash-panel__toggle-title">{{ panel.title }}</span>
+                  <span class="dash-panel__toggle-sub">{{ panel.subtitle }}</span>
+                </span>
+                <span class="material-symbols-rounded" aria-hidden="true">{{ isExpanded(panel) ? 'expand_less' : 'expand_more' }}</span>
+              </button>
+              @if (isExpanded(panel)) {
+                <div class="dash-panel__body">
+                  <app-chart-panel
+                    [panel]="panel"
+                    [exportHref]="exportHref(panel)"
+                    [suppressed]="doc.meta.suppressedBuckets"
+                    (drill)="navigate($event)"
+                    (retry)="retry()"
+                  />
+                </div>
+              }
+            </section>
+          } @else {
+            <app-chart-panel
+              [panel]="panel"
+              [exportHref]="exportHref(panel)"
+              [suppressed]="doc.meta.suppressedBuckets"
+              (drill)="navigate($event)"
+              (retry)="retry()"
+            />
+          }
+        </div>
+      }
+    </div>
+
+    <!-- Band 4 · Decision support -->
+    <div class="dash__band">
+      <div class="dash-col-8 dash__insights">
+        <h2 class="dash__section-title">What needs a decision</h2>
+        @if (insights().length) {
+          <div class="dash__insight-grid">
+            @for (card of insights(); track card.id) {
+              <app-insight-card [card]="card" (act)="onInsight($event)" />
+            }
+          </div>
+        } @else {
+          <p class="viz-empty">Nothing in this period crossed a threshold worth raising.</p>
+        }
+      </div>
+
+      @if (!isNarrow() && alerts(); as rail) {
+        <div class="dash-col-4">
+          <app-chart-panel [panel]="rail" [exportHref]="exportHref(rail)" (drill)="navigate($event)" (retry)="retry()" />
+        </div>
+      }
+    </div>
+
+    <!-- Band 5 · Quick actions -->
+    @if (!isNarrow() && quickActions().length) {
+      <nav class="dash__actions" aria-label="Quick actions">
+        @for (action of quickActions(); track action.key) {
+          <button type="button" class="dash__action" (click)="onQuickAction(action)">
+            <span class="material-symbols-rounded" aria-hidden="true">{{ action.icon }}</span>
+            {{ action.label }}
+            @if (action.badge) { <span class="dash__action-badge">{{ action.badge }}</span> }
+          </button>
+        }
+      </nav>
+    }
+
+    <footer class="dash__footer">
+      <span>Generated {{ generatedLabel() }} · {{ doc.meta.widgetCount }} widgets in {{ doc.meta.queryMs }} ms</span>
+      @if (doc.meta.suppressedBuckets) {
+        <span>· {{ doc.meta.suppressedBuckets }} bucket(s) below the reporting threshold, shown as —</span>
+      }
+      @if (doc.meta.foldedSeries) {
+        <span>· {{ doc.meta.foldedSeries }} series folded into “Other”</span>
+      }
+    </footer>
+  }
+</section>

@@ -1,0 +1,349 @@
+// Dashboard visualisation tokens and layout grid.
+//
+// Every colour a chart can use is declared here once as a `--viz-*` custom
+// property and referenced by role. No chart component holds a raw hex — that
+// rule is what makes the palette auditable, and it is why swapping a hue is a
+// one-line change rather than a search across fourteen components.
+//
+// The categorical ramp was validated, not eyeballed, against a white surface
+// (docs/dashboards/03 § 6): all eight sit inside the L 0.43–0.77 band, clear a
+// 0.1 chroma floor, and the worst adjacent pair holds ΔE 9.1 under protanopia.
+// Slots 3, 4 and 5 fall under 3:1 contrast on white, which is an obligation
+// rather than a dismissal: every panel ships a table view, and any panel using
+// those slots as its only encoding also direct-labels.
+
+:root {
+  // --- Categorical · fixed slot order, never cycled ---------------------
+  // Slot 1 is the app's own primary, so charts read as part of this
+  // application rather than beside it.
+  --viz-slot-1: #1769d6; // blue   — var(--apu-blue-700)
+  --viz-slot-2: #eb6834; // orange
+  --viz-slot-3: #1baf7a; // aqua
+  --viz-slot-4: #eda100; // yellow
+  --viz-slot-5: #e87ba4; // magenta
+  --viz-slot-6: #008300; // green
+  --viz-slot-7: #4a3aa7; // violet
+  --viz-slot-8: #e34948; // red
+
+  // --- Sequential · one hue, light → dark -------------------------------
+  // Every magnitude encoding. Ordinal ramps start no lighter than step 250 so
+  // the lightest mark still clears 2:1 against white.
+  --viz-seq-100: #cde2fb;
+  --viz-seq-150: #b7d3f6;
+  --viz-seq-200: #9ec5f4;
+  --viz-seq-250: #86b6ef;
+  --viz-seq-300: #6da7ec;
+  --viz-seq-350: #5598e7;
+  --viz-seq-400: #3987e5;
+  --viz-seq-450: #2a78d6;
+  --viz-seq-500: #256abf;
+  --viz-seq-550: #1c5cab;
+  --viz-seq-600: #184f95;
+  --viz-seq-650: #104281;
+
+  // --- Diverging · blue ↔ red, neutral grey midpoint --------------------
+  // For anything carrying a sign. Never a hue at the midpoint: the middle has
+  // to read as "nothing".
+  --viz-div-neg-2: #c0392b;
+  --viz-div-neg-1: #e08c82;
+  --viz-div-mid: #f0efec;
+  --viz-div-pos-1: #86b6ef;
+  --viz-div-pos-2: #1c5cab;
+
+  // --- Status · fixed, never themed, never a series colour --------------
+  // `warning` and `serious` are sub-3:1 on white by design. Every status
+  // renders as icon + label + colour, so hue never carries meaning alone —
+  // which also keeps status distinguishable from slots 2 and 8.
+  --viz-good: #0ca30c;
+  --viz-warning: #fab219;
+  --viz-serious: #ec835a;
+  --viz-critical: #d03b3b;
+  --viz-unknown: var(--apu-text-soft);
+
+  --viz-good-soft: rgb(12 163 12 / 12%);
+  --viz-warning-soft: rgb(250 178 25 / 16%);
+  --viz-serious-soft: rgb(236 131 90 / 16%);
+  --viz-critical-soft: rgb(208 59 59 / 12%);
+
+  // --- Chrome -----------------------------------------------------------
+  --viz-surface: var(--apu-surface);
+  --viz-plane: var(--apu-surface-muted);
+  --viz-ink: var(--apu-navy-900);
+  --viz-ink-secondary: var(--apu-text-muted);
+  --viz-ink-muted: var(--apu-text-soft);
+  --viz-grid: var(--apu-border);
+  --viz-deemphasis: var(--apu-blue-200);
+
+  // --- Geometry ---------------------------------------------------------
+  // Mark specs from docs/dashboards/03 § 5, declared once so a column in one
+  // panel is the same weight as a column in another.
+  --viz-stroke: 2px;
+  --viz-marker: 8px;
+  --viz-bar-max: 24px;
+  --viz-bar-radius: 4px;
+  --viz-gap: 2px;
+  --viz-hit-target: 44px;
+}
+
+// ---------------------------------------------------------------------------
+// Grid
+// ---------------------------------------------------------------------------
+// 12 columns at desktop, 8 at tablet, 4 on a phone. Tokens are the ones
+// already in _design-system.scss; the dashboard adds none.
+
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: var(--layout-max);
+  margin-inline: auto;
+  color: var(--viz-ink);
+}
+
+.dash__band {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.dash__band > * { min-width: 0; }
+
+.dash-col-2 { grid-column: span 2; }
+.dash-col-3 { grid-column: span 3; }
+.dash-col-4 { grid-column: span 4; }
+.dash-col-5 { grid-column: span 5; }
+.dash-col-6 { grid-column: span 6; }
+.dash-col-8 { grid-column: span 8; }
+.dash-col-12 { grid-column: span 12; }
+
+// ---------------------------------------------------------------------------
+// Card
+// ---------------------------------------------------------------------------
+
+.dash-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--viz-surface);
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--internal-card-shadow);
+  min-width: 0;
+}
+
+.dash-card--interactive {
+  cursor: pointer;
+  transition: box-shadow var(--internal-transition), transform var(--internal-transition);
+
+  &:hover { box-shadow: var(--shadow-card-hover); transform: translateY(-1px); }
+  &:focus-visible { outline: none; box-shadow: var(--internal-focus-ring), var(--shadow-card-hover); }
+}
+
+// Refetch holds the previous render at reduced opacity. Never a skeleton
+// flash — that causes a layout jump on a page someone is mid-read of.
+.dash--refetching .dash-card { opacity: 0.55; transition: opacity 160ms var(--ease-standard); }
+
+// ---------------------------------------------------------------------------
+// Typography inside a card
+// ---------------------------------------------------------------------------
+
+.dash-label {
+  font-size: 0.8125rem;
+  font-weight: var(--weight-label);
+  color: var(--viz-ink-secondary);
+  letter-spacing: 0.01em;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.dash-value {
+  // Proportional figures, not tabular: `tabular-nums` gives every digit the
+  // width of a zero, which makes 121 look loose at this size.
+  font-variant-numeric: proportional-nums;
+  font-weight: 700;
+  color: var(--viz-ink);
+  line-height: 1.1;
+  font-size: 1.75rem;
+}
+
+.dash-value--hero { font-size: clamp(2.75rem, 4.5vw, 3.5rem); }
+.dash-value--empty { color: var(--viz-ink-muted); font-weight: 600; font-size: 1.25rem; }
+
+.dash-caption { font-size: 0.75rem; color: var(--viz-ink-muted); line-height: 1.45; }
+.dash-caveat {
+  font-size: 0.75rem;
+  color: var(--viz-ink-secondary);
+  line-height: 1.45;
+  padding-top: var(--space-1);
+  border-top: 1px dashed var(--apu-border);
+}
+
+// Text never wears the series colour — identity comes from the swatch beside
+// it. Only status text is tinted, and it always ships an icon and a word too.
+.dash-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  padding: 0.15rem 0.5rem;
+
+  .material-symbols-rounded { font-size: 1rem; }
+}
+
+.dash-status--good { color: var(--viz-good); background: var(--viz-good-soft); }
+.dash-status--warning { color: #8a6100; background: var(--viz-warning-soft); }
+.dash-status--serious { color: #9c4419; background: var(--viz-serious-soft); }
+.dash-status--critical { color: var(--viz-critical); background: var(--viz-critical-soft); }
+.dash-status--unknown { color: var(--viz-ink-muted); background: rgb(15 35 60 / 5%); }
+
+.dash-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+
+  .material-symbols-rounded { font-size: 1rem; }
+}
+
+.dash-delta--good { color: var(--viz-good); }
+.dash-delta--bad { color: var(--viz-critical); }
+.dash-delta--flat { color: var(--viz-ink-muted); }
+
+// ---------------------------------------------------------------------------
+// Legend and swatches
+// ---------------------------------------------------------------------------
+
+.dash-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  font-size: 0.75rem;
+  color: var(--viz-ink-secondary);
+}
+
+.dash-legend__item { display: inline-flex; align-items: center; gap: 0.4rem; }
+
+.dash-swatch {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 0.2rem;
+  flex: none;
+}
+
+// ---------------------------------------------------------------------------
+// SVG chart chrome
+// ---------------------------------------------------------------------------
+
+.viz-svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+// Solid hairline grid. Dashing is reserved for the projected segment of a
+// forecast and means only that.
+.viz-grid-line { stroke: var(--viz-grid); stroke-width: 1; shape-rendering: crispEdges; }
+.viz-axis-line { stroke: var(--viz-grid); stroke-width: 1; }
+.viz-axis-label { fill: var(--viz-ink-muted); font-size: 0.6875rem; }
+.viz-axis-title { fill: var(--viz-ink-secondary); font-size: 0.6875rem; font-weight: 600; }
+.viz-value-label { fill: var(--viz-ink-secondary); font-size: 0.6875rem; font-weight: 600; }
+
+.viz-threshold { stroke: var(--viz-ink-secondary); stroke-width: 1.5; }
+.viz-threshold--alt { stroke: var(--viz-ink-secondary); stroke-width: 1.5; stroke-dasharray: 8 4; }
+.viz-threshold-label { fill: var(--viz-ink-secondary); font-size: 0.6875rem; font-weight: 600; }
+.viz-reference { stroke: var(--viz-ink-muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.viz-band { fill: var(--viz-seq-100); opacity: 0.45; }
+
+.viz-mark { transition: opacity 140ms var(--ease-standard); }
+.viz-mark--muted { opacity: 0.35; }
+.viz-mark:focus-visible { outline: none; stroke: var(--viz-ink); stroke-width: 2; }
+
+// A breach is never colour alone: it takes a ring and a glyph.
+.viz-breach-ring { fill: none; stroke: var(--viz-critical); stroke-width: 2; }
+.viz-warn-ring { fill: none; stroke: var(--viz-warning); stroke-width: 2; }
+.viz-glyph { fill: var(--viz-critical); font-size: 0.75rem; font-weight: 700; }
+
+.viz-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 8rem;
+  padding: var(--space-4);
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--viz-ink-muted);
+  background: var(--viz-plane);
+  border-radius: var(--radius-control);
+  line-height: 1.5;
+}
+
+// ---------------------------------------------------------------------------
+// Responsive
+// ---------------------------------------------------------------------------
+// A department head on a phone is not doing analysis — they are between
+// meetings checking whether anything is on fire. So the mobile view is a
+// re-ordering around that job, not the desktop grid reflowed.
+
+@media (max-width: 80rem) {
+  .dash-col-4:not(.dash-col--hero) { grid-column: span 6; }
+  .dash-col-8 { grid-column: span 12; }
+  .dash-col-3 { grid-column: span 6; }
+}
+
+@media (max-width: 64rem) {
+  .dash__band { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+  .dash-col-2, .dash-col-3, .dash-col-4 { grid-column: span 4; }
+  .dash-col-5, .dash-col-6, .dash-col-8, .dash-col-12 { grid-column: span 8; }
+}
+
+@media (max-width: 48rem) {
+  .dash__band { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
+  .dash-col-2, .dash-col-3, .dash-col-4, .dash-col-5, .dash-col-6, .dash-col-8, .dash-col-12 {
+    grid-column: span 4;
+  }
+  .dash-card { padding: var(--space-3); }
+  .dash-value { font-size: 1.5rem; }
+  .dash-value--hero { font-size: 2.5rem; }
+}
+
+@media (max-width: 30rem) {
+  // Below 360px the sparkline is decoration competing with the number it
+  // describes, so it goes rather than shrinking to illegibility.
+  .dash-sparkline { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-card,
+  .viz-mark { transition: none; }
+}
+
+// Forced colours drop every custom property, so identity has to survive on
+// shape alone. Marks keep their outline and breaches keep their glyph.
+@media (forced-colors: active) {
+  .dash-card { border: 1px solid CanvasText; }
+  .viz-mark { forced-color-adjust: none; stroke: CanvasText; stroke-width: 1; }
+  .viz-breach-ring, .viz-warn-ring { stroke: Highlight; }
+}
+
+// ---------------------------------------------------------------------------
+// Print
+// ---------------------------------------------------------------------------
+// A printed page must not be mistakable for a current one, so the generation
+// time and the active filters print in the header.
+
+@media print {
+  .dash__filters,
+  .dash__actions,
+  .dash-panel__tools { display: none !important; }
+
+  .dash__band { display: block; }
+  .dash-card {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #999;
+    margin-bottom: var(--space-3);
+  }
+  .dash-panel--collapsed .dash-panel__body { display: block !important; }
+}

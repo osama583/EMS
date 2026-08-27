@@ -103,15 +103,13 @@ export const routes: Routes = [
         },
       },
       {
+        // Ten role-specific dashboards behind one component: the page walks a
+        // profile document naming widget ids and computes nothing itself, so a
+        // new role is a server-side PROFILES entry rather than a route change.
         path: 'dashboard',
-        loadComponent: placeholderPage,
+        loadComponent: () =>
+          import('./features/internal/pages/dashboard/dashboard').then((module) => module.DashboardComponent),
         title: 'Dashboard | APU Events',
-        data: {
-          eyebrow: 'Overview',
-          title: 'Dashboard',
-          description: 'Your event activity and important updates will appear here.',
-          icon: 'space_dashboard',
-        },
       },
       {
         path: 'created-by-me',

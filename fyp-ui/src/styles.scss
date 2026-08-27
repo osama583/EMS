@@ -10,6 +10,7 @@
 @use './styles/tabs';
 @use './styles/ai-assistant-expanded';
 @use './styles/task-calendar-toggle';
+@use './styles/dashboard';
 @use './app/shared/components/form-modal/form-modal';
 
 // Internal navigation styles are loaded globally so the floating shell can

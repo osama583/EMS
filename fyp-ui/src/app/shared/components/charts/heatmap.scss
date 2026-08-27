@@ -1,0 +1,108 @@
+:host { display: block; width: 100%; min-width: 0; }
+
+.viz-heat {
+  display: grid;
+  grid-template-columns: minmax(5rem, 9rem) repeat(var(--heat-cols), minmax(0.9rem, 1fr));
+  gap: var(--viz-gap);
+  align-items: stretch;
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+}
+
+.viz-heat__corner { min-height: 1.25rem; }
+
+.viz-heat__col-head,
+.viz-heat__row-head {
+  font-size: 0.625rem;
+  color: var(--viz-ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.viz-heat__col-head {
+  writing-mode: vertical-rl;
+  text-orientation: sideways;
+  justify-self: center;
+  max-height: 3.5rem;
+}
+
+.viz-heat__row-head {
+  font-size: 0.6875rem;
+  color: var(--viz-ink-secondary);
+  align-self: center;
+  padding-right: var(--space-1);
+}
+
+.viz-heat__cell {
+  position: relative;
+  min-height: 1.4rem;
+  border: 0;
+  border-radius: 0.2rem;
+  padding: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+
+  &:focus-visible { outline: none; box-shadow: var(--internal-focus-ring); }
+}
+
+.viz-heat__cell--void { background: repeating-linear-gradient(45deg, transparent 0 3px, rgb(15 35 60 / 5%) 3px 6px); }
+
+// Never colour alone: a breach takes a ring and a glyph.
+.viz-heat__cell--breach { box-shadow: inset 0 0 0 2px var(--viz-critical); }
+.viz-heat__cell--warn { box-shadow: inset 0 0 0 2px var(--viz-warning); }
+
+.viz-heat__glyph {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  color: var(--apu-white);
+  text-shadow: 0 0 2px rgb(0 0 0 / 45%);
+  line-height: 1;
+}
+
+.viz-heat__dash { font-size: 0.6875rem; color: var(--viz-ink-muted); }
+
+.viz-heat__scale {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-top: var(--space-2);
+  font-size: 0.625rem;
+  color: var(--viz-ink-muted);
+}
+
+.viz-heat__scale-step { width: 1.25rem; height: 0.5rem; border-radius: 0.15rem; }
+.viz-heat__scale-label { margin-inline: 0.25rem; }
+
+// --- Phone fallback -------------------------------------------------------
+
+.viz-heat__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--viz-gap); }
+
+.viz-heat__row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: var(--viz-hit-target);
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-control);
+  background: var(--viz-plane);
+  font-size: 0.8125rem;
+}
+
+.viz-heat__row--breach { background: var(--viz-critical-soft); }
+.viz-heat__row--clear { grid-template-columns: 1fr; color: var(--viz-ink-muted); font-size: 0.75rem; }
+.viz-heat__row-label { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viz-heat__row-date { color: var(--viz-ink-muted); font-size: 0.75rem; }
+.viz-heat__row-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 700;
+  font-variant-numeric: proportional-nums;
+
+  .material-symbols-rounded { font-size: 1rem; color: var(--viz-critical); }
+}
+
+.viz-scroll__hint { display: block; font-size: 0.6875rem; color: var(--viz-ink-muted); margin: var(--space-1) 0 0; }

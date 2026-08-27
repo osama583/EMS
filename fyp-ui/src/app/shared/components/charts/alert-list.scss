@@ -1,0 +1,60 @@
+:host { display: block; width: 100%; min-width: 0; }
+
+.viz-alerts,
+.viz-alerts__items { list-style: none; margin: 0; padding: 0; }
+
+.viz-alerts { display: flex; flex-direction: column; gap: var(--viz-gap); }
+
+.viz-alert {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: var(--viz-hit-target);
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--radius-control);
+  background: var(--viz-plane);
+  border-left: 3px solid transparent;
+}
+
+.viz-alert--critical { background: var(--viz-critical-soft); border-left-color: var(--viz-critical); }
+.viz-alert--serious { background: var(--viz-serious-soft); border-left-color: var(--viz-serious); }
+.viz-alert--warning { background: var(--viz-warning-soft); border-left-color: var(--viz-warning); }
+.viz-alert--clear { background: var(--viz-good-soft); border-left-color: var(--viz-good); }
+
+.viz-alert__icon { font-size: 1.15rem; color: var(--viz-ink-secondary); }
+.viz-alert--critical .viz-alert__icon { color: var(--viz-critical); }
+.viz-alert--serious .viz-alert__icon { color: var(--viz-serious); }
+.viz-alert--warning .viz-alert__icon { color: #8a6100; }
+.viz-alert--clear .viz-alert__icon { color: var(--viz-good); }
+
+.viz-alert__body { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.viz-alert__title { font-size: 0.8125rem; font-weight: 600; color: var(--viz-ink); }
+.viz-alert__detail { font-size: 0.6875rem; color: var(--viz-ink-muted); line-height: 1.4; }
+.viz-alert__count { font-size: 1.05rem; font-weight: 800; font-variant-numeric: proportional-nums; }
+
+.viz-alerts__items { margin-top: var(--space-3); display: flex; flex-direction: column; gap: var(--viz-gap); }
+
+.viz-alerts__item {
+  display: grid;
+  grid-template-columns: 4.25rem 1fr auto;
+  gap: var(--space-2);
+  align-items: center;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-control);
+  background: var(--apu-surface);
+  font: inherit;
+  font-size: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover { border-color: var(--internal-control-border-hover); }
+  &:focus-visible { outline: none; box-shadow: var(--internal-focus-ring); }
+}
+
+.viz-alerts__item-date { color: var(--viz-ink-muted); font-weight: 600; }
+.viz-alerts__item-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--viz-ink); }
+.viz-alerts__item-status { color: var(--viz-ink-muted); text-transform: capitalize; }

@@ -1,0 +1,76 @@
+:host { display: block; width: 100%; min-width: 0; }
+
+.viz-funnel {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  counter-reset: funnel;
+}
+
+.viz-funnel__step { display: flex; flex-direction: column; gap: 0.25rem; }
+
+.viz-funnel__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+}
+
+.viz-funnel__name { font-weight: 600; color: var(--viz-ink-secondary); }
+.viz-funnel__value { font-weight: 700; color: var(--viz-ink); font-variant-numeric: proportional-nums; }
+
+.viz-funnel__track {
+  height: 1.5rem;
+  border-radius: var(--radius-control);
+  background: var(--viz-plane);
+  overflow: hidden;
+}
+
+.viz-funnel__fill {
+  display: block;
+  height: 100%;
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: 0;
+  cursor: pointer;
+  transition: filter var(--internal-transition);
+
+  &:hover { filter: brightness(0.94); }
+  &:focus-visible { outline: none; box-shadow: var(--internal-focus-ring); }
+}
+
+.viz-funnel__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  font-size: 0.6875rem;
+  color: var(--viz-ink-muted);
+  min-height: 1rem;
+}
+
+.viz-funnel__conversion { font-weight: 600; }
+
+.viz-funnel__empty { font-size: 0.8125rem; color: var(--viz-ink-muted); padding: var(--space-3); text-align: center; }
+
+/* The one figure here with a sign, so it takes the diverging pair. */
+.viz-funnel__net {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: var(--space-3) 0 0;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.8125rem;
+  font-weight: 700;
+
+  .material-symbols-rounded { font-size: 1.1rem; }
+}
+
+.viz-funnel__net--positive { background: rgb(28 92 171 / 12%); color: var(--viz-div-pos-2); }
+.viz-funnel__net--negative { background: rgb(192 57 43 / 10%); color: var(--viz-div-neg-2); }
+.viz-funnel__net--neutral { background: var(--viz-div-mid); color: var(--viz-ink-secondary); }

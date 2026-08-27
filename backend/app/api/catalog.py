@@ -35,13 +35,43 @@ CONFIG_FIELDS: dict[str, str] = {
     "paxReviewerThreshold": "HIGH_PAX_THRESHOLD",
     "cancellationDaysLimit": "CANCELLATION_DEADLINE_DAYS",
     "maxEventCategories": "MAX_EVENT_CATEGORIES",
+    # --- Dashboard thresholds (migration 018) -----------------------------
+    # Every SLA target, capacity assumption, risk window and forecast horizon
+    # the dashboards read. They are here rather than in code so an
+    # administrator retunes a department's SLA without a deploy - the same rule
+    # HIGH_PAX_THRESHOLD has always followed. Per-unit overrides use a
+    # `__<unit_code>` suffix on the same code and are not editable from this
+    # form; the resolver falls back to these defaults.
+    "slaDecisionHours": "SLA_DECISION_HOURS",
+    "slaAssignmentHours": "SLA_ASSIGNMENT_HOURS",
+    "slaFulfilmentLeadDays": "SLA_FULFILMENT_LEAD_DAYS",
+    "slaOrderAcceptHours": "SLA_ORDER_ACCEPT_HOURS",
+    "slaOrderClaimHours": "SLA_ORDER_CLAIM_HOURS",
+    "staffShiftHours": "STAFF_SHIFT_HOURS",
+    "capacityWarnRatio": "CAPACITY_WARN_RATIO",
+    "atRiskWindowDays": "AT_RISK_WINDOW_DAYS",
+    "stallMultiplier": "STALL_MULTIPLIER",
+    "forecastHorizonDays": "FORECAST_HORIZON_DAYS",
+    "dashboardTrendWeeks": "DASHBOARD_TREND_WEEKS",
+    "anomalySigma": "ANOMALY_SIGMA",
+    "minBucketSize": "MIN_BUCKET_SIZE",
+    "sendBackWarnRate": "SEND_BACK_WARN_RATE",
+    "venueTeardownMinutes": "VENUE_TEARDOWN_MINUTES",
+    "startPointMaxTours": "START_POINT_MAX_TOURS",
 }
 
+# CAPACITY_WARN_RATIO is 0.85, not 85. Rounding every value to an integer the
+# way the original three could be would silently turn it into 0 or 1 and move
+# every amber threshold in the system.
+_FRACTIONAL_FIELDS = frozenset({"capacityWarnRatio"})
 
-def _config_payload(rows) -> dict[str, int]:
+
+def _config_payload(rows) -> dict[str, float]:
     by_code = {r["code"]: r["number"] for r in rows}
     return {
-        field: int(by_code[code]) for field, code in CONFIG_FIELDS.items() if code in by_code
+        field: (float(by_code[code]) if field in _FRACTIONAL_FIELDS else int(by_code[code]))
+        for field, code in CONFIG_FIELDS.items()
+        if code in by_code
     }
 
 

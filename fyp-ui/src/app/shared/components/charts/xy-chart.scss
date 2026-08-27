@@ -1,0 +1,48 @@
+:host {
+  display: block;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.viz-hit {
+  cursor: pointer;
+
+  &:focus-visible { outline: none; }
+}
+
+// Focus reaches everything hover does, and shows the same tooltip.
+.viz-hit:focus-visible + circle,
+.viz-hit:focus-visible { stroke: var(--apu-blue-700); stroke-width: 2; }
+
+.viz-tooltip {
+  margin: var(--space-1) 0 0;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-control);
+  background: var(--viz-plane);
+  font-size: 0.75rem;
+  color: var(--viz-ink-secondary);
+  line-height: 1.4;
+
+  strong { color: var(--viz-ink); margin-right: 0.35rem; }
+}
+
+// A horizontally scrollable plot needs a visible affordance, or it reads as a
+// truncated chart rather than a scrollable one.
+.viz-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  padding-bottom: var(--space-1);
+}
+
+.viz-scroll__hint {
+  display: none;
+  font-size: 0.6875rem;
+  color: var(--viz-ink-muted);
+  margin: 0.15rem 0 0;
+}
+
+@media (max-width: 48rem) {
+  .viz-scroll__hint { display: block; }
+}

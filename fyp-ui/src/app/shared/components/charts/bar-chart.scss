@@ -1,0 +1,24 @@
+:host {
+  display: block;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.viz-bar__track { fill: var(--viz-plane); }
+.viz-bar__name { fill: var(--viz-ink-secondary); font-size: 0.75rem; }
+.viz-bar__note { fill: var(--viz-ink-muted); font-weight: 400; }
+
+.viz-mark { cursor: pointer; }
+.viz-mark:focus-visible { outline: none; stroke: var(--apu-blue-700); stroke-width: 2; }
+
+.viz-tooltip {
+  margin: var(--space-1) 0 0;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-control);
+  background: var(--viz-plane);
+  font-size: 0.75rem;
+  color: var(--viz-ink-secondary);
+
+  strong { color: var(--viz-ink); margin-right: 0.35rem; }
+}

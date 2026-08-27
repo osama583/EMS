@@ -1,0 +1,73 @@
+:host { display: block; position: relative; width: 100%; min-width: 0; }
+
+.viz-tl__lane-track { fill: var(--viz-plane); }
+.viz-tl__lane-name { fill: var(--viz-ink-secondary); font-size: 0.6875rem; }
+.viz-tl__bar-label { fill: var(--apu-white); font-size: 0.625rem; font-weight: 600; pointer-events: none; }
+.viz-tl__breach-note { fill: var(--viz-critical); font-size: 0.625rem; font-weight: 700; }
+
+.viz-tl__bar {
+  cursor: pointer;
+
+  &:focus-visible { outline: none; stroke: var(--apu-blue-700); stroke-width: 2; }
+}
+
+// "Nobody has this" is a state, not a quantity — so it takes a texture rather
+// than another hue, which also survives forced-colors.
+.viz-tl__bar--hatched {
+  stroke: var(--viz-serious);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+}
+
+.viz-tooltip {
+  margin: var(--space-1) 0 0;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-control);
+  background: var(--viz-plane);
+  font-size: 0.75rem;
+  color: var(--viz-ink-secondary);
+
+  strong { color: var(--viz-ink); margin-right: 0.35rem; }
+}
+
+// --- Phone fallback: a vertical list in time order ------------------------
+
+.viz-tl__list,
+.viz-tl__items { list-style: none; margin: 0; padding: 0; }
+
+.viz-tl__list { display: flex; flex-direction: column; gap: var(--space-3); }
+.viz-tl__items { display: flex; flex-direction: column; gap: var(--viz-gap); }
+
+.viz-tl__group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--viz-ink-secondary);
+}
+
+.viz-tl__item {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  gap: var(--space-2);
+  align-items: start;
+  min-height: var(--viz-hit-target);
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius-control);
+  background: var(--viz-plane);
+  border-left: 3px solid var(--viz-seq-350);
+}
+
+.viz-tl__item--breach { background: var(--viz-critical-soft); border-left-color: var(--viz-critical); }
+.viz-tl__item--unclaimed { border-left-color: var(--viz-serious); border-left-style: dashed; }
+
+.viz-tl__time { font-size: 0.75rem; font-weight: 700; color: var(--viz-ink); font-variant-numeric: proportional-nums; }
+.viz-tl__body { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.viz-tl__label { font-size: 0.8125rem; font-weight: 600; overflow-wrap: anywhere; }
+.viz-tl__meta { font-size: 0.6875rem; color: var(--viz-ink-muted); }
+.viz-tl__meta--warn { color: var(--viz-serious); font-weight: 600; }
+
+.viz-tl__empty { font-size: 0.8125rem; color: var(--viz-ink-muted); padding: var(--space-3); text-align: center; }

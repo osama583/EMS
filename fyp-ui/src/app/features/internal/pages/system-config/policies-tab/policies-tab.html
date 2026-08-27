@@ -50,5 +50,37 @@
         Applicants may tag a public event with at most <strong>{{ maxCategories() }}</strong> categor{{ maxCategories() === 1 ? 'y' : 'ies' }} on the proposal form. Existing proposals keep the categories they were submitted with.
       </p>
     </div>
+
+    <!--
+      Dashboard thresholds. Every SLA target, capacity assumption and risk
+      window the role dashboards read lives here rather than in code, so an
+      administrator retunes a department without a deploy. Rendered from
+      DASHBOARD_THRESHOLD_GROUPS so a new threshold is one entry plus a config
+      row, not a template edit.
+    -->
+    @for (group of thresholdGroups; track group.title) {
+      <section class="policies-tab__card policies-tab__group">
+        <header class="policies-tab__group-head">
+          <h3>{{ group.title }}</h3>
+          <p class="policies-tab__note">{{ group.blurb }}</p>
+        </header>
+        <div class="policies-tab__grid">
+          @for (item of group.items; track item.field) {
+            <div class="policies-tab__threshold">
+              <app-form-field
+                [controlId]="'config-' + item.field"
+                [label]="item.label"
+                type="number"
+                [min]="item.min"
+                [step]="item.step ?? 1"
+                [value]="thresholdValue(item)"
+                (valueChange)="setThreshold(item, $event)"
+              />
+              <p class="policies-tab__note policies-tab__note--tight">{{ item.help }}</p>
+            </div>
+          }
+        </div>
+      </section>
+    }
   }
 </div>

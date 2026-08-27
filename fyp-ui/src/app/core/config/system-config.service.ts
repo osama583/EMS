@@ -5,10 +5,29 @@ import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { SystemConfig, SystemConfigDraft } from './system-config.models';
 
+// Mirrors the values seeded by migration 018. Only rendered while the real GET
+// is in flight — `loading` guards every reader, so these are never mistaken for
+// the saved configuration.
 const DEFAULT_CONFIG: SystemConfig = {
   paxReviewerThreshold: 50,
   cancellationDaysLimit: 3,
   maxEventCategories: 2,
+  slaDecisionHours: 48,
+  slaAssignmentHours: 24,
+  slaFulfilmentLeadDays: 3,
+  slaOrderAcceptHours: 12,
+  slaOrderClaimHours: 4,
+  staffShiftHours: 8,
+  capacityWarnRatio: 0.85,
+  atRiskWindowDays: 7,
+  stallMultiplier: 2,
+  forecastHorizonDays: 60,
+  dashboardTrendWeeks: 12,
+  anomalySigma: 2,
+  minBucketSize: 5,
+  sendBackWarnRate: 15,
+  venueTeardownMinutes: 60,
+  startPointMaxTours: 2,
 };
 
 @Injectable({ providedIn: 'root' })

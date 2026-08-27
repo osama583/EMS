@@ -1,0 +1,107 @@
+.dash-panel {
+  gap: var(--space-3);
+}
+
+// The signature panel is the widest and tallest element on the page and is
+// different for every role — it is what makes these ten dashboards rather than
+// one dashboard with ten titles, so it reads as the lead instrument.
+.dash-panel--signature {
+  border-color: rgb(23 105 214 / 22%);
+  box-shadow: 0 0.55rem 1.4rem rgb(23 105 214 / 10%);
+}
+
+.dash-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dash-panel__titles { min-width: 0; }
+
+.dash-panel__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: var(--weight-card);
+  color: var(--viz-ink);
+  line-height: 1.3;
+}
+
+.dash-panel__subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--viz-ink-muted);
+  line-height: 1.45;
+}
+
+.dash-panel__tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+}
+
+.dash-panel__tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-control);
+  background: var(--apu-surface);
+  color: var(--viz-ink-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color var(--internal-transition), color var(--internal-transition);
+
+  .material-symbols-rounded { font-size: 1.05rem; }
+
+  &:hover { border-color: var(--internal-control-border-hover); color: var(--apu-blue-700); }
+  &:focus-visible { outline: none; box-shadow: var(--internal-focus-ring); }
+}
+
+.dash-panel__tool--on {
+  border-color: var(--apu-blue-700);
+  color: var(--apu-blue-700);
+  background: rgb(23 105 214 / 6%);
+}
+
+.dash-panel__legend { margin: 0; padding: 0; list-style: none; }
+
+.dash-swatch--dashed {
+  background-image: repeating-linear-gradient(90deg, transparent 0 2px, rgb(255 255 255 / 85%) 2px 4px);
+}
+
+.dash-panel__body { min-width: 0; }
+
+.viz-empty--error {
+  color: var(--viz-critical);
+  background: var(--viz-critical-soft);
+  flex-direction: column;
+}
+
+.dash-panel__retry {
+  margin-top: var(--space-2);
+  padding: 0.35rem 0.9rem;
+  border: 1px solid currentcolor;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dash-caption--footnote { font-style: italic; }
+
+@media (max-width: 48rem) {
+  // Icon-only tools on a phone: the two words cost a third of the header row
+  // and the icons are unambiguous next to a chart.
+  .dash-panel__tool-text { display: none; }
+  .dash-panel__tool { min-width: 2.75rem; justify-content: center; }
+}
