@@ -105,7 +105,14 @@
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--space-4);
+  // Cards size to their content rather than stretching to the tallest in the
+  // row: a short panel padded out to match a long one is mostly empty border.
+  align-items: start;
 }
+
+// Band 1 is the exception — the hero and the KPI row are one visual unit and
+// have to share a baseline.
+.dash__band--signal { align-items: stretch; }
 
 .dash__band > * { min-width: 0; }
 
@@ -252,7 +259,18 @@
 
 .viz-threshold { stroke: var(--viz-ink-secondary); stroke-width: 1.5; }
 .viz-threshold--alt { stroke: var(--viz-ink-secondary); stroke-width: 1.5; stroke-dasharray: 8 4; }
-.viz-threshold-label { fill: var(--viz-ink-secondary); font-size: 0.6875rem; font-weight: 600; }
+.viz-threshold-label {
+  fill: var(--viz-ink-secondary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  // The label sits inside the plot, so it has to survive a column passing
+  // under it. Painting the stroke first gives a halo without a background rect
+  // that would have to be measured.
+  paint-order: stroke;
+  stroke: var(--viz-surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
 .viz-reference { stroke: var(--viz-ink-muted); stroke-width: 1; stroke-dasharray: 3 3; }
 .viz-band { fill: var(--viz-seq-100); opacity: 0.45; }
 

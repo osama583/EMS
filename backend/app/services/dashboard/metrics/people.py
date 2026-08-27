@@ -14,8 +14,13 @@ from ..scope import Scope, num, ratio
 from .common import NON_COMMITTED_STATUSES, DepartmentSpec
 
 
-def assignments_per_staff(cur, scope: Scope, spec: DepartmentSpec) -> list[dict[str, Any]]:
+def assignments_per_staff(cur, scope: Scope, spec: DepartmentSpec | None = None) -> list[dict[str, Any]]:
     """M60 - row assignments plus task assignments per staff member.
+
+    Takes no detail table: both assignment tables reach the unit through
+    request_task, so this answers for a service department created after this
+    design shipped as well as for the six it knows about. `spec` is accepted for
+    call-site symmetry with the rest of the family and deliberately unused.
 
     Row assignments are the real unit of work for the five row-assignable
     requirements (migration 012); counting only `task_assignment` undercounts

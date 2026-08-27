@@ -173,7 +173,10 @@
 
 .dash__kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr));
+  // Sized so a five-tile role fits on one row beside the hero at the container
+  // max width. Four-tile roles collapse the empty track, six wrap to 3+3 — in
+  // every case the row stays balanced instead of orphaning one tile.
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.75rem), 1fr));
   gap: var(--space-3);
   align-content: stretch;
 }
@@ -292,10 +295,10 @@
   .dash__periods { width: 100%; justify-content: space-between; }
   .dash__period { flex: 1; }
   // Two tiles per row on a phone, in the role's own priority order.
-  .dash__kpis { grid-template-columns: 1fr 1fr; gap: var(--space-2); }
-  .dash__actions--mobile { display: grid; grid-template-columns: 1fr 1fr; }
+  .dash__kpis { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2); }
+  .dash__actions--mobile { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .dash__action { justify-content: center; }
-  .dash__insight-grid { grid-template-columns: 1fr; }
+  .dash__insight-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media print {

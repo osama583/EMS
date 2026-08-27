@@ -4,7 +4,19 @@
   height: 100%;
   justify-content: flex-start;
   gap: var(--space-1);
+  min-width: 0;
 }
+
+// Prose may break anywhere so a narrow tile can shrink; the value may not.
+// `anywhere` lowers an element's min-content width, which is what lets the tile
+// fit two-up on a phone — applied to the number it would split "RM 8,898"
+// across two lines.
+.dash-stat .dash-label,
+.dash-stat .dash-caption,
+.dash-stat .dash-caveat,
+.dash-stat .dash-stat__secondary { overflow-wrap: anywhere; }
+
+.dash-stat .dash-value { overflow-wrap: normal; word-break: keep-all; }
 
 // The hero is the page's lead number, not a larger tile: it gets the full band
 // height and enough breathing room that the eye lands there first.

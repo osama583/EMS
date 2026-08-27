@@ -628,6 +628,7 @@ def dependency_map(cur, scope: Scope) -> dict[str, Any]:
         caption="Requirements this school never selects are listed beneath, greyed rather than hidden.",
         empty="This school has submitted no proposals carrying a service requirement in this period.",
         drill_to=drill("/app/history/proposals", school="mine"),
+        suppressed=sum(1 for row in floored if row.get("suppressed")),
         signature=True,
         mobile="ranked-list",
     )
@@ -843,6 +844,7 @@ def requirement_mix(cur, scope: Scope) -> dict[str, Any]:
             mine,
         ),
         caption=f"Buckets under {scope.config.bucket_floor()} proposals are suppressed on the peer series.",
+        suppressed=sum(1 for row in peer_floored if row.get("suppressed")),
         empty="This school has submitted no proposals in this period.",
         drill_to=drill("/app/history/proposals", school="mine"),
         mobile="ranked-list",

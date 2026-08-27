@@ -167,6 +167,10 @@ export interface PanelWidget extends WidgetBase {
   drill?: Drill | null;
   signature: boolean;
   mobile?: MobileForm | null;
+  /** Buckets *this* panel withheld under the k>=5 floor. Per panel, not the page
+   *  total: a footnote repeating one number under five charts says nothing about
+   *  which chart is incomplete. */
+  suppressed?: number;
 }
 
 export type DashboardWidget = StatWidget | PanelWidget;

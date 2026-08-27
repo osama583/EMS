@@ -208,9 +208,13 @@ export class TimelineChartComponent extends VizChartBase {
       breached: !!lane.breached,
       bars: lane.bars.map((bar) => {
         const start = minutesOfDay(bar.start) ?? this.window()[0];
-        const end = minutesOfDay(bar.end) ?? start + 30;
+        const rawEnd = minutesOfDay(bar.end);
+        // An order has a serve time, not a window. Drawing it as a hairline
+        // makes it unclickable and unreadable, so an instant gets a marker's
+        // worth of width rather than its true zero duration.
+        const end = rawEnd !== null && rawEnd > start ? rawEnd : start + 30;
         const x = this.xFor(start);
-        const width = Math.max(6, this.xFor(Math.max(end, start + 15)) - x);
+        const width = Math.max(14, this.xFor(end) - x);
         const breach = !!(ceiling && (bar.overlap ?? 0) > ceiling);
         return {
           raw: bar,

@@ -505,3 +505,64 @@ def test_colour_slots_are_integers_not_hexes():
         for entry in result.get("series") or []:
             assert isinstance(entry["colorSlot"], int), f"{widget_id} sent a non-integer colour slot"
             assert 1 <= entry["colorSlot"] <= 8, f"{widget_id} used slot {entry['colorSlot']}"
+
+
+# --- Populated data -------------------------------------------------------
+# The empty-database tests above and these are not redundant: empty data
+# catches a missing NULLIF, populated data catches a panel that divides by a
+# count it assumed was non-zero, a fold that drops the wrong series, or a chart
+# that only renders once it has three points. Neither finds the other's bugs.
+
+
+def _preview():
+    from scripts import dashboard_preview
+
+    return dashboard_preview
+
+
+@pytest.mark.parametrize(
+    "profile_key,variant",
+    [
+        (key, variant)
+        for key in sorted(_preview().PROFILE_SETUP)
+        for variant in (("service", "commercial") if key == "hos_school" else (None,))
+    ],
+)
+def test_profile_builds_with_populated_data(profile_key, variant):
+    document = _preview().build_preview(profile_key, variant=variant)
+    widgets = [
+        document["hero"],
+        *document["kpis"],
+        document["signature"],
+        *document["panels"],
+        document["alerts"],
+    ]
+    broken = [w["id"] for w in widgets if w.get("state") == "error"]
+    assert not broken, f"{profile_key}/{variant}: {broken} errored on populated data"
+    for widget in widgets:
+        if widget["kind"] == "panel":
+            assert widget["tableView"] is not None, f"{widget['id']} ships no table view"
+
+
+@pytest.mark.parametrize("profile_key", sorted(_preview().PROFILE_SETUP))
+def test_document_is_json_serialisable(profile_key):
+    """psycopg2 hands back Decimal, date and time; Flask's provider handles the
+    last two and refuses the first. Every metric passes through num() for
+    exactly this reason, and this is what proves it stayed true."""
+    import json
+
+    document = _preview().build_preview(profile_key)
+    json.dumps(document)  # No `default=`: anything needing one is a leak.
+
+
+def test_generic_profile_survives_a_unit_with_no_detail_table():
+    """A service department a System Admin creates later has no known detail
+    table. It degrades to the flow/SLA/quality/people families rather than
+    erroring - which is the whole reason hod_generic exists."""
+    document = _preview().build_preview("hod_generic")
+    widgets = [document["hero"], *document["kpis"], document["signature"], *document["panels"]]
+    assert all(w.get("state") != "error" for w in widgets)
+    # Its drills land on an unfiltered list rather than one filtered by a
+    # requirement the unit does not have.
+    latency = next(w for w in document["kpis"] if w["id"] == "dept_decision_latency")
+    assert "requestKind" not in latency["drill"]["params"]

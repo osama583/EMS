@@ -29,13 +29,32 @@ from .base import (
 
 
 def spec(scope: Scope) -> common.DepartmentSpec:
-    """The caller's own department shape. Raises for a unit with no known detail
-    table, which `build()` turns into an inline error - correct, because a widget
-    that depends on a detail table has nothing to say without one."""
+    """The caller's own department shape.
+
+    Raises for a unit with no known detail table. Only widgets that genuinely
+    read that table call this; the ones that merely want a `requestKind` for a
+    drill link use `maybe_spec()` instead, so a service department created after
+    this design shipped degrades to the generic profile rather than erroring -
+    which is the whole reason `hod_generic` exists.
+    """
     found = common.spec_for(scope.unit_code)
     if found is None:
         raise ValueError(f"No department spec for unit {scope.unit_code}")
     return found
+
+
+def maybe_spec(scope: Scope) -> common.DepartmentSpec | None:
+    return common.spec_for(scope.unit_code)
+
+
+def requirement_of(scope: Scope) -> str | None:
+    """The requirement name for a drill filter, or None for an unmapped unit.
+
+    `drill()` strips None params, so an unmapped unit gets an unfiltered
+    destination rather than a broken one.
+    """
+    found = common.spec_for(scope.unit_code)
+    return found.requirement if found else None
 
 
 def _requests_route(scope: Scope, bucket: str = "inbox") -> str:
@@ -63,7 +82,7 @@ def decision_latency(cur, scope: Scope) -> dict[str, Any]:
         delta=delta(median, previous["median"], higher_is_better=False),
         sparkline=trend,
         definition="M10 - task created to its first approve or send-back",
-        drill_to=drill(_requests_route(scope), bucket="inbox", requestKind=spec(scope).requirement),
+        drill_to=drill(_requests_route(scope), bucket="inbox", requestKind=requirement_of(scope)),
     )
 
 
@@ -102,7 +121,7 @@ def send_back_rate(cur, scope: Scope) -> dict[str, Any]:
         status=status_for(current["rate"], warn=warn, critical=warn * 2),
         delta=delta(current["rate"], previous["rate"], higher_is_better=False),
         definition="M20 with M24 - a terse comment guarantees another loop",
-        drill_to=drill("/app/history/requests", requestKind=spec(scope).requirement, outcome="resubmitted"),
+        drill_to=drill("/app/history/requests", requestKind=requirement_of(scope), outcome="resubmitted"),
     )
 
 
@@ -170,14 +189,16 @@ def lane_time(cur, scope: Scope) -> dict[str, Any]:
         ),
         caption="Turns “we are slow” into “we are slow here”, which has three different fixes.",
         empty="No tasks have completed a full cycle in this period yet.",
-        drill_to=drill("/app/history/requests", requestKind=spec(scope).requirement),
+        drill_to=drill("/app/history/requests", requestKind=requirement_of(scope)),
     )
 
 
 @widget("dept_staff_balance")
 def staff_balance(cur, scope: Scope) -> dict[str, Any]:
-    department = spec(scope)
-    staff = people.assignments_per_staff(cur, scope, department)
+    # No spec needed: assignments are scoped by unit code through the task
+    # table, not by the department's own detail table, so this works for a unit
+    # created after this design shipped.
+    staff = people.assignments_per_staff(cur, scope, maybe_spec(scope))
     balance = people.workload_balance(staff)
     median = balance["median"]
     subtitle = "Assignments per person this period"
@@ -282,7 +303,7 @@ def rework_profile(cur, scope: Scope) -> dict[str, Any]:
         ),
         caption=" · ".join(caption_parts) or None,
         empty="Nothing has been sent back in this period.",
-        drill_to=drill("/app/history/requests", requestKind=spec(scope).requirement, outcome="resubmitted"),
+        drill_to=drill("/app/history/requests", requestKind=requirement_of(scope), outcome="resubmitted"),
         mobile="scroll",
     )
 

@@ -172,6 +172,7 @@ def panel(
     drill_to: dict[str, Any] | None = None,
     signature: bool = False,
     mobile: str | None = None,
+    suppressed: int = 0,
 ) -> dict[str, Any]:
     """A chart card.
 
@@ -200,6 +201,10 @@ def panel(
         "drill": drill_to,
         "signature": signature,
         "mobile": mobile,
+        # Buckets *this* panel withheld under the k>=5 floor. Per panel, not the
+        # page total: a footnote that repeats the same number under five charts
+        # tells a reader nothing about which chart is incomplete.
+        "suppressed": suppressed,
     }
 
 

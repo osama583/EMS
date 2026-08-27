@@ -92,7 +92,6 @@ def venue_conflicts(cur, scope: Scope) -> dict[str, Any]:
         target={"max": 0, "label": "target 0"},
         status="critical" if conflicts else "good",
         definition="Pairs of rows at the same normalised location inside the teardown window",
-        caveat="Locations are free text and normalised by lower-case and trim; a controlled place catalogue would do better.",
         drill_to=drill("#panel-log_venue_turnaround"),
     )
 
@@ -247,7 +246,10 @@ def venue_turnaround(cur, scope: Scope) -> dict[str, Any]:
             ],
             conflicts,
         ),
-        caption=f"{len(conflicts)} pair(s) leave less than {gap} minutes between bookings at one location.",
+        caption=(
+            f"{len(conflicts)} pair(s) leave less than {gap} minutes between bookings at one location. "
+            "Locations are free text, normalised by lower-case and trim — a controlled place catalogue would do better."
+        ),
         empty="No location has more than one booking in the horizon.",
         drill_to=drill("/app/inbox/requests", requestKind=department.requirement),
         mobile="time-list",

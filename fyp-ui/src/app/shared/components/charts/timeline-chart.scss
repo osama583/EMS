@@ -51,7 +51,7 @@
 
 .viz-tl__item {
   display: grid;
-  grid-template-columns: 4.5rem 1fr;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
   gap: var(--space-2);
   align-items: start;
   min-height: var(--viz-hit-target);

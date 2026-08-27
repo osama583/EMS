@@ -1,23 +1,23 @@
-# Graph Report - fyp-ui  (2026-08-27)
+# Graph Report - fyp-ui  (2026-08-26)
 
 ## Corpus Check
-- 243 files · ~547,191 words
+- 222 files · ~537,296 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3281 nodes · 7246 edges · 199 communities (121 shown, 78 thin omitted)
+- 3061 nodes · 6766 edges · 188 communities (115 shown, 73 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 60 edges (avg confidence: 0.77)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a19c8f49`
+- Built from commit: `f99120eb`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - auth.interceptor.ts
-- landing-page.ts
-- request-option-management.ts
+- SiteHeaderComponent
+- internal-data-page.ts
 - ApiProposalWorkflowRepository
 - EventProposalComponent
 - CafeteriaStaffTasksComponent
@@ -30,7 +30,7 @@
 - RequestOptionManagementComponent
 - staff-task.repository.ts
 - EventCalendarComponent
-- InternalDataRecord
+- internal-data-page.models.ts
 - Users & Units Admin
 - HappeningSoonComponent
 - PageVisibilityComponent
@@ -46,7 +46,7 @@
 - ProposalReviewRecord
 - event-calendar.ts
 - CafeteriaManageComponent
-- proposal-review.models.ts
+- proposal-review.mock-data.ts
 - request-option.service.ts
 - InternalLayoutComponent
 - ClubManagementComponent
@@ -54,13 +54,13 @@
 - AdminUnitRecord
 - auth.test-fixtures.ts
 - apiErrorMessage
-- components/explore-events/explore-events.ts
-- dashboard.models.ts
+- published-event.models.ts
+- request-option-management.ts
 - How It Works Timeline
 - proposal-visibility.ts
 - ProposalDepartmentViewComponent
 - CafeteriaStaffAssignmentsComponent
-- event-image-upload.service.ts
+- event-details-modal.ts
 - AiAssistantComponent
 - SharedLibraryComponent
 - RequestOption
@@ -69,31 +69,31 @@
 - request-option.models.ts
 - Explore Events Component Template
 - club-hub.ts
-- viz.ts
+- components/explore-events/explore-events.ts
 - GuestRegistrationModalComponent
 - DepartmentResubmitComponent
 - DepartmentRequestKind
-- chart-panel.ts
+- club.service.ts
 - HubClubRequestsComponent
 - Schema Alignment Plan
 - RecordsPageComponent
 - ProposalReviewerViewComponent
-- department-resubmit.ts
+- SelectOption
 - department-workflow.config.ts
-- proposal-workflow.repository.ts
+- ProposalWorkflowService
 - HubPresidentChangeRequestsComponent
 - RBAC Seed Role Catalog
-- charts.spec.ts
-- staff-tasks.ts
+- page-visibility.ts
+- InternalTableColumn
 - Backend Design Principles
 - Workflow State Machine Notes
 - environment.ts
 - HubHistoryClubsComponent
-- login.ts
+- LoginComponent
 - Club Discover Page
 - HubProposalsComponent
 - EventDetailsModalComponent
-- formatValue
+- FormModalComponent
 - RBAC Table Design
 - HubHistoryEventsComponent
 - AdminNavPageRecord
@@ -105,14 +105,13 @@
 - RBAC Design Notes
 - Unit Role Migration Notes
 - CafeteriaMyStaffComponent
-- SiteHeaderComponent
+- .closePanel
 - app-internal-data-page Component
 - Shared Library Catalog Page Template
 - Proposal Review Templates
 - .navigateToTableError
 - AiConversationStore
 - RequestOptionKind
-- AuthUser
 - MyEventsTabComponent
 - HubMyClubsComponent
 - Permission Grant Labels
@@ -123,7 +122,7 @@
 - AiAccessLogComponent
 - Club Page Templates
 - CafeteriaMenuOversightComponent
-- ProposalReviewPageComponent
+- proposal-review-page.spec.ts
 - Express Backend Design
 - APU Logo Assets
 - APU Wordmark Assets
@@ -156,12 +155,12 @@
 - Option Picker Grid
 - Site Footer Template
 - CameraCaptureComponent
-- HeroComponent
+- ai-access-log.service.ts
 - auth.service.ts
-- HubRequestsComponent
-- PoliciesTabComponent
+- hub-proposals.ts
+- Policies Config Tab
 - Admin Page Design Notes
-- auth.models.ts
+- purge-sweep.service.ts
 - Request Option Management Template
 - ForgotPasswordModalComponent
 - Club Category Picker
@@ -172,34 +171,24 @@
 - Production Environment
 - How It Works Template
 - Placeholder Page Template
-- happening-soon.ts
 - EventImageUploadComponent
 - CafeteriaService
 - event-catalog.service.ts
-- event-engagement.models.ts
+- SavedEventsService
 - request-option.service.spec.ts
 - EventCatalogRepositoryImpl
-- policies-tab.ts
+- system-config.service.ts
 - EventCatalogEntry
 - EventCatalogRepository
 - cafeteria.service.ts
 - AdminUserAssignment
 - PresidentChangeRequestModalComponent
-- StepIndicatorComponent
+- internal-user-directory.service.ts
 - LogoutComponent
 - NavEntryType
 - ResetPasswordComponent
 - AiOrbAwarenessService
-- TimelineChartComponent
-- DashboardService
-- meter.ts
-- .send
-- BarChartComponent
-- proposal-table.ts
-- StatTileComponent
-- ReviewerCommentsDrawerComponent
-- CharacterCounterComponent
-- ai-assistant-page.ts
+- OptionPickerItem
 
 ## God Nodes (most connected - your core abstractions)
 1. `EventProposalComponent` - 144 edges
@@ -210,8 +199,8 @@
 6. `AuthService` - 61 edges
 7. `InternalRowActionEvent` - 61 edges
 8. `RequestOptionManagementComponent` - 53 edges
-9. `AiAssistantComponent` - 53 edges
-10. `ClubService` - 51 edges
+9. `ClubService` - 51 edges
+10. `AiAssistantComponent` - 51 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `APU Logo Text with Globe Icon (legacy/old version)` --semantically_similar_to--> `AI-Generated APU Logo Text with Globe Icon (ChatGPT image asset)`  [INFERRED] [semantically similar]
@@ -239,22 +228,22 @@
 - **Footer Social Media Icon Set** — public_assets_media_footer_social_tiktok, public_assets_media_footer_social_x, public_assets_media_footer_social_youtube [INFERRED 0.85]
 - **Records Hub Tab Pages Sharing app-internal-data-page Shell** — src_app_features_internal_pages_records_hub_hub_proposals_hub_proposals_html, src_app_features_internal_pages_records_hub_hub_requests_hub_requests_html, src_app_features_internal_pages_records_hub_hub_club_requests_hub_club_requests_html, shared_components_internal_data_page_internal_data_page_html, src_app_features_internal_pages_records_hub_records_hub_html [INFERRED 0.85]
 
-## Communities (199 total, 78 thin omitted)
+## Communities (188 total, 73 thin omitted)
 
 ### Community 0 - "auth.interceptor.ts"
-Cohesion: 0.07
-Nodes (18): App, appConfig, routes, Component, ANONYMOUS_PATHS, authInterceptor(), isAnonymous(), isApiRequest() (+10 more)
+Cohesion: 0.06
+Nodes (20): App, appConfig, routes, Component, ANONYMOUS_PATHS, authInterceptor(), isAnonymous(), isApiRequest() (+12 more)
 
-### Community 1 - "landing-page.ts"
-Cohesion: 0.11
-Nodes (16): CampusLifeComponent, CampusLifePillar, Component, LandingPageComponent, Component, MyEventsComponent, Component, CtaLinkArrow (+8 more)
+### Community 1 - "SiteHeaderComponent"
+Cohesion: 0.06
+Nodes (24): CampusLifeComponent, CampusLifePillar, Component, HeroComponent, MockIntersectionObserver, Component, ViewChild, LandingPageComponent (+16 more)
 
-### Community 2 - "request-option-management.ts"
-Cohesion: 0.07
-Nodes (42): ViewMode, Requester, ViewMode, DecidedByFilter, Outcome, RegistrationHistoryEntry, Requester, ViewMode (+34 more)
+### Community 2 - "internal-data-page.ts"
+Cohesion: 0.10
+Nodes (29): ViewMode, ViewMode, Requester, ViewMode, DecidedByFilter, Outcome, RegistrationHistoryEntry, Requester (+21 more)
 
 ### Community 3 - "ApiProposalWorkflowRepository"
-Cohesion: 0.11
+Cohesion: 0.10
 Nodes (3): ApiProposalWorkflowRepository, fmbOptionRowId(), Injectable
 
 ### Community 5 - "CafeteriaStaffTasksComponent"
@@ -270,8 +259,8 @@ Cohesion: 0.06
 Nodes (9): requiresSameDayStart(), StaffTasksComponent, Component, HostListener, CalendarCell, TaskCalendarComponent, TaskCalendarMode, TaskDateSelection (+1 more)
 
 ### Community 8 - "ExploreEventsComponent"
-Cohesion: 0.09
-Nodes (5): InternalExploreEventsComponent, Component, ExploreEventsComponent, Component, HostListener
+Cohesion: 0.10
+Nodes (4): EventSearchParams, ExploreEventsComponent, Component, HostListener
 
 ### Community 9 - "Angular Build Config"
 Cohesion: 0.05
@@ -279,15 +268,11 @@ Nodes (44): build, serve, test, builder, configurations, defaultConfiguration, o
 
 ### Community 10 - "PublishedEventService"
 Cohesion: 0.08
-Nodes (8): RegisteredEventsResponse, EventRegistration, PendingEventRegistration, PublishedEvent, PublishedEventService, Injectable, CreatedByMeComponent, Component
+Nodes (9): RegisteredEventsResponse, SavedEventsResponse, EventRegistration, PendingEventRegistration, PublishedEvent, PublishedEventService, Injectable, CreatedByMeComponent (+1 more)
 
 ### Community 11 - "role-access.ts"
-Cohesion: 0.11
-Nodes (21): authGuard(), defaultRoleRouteGuard(), externalUserGuard(), loginGuard(), publicLandingGuard(), recordsHubDefaultTabGuard(), roleGuard(), hasAnyRole() (+13 more)
-
-### Community 12 - "RequestOptionManagementComponent"
-Cohesion: 0.06
-Nodes (3): RequestOptionManagementComponent, restoreLabelFor(), Component
+Cohesion: 0.07
+Nodes (37): authGuard(), defaultRoleRouteGuard(), externalUserGuard(), loginGuard(), publicLandingGuard(), recordsHubDefaultTabGuard(), roleGuard(), AuthNavigationItem (+29 more)
 
 ### Community 13 - "staff-task.repository.ts"
 Cohesion: 0.19
@@ -297,9 +282,13 @@ Nodes (10): StaffTask, StaffTaskAssignmentDraft, StaffTaskRepository, StaffTaskR
 Cohesion: 0.08
 Nodes (3): EventCalendarComponent, Component, HostListener
 
-### Community 15 - "InternalDataRecord"
+### Community 15 - "internal-data-page.models.ts"
 Cohesion: 0.09
-Nodes (24): ProposalSortKey, SortOrder, ACTION_LABELS, ACTION_TONES, BUCKET_COPY, BUCKET_COPY, ORDER_STATUS_LABEL, PROGRESS_STATUS_LABEL (+16 more)
+Nodes (24): SortOrder, ACTION_LABELS, ACTION_TONES, PCR_REJECTION_COMMENT_MIN_LENGTH, STATUS_LABELS, STATUS_TONES, BUCKET_COPY, ORDER_STATUS_LABEL (+16 more)
+
+### Community 17 - "HappeningSoonComponent"
+Cohesion: 0.11
+Nodes (3): ProposalEventSchedule, HappeningSoonComponent, Component
 
 ### Community 20 - "RolesComponent"
 Cohesion: 0.08
@@ -307,67 +296,63 @@ Nodes (4): deriveRoleCode(), restoreLabelFor(), RolesComponent, Component
 
 ### Community 21 - "ai-assistant.ts"
 Cohesion: 0.11
-Nodes (22): AiAssistantAnswer, AiAssistantClub, AiAssistantHistoryTurn, AiAssistantNavigation, AiAssistantProposal, AiAssistantRegistrant, AiAssistantRegistrantsTable, AiAssistantService (+14 more)
+Nodes (20): AiAssistantAnswer, AiAssistantClub, AiAssistantHistoryTurn, AiAssistantProposal, AiAssistantRegistrant, AiAssistantRegistrantsTable, AiAssistantService, AiAssistantSource (+12 more)
 
 ### Community 22 - "event-proposal.ts"
-Cohesion: 0.11
-Nodes (17): LogisticsAvailability, LogisticsAvailabilityService, Injectable, InternalUserDirectoryService, Injectable, option(), options(), ProposalReviewItem (+9 more)
+Cohesion: 0.10
+Nodes (17): LogisticsAvailability, LogisticsAvailabilityService, Injectable, option(), options(), ProposalReviewItem, ProposalReviewSection, ProposalStep (+9 more)
 
 ### Community 23 - "EditableTableColumn"
-Cohesion: 0.12
+Cohesion: 0.11
 Nodes (3): RequestDefinition, EditableTableColumn, FormControlType
 
 ### Community 24 - "row-assignment.repository.ts"
-Cohesion: 0.15
+Cohesion: 0.16
 Nodes (14): AssignableStaff, MyRowAssignment, MyRowAssignmentQuery, MyRowAssignmentSortKey, Page, RowAssignment, RowAssignmentsForTask, RowAssignmentStatus (+6 more)
 
 ### Community 27 - "proposal-department-view.ts"
-Cohesion: 0.10
-Nodes (26): maxAssigneesPerRow(), ConversationMessage, ConversationSenderSide, allCommentEntries(), DEPARTMENT_LABELS, DepartmentConfirmation, DepartmentTaskStatus, initialsFor() (+18 more)
-
-### Community 28 - "ProposalReviewRecord"
-Cohesion: 0.09
-Nodes (4): ProposalReviewRecord, ProposalWorkflowRepository, ProposalWorkflowService, Injectable
+Cohesion: 0.07
+Nodes (32): maxAssigneesPerRow(), ConversationMessage, ConversationSenderSide, ProposalConversation, allCommentEntries(), DepartmentConfirmation, DepartmentTaskStatus, initialsFor() (+24 more)
 
 ### Community 29 - "event-calendar.ts"
-Cohesion: 0.10
-Nodes (14): ProposalEventSchedule, AgendaDay, CalendarDay, CalendarEvent, CalendarView, isoDate(), MOCK_EVENT_FIXTURES, MOCK_PUBLISHED_EVENTS (+6 more)
+Cohesion: 0.09
+Nodes (13): AgendaDay, CalendarDay, CalendarEvent, CalendarView, isoDate(), MOCK_EVENT_FIXTURES, MOCK_PUBLISHED_EVENTS, ExpandableSearchComponent (+5 more)
 
 ### Community 30 - "CafeteriaManageComponent"
 Cohesion: 0.09
 Nodes (3): CafeteriaManageComponent, restoreLabelFor(), Component
 
-### Community 31 - "proposal-review.models.ts"
-Cohesion: 0.14
-Nodes (18): RegistrationMode, AGENDA, coOwnersFor(), DISCUSSIONS, GUESTS, IMPORTANT_PEOPLE, organizersFor(), proposal() (+10 more)
+### Community 31 - "proposal-review.mock-data.ts"
+Cohesion: 0.17
+Nodes (15): AGENDA, coOwnersFor(), DISCUSSIONS, GUESTS, IMPORTANT_PEOPLE, organizersFor(), proposal(), proposalForTitle() (+7 more)
 
 ### Community 32 - "request-option.service.ts"
 Cohesion: 0.14
 Nodes (11): mapRequestOptionResponse(), mapRequestOptionWrite(), RequestOptionDto, RequestOptionWriteDto, ArchivedRequestOption, RequestOptionDraft, RequestOptionQuery, RequestOptionRepository (+3 more)
 
 ### Community 33 - "InternalLayoutComponent"
-Cohesion: 0.13
+Cohesion: 0.14
 Nodes (3): InternalLayoutComponent, Component, HostListener
 
 ### Community 35 - "external-registration.service.ts"
 Cohesion: 0.13
-Nodes (11): ExternalRegistrationService, GuestRegistrationFlowService, StartRegistrationResponse, Injectable, EmailStatusResponse, ExternalRegistrationApi, ExternalUserRegistrationRequest, ExternalUserRegistrationResponse (+3 more)
+Nodes (16): ExternalRegistrationService, StartRegistrationResponse, Injectable, VerifyRegistrationResponse, EmailStatusResponse, EventRegistrationApi, ExternalRegistrationApi, ExternalUserRegistrationRequest (+8 more)
 
 ### Community 37 - "auth.test-fixtures.ts"
-Cohesion: 0.12
-Nodes (25): SEED_UNITS, SEED_USERS, TEST_CAFETERIA_MANAGER, TEST_CFO, TEST_EXTERNAL_USER, TEST_FMB_HEAD, TEST_HEAD_OF_SCHOOL, TEST_LOGISTICS_STAFF (+17 more)
+Cohesion: 0.14
+Nodes (23): SEED_UNITS, SEED_USERS, AuthNavNode, TEST_CAFETERIA_MANAGER, TEST_CFO, TEST_EXTERNAL_USER, TEST_FMB_HEAD, TEST_HEAD_OF_SCHOOL (+15 more)
 
 ### Community 38 - "apiErrorMessage"
-Cohesion: 0.09
-Nodes (44): AssignableCafeteriaUser, CafeteriaStaffRoleCode, AdminEntity, AdminTab, AssignmentRow, UserAssignmentGroup, CafeteriaManageTab, ROLE_CODE (+36 more)
-
-### Community 39 - "components/explore-events/explore-events.ts"
 Cohesion: 0.13
-Nodes (15): EVENT_FIELD_MAPPING, EventSearchParams, EventSearchResponse, EventVisibility, PaymentStatus, RegistrationResult, VISIBLE_STATUSES, AppliedFilterChip (+7 more)
+Nodes (37): AdminEntity, AdminTab, AssignmentRow, UserAssignmentGroup, CafeteriaManageTab, ROLE_CODE, ROLE_OPTIONS, COLUMNS (+29 more)
 
-### Community 40 - "dashboard.models.ts"
-Cohesion: 0.06
-Nodes (28): AxisSpec, ChartKind, DashboardMeta, DashboardPeriod, DashboardProfile, DashboardWidget, Delta, Drill (+20 more)
+### Community 39 - "published-event.models.ts"
+Cohesion: 0.11
+Nodes (17): EVENT_FIELD_MAPPING, EventSearchResponse, EventVisibility, PaymentStatus, RegistrationMode, RegistrationResult, VISIBLE_STATUSES, EventCard (+9 more)
+
+### Community 40 - "request-option-management.ts"
+Cohesion: 0.21
+Nodes (9): CAFETERIA_OPTION_KINDS, KIND_LABELS, restoreLabelFor(), OptionCardMetaField, OptionCardViewModel, OptionCardGridComponent, Component, OptionItemDetailsModalComponent (+1 more)
 
 ### Community 41 - "How It Works Timeline"
 Cohesion: 0.18
@@ -375,26 +360,26 @@ Nodes (8): HowItWorksComponent, ProcessPathMarker, ProcessPathPoint, ProcessPath
 
 ### Community 42 - "proposal-visibility.ts"
 Cohesion: 0.21
-Nodes (23): departmentFor(), hasRole(), isExternalUser(), requestKindsForRole(), departmentsForRole(), departmentAwaitingApplicant(), headOfSchoolUnitCode(), isApplicantLike() (+15 more)
+Nodes (23): departmentFor(), hasRole(), isExternalUser(), requestKindsForRole(), departmentsForRole(), isReviewerStage(), departmentAwaitingApplicant(), headOfSchoolUnitCode() (+15 more)
 
 ### Community 43 - "ProposalDepartmentViewComponent"
-Cohesion: 0.07
+Cohesion: 0.08
 Nodes (3): FmbSelection, ProposalDepartmentViewComponent, Component
 
-### Community 45 - "event-image-upload.service.ts"
-Cohesion: 0.23
+### Community 45 - "event-details-modal.ts"
+Cohesion: 0.22
 Nodes (11): ApiEventImageUploadService, EVENT_IMAGE_UPLOAD_API, EventImageUploadApi, EventImageUploadRequest, EventImageUploadResponse, MockEventImageUploadService, readAsDataUrl(), Injectable (+3 more)
 
 ### Community 46 - "AiAssistantComponent"
-Cohesion: 0.09
-Nodes (4): AiAssistantComponent, isAssistantUrl(), Component, HostListener
+Cohesion: 0.10
+Nodes (4): AiAssistantComponent, newMessageId(), segmentMessageText(), Component
 
 ### Community 47 - "SharedLibraryComponent"
-Cohesion: 0.12
-Nodes (4): SharedLibraryComponent, Component, StepStatus, WizardStep
+Cohesion: 0.09
+Nodes (6): SharedLibraryComponent, Component, StepIndicatorComponent, StepStatus, Component, WizardStep
 
 ### Community 48 - "RequestOption"
-Cohesion: 0.29
+Cohesion: 0.24
 Nodes (3): RequestOption, RequestOptionService, Injectable
 
 ### Community 49 - "ApiAdminDirectoryRepository"
@@ -402,20 +387,20 @@ Cohesion: 0.11
 Nodes (5): AdminRoleRecord, AdminUserRecord, ApiAdminDirectoryRepository, Injectable, AssignmentDraftRow
 
 ### Community 50 - "ClubService"
-Cohesion: 0.07
-Nodes (20): ClubCategoryPage, ClubCategoryRecord, ClubDraft, ClubJoinRequestRecord, ClubJoinRequestStatus, ClubMemberRecord, ClubMyStatus, ClubPage (+12 more)
+Cohesion: 0.13
+Nodes (5): ClubCategoryRecord, ClubDraft, ClubRecord, ClubService, Injectable
 
 ### Community 51 - "request-option.models.ts"
-Cohesion: 0.19
-Nodes (14): CampusTourStartOption, CampusTourTypeOption, DietaryInformationOption, FoodRequestOption, FundingMainOption, FundingSubOption, LogisticsRequestOption, MediaRequestOption (+6 more)
+Cohesion: 0.27
+Nodes (13): CampusTourStartOption, CampusTourTypeOption, DietaryInformationOption, FoodRequestOption, FundingMainOption, FundingSubOption, LogisticsRequestOption, MediaRequestOption (+5 more)
 
 ### Community 52 - "Explore Events Component Template"
 Cohesion: 0.21
 Nodes (16): app-cta-link Component, app-event-card Component, app-event-details-modal Component, app-expandable-search Component, app-filter-button Component, app-internal-page-state Component, app-site-footer Component, app-site-header Component (+8 more)
 
-### Community 54 - "viz.ts"
-Cohesion: 0.12
-Nodes (25): Annotation, Axes, Series, areaPath(), barPath(), categoriesOf(), columnPath(), CURRENCY (+17 more)
+### Community 54 - "components/explore-events/explore-events.ts"
+Cohesion: 0.09
+Nodes (13): GuestRegistrationFlowService, EventFavouriteService, Injectable, InternalExploreEventsComponent, Component, AppliedFilterChip, FilterGroup, FilterKey (+5 more)
 
 ### Community 56 - "DepartmentResubmitComponent"
 Cohesion: 0.11
@@ -423,27 +408,31 @@ Nodes (4): optionKindForDepartmentField(), resolveDepartmentRowLabels(), Departm
 
 ### Community 57 - "DepartmentRequestKind"
 Cohesion: 0.12
-Nodes (4): DepartmentRequestKind, RowAssignmentRepository, ApiRowAssignmentRepository, Injectable
+Nodes (4): DepartmentRequestKind, RowAssignmentRepository, RowAssignmentService, Injectable
 
-### Community 58 - "chart-panel.ts"
-Cohesion: 0.09
-Nodes (15): Directive, Point, AlertListComponent, Component, ChartPanelComponent, Component, ColumnChartComponent, Component (+7 more)
+### Community 58 - "club.service.ts"
+Cohesion: 0.18
+Nodes (10): ClubCategoryPage, ClubJoinRequestStatus, ClubMyStatus, ClubPage, ClubSortKey, ClubUserSummary, PresidentChangeRequestPage, PresidentChangeRequestQuery (+2 more)
+
+### Community 59 - "HubClubRequestsComponent"
+Cohesion: 0.10
+Nodes (4): ClubJoinRequestRecord, HubClubRequestsComponent, Component, RequestHistoryEntry
 
 ### Community 60 - "Schema Alignment Plan"
 Cohesion: 0.05
 Nodes (38): EMS Schema Alignment + Mock Backend Implementation Plan, Global Constraints, Phase 1: Source-of-Truth Corrections, Phase 2: Angular Frontend Refactor, Phase 2b: Extend Auth, Events, Saved Events, System Config, and Image Upload to REST, Phase 3: Express Mock Backend, Phase 4: Wire the Dev-Server Proxy and Verify End-to-End, Task 1.1: Correct `ems_database_schema.sql` — roles, F&B rename, water/campus-tour restructuring, new status columns (+30 more)
 
-### Community 63 - "department-resubmit.ts"
-Cohesion: 0.14
-Nodes (7): ManagerField, EditableColumnType, SelectOption, StaffOption, SearchableDropdownComponent, Component, HostListener
+### Community 63 - "SelectOption"
+Cohesion: 0.12
+Nodes (9): ManagerField, CLUB_CATEGORY_MAX, CLUB_CATEGORY_MIN, EditableColumnType, SelectOption, StaffOption, SearchableDropdownComponent, Component (+1 more)
 
 ### Community 64 - "department-workflow.config.ts"
-Cohesion: 0.14
-Nodes (16): assignmentRequiredForManager(), FLAT_DEPARTMENT_WORKFLOWS, isFlatRoleCode(), MAX_ASSIGNEES_PER_ROW, optionKindsForManager(), requestKindsForManager(), SAME_DAY_START_ONLY, staffUnitCodeForManager() (+8 more)
-
-### Community 65 - "proposal-workflow.repository.ts"
 Cohesion: 0.13
-Nodes (12): ProposalConversation, DepartmentRequestBucket, DepartmentRequestListQuery, DepartmentRequestOrder, DepartmentRequestSortKey, FmbSelectionDraft, FmbSelectionEdit, Page (+4 more)
+Nodes (15): assignmentRequiredForManager(), FLAT_DEPARTMENT_WORKFLOWS, isFlatRoleCode(), MAX_ASSIGNEES_PER_ROW, requestKindsForManager(), SAME_DAY_START_ONLY, staffUnitCodeForManager(), UNIT_DEPARTMENT_WORKFLOWS (+7 more)
+
+### Community 65 - "ProposalWorkflowService"
+Cohesion: 0.11
+Nodes (3): ProposalBucket, ProposalWorkflowService, Injectable
 
 ### Community 67 - "HubPresidentChangeRequestsComponent"
 Cohesion: 0.14
@@ -453,13 +442,13 @@ Nodes (3): PresidentChangeRequestRecord, HubPresidentChangeRequestsComponent, Co
 Cohesion: 0.33
 Nodes (6): RBAC Redesign: Users/Units/Roles/Page Visibility Design, isSchoolUnit(code) backend helper, One head per unit constraint, Protected vs custom role distinction, 9 seed role catalog (protected), School detection by substring match
 
-### Community 69 - "charts.spec.ts"
-Cohesion: 0.12
-Nodes (12): TableView, ChartFrameComponent, Component, FrameHost, InsightHost, PanelHost, TableHost, TileHost (+4 more)
+### Community 69 - "page-visibility.ts"
+Cohesion: 0.14
+Nodes (10): CAFETERIA_ROLE_CODES, EMPTY_DRAFT, GRANT_TYPE_OPTIONS, PageVisibilityTab, ImageUploadFieldComponent, Component, ViewChild, PopoverComponent (+2 more)
 
-### Community 70 - "staff-tasks.ts"
-Cohesion: 0.24
-Nodes (7): COMMON_END, DEFAULT_PRESENTATION, PageMode, ROLE_PRESENTATION, RolePresentation, InternalTableColumn, InternalDataTableComponent
+### Community 70 - "InternalTableColumn"
+Cohesion: 0.20
+Nodes (6): RolePresentation, InternalRowAction, InternalTableColumn, InternalDataTableComponent, InternalMobileRecordListComponent, HostListener
 
 ### Community 71 - "Backend Design Principles"
 Cohesion: 0.29
@@ -470,36 +459,36 @@ Cohesion: 0.40
 Nodes (5): Cafeteria Staff shared inbox mechanism, department_review parallel independent tasks, workflow.service.js (state machine implementation), Corrected Workflow State Machine (section 3), workflow.service.js hasRole update
 
 ### Community 73 - "environment.ts"
-Cohesion: 0.13
-Nodes (11): AiAccessDenial, AiAccessDenialPage, AiAccessLogService, Injectable, PurgeSweepEntityResult, PurgeSweepResult, AuthUserRole, DevUsersService (+3 more)
+Cohesion: 0.16
+Nodes (9): DevUser, DevUsersService, Injectable, APPLICANT_USER, loginViaMock(), sessionEnvelope(), DemoUserGroup, CATALOG_SEED (+1 more)
 
-### Community 75 - "login.ts"
-Cohesion: 0.14
-Nodes (6): DevUser, roleCanUseSavedEvents(), DemoUserGroup, LoginComponent, Component, ViewChild
+### Community 75 - "LoginComponent"
+Cohesion: 0.18
+Nodes (3): LoginComponent, Component, ViewChild
 
 ### Community 77 - "HubProposalsComponent"
 Cohesion: 0.16
 Nodes (3): departmentsAwaitingApplicant(), HubProposalsComponent, Component
 
-### Community 79 - "formatValue"
-Cohesion: 0.12
-Nodes (9): ValueFormat, FunnelComponent, FunnelStage, Component, HeatCell, HeatmapComponent, Component, formatValue() (+1 more)
+### Community 79 - "FormModalComponent"
+Cohesion: 0.23
+Nodes (3): FormModalComponent, Component, HostListener
 
 ### Community 80 - "RBAC Table Design"
 Cohesion: 0.25
 Nodes (8): Page Visibility / Nav Builder, nav_page_roles table, nav_page table, role table, unit table, user_unit_roles table, users table (identity fields only), page-visibility.html (Pages/Permissions/Deleted admin UI)
 
 ### Community 83 - "admin-directory.models.ts"
+Cohesion: 0.28
+Nodes (7): AdminDirectoryRepository, AdminNavPageGrant, AdminNavPageGrantDraft, AdminRoleDraft, AdminUnitDraft, AdminUserDraft, ADMIN_DIRECTORY_REPOSITORY
+
+### Community 85 - "ClubRosterModalComponent"
 Cohesion: 0.24
-Nodes (8): AdminDirectoryRepository, AdminNavPageDraft, AdminNavPageGrant, AdminNavPageGrantDraft, AdminRoleDraft, AdminUnitDraft, AdminUserDraft, ADMIN_DIRECTORY_REPOSITORY
+Nodes (3): ClubMemberRecord, ClubRosterModalComponent, Component
 
 ### Community 86 - "payment-proof-upload.service.ts"
 Cohesion: 0.27
 Nodes (8): ApiPaymentProofUploadService, MockPaymentProofUploadService, PAYMENT_PROOF_UPLOAD_API, PaymentProofUploadApi, PaymentProofUploadRequest, PaymentProofUploadResponse, readAsDataUrl(), Injectable
-
-### Community 87 - "EditableRow"
-Cohesion: 0.13
-Nodes (3): EditableRow, ProposalTableComponent, Component
 
 ### Community 89 - "RBAC Design Notes"
 Cohesion: 0.20
@@ -508,10 +497,6 @@ Nodes (10): nav-tree.service.js, role-eligibility.service.js, role-navigation.ts
 ### Community 90 - "Unit Role Migration Notes"
 Cohesion: 0.29
 Nodes (8): Fully data-driven RBAC rationale, Unit + Level RBAC Migration Prompt, applicant role deletion rationale, generic staff role deletion rationale, migrate-unit-level-roles.js migration script, users.role generic level marker compatibility field, School unit-kind warning note, Unit + Level identity model
-
-### Community 92 - "SiteHeaderComponent"
-Cohesion: 0.18
-Nodes (4): SiteHeaderComponent, Component, HostListener, ViewChild
 
 ### Community 93 - "app-internal-data-page Component"
 Cohesion: 0.33
@@ -530,12 +515,8 @@ Cohesion: 0.22
 Nodes (3): AiConversationStore, newId(), Injectable
 
 ### Community 98 - "RequestOptionKind"
-Cohesion: 0.22
+Cohesion: 0.38
 Nodes (3): FlatDepartmentWorkflowConfig, UnitDepartmentWorkflowConfig, RequestOptionKind
-
-### Community 99 - "AuthUser"
-Cohesion: 0.15
-Nodes (9): AuthUser, LoginResponse, PersistedSession, VerifyRegistrationResponse, AuthTokens, PersistedTokens, APPLICANT_USER, loginViaMock() (+1 more)
 
 ### Community 101 - "HubMyClubsComponent"
 Cohesion: 0.11
@@ -548,6 +529,10 @@ Nodes (5): event-proposal.html (6-step proposal form), Logistics quantity availa
 ### Community 106 - "Header & View Templates"
 Cohesion: 0.33
 Nodes (6): app-cta-link (header usage), Site Header Template, Calendar Month/Week/Agenda View Modes, Explore Events Public/Internal Variant Pattern, My Events publicLayout Toggle, External User Restricted Navigation
+
+### Community 110 - "proposal-review-page.spec.ts"
+Cohesion: 0.18
+Nodes (5): PROPOSAL_REVIEW_RECORDS, ProposalReviewPageComponent, activatedRouteStub(), configureWithRoute(), Component
 
 ### Community 111 - "Express Backend Design"
 Cohesion: 0.40
@@ -581,29 +566,25 @@ Nodes (3): FypUi README, Angular CLI, Vitest test runner
 Cohesion: 0.67
 Nodes (3): login.html (Login page template), Development demo users picker, app-guest-registration-modal component usage
 
-### Community 148 - "HeroComponent"
-Cohesion: 0.24
-Nodes (4): HeroComponent, MockIntersectionObserver, Component, ViewChild
+### Community 148 - "ai-access-log.service.ts"
+Cohesion: 0.29
+Nodes (4): AiAccessDenial, AiAccessDenialPage, AiAccessLogService, Injectable
 
 ### Community 149 - "auth.service.ts"
 Cohesion: 0.06
 Nodes (22): dropdownSettingRoutes, placeholderPage(), AuthService, ChangePasswordResult, LoginResult, MessageResponse, PasswordResetConfirmResult, Injectable (+14 more)
 
-### Community 152 - "HubRequestsComponent"
-Cohesion: 0.15
-Nodes (4): ProposalDepartmentRequest, DepartmentRequestListItem, HubRequestsComponent, Component
-
-### Community 153 - "PoliciesTabComponent"
-Cohesion: 0.22
-Nodes (3): DashboardThreshold, PoliciesTabComponent, Component
+### Community 152 - "hub-proposals.ts"
+Cohesion: 0.09
+Nodes (15): ProposalDepartmentRequest, DEPARTMENT_LABELS, DepartmentRequestBucket, DepartmentRequestListItem, DepartmentRequestListQuery, DepartmentRequestOrder, DepartmentRequestSortKey, FmbSelectionEdit (+7 more)
 
 ### Community 154 - "Admin Page Design Notes"
 Cohesion: 0.33
 Nodes (6): Soft-delete with 7-day auto-purge, Unit Code auto-derived read-only field, admin-directory.html (Users/Units admin page), app-delete-confirm-dialog usage, Deleted tab (archived users/units), derivedUnitCode() read-only unit code field
 
-### Community 155 - "auth.models.ts"
-Cohesion: 0.14
-Nodes (16): PurgeSweepService, Injectable, AuthNavigationItem, AuthNavigationSection, AuthNavNode, RoleNavigation, RoleNavigationEntry, UserAccountType (+8 more)
+### Community 155 - "purge-sweep.service.ts"
+Cohesion: 0.33
+Nodes (4): PurgeSweepEntityResult, PurgeSweepResult, PurgeSweepService, Injectable
 
 ### Community 156 - "Request Option Management Template"
 Cohesion: 0.22
@@ -621,53 +602,37 @@ Nodes (5): buildDepartmentRequestDefinitions(), DepartmentRequestDefinition, fil
 Cohesion: 0.40
 Nodes (3): DeadlineReminderService, ReminderTask, Injectable
 
-### Community 169 - "happening-soon.ts"
-Cohesion: 0.14
-Nodes (12): EventCard, EventDate, ExpandingCard, QueueDirection, inDays(), MOCK_EVENT_FIXTURES, MOCK_PUBLISHED_EVENTS, TransitionPhase (+4 more)
-
 ### Community 171 - "CafeteriaService"
-Cohesion: 0.19
-Nodes (5): Cafeteria, CafeteriaAssignment, CafeteriaDraft, CafeteriaService, Injectable
+Cohesion: 0.20
+Nodes (4): Cafeteria, CafeteriaAssignment, CafeteriaService, Injectable
 
 ### Community 172 - "event-catalog.service.ts"
 Cohesion: 0.17
 Nodes (10): ArchivedEventCatalogEntry, EventCatalogDraft, EventCatalogResource, EventCategoryService, EventFormatService, Injectable, CategoriesTabComponent, Component (+2 more)
 
-### Community 173 - "event-engagement.models.ts"
-Cohesion: 0.10
-Nodes (13): EventRegistrationApi, NotificationPreference, RegisteredEventEntry, SavedEventMutationResponse, SavedEventRecord, SavedEventsApi, SavedEventsResponse, EventFavouriteService (+5 more)
+### Community 173 - "SavedEventsService"
+Cohesion: 0.19
+Nodes (5): NotificationPreference, SavedEventMutationResponse, SavedEventsApi, SavedEventsService, Injectable
 
 ### Community 174 - "request-option.service.spec.ts"
-Cohesion: 0.20
-Nodes (9): avManager, cafeteriaManagerUser, cfoUser, DROPDOWN_PAGES_BY_UNIT, fmbManager, logisticsManager, SEED_OPTIONS, studentServicesManager (+1 more)
+Cohesion: 0.15
+Nodes (14): flattenRoutes(), roleCanAccess(), optionKindsForManager(), canManageRequestOptions(), managerOptionKinds(), avManager, cafeteriaManagerUser, cfoUser (+6 more)
 
-### Community 176 - "policies-tab.ts"
-Cohesion: 0.28
-Nodes (7): DASHBOARD_THRESHOLD_GROUPS, SystemConfig, SystemConfigDraft, ThresholdGroup, DEFAULT_CONFIG, SystemConfigService, Injectable
+### Community 176 - "system-config.service.ts"
+Cohesion: 0.31
+Nodes (5): SystemConfig, SystemConfigDraft, DEFAULT_CONFIG, SystemConfigService, Injectable
 
 ### Community 179 - "cafeteria.service.ts"
-Cohesion: 0.24
-Nodes (9): CafeteriaStaffAuditAction, CafeteriaStaffAuditActorRole, CafeteriaStaffAuditEntry, CafeteriaStaffAuditQuery, CafeteriaStaffAuditSortKey, Page, SortOrder, CafeteriaAssignmentDraft (+1 more)
+Cohesion: 0.17
+Nodes (12): CafeteriaStaffAuditAction, CafeteriaStaffAuditActorRole, CafeteriaStaffAuditEntry, CafeteriaStaffAuditQuery, CafeteriaStaffAuditSortKey, Page, SortOrder, AssignableCafeteriaUser (+4 more)
+
+### Community 182 - "internal-user-directory.service.ts"
+Cohesion: 0.50
+Nodes (4): AuthUserRole, InternalDirectoryUser, InternalUserDirectoryService, Injectable
 
 ### Community 186 - "AiOrbAwarenessService"
 Cohesion: 0.40
 Nodes (3): AiAwarenessEvent, AiOrbAwarenessService, Injectable
-
-### Community 187 - "TimelineChartComponent"
-Cohesion: 0.14
-Nodes (6): TimelineBar, TimelineChartComponent, TimelineLane, Component, formatClock(), minutesOfDay()
-
-### Community 188 - "DashboardService"
-Cohesion: 0.29
-Nodes (3): DashboardDocument, DashboardService, Injectable
-
-### Community 190 - "meter.ts"
-Cohesion: 0.29
-Nodes (6): VizStatus, MeterComponent, MeterSpec, Component, STATUS_ICON, statusColor()
-
-### Community 194 - "proposal-table.ts"
-Cohesion: 0.40
-Nodes (3): ProposalTableColumn, RowCounterComponent, Component
 
 ## Ambiguous Edges - Review These
 - `Fully data-driven RBAC rationale` → `Unit + Level identity model`  [AMBIGUOUS]
@@ -676,9 +641,9 @@ Nodes (3): ProposalTableColumn, RowCounterComponent, Component
   src/app/features/shared-library/shared-library.html · relation: references
 
 ## Knowledge Gaps
-- **361 isolated node(s):** `$schema`, `version`, `packageManager`, `newProjectRoot`, `projectType` (+356 more)
+- **339 isolated node(s):** `$schema`, `version`, `packageManager`, `newProjectRoot`, `projectType` (+334 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **78 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **73 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -687,13 +652,13 @@ _Questions this graph is uniquely positioned to answer:_
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
 - **What is the exact relationship between `app-internal-table-workspace Component` and `Shared Library Catalog Page Template`?**
   _Edge tagged AMBIGUOUS (relation: references) - confidence is low._
-- **Why does `apiErrorMessage()` connect `apiErrorMessage` to `request-option-management.ts`, `CafeteriaStaffTasksComponent`, `StaffTasksComponent`, `RequestOptionManagementComponent`, `InternalDataRecord`, `Users & Units Admin`, `PageVisibilityComponent`, `EventCatalogSectionComponent`, `RolesComponent`, `auth.service.ts`, `Deleted Items Admin`, `event-proposal.ts`, `Proposal Submit Actions`, `PoliciesTabComponent`, `ClubCategoryManagementComponent`, `auth.models.ts`, `proposal-department-view.ts`, `CafeteriaManageComponent`, `InternalLayoutComponent`, `ClubManagementComponent`, `ProposalDepartmentViewComponent`, `CafeteriaStaffAssignmentsComponent`, `policies-tab.ts`, `ClubService`, `PresidentChangeRequestModalComponent`, `DepartmentResubmitComponent`, `RecordsPageComponent`, `ProposalReviewerViewComponent`, `department-resubmit.ts`, `HubPresidentChangeRequestsComponent`, `staff-tasks.ts`, `ClubRosterModalComponent`, `Page Visibility Grants`, `CafeteriaMyStaffComponent`, `HubRegistrationsComponent`, `AiAccessLogComponent`, `Page Visibility Restore`?**
-  _High betweenness centrality (0.075) - this node is a cross-community bridge._
-- **Why does `EventProposalComponent` connect `EventProposalComponent` to `.navigateToTableError`, `.logisticsExceedsRemaining`, `proposal-table.ts`, `department-resubmit.ts`, `request-option.models.ts`, `EditableTableColumn`, `EditableRow`, `Proposal Submit Actions`, `event-proposal.ts`, `DepartmentResubmitComponent`, `.saveTableRow`, `.row`?**
-  _High betweenness centrality (0.052) - this node is a cross-community bridge._
-- **Why does `AuthService` connect `auth.service.ts` to `auth.interceptor.ts`, `landing-page.ts`, `request-option-management.ts`, `role-access.ts`, `InternalDataRecord`, `ai-assistant.ts`, `event-proposal.ts`, `proposal-department-view.ts`, `auth.models.ts`, `external-registration.service.ts`, `auth.test-fixtures.ts`, `apiErrorMessage`, `components/explore-events/explore-events.ts`, `proposal-visibility.ts`, `event-engagement.models.ts`, `ClubService`, `department-resubmit.ts`, `login.ts`, `admin-directory.models.ts`, `AuthUser`?**
-  _High betweenness centrality (0.041) - this node is a cross-community bridge._
+- **Why does `EventProposalComponent` connect `EventProposalComponent` to `.navigateToTableError`, `.logisticsExceedsRemaining`, `Proposal Step Navigation`, `proposal-department-view.ts`, `environment.ts`, `EditableTableColumn`, `event-proposal.ts`, `Proposal Submit Actions`, `EditableRow`, `DepartmentResubmitComponent`, `OptionPickerItem`, `SelectOption`?**
+  _High betweenness centrality (0.085) - this node is a cross-community bridge._
+- **Why does `apiErrorMessage()` connect `apiErrorMessage` to `CafeteriaStaffTasksComponent`, `StaffTasksComponent`, `role-access.ts`, `RequestOptionManagementComponent`, `internal-data-page.models.ts`, `Users & Units Admin`, `PageVisibilityComponent`, `EventCatalogSectionComponent`, `RolesComponent`, `auth.service.ts`, `Deleted Items Admin`, `event-proposal.ts`, `Proposal Submit Actions`, `Policies Config Tab`, `ClubCategoryManagementComponent`, `proposal-department-view.ts`, `CafeteriaManageComponent`, `InternalLayoutComponent`, `ClubManagementComponent`, `request-option-management.ts`, `ProposalDepartmentViewComponent`, `CafeteriaStaffAssignmentsComponent`, `PresidentChangeRequestModalComponent`, `DepartmentResubmitComponent`, `RecordsPageComponent`, `ProposalReviewerViewComponent`, `SelectOption`, `HubPresidentChangeRequestsComponent`, `page-visibility.ts`, `ClubRosterModalComponent`, `Page Visibility Grants`, `CafeteriaMyStaffComponent`, `HubRegistrationsComponent`, `AiAccessLogComponent`, `Page Visibility Restore`?**
+  _High betweenness centrality (0.061) - this node is a cross-community bridge._
+- **Why does `InternalRowActionEvent` connect `apiErrorMessage` to `internal-data-page.ts`, `CafeteriaStaffTasksComponent`, `StaffTasksComponent`, `RequestOptionManagementComponent`, `internal-data-page.models.ts`, `EventCatalogSectionComponent`, `RolesComponent`, `auth.service.ts`, `hub-proposals.ts`, `ClubCategoryManagementComponent`, `CafeteriaManageComponent`, `ClubManagementComponent`, `Assignment Row Actions`, `Nav Page Purge Actions`, `request-option-management.ts`, `CafeteriaStaffAssignmentsComponent`, `SharedLibraryComponent`, `HubClubRequestsComponent`, `RecordsPageComponent`, `HubPresidentChangeRequestsComponent`, `page-visibility.ts`, `HubHistoryClubsComponent`, `Club Discover Page`, `HubProposalsComponent`, `HubHistoryEventsComponent`, `Page Visibility Grants`, `CafeteriaMyStaffComponent`, `HubMyClubsComponent`, `HubRegistrationsComponent`, `HubOngoingClubsComponent`, `Admin Directory Actions`?**
+  _High betweenness centrality (0.053) - this node is a cross-community bridge._
 - **What connects `$schema`, `version`, `packageManager` to the rest of the system?**
-  _361 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _339 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `auth.interceptor.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.06829268292682927 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06448202959830866 - nodes in this community are weakly interconnected._

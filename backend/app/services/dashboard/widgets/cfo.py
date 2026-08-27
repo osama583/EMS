@@ -275,6 +275,7 @@ def gate_matrix(cur, scope: Scope) -> dict[str, Any]:
         empty="No proposals were submitted in this period.",
         filters=["school", "format"],
         drill_to=drill("/app/history/proposals"),
+        suppressed=sum(1 for row in floored if row.get("suppressed")),
         signature=True,
         mobile="breach-list",
     )
@@ -430,6 +431,7 @@ def cost_per_pax_schools(cur, scope: Scope) -> dict[str, Any]:
         caption=f"Buckets under {scope.config.bucket_floor()} proposals render as an em dash and are counted in the page footnote.",
         empty="No proposal in this period carries a committed cost.",
         drill_to=drill("/app/history/proposals"),
+        suppressed=sum(1 for row in floored if row.get("suppressed")),
         mobile="ranked-list",
     )
 

@@ -101,7 +101,7 @@
          it reads as the page's lead rather than a larger tile; the KPI tiles
          share the remaining eight and flow, because roles carry four, five or
          six of them and a fixed span would strand one on its own row. -->
-    <div class="dash__band">
+    <div class="dash__band dash__band--signal">
       @if (hero(); as heroStat) {
         <div class="dash-col-4 dash-col--hero">
           <app-stat-tile [stat]="heroStat" (drill)="onStat($event)" />
@@ -135,7 +135,6 @@
           <app-chart-panel
             [panel]="signaturePanel"
             [exportHref]="exportHref(signaturePanel)"
-            [suppressed]="doc.meta.suppressedBuckets"
             (drill)="navigate($event)"
             (retry)="retry()"
           />
@@ -163,7 +162,6 @@
                   <app-chart-panel
                     [panel]="panel"
                     [exportHref]="exportHref(panel)"
-                    [suppressed]="doc.meta.suppressedBuckets"
                     (drill)="navigate($event)"
                     (retry)="retry()"
                   />
@@ -174,7 +172,6 @@
             <app-chart-panel
               [panel]="panel"
               [exportHref]="exportHref(panel)"
-              [suppressed]="doc.meta.suppressedBuckets"
               (drill)="navigate($event)"
               (retry)="retry()"
             />

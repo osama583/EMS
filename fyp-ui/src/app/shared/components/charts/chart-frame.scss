@@ -1,5 +1,8 @@
+:host { display: block; height: 100%; }
+
 .dash-panel {
   gap: var(--space-3);
+  height: 100%;
 }
 
 // The signature panel is the widest and tallest element on the page and is

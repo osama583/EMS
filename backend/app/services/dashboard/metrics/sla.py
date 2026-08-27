@@ -468,13 +468,21 @@ def delivery_punctuality(cur, scope: Scope, *, outlet: str | None = None) -> dic
     }
 
 
-def approximate_since(scope: Scope) -> str:
-    """The caption every M17/M18 widget carries, naming the gap rather than
-    hiding it (gap G1 in docs/dashboards/02-metric-catalog.md)."""
-    return (
-        "Acceptance and claim times are derived from order history for orders "
-        "placed before the lifecycle timestamps were added; newer orders are measured directly."
-    )
+# Two lengths of the same caveat. A KPI tile is one column wide and a six-line
+# note swamps the number it qualifies, so the tile gets the short form and the
+# panel behind it carries the explanation.
+_G1_SHORT = "Approximate for orders placed before the lifecycle timestamps were added."
+_G1_LONG = (
+    "Acceptance and claim times for orders placed before the lifecycle timestamps were added are "
+    "derived from request-level history, which cannot tell sibling orders on one proposal apart. "
+    "Newer orders are measured directly."
+)
+
+
+def approximate_since(scope: Scope, *, short: bool = False) -> str:
+    """The caveat every M17/M18 widget carries, naming gap G1 rather than
+    hiding it (docs/dashboards/02-metric-catalog.md)."""
+    return _G1_SHORT if short else _G1_LONG
 
 
 def month_floor(day: dt.date) -> dt.date:

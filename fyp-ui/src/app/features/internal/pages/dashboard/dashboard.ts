@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { DashboardService } from '../../../../core/dashboard/dashboard.service';
 import {
   DashboardWidget,
@@ -42,6 +42,7 @@ import { LoadingStateComponent } from '../../../../shared/components/loading-sta
 export class DashboardComponent {
   private readonly service = inject(DashboardService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly periods = PERIOD_OPTIONS;
   readonly document = this.service.document;
@@ -57,6 +58,19 @@ export class DashboardComponent {
   private readonly narrow = signal(false);
 
   constructor() {
+    // A profile and a period in the URL make the switcher shareable: "look at
+    // the Transport dashboard for this term" is a link rather than a set of
+    // instructions. Both are validated server-side against what the caller
+    // actually holds, so a hand-edited value can only ever reorder a list they
+    // already own (R4).
+    const params = this.route.snapshot.queryParamMap;
+    const profile = params.get('profile');
+    if (profile) this.service.profileId.set(profile);
+    const period = params.get('period');
+    if (period && PERIOD_OPTIONS.some((option) => option.key === period)) this.service.period.set(period);
+    const outlet = params.get('outlet');
+    if (outlet && outlet !== 'all') this.service.outlet.set(outlet);
+
     this.service.load();
     if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
       const query = window.matchMedia('(max-width: 48rem)');
@@ -146,14 +160,32 @@ export class DashboardComponent {
 
   setPeriod(key: string): void {
     this.service.setPeriod(key);
+    this.syncUrl();
   }
 
   setProfile(event: Event): void {
     this.service.setProfile((event.target as HTMLSelectElement).value);
+    this.syncUrl();
   }
 
   setOutlet(event: Event): void {
     this.service.setOutlet((event.target as HTMLSelectElement).value);
+    this.syncUrl();
+  }
+
+  /** Reflect the active scope in the URL without adding a history entry — the
+   *  back button should leave the dashboard, not step through filter changes. */
+  private syncUrl(): void {
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        profile: this.service.profileId() ?? null,
+        period: this.service.period(),
+        outlet: this.service.outlet() ?? null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   refresh(): void {

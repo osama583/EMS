@@ -44,7 +44,7 @@ import { hasData } from './viz';
     AlertListComponent,
   ],
   template: `
-    <app-chart-frame [panel]="panel()" [empty]="isEmpty()" [exportHref]="exportHref()" [suppressed]="suppressed()" (retry)="retry.emit($event)">
+    <app-chart-frame [panel]="panel()" [empty]="isEmpty()" [exportHref]="exportHref()" [suppressed]="panel().suppressed ?? 0" (retry)="retry.emit($event)">
       @switch (form()) {
         @case ('line') {
           <app-line-chart mode="line" [series]="panel().series" [axes]="panel().axes" [annotations]="panel().annotations" (markSelect)="onMark($event)" />
@@ -89,7 +89,6 @@ import { hasData } from './viz';
 export class ChartPanelComponent {
   readonly panel = input.required<PanelWidget>();
   readonly exportHref = input<string | null>(null);
-  readonly suppressed = input(0);
   readonly drill = output<Drill>();
   readonly retry = output<string>();
 

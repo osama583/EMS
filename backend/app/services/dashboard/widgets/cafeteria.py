@@ -69,7 +69,7 @@ def claim_latency(cur, scope: Scope) -> dict[str, Any]:
         target={"max": target, "label": f"target <= {target:g}h"},
         status=status_for(result["median"], warn=target, critical=target * 3),
         definition="M18 — accepted → claimed out of the shared pool",
-        caveat=sla.approximate_since(scope),
+        caveat=sla.approximate_since(scope, short=True),
         drill_to=drill("#panel-caf_order_lifecycle"),
     )
 
