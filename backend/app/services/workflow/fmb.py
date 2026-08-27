@@ -159,8 +159,9 @@ def create_selection(
     menu_item = _resolve_menu_item(cur, fmb_option_id)
     cur.execute(
         """INSERT INTO request_fmb_selection
-               (request_fmb_id, unit_code, fmb_option_id, menu_item_label, quantity, status, notes)
-           VALUES (%s, %s, %s, %s, %s, %s, %s)
+               (request_fmb_id, unit_code, fmb_option_id, menu_item_label, quantity, status, notes,
+                created_at)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, now())
            RETURNING *""",
         (
             fmb_row["request_fmb_id"],
@@ -194,7 +195,7 @@ def approve_selection(cur, selection_id: int, actor_user_id: int) -> dict:
         raise WorkflowError("This order is not awaiting your review.")
 
     cur.execute(
-        "UPDATE request_fmb_selection SET status = %s WHERE request_fmb_selection_id = %s",
+        "UPDATE request_fmb_selection SET status = %s, approved_at = now() WHERE request_fmb_selection_id = %s",
         (SEL_APPROVED, selection_id),
     )
     request_id = request_id_for_selection(cur, selection_id)
@@ -367,7 +368,7 @@ def mark_selection_ready(cur, selection_id: int, actor_user_id: int) -> dict:
         raise Forbidden("This order was claimed by another staff member.")
 
     cur.execute(
-        "UPDATE request_fmb_selection SET status = %s WHERE request_fmb_selection_id = %s",
+        "UPDATE request_fmb_selection SET status = %s, ready_at = now() WHERE request_fmb_selection_id = %s",
         (SEL_READY, selection_id),
     )
     history.record(

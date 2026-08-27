@@ -85,8 +85,13 @@ def nav_catalogue() -> list[dict]:
     # --- Top level --------------------------------------------------------
     page("how-it-works", "How It Works", "help_center", "/app/how-it-works", None, 0,
          grants_for(["lecturer", "student"]))
+    # Ten roles hold a dashboard (docs/dashboards/01 § 1): both head roles across
+    # every unit, the CFO, and every Cafeteria Manager. The cafeteria grant is a
+    # `cafeteria` row rather than a unit_role row enumerating outlets - enumerating
+    # outlets is exactly what went stale in commit 7ee8930 and left a new outlet's
+    # staff with an empty sidebar.
     page("dashboard", "Dashboard", "space_dashboard", "/app/dashboard", None, 1,
-         grants_for(HEAD_ROLES))
+         grants_for([*HEAD_ROLES, "cfo"]) + [cafeteria_manager_grant()])
     # Cafeteria Manager gets Inbox/Ongoing/History for the per-order food
     # approval flow, but never Drafts or Forms - they review orders, they do not
     # submit proposals.
