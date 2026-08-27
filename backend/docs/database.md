@@ -161,3 +161,40 @@ transaction in Postgres, and skipping this leaves pooled connections sitting
 "idle in transaction". Writes use `transaction()`, which commits on success and
 rolls back on any exception, so a partially applied workflow transition cannot
 be left behind.
+
+
+## 018 — dashboard support (2026-08-27)
+
+Three independent pieces, in the order a rollback would unwind them.
+
+**Config codes.** Sixteen new rows: every SLA target, capacity assumption, risk
+window and forecast horizon the role dashboards read. None lives in code, the
+same way `HIGH_PAX_THRESHOLD` never has, so an administrator retunes a
+department without a deploy. Per-unit overrides use a `__<unit_code>` suffix on
+the same code; the resolver tries the suffixed form first and falls back to the
+bare one. The longest possible key,
+`SLA_DECISION_HOURS__logistics_and_facilities`, is 44 characters and fits
+`config.code`'s `VARCHAR(50)`. All sixteen are editable on
+`/app/admin/settings/policies`.
+
+**Gap G1.** `request_fmb_selection` carried only `delivered_at` (migration
+013), so "how long did the manager take to accept this order" and "how long did
+it sit unclaimed" had no source. `created_at`, `approved_at` and `ready_at`
+close that. Existing rows are backfilled from the selection-level
+`workflow_history` actions, which carry `request_id` but no selection id — a
+proposal with several sibling orders therefore gets the same approximated
+timestamp on each, and the widgets reading those figures say so on the card
+rather than presenting them as measured. `services/workflow/fmb.py` writes all
+three going forward, so new orders are exact.
+
+The backfill is deliberately not `now()`: stamping every historical row with
+the migration time would make acceptance and claim latency read as instant on
+all of them.
+
+**Indexes.** The existing 26 cover point lookups. A dashboard does time-series
+scans over the same tables, which is a different access pattern; 18 indexes
+cover it, partial where the predicate is always the same (resolved rows, open
+tasks, submitted proposals).
+
+Idempotent throughout — `ON CONFLICT DO NOTHING` on the config seed,
+`IF NOT EXISTS` on every column and index.

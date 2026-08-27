@@ -36,6 +36,7 @@ frontend can migrate route by route rather than in one flag day.
 | Administration | `/admin` |
 | Published events | `/events` |
 | Clubs | `/clubs` |
+| Role dashboards | `/dashboard` |
 
 ## Decisions worth explaining
 
@@ -100,6 +101,33 @@ and means "visible to nobody".
 `/proposals/{id}/history`, `/tasks/{id}/assignments`, `/events/{id}/registrations`.
 Each is a collection in its own right with its own visibility rule, so each gets
 its own path rather than a flag on the parent.
+
+### The dashboard is one document, not a metric API
+
+`GET /dashboard` returns a whole page: the resolved profile, its hero, its KPI
+tiles, its panels, its insight cards and its quick actions, each with the data
+already aggregated. There is no `/metrics/decision-latency` to compose from.
+
+Two reasons. The page is one request on a 1-10 connection pool, and ten
+parallel metric calls would exhaust it for a single page load — the widgets run
+sequentially on one `read_cursor()` instead. And a metric endpoint invites a
+client to divide one figure by another, which is how two screens end up
+disagreeing about what "decision latency" means. Every ratio here is computed
+in SQL, and the client renders what it is given.
+
+The layout is data. A profile is a dict naming widget ids; the Angular
+component walks it. Adding a Cafeteria Admin dashboard later is a `PROFILES`
+entry plus any new widgets, with no change to the component, the route, or this
+contract.
+
+`GET /dashboard/widgets/<id>` re-fetches one widget on a filter change,
+`/dashboard/profiles` lists what the caller may switch between, and
+`/dashboard/export` returns any panel's table view as CSV.
+
+There is no `@require_roles` on any of them. The profile resolver is the gate
+and it fails closed: a caller holding none of the four dashboard roles gets a
+200 carrying `{"profile": null}`, because the client's job in that case is to
+render the existing no-access placeholder rather than an error page.
 
 ### `/me` for "about the caller"
 

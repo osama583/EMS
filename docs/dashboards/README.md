@@ -3,9 +3,21 @@
 Planning documents for the dashboard page. Ten roles, ten dashboards, no shared
 generic layout.
 
-Status: **design — not implemented.** `/app/dashboard` currently resolves to
-`InternalPlaceholderComponent` (`fyp-ui/src/app/app.routes.ts`), and no analytics
-endpoint exists on the API.
+Status: **built.** `/app/dashboard` resolves to `DashboardComponent`, served by
+`GET /api/v1/dashboard`. Where the implementation departs from what is written
+below, the reason is recorded here:
+
+| Design says | Built as | Why |
+|---|---|---|
+| `hero-figure` and `stat-tile` as separate components | one `stat-tile` with a `kind` of `hero` or `kpi` | Same object at two weights. Two components would mean two places to keep the caveat rendering, the delta logic and the drill target in step, and they would drift. |
+| A drawn `funnel` | full-width bars scaled by length, with the conversion printed per step | A tapering polygon encodes each stage as an *area*, which readers compare badly and which exaggerates every drop. |
+| M67 staffing-request cycle time | active headcount plus audit-log churn | Migration 015 removed the staffing-request tables; a manager now creates staff directly, so the pending queue no longer has a source. The tile says so. |
+| `line-chart` "rejects a second y-axis" | has no second-axis input at all | Rejecting at runtime still admits the shape into the contract. Leaving it out makes the mistake unrepresentable. |
+
+Two thresholds the role documents call "configurable" without naming a code are
+`VENUE_TEARDOWN_MINUTES` and `START_POINT_MAX_TOURS`; both are seeded by
+migration 018 alongside the fourteen in
+[03-dashboard-architecture.md](03-dashboard-architecture.md) § 8.
 
 ## Why ten dashboards and not one
 

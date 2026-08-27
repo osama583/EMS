@@ -144,3 +144,45 @@ Honest list of what is not done.
 5. **Uploads are base64 in the JSON body**, stored as data URLs. Real object
    storage with content-type validation and a size cap is the production answer.
 6. **Rate limit storage is in-process by default** — see above.
+
+
+## Dashboard aggregates (2026-08-27)
+
+`/dashboard` is the first place in this API where a caller sees a figure
+computed over rows they cannot open. That is deliberate and bounded.
+
+**Why it exists.** `_VISIBLE_SQL` clause 5 gives the CFO a proposal only while
+it sits at `cfo_review`, and `cfo_review` is only reached above
+`HIGH_PAX_THRESHOLD`. Every proposal at or below the threshold — including the
+`request_funding_purchase` rows recorded on *all* of them — is invisible to the
+person who owns the budget. A CFO dashboard built strictly on `_VISIBLE_SQL`
+would report on a minority of spend and silently omit the rest.
+
+**The bound.** An aggregate may cross a scope boundary only when all four hold:
+
+1. The response carries no per-row identifier, name, email or free text.
+   `services/dashboard/scope.py`'s `strip_identity()` enforces the column list.
+2. The result is a count, sum, mean, median, percentile, ratio or bucketed
+   distribution — never a min/max that names its row, and never a top-N list of
+   entities the caller cannot open.
+3. Buckets below `MIN_BUCKET_SIZE` (default 5) render as an em dash.
+   `apply_bucket_floor()` does this and counts the suppressions onto the
+   response, so a chart never silently drops a bucket. The CSV export renders
+   the same em dash — export is not a hole through which the floor leaks.
+4. Drill-through re-applies `_VISIBLE_SQL` at the destination, so the caller
+   lands on the subset they may actually read.
+
+**Unit scope never comes from the request.** `/dashboard` does not read a
+`unit` parameter at all; scope comes from `principal.headed_units`. A
+department head passing another unit's code gets their own data rather than a
+403, because the parameter is not consulted. `outlet` is validated against
+`units_for_role('cafeteria-manager')` before it reaches SQL and falls back to
+the caller's own set.
+
+**Money.** `bank_account_name` and `bank_account_number` are read by no
+dashboard query. They are a payout destination, not an analytic.
+
+**Names.** Per-person figures appear only within the viewer's own unit or
+outlet. Cross-unit staffing comparisons are headcount and distribution shape.
+Attendee identity appears nowhere; `event_registration` reaches a dashboard only
+as counts and payment-status distributions.

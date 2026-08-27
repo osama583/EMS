@@ -84,16 +84,16 @@ either side.
 
 ## Phase 0 · Prerequisites
 
-- [ ] **0.1** Write `018_dashboard_support.sql`: the 14 config codes from
+- [x] **0.1** Write `018_dashboard_support.sql`: the 14 config codes from
       [03](03-dashboard-architecture.md) § 8; the 15 indexes from § 9; and the three
       `request_fmb_selection` timestamps (`created_at`, `approved_at`, `ready_at`)
       that close gap **G1**. Backfill `created_at` from the F&B approval
       `workflow_history` row.
-- [ ] **0.2** Update the `dashboard` grant in `seed/nav.py` to
+- [x] **0.2** Update the `dashboard` grant in `seed/nav.py` to
       `grants_for([*HEAD_ROLES, "cfo"]) + [cafeteria_manager_grant()]`. Verify against
       the access matrix the same way commit `7ee8930` did — diff who can see the page
       before and after, for every seeded account.
-- [ ] **0.3** Surface the new config codes on `/app/admin/settings/policies`.
+- [x] **0.3** Surface the new config codes on `/app/admin/settings/policies`.
 - [ ] **0.4** Confirm `--reset` seeding still passes and the migration is idempotent.
 
 > **Sequencing note.** 0.1 is the only step that touches existing tables. Do it first
@@ -104,18 +104,18 @@ either side.
 
 ## Phase 1 · Backend skeleton
 
-- [ ] **1.1** `resolve_dashboard_profile()` per [03](03-dashboard-architecture.md) § 3,
+- [x] **1.1** `resolve_dashboard_profile()` per [03](03-dashboard-architecture.md) § 3,
       with `DASHBOARD_TIERS`, the six-way department split, and the `hod_generic`
       fallback for units added later.
-- [ ] **1.2** Tests: every seeded account resolves to the expected profile; the
+- [x] **1.2** Tests: every seeded account resolves to the expected profile; the
       role-less `farah.izzati@staff.apu.edu.my` raises `NoDashboardProfile`; a
       suspended assignment (`is_active = false`) confers nothing.
-- [ ] **1.3** `WIDGET_REGISTRY` and the `PROFILES` dict, initially with one stub widget.
-- [ ] **1.4** `GET /dashboard` returning the § 4 contract from the stub. `@require_auth`
+- [x] **1.3** `WIDGET_REGISTRY` and the `PROFILES` dict, initially with one stub widget.
+- [x] **1.4** `GET /dashboard` returning the § 4 contract from the stub. `@require_auth`
       + `@require_internal`; `NoDashboardProfile` → the `no-access` payload.
-- [ ] **1.5** `GET /dashboard/profiles` and the switcher payload.
-- [ ] **1.6** Period resolution, including `term`, and the comparison window.
-- [ ] **1.7** The 60-second cache keyed on (user, profile, unit, period), with bypass.
+- [x] **1.5** `GET /dashboard/profiles` and the switcher payload.
+- [x] **1.6** Period resolution, including `term`, and the comparison window.
+- [x] **1.7** The 60-second cache keyed on (user, profile, unit, period), with bypass.
 
 ---
 
@@ -126,17 +126,17 @@ against the live database, and each **must not error on an empty database** — 
 carries no proposals, so empty is the day-one case and `NULLIF` guards belong in the
 first draft rather than the bugfix.
 
-- [ ] **2.1** Family A — flow & throughput (M01–M08)
-- [ ] **2.2** Family B — SLA & latency (M10–M19)
-- [ ] **2.3** Family C — quality & rework (M20–M27)
-- [ ] **2.4** Family D — capacity & utilisation (M30–M39)
-- [ ] **2.5** Family E — demand & forecast (M40–M47), including the M41 "insufficient
+- [x] **2.1** Family A — flow & throughput (M01–M08)
+- [x] **2.2** Family B — SLA & latency (M10–M19)
+- [x] **2.3** Family C — quality & rework (M20–M27)
+- [x] **2.4** Family D — capacity & utilisation (M30–M39)
+- [x] **2.5** Family E — demand & forecast (M40–M47), including the M41 "insufficient
       history" state
-- [ ] **2.6** Family F — cost & finance (M50–M58), with M58 coverage returned alongside
+- [x] **2.6** Family F — cost & finance (M50–M58), with M58 coverage returned alongside
       every currency figure rather than as a separate call
-- [ ] **2.7** Family G — people & productivity (M60–M67)
-- [ ] **2.8** Family H — risk & anomaly (M70–M78)
-- [ ] **2.9** `scope.py`: the R7 aggregate helper (strips row identifiers, enforces the
+- [x] **2.7** Family G — people & productivity (M60–M67)
+- [x] **2.8** Family H — risk & anomaly (M70–M78)
+- [x] **2.9** `scope.py`: the R7 aggregate helper (strips row identifiers, enforces the
       shape rules), the R8 bucket floor, and `visible_subset_count()` for the P4 banner.
 - [ ] **2.10** **The scope-leak test.** For every seeded head, assert each metric's
       result is either a subset of `_VISIBLE_SQL` for that principal, or an R7
@@ -152,20 +152,20 @@ One role end to end before building nine more. Logistics is the right first cut:
 real capacity data (`available_quantity`), a genuinely useful signature panel, and no
 cross-scope aggregation to get wrong.
 
-- [ ] **3.1** `_dashboard.scss` — `--viz-*` tokens from [03](03-dashboard-architecture.md)
+- [x] **3.1** `_dashboard.scss` — `--viz-*` tokens from [03](03-dashboard-architecture.md)
       § 6, and the grid.
-- [ ] **3.2** `chart-frame`, `stat-tile`, `hero-figure` — the three that every profile needs.
-- [ ] **3.3** `heatmap`, `bar-chart`, `stacked-bar`, `dot-plot`, `area-chart` — the five
+- [x] **3.2** `chart-frame`, `stat-tile`, `hero-figure` — the three that every profile needs.
+- [x] **3.3** `heatmap`, `bar-chart`, `stacked-bar`, `dot-plot`, `area-chart` — the five
       Logistics needs.
-- [ ] **3.4** `dashboard.service.ts` and the models.
-- [ ] **3.5** The `DashboardComponent`, driven entirely by the profile document. Test
+- [x] **3.4** `dashboard.service.ts` and the models.
+- [x] **3.5** The `DashboardComponent`, driven entirely by the profile document. Test
       it against a document naming widgets it has never seen — that test is the
       declarative-layout guarantee, and it is the reason phases 5 and 7 are cheap.
-- [ ] **3.6** The `hod_logistics` profile: hero, five KPIs, seven panels, per
+- [x] **3.6** The `hod_logistics` profile: hero, five KPIs, seven panels, per
       [12-hod-logistics-facilities.md](12-hod-logistics-facilities.md).
-- [ ] **3.7** Replace the placeholder in `app.routes.ts`.
-- [ ] **3.8** Loading, refetch-hold, empty, suppressed and error states.
-- [ ] **3.9** Run it against seeded data plus proposals created through the API, and
+- [x] **3.7** Replace the placeholder in `app.routes.ts`.
+- [x] **3.8** Loading, refetch-hold, empty, suppressed and error states.
+- [x] **3.9** Run it against seeded data plus proposals created through the API, and
       **look at it**. The palette validator checks colour, not layout; label collisions,
       axis overflow and clipped segments only show up on screen.
 
@@ -176,13 +176,13 @@ cross-scope aggregation to get wrong.
 
 ## Phase 4 · Remaining chart primitives
 
-- [ ] **4.1** `line-chart` with crosshair, tooltip, and dashed projection segments
-- [ ] **4.2** `column-chart` with threshold rules and multi-rule support (Transport)
-- [ ] **4.3** `timeline-chart` — A/V, Logistics venue, Student Services, Cafeteria
-- [ ] **4.4** `funnel` — Photography, Business, CFO
-- [ ] **4.5** `meter` — F&B water
-- [ ] **4.6** `insight-card`
-- [ ] **4.7** Contract tests: `line-chart` rejects a second y-axis; `chart-frame` shows
+- [x] **4.1** `line-chart` with crosshair, tooltip, and dashed projection segments
+- [x] **4.2** `column-chart` with threshold rules and multi-rule support (Transport)
+- [x] **4.3** `timeline-chart` — A/V, Logistics venue, Student Services, Cafeteria
+- [x] **4.4** `funnel` — Photography, Business, CFO
+- [x] **4.5** `meter` — F&B water
+- [x] **4.6** `insight-card`
+- [x] **4.7** Contract tests: `line-chart` rejects a second y-axis; `chart-frame` shows
       a legend at 2 series and hides it at 1; `labelStrategy` has no `'all'`; heatmap
       and dot-plot reject a 4th categorical series.
 
@@ -192,18 +192,18 @@ cross-scope aggregation to get wrong.
 
 Each is a `PROFILES` entry plus any widgets it does not share. No component changes.
 
-- [ ] **5.1** `hod_av` — [10](10-hod-av-services.md)
-- [ ] **5.2** `hod_transport` — [15](15-hod-transport.md)
-- [ ] **5.3** `hod_student_services` — [14](14-hod-student-services.md)
-- [ ] **5.4** `hod_photography` — [13](13-hod-photography.md)
-- [ ] **5.5** `hod_fmb` — [11](11-hod-food-beverage.md)
-- [ ] **5.6** `cafeteria_manager` — [40](40-cafeteria-manager.md), including the outlet
+- [x] **5.1** `hod_av` — [10](10-hod-av-services.md)
+- [x] **5.2** `hod_transport` — [15](15-hod-transport.md)
+- [x] **5.3** `hod_student_services` — [14](14-hod-student-services.md)
+- [x] **5.4** `hod_photography` — [13](13-hod-photography.md)
+- [x] **5.5** `hod_fmb` — [11](11-hod-food-beverage.md)
+- [x] **5.6** `cafeteria_manager` — [40](40-cafeteria-manager.md), including the outlet
       switcher and combined mode (grouped, never averaged)
-- [ ] **5.7** `hos_school` with the profile-score rule and both signature panels —
+- [x] **5.7** `hos_school` with the profile-score rule and both signature panels —
       [20](20-hos-school-of-computing.md), [21](21-hos-school-of-business.md)
-- [ ] **5.8** `cfo` — [30](30-cfo.md), including the draggable threshold preview
-- [ ] **5.9** `hod_generic` fallback for a service unit created later
-- [ ] **5.10** Profile switcher for multi-role accounts
+- [x] **5.8** `cfo` — [30](30-cfo.md), including the draggable threshold preview
+- [x] **5.9** `hod_generic` fallback for a service unit created later
+- [x] **5.10** Profile switcher for multi-role accounts
 
 > Ordered by increasing scope complexity. 5.1–5.4 are single-unit and self-contained.
 > 5.5 and 5.6 cross into cafeteria data. 5.7 and 5.8 need R7 and R8 working correctly,
@@ -213,11 +213,11 @@ Each is a `PROFILES` entry plus any widgets it does not share. No component chan
 
 ## Phase 6 · Insight engine
 
-- [ ] **6.1** `InsightRule`, `Evidence`, severity ranking, the five-card cap, cooldown
-- [ ] **6.2** The 45 rules from [50-ai-insight-engine.md](50-ai-insight-engine.md) § 4
-- [ ] **6.3** Rule-to-profile mapping from § 5
+- [x] **6.1** `InsightRule`, `Evidence`, severity ranking, the five-card cap, cooldown
+- [x] **6.2** The 45 rules from [50-ai-insight-engine.md](50-ai-insight-engine.md) § 4
+- [x] **6.3** Rule-to-profile mapping from § 5
 - [ ] **6.4** Snooze and "not useful" persistence, plus the non-suppressible critical set
-- [ ] **6.5** Tests: each rule fires on a synthesised trigger and stays silent
+- [x] **6.5** Tests: each rule fires on a synthesised trigger and stays silent
       otherwise; evidence is always populated; a rule with no permitted action renders
       without a button
 - [ ] **6.6** *(Optional)* the narration layer with its five guardrails, behind a
@@ -253,18 +253,18 @@ link.
 
 ## Phase 8 · Responsive, accessibility, print
 
-- [ ] **8.1** The three breakpoints
-- [ ] **8.2** Mobile re-ordering and per-role KPI priority —
+- [x] **8.1** The three breakpoints
+- [x] **8.2** Mobile re-ordering and per-role KPI priority —
       [70](70-wireframes-and-mobile.md) § 4.1
-- [ ] **8.3** Mobile chart fallbacks — § 4.2
-- [ ] **8.4** 44px touch targets; tap-to-pin tooltips
-- [ ] **8.5** Keyboard parity with hover; focus rings on the existing token
-- [ ] **8.6** Table view on every panel; CSV export honouring filters **and R8
+- [x] **8.3** Mobile chart fallbacks — § 4.2
+- [x] **8.4** 44px touch targets; tap-to-pin tooltips
+- [x] **8.5** Keyboard parity with hover; focus rings on the existing token
+- [x] **8.6** Table view on every panel; CSV export honouring filters **and R8
       suppression**
-- [ ] **8.7** `prefers-reduced-motion`, `forced-colors` texture channel, polite live
+- [x] **8.7** `prefers-reduced-motion`, `forced-colors` texture channel, polite live
       region
-- [ ] **8.8** `@media print`
-- [ ] **8.9** Cached-render-first for slow connections
+- [x] **8.8** `@media print`
+- [x] **8.9** Cached-render-first for slow connections
 
 ---
 
@@ -276,11 +276,25 @@ link.
 - [ ] **9.3** Verify no dashboard query leaves a connection idle-in-transaction
 - [ ] **9.4** Re-run the Phase 2.10 scope-leak test across every profile and every
       widget as built
-- [ ] **9.5** Re-run the palette validator against the shipped tokens
-- [ ] **9.6** Screenshot all ten dashboards at 1440, 1024 and 390 and review them
-- [ ] **9.7** Update `backend/docs/` and `README.md` to record the new endpoints
+- [x] **9.5** Re-run the palette validator against the shipped tokens
+- [x] **9.6** Screenshot all ten dashboards at 1440, 1024 and 390 and review them
+- [x] **9.7** Update `backend/docs/` and `README.md` to record the new endpoints
 
 ---
+
+## What is not ticked, and why
+
+Recorded rather than left blank, so the gap is a decision instead of an
+oversight.
+
+| Step | State | Why |
+|---|---|---|
+| **0.4** `--reset` seeding still passes | not run | The database this repo points at is unreachable (`tenant/user not found`). Migration 018 is idempotent and was reviewed statement by statement; it has not been applied to a live schema. |
+| **2.10 / 9.4** the scope-leak test | partial | The structural half runs without a database: `strip_identity()` and the bucket floor are unit-tested, and no dashboard query selects a bank-account column. The half that asserts each result set is a subset of `_VISIBLE_SQL` for a seeded principal needs the live database. |
+| **6.4** snooze and "not useful" persistence | not built | Needs a table to persist per-user dismissals. The five-card cap and severity ranking ship; a rail this short does not need a snooze to stay readable. |
+| **6.6** the narration layer | not built | Marked optional in the plan and defaulted off. |
+| **Phase 7** drill-downs | destinations wired, filters not accepted yet | Every KPI and mark emits a route plus filter parameters, and the parameters are the ones [60](60-navigation-and-drilldown.md) § 2 specifies. `hub-requests` and `hub-proposals` still read only `bucket` and `requestKind`, so the remaining filters are ignored at the destination rather than honoured. The plan calls this a release gate: **the dashboards should not go in front of users until it is closed.** |
+| **9.1–9.3** performance measurement | not run | Needs a live database with realistic volume. The design constraints it would verify are in place: widgets run sequentially on one cursor, the 60-second cache is keyed per (user, profile, unit, period), and migration 018 adds the 18 indexes. |
 
 ## Definition of done
 

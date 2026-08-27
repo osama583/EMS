@@ -36,6 +36,8 @@ Health check: `curl http://localhost:5000/health`
 - [workflow.md](backend/docs/workflow.md) — the proposal state machine
 - [security.md](backend/docs/security.md) — auth, authorisation, known gaps
 - [database.md](backend/docs/database.md) — migrations and schema notes
+- [docs/dashboards/](docs/dashboards/README.md) — the ten role dashboards at
+  `/app/dashboard`: their metrics, access rules, insight rules and layouts
 
 Interactive API docs: `cd backend/docs && python -m http.server 8080`, then open
 `index.html`.
@@ -43,8 +45,12 @@ Interactive API docs: `cd backend/docs && python -m http.server 8080`, then open
 ## Tests
 
 ```bash
-cd backend && .venv/Scripts/python -m pytest tests/ -q   # 58, against the live database
-cd fyp-ui  && npm test                                    # 99
+# Most of the backend suite runs against the live database; test_dashboard.py
+# deliberately does not, so the layout, empty-database and scope checks are
+# runnable without one.
+cd backend && .venv/Scripts/python -m pytest tests/ -q                  # against the live database
+cd backend && .venv/Scripts/python -m pytest tests/test_dashboard.py -q # 223, no database needed
+cd fyp-ui  && npm test
 ```
 
 ## Architecture
