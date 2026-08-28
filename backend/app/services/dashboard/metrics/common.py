@@ -176,7 +176,7 @@ DEPARTMENT_SPEC: dict[str, DepartmentSpec] = {
     ),
     "food_beverage_services": DepartmentSpec(
         unit_code="food_beverage_services",
-        label="Food & Beverage Services",
+        label="F&B",
         requirement="fmb",
         table="request_fmb",
         pk="request_fmb_id",

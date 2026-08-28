@@ -67,7 +67,7 @@ GENERIC_DEPARTMENT_PROFILE = "hod_generic"
 
 PROFILE_TITLES = {
     "hod_av": ("A/V Services", "Crew & rig operations"),
-    "hod_fmb": ("Food & Beverage Services", "Order fan-out & delivery"),
+    "hod_fmb": ("F&B", "Cost, gate and outlet fan-out"),
     "hod_logistics": ("Logistics and Facilities", "Inventory & venue operations"),
     "hod_photography": ("Photography Services", "Shoot & delivery pipeline"),
     "hod_student_services": ("Student Services", "Guide demand & tour planning"),
@@ -310,31 +310,40 @@ PROFILES: dict[str, dict[str, Any]] = {
     # signature panel is the routing decision: which outlet should take the next
     # order, judged on measured behaviour rather than capacity on paper.
     "hod_fmb": {
+        # Rebuilt to the shape F&B actually asked for. Every row reuses a
+        # component the Cafeteria Manager profile already ships:
+        #   counts  - the Inbox/Ongoing/Completed strip, with CANCELLED where
+        #             that page has LATE (see fmb_request_counts on why).
+        #   kpis    - the four money-and-rework tiles.
+        #   panels  - the gate, then where the orders went, then water.
+        # fmb_committed_cost and fmb_pushback_rate are gone: the new Total cost
+        # and Cafeteria request change rate tiles are the same two metrics under
+        # clearer labels, and keeping both would have been the duplicate logic
+        # this rebuild was meant to avoid.
+        "counts": "fmb_request_counts",
         "hero": "fmb_on_time_delivery",
         "kpis": [
-            "fmb_orders_at_risk",
-            "fmb_gate_queue",
-            "fmb_pushback_rate",
-            "fmb_committed_cost",
-            "fmb_water_runway",
+            "fmb_total_cost",
+            "fmb_cafeteria_cost",
+            "fmb_cost_per_pax",
+            "fmb_change_rate",
         ],
-        "signature": "fmb_fanout_board",
+        "signature": "fmb_gate_outcomes",
         "panels": [
-            "fmb_gate_outcomes",
-            "fmb_outlet_balance",
+            # The two the spec asks for lead the row; the analysis panels that
+            # were already here follow underneath, unchanged.
+            "fmb_order_distribution",
+            "fmb_water_usage",
             "fmb_cost_by_outlet",
-            "fmb_water_meter",
+            "fmb_fanout_board",
+            "fmb_outlet_balance",
             "fmb_dietary_coverage",
             "fmb_order_lifecycle",
         ],
         "alerts": "fmb_at_risk",
-        "quickActions": ["review_inbox", "review_gate", "menu_oversight"],
-        "mobileKpis": ["fmb_orders_at_risk", "fmb_gate_queue", "fmb_pushback_rate"],
+        "quickActions": [],
+        "mobileKpis": ["fmb_total_cost", "fmb_cafeteria_cost", "fmb_change_rate"],
     },
-    # -------------------------------------------------------- Generic --
-    # A service unit created after this design shipped. Flow, SLA, quality and
-    # people only: no detail table is known for it, so nothing that depends on
-    # one is offered.
     "hod_generic": {
         # No detail table is known for this unit (see maybe_spec()), so neither
         # dept_jobs_at_risk/dept_risk_list (needs a department spec to find a
@@ -411,6 +420,9 @@ PROFILES: dict[str, dict[str, Any]] = {
         "hero": "cfo_forward_spend",
         "kpis": [
             "cfo_total_spend",
+            # Directly under the total it is part of, so the relationship reads
+            # as "of which" rather than as a second, competing figure.
+            "cfo_cafeteria_cost",
             "cfo_cost_per_pax",
             "cfo_total_pax",
             "cfo_gate_coverage",

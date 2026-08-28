@@ -122,11 +122,6 @@ CATALOGUES: dict[str, Catalogue] = {
         {"meetingInstructions": "meeting_instructions", "maximumGroupSize": "max_group_size"}),
     "campusTourType": Catalogue(
         "campus_tour_type_options", "campus_tour_type_option_id", "student_services", None),
-    "waterNormal": Catalogue(
-        "water_normal_options", "water_normal_option_id", "food_beverage_services", None,
-        {"bottleCount": "number_of_bottles", "availableStock": "available_stock",
-         "orderingInstructions": "ordering_delivery_instructions",
-         "brandingRequirement": "logo_branding_requirement"}),
     "fundingMain": Catalogue(
         "funding_main_options", "funding_main_option_id", None, "cfo",
         {"financeCode": "budget_category_finance_code",

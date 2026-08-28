@@ -230,7 +230,7 @@ describe('ProposalReviewPageComponent', () => {
     expect(atFmbReview).toBeDefined();
 
     await configureWithRoute(String(atFmbReview.id));
-    TestBed.inject(AuthService).establishSession(testUser([testRole('head-of-department', 'food_beverage_services', 'Food & Beverage Services')], {
+    TestBed.inject(AuthService).establishSession(testUser([testRole('head-of-department', 'food_beverage_services', 'F&B')], {
       email: 'fmb@demo.apu.edu.my', displayName: 'F&B Demo',
     }), testTokens());
 

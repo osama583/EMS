@@ -20,6 +20,11 @@ from ..scope import Scope, num, ratio
 # Proposals whose money is not a commitment.
 _DEAD = "('cancelled', 'completed_rejected', 'draft')"
 
+# The Food & Beverage budget category, matched on its finance code because the
+# LABEL is editable in /app/dropdown-options and the code is what accounting
+# reconciles against. Seeded by seed/data.FUNDING_MAIN_OPTIONS.
+_FNB_FINANCE_CODE = "FIN-FNB"
+
 
 def committed_food_cost(cur, scope: Scope, *, request_filter: str = "", previous: bool = False, extra: dict | None = None) -> dict[str, Any]:
     """M50 - ordered quantity times menu price, over live proposals.
@@ -51,6 +56,167 @@ def committed_food_cost(cur, scope: Scope, *, request_filter: str = "", previous
         "pricedItems": int(row["priced"]) if row else 0,
         "totalItems": int(row["items"]) if row else 0,
         "coverage": ratio(row["priced"], row["items"]) if row else None,
+    }
+
+
+def fnb_spend(cur, scope: Scope, *, previous: bool = False) -> dict[str, Any]:
+    """What F&B costs, split into the two places the money actually comes from.
+
+    The F&B dashboard shows both halves and the CFO shows the cafeteria half
+    beside its own totals, so the split is computed once here rather than twice
+    in two widget modules that could drift apart.
+
+      cafeteria - orders placed on a cafeteria's own menu
+                  (request_fmb_selection x fmb_options.unit_price_rm). This is
+                  the "food spend requests submitted by cafeterias" figure, and
+                  it is the ONLY part an outlet is accountable for.
+      funding   - purchase lines the applicant filed under the Food & Beverage
+                  budget category. Real F&B money, but bought outside the
+                  cafeterias entirely (external caterers, supermarket runs), so
+                  no outlet can be held to it.
+
+    Matched on budget_category_finance_code rather than the label, because the
+    label is editable in /app/dropdown-options and the finance code is the
+    stable identifier accounting actually reconciles against.
+
+    Both halves are already inside the CFO's Total Spend - `cafeteria` through
+    committed_food_cost and `funding` through funding_commitment - so this adds
+    no new money to that total; it only says which part of it is F&B's.
+    """
+    cafeteria = committed_food_cost(cur, scope, previous=previous)
+    lo, hi = ("prev_from", "prev_to") if previous else ("from", "to")
+    row = fetch_one(
+        cur,
+        f"""
+        SELECT sum(p.quantity * p.unit_price_rm) AS total
+          FROM request_funding_purchase p
+          JOIN request r ON r.request_id = p.request_id
+          LEFT JOIN funding_main_options m
+                 ON m.funding_main_option_id = p.main_option_id
+         WHERE r.status NOT IN {_DEAD}
+           AND m.budget_category_finance_code = %(fnb_code)s
+           AND r.submitted_at >= %({lo})s AND r.submitted_at < %({hi})s
+        """,
+        scope.params(fnb_code=_FNB_FINANCE_CODE),
+    )
+    funding = num(row["total"], 0.0) if row else 0.0
+    return {
+        "cafeteria": round(cafeteria["total"], 2),
+        "funding": round(funding, 2),
+        "total": round(cafeteria["total"] + funding, 2),
+        "pricedItems": cafeteria["pricedItems"],
+        "totalItems": cafeteria["totalItems"],
+        "coverage": cafeteria["coverage"],
+    }
+
+
+def fnb_cost_per_pax(cur, scope: Scope) -> dict[str, Any]:
+    """F&B spend over the attendance behind it.
+
+    Deliberately the same shape as cost_per_pax (M55) - same denominator, same
+    live-proposal window - so the F&B figure and the CFO's institutional one are
+    comparable rather than two different calculations that happen to share a
+    name. The only difference is the numerator: F&B money, not all money.
+    """
+    spend = fnb_spend(cur, scope)
+    row = fetch_one(
+        cur,
+        f"""
+        SELECT sum(r.total_pax) AS pax, count(*) AS n
+          FROM request r
+         WHERE r.status NOT IN {_DEAD}
+           AND r.submitted_at >= %(from)s AND r.submitted_at < %(to)s
+        """,
+        scope.params(),
+    )
+    pax = num(row["pax"], 0.0) if row else 0.0
+    return {
+        "value": ratio(spend["total"], pax),
+        "cost": spend["total"],
+        "pax": pax,
+        "proposals": int(row["n"]) if row else 0,
+        "coverage": spend["coverage"],
+    }
+
+
+def cafeteria_order_distribution(cur, scope: Scope) -> list[dict[str, Any]]:
+    """Orders per outlet - the fan-out F&B decided, counted.
+
+    Orders rather than portions or money: the question this answers is "who is
+    F&B leaning on", and one 200-portion order is one decision to send work
+    somewhere, the same as one 5-portion order.
+    """
+    rows = fetch_all(
+        cur,
+        f"""
+        SELECT sel.unit_code AS code,
+               u.description AS label,
+               count(*) AS orders,
+               coalesce(sum(sel.quantity), 0) AS portions,
+               sum(sel.quantity * o.unit_price_rm) AS cost
+          FROM request_fmb_selection sel
+          JOIN fmb_options o ON o.fmb_option_id = sel.fmb_option_id
+          JOIN request_fmb f ON f.request_fmb_id = sel.request_fmb_id
+          JOIN request r ON r.request_id = f.request_id
+          LEFT JOIN unit u ON u.code = sel.unit_code
+         WHERE sel.status <> 'cancelled'
+           AND r.status NOT IN {_DEAD}
+           AND coalesce(sel.created_at, r.submitted_at) >= %(from)s
+           AND coalesce(sel.created_at, r.submitted_at) < %(to)s
+      GROUP BY 1, 2
+      ORDER BY 3 DESC
+        """,
+        scope.params(),
+    )
+    return [
+        {
+            "code": r["code"],
+            "label": r["label"] or r["code"],
+            "orders": int(r["orders"]),
+            "portions": int(r["portions"]),
+            "cost": num(r["cost"], 0.0),
+        }
+        for r in rows
+    ]
+
+
+def water_requested(cur, scope: Scope) -> dict[str, Any]:
+    """Mineral water actually asked for, split by logo and by whether the ask
+    survived.
+
+    Bottles, not requests: two rows of 12 and one of 200 are not "three".
+
+    `cancelled` is the requested volume on proposals that died (cancelled or
+    rejected). It is the nearest thing the schema holds to water that was
+    ordered and then not used - nobody records spillage - and it is reported
+    under its own honest name rather than as a wastage figure the data cannot
+    support.
+    """
+    row = fetch_one(
+        cur,
+        f"""
+        SELECT coalesce(sum(w.quantity) FILTER (
+                   WHERE w.with_logo AND r.status NOT IN {_DEAD}), 0) AS with_logo,
+               coalesce(sum(w.quantity) FILTER (
+                   WHERE NOT w.with_logo AND r.status NOT IN {_DEAD}), 0) AS without_logo,
+               coalesce(sum(w.quantity) FILTER (
+                   WHERE r.status IN ('cancelled', 'completed_rejected')), 0) AS cancelled,
+               count(*) FILTER (WHERE r.status NOT IN {_DEAD}) AS requests
+          FROM request_mineral_water w
+          JOIN request r ON r.request_id = w.request_id
+         WHERE w."date" >= %(from)s AND w."date" < %(to)s
+        """,
+        scope.params(),
+    )
+    if row is None:
+        return {"withLogo": 0, "withoutLogo": 0, "cancelled": 0, "requests": 0, "total": 0}
+    with_logo, without_logo = int(row["with_logo"]), int(row["without_logo"])
+    return {
+        "withLogo": with_logo,
+        "withoutLogo": without_logo,
+        "cancelled": int(row["cancelled"]),
+        "requests": int(row["requests"]),
+        "total": with_logo + without_logo,
     }
 
 

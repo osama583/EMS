@@ -42,7 +42,7 @@ SERVICE_UNITS = [
     ("photography_services", "Photography Services"),
     ("a_v_services", "A/V Services"),
     ("student_services", "Student Services"),
-    ("food_beverage_services", "Food & Beverage Services"),
+    ("food_beverage_services", "F&B"),
 ]
 CAFETERIA_UNIT_PREFIX = "cafeteria__"
 CAFETERIA_UNITS = [
@@ -188,11 +188,6 @@ CAMPUS_TOUR_TYPE_OPTIONS = [
     ("Facilities Tour", "Labs, studios, and workshops.", {}),
     ("Accommodation Tour", "Student residence walkthrough.", {}),
 ]
-WATER_NORMAL_OPTIONS = [
-    ("500ml Bottled Water", "Standard bottle, unlabelled.", {"number_of_bottles": 24, "available_stock": 600}),
-    ("1.5L Bottled Water", "Large bottle for speaker tables.", {"number_of_bottles": 12, "available_stock": 240}),
-    ("Water Dispenser (19L)", "Dispenser with cups.", {"number_of_bottles": 1, "available_stock": 15}),
-]
 FUNDING_MAIN_OPTIONS = [
     ("Venue & Facilities", "Room hire, setup, and cleaning.", "FIN-VEN"),
     ("Food & Beverage", "Catering and refreshments.", "FIN-FNB"),
@@ -209,20 +204,25 @@ FUNDING_SUB_OPTIONS = [
     ("Equipment Rental", [("AV Equipment Hire", "Third-party AV rental."), ("Furniture Hire", "Additional furniture.")]),
 ]
 # Menu items per cafeteria unit code.
+# (label, description, serving unit, dietary tag, unit price in RM).
+# Priced from the start: an unpriced menu item multiplies out to nothing, so
+# every food cost on the F&B and CFO dashboards would read RM 0 against real
+# portions. Migration 019 backfills the same figures onto databases seeded
+# before prices existed.
 FMB_MENU = {
     CAFETERIA_UNITS[0][0]: [
-        ("Nasi Lemak Set", "Coconut rice, sambal, egg, anchovies.", "Per Person", "Halal"),
-        ("Mee Goreng Mamak", "Spiced fried noodles.", "Per Person", "Vegetarian"),
-        ("Chicken Rice Box", "Steamed chicken with rice and soup.", "Per Box", "Halal"),
-        ("Assorted Kuih Tray", "Traditional cakes, 20 pieces.", "Per Tray", "Vegetarian"),
-        ("Teh Tarik Urn", "Pulled milk tea, served hot.", "Per Litre", "Halal"),
+        ("Nasi Lemak Set", "Coconut rice, sambal, egg, anchovies.", "Per Person", "Halal", 8.50),
+        ("Mee Goreng Mamak", "Spiced fried noodles.", "Per Person", "Vegetarian", 7.00),
+        ("Chicken Rice Box", "Steamed chicken with rice and soup.", "Per Box", "Halal", 9.50),
+        ("Assorted Kuih Tray", "Traditional cakes, 20 pieces.", "Per Tray", "Vegetarian", 45.00),
+        ("Teh Tarik Urn", "Pulled milk tea, served hot.", "Per Litre", "Halal", 30.00),
     ],
     CAFETERIA_UNITS[1][0]: [
-        ("Sandwich Platter", "Assorted sandwiches, 10 rounds.", "Per Tray", "Vegetarian"),
-        ("Pasta Aglio Olio", "Garlic and chilli pasta.", "Per Person", "Vegan"),
-        ("Fruit Platter", "Seasonal cut fruit.", "Per Tray", "Vegan"),
-        ("Curry Puff Box", "Twelve pieces per box.", "Per Box", "Halal"),
-        ("Fresh Orange Juice", "Cold-pressed, no added sugar.", "Per Litre", "Vegan"),
+        ("Sandwich Platter", "Assorted sandwiches, 10 rounds.", "Per Tray", "Vegetarian", 55.00),
+        ("Pasta Aglio Olio", "Garlic and chilli pasta.", "Per Person", "Vegan", 10.00),
+        ("Fruit Platter", "Seasonal cut fruit.", "Per Tray", "Vegan", 40.00),
+        ("Curry Puff Box", "Twelve pieces per box.", "Per Box", "Halal", 24.00),
+        ("Fresh Orange Juice", "Cold-pressed, no added sugar.", "Per Litre", "Vegan", 18.00),
     ],
 }
 

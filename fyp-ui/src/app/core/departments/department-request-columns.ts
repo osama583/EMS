@@ -83,7 +83,7 @@ export function buildDepartmentRequestDefinitions(
         { ...notes },
       ],
     },
-    { key: 'waterNormal', label: 'Mineral Water', columns: [{ key: 'quantity', label: 'Quantity', type: 'select', required: true, options: activeSelectOptions('waterNormal'), span: 'half' }, { key: 'withLogo', label: 'With Logo?', type: 'select', required: true, options: selectOptionsOf('No', 'Yes'), span: 'half' }, { ...date }, { ...start }, { ...end }, { ...location, span: 'half' }, { ...notes }] },
+    { key: 'waterNormal', label: 'Mineral Water', columns: [{ key: 'quantity', label: 'Number of bottles', type: 'number', min: 1, required: true, placeholder: 'e.g. 200', span: 'half' }, { key: 'withLogo', label: 'With Logo?', type: 'select', required: true, options: selectOptionsOf('No', 'Yes'), span: 'half' }, { ...date }, { ...start }, { ...end }, { ...location, span: 'half' }, { ...notes }] },
     { key: 'fundingPurchase', label: 'Funding / Purchase Requirement', columns: [{ key: 'mainItem', label: 'Main Item', type: 'select', required: true, options: activeSelectOptions('fundingMain'), span: 'half' }, { key: 'subItem', label: 'Sub-item', type: 'select', required: true, parentKey: 'mainItem', span: 'half' }, { key: 'quantity', label: 'Quantity', type: 'number', min: 0, required: true, span: 'half' }, { key: 'unit', label: 'Unit RM', type: 'number', min: 0, step: 0.01, required: true, span: 'half' }, { ...notes }] },
   ];
   return definitions.map((definition) => ({ ...definition, columns: fillDanglingHalves(definition.columns) }));
@@ -98,7 +98,6 @@ export function optionKindForDepartmentField(key: DepartmentRequestKind, columnK
   if (key === 'fmb' && columnKey === 'foodType') return 'fmb';
   if (key === 'campusTour' && columnKey === 'startPoint') return 'campusTourStart';
   if (key === 'campusTour' && columnKey === 'tourType') return 'campusTourType';
-  if (key === 'waterNormal' && columnKey === 'quantity') return 'waterNormal';
   if (key === 'fundingPurchase' && columnKey === 'mainItem') return 'fundingMain';
   if (key === 'fundingPurchase' && columnKey === 'subItem') return 'fundingSub';
   return null;

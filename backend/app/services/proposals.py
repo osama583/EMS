@@ -63,7 +63,6 @@ _OPTION_CATALOGUES: dict[str, tuple[str, str]] = {
     "fmb": ("fmb_options", "fmb_option_id"),
     "campusTourStart": ("campus_tour_start_options", "campus_tour_start_option_id"),
     "campusTourType": ("campus_tour_type_options", "campus_tour_type_option_id"),
-    "waterNormal": ("water_normal_options", "water_normal_option_id"),
     "fundingMain": ("funding_main_options", "funding_main_option_id"),
     "fundingSub": ("funding_sub_options", "funding_sub_option_id"),
 }
@@ -148,6 +147,22 @@ def validate(cur, payload: dict, *, draft: bool) -> None:
             errors.append(
                 "A paid event needs both a bank account name and number so attendees can pay."
             )
+
+    if not draft:
+        # Mineral water is typed in rather than picked (migration 028), so the
+        # count is now free text from a number input and has to be checked here.
+        # Draft-exempt like every other row rule above: an unfinished repeat-row
+        # is work in progress, and _write_water_normal_rows skips it.
+        water_rows = (payload.get("requestRows") or {}).get("waterNormal")
+        for index, row in enumerate(water_rows if isinstance(water_rows, list) else [], start=1):
+            raw = (row or {}).get("quantity")
+            if raw in (None, ""):
+                continue
+            if _as_int(raw, default=-1) <= 0:
+                errors.append(
+                    f"Mineral water row {index}: enter how many bottles you need, as a whole "
+                    "number greater than zero."
+                )
 
     if errors:
         raise ValidationError(errors[0], details={"errors": errors})
@@ -445,10 +460,14 @@ def _write_requirement_rows(cur, request_id: int, payload: dict) -> None:
     The client sends these nested under `requestRows`, keyed by the same
     requirement names as `selectedRequirements` (event_requirements.requirement_name) -
     'waterNormal' for mineral water, not 'mineralWater'. Each row's select
-    fields (item/type/service/foodType/startPoint/tourType/mainItem/subItem,
-    and waterNormal's `quantity`) hold a catalogue option id ("logistics:1"),
-    not a label - _resolve_option looks up the real (option_id, label) pair to
-    freeze onto the row, the same way write_children freezes category names.
+    fields (item/type/service/foodType/startPoint/tourType/mainItem/subItem)
+    hold a catalogue option id ("logistics:1"), not a label - _resolve_option
+    looks up the real (option_id, label) pair to freeze onto the row, the same
+    way write_children freezes category names.
+
+    waterNormal's `quantity` is the exception and is NOT a catalogue id: it is
+    the number of bottles the applicant typed (migration 028 removed the
+    dropdown it used to pick from).
     """
     request_rows = payload.get("requestRows")
     request_rows = request_rows if isinstance(request_rows, dict) else {}
@@ -545,17 +564,30 @@ def _write_campus_tour_rows(cur, request_id: int, rows: list[dict]) -> None:
 
 
 def _write_water_normal_rows(cur, request_id: int, rows: list[dict]) -> None:
+    """Mineral water: the applicant types how many bottles they want.
+
+    This used to be a catalogue pick, and `quantity` arrived as "waterNormal:2"
+    - an option id whose number_of_bottles was then copied in as the real
+    figure. So the number stored was never the number asked for: it was
+    whatever pack size the chosen row happened to carry, and an applicant who
+    needed 200 bottles could only ask for one of three preset amounts. The
+    catalogue is gone (migration 028) and the value is now the count itself.
+
+    A row with no quantity is skipped rather than rejected, matching every other
+    writer here - an empty repeat-row on a draft is unfinished work, not an
+    error. Zero and negatives are caught by validate(); the column's own CHECK
+    is the backstop for anything that bypasses the API.
+    """
     for row in rows:
-        if not row.get("quantity"):
+        quantity = _as_int(row.get("quantity"), default=0)
+        if quantity <= 0:
             continue
-        option_id, label, option_row = _resolve_option(cur, row.get("quantity"), "waterNormal")
-        bottle_count = _as_int((option_row or {}).get("number_of_bottles"), default=0)
         cur.execute(
             """INSERT INTO request_mineral_water
-                   (request_id, option_id, option_label, quantity, with_logo, "date",
+                   (request_id, quantity, with_logo, "date",
                     start_time, end_time, location, notes)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-            (request_id, option_id, label, bottle_count,
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+            (request_id, quantity,
              str(row.get("withLogo") or "").strip().lower() == "yes", row.get("date"),
              row.get("start"), row.get("end"), row.get("location") or "", row.get("notes")),
         )
@@ -925,7 +957,10 @@ def flatten_requests(cur, request_id: int) -> list[dict[str, Any]]:
         (request_id,),
     ):
         requests.append({
-            "id": r["request_mineral_water_id"], "department": "waterNormal", "item": r["option_label"],
+            "id": r["request_mineral_water_id"], "department": "waterNormal",
+            # The catalogue that used to name this row is gone (migration 028); every row on
+            # this table is mineral water, and the logo toggle is the only thing that varies.
+            "item": "Mineral Water (with logo)" if r["with_logo"] else "Mineral Water",
             "quantity": f"{r['quantity']} bottles", "schedule": f"{r['date']} · {str(r['start_time'])[:5]}-{str(r['end_time'])[:5]}",
             "location": r["location"], "notes": r["notes"] or "",
         })
@@ -1025,7 +1060,7 @@ def _read_requirement_rows(cur, request_id: int) -> dict[str, list[dict[str, Any
     ]
     rows["waterNormal"] = [
         {
-            "id": r["request_mineral_water_id"], "quantity": _option_ref(r["option_id"], "waterNormal"),
+            "id": r["request_mineral_water_id"], "quantity": r["quantity"],
             "withLogo": "Yes" if r["with_logo"] else "No", "date": str(r["date"]),
             "start": str(r["start_time"]), "end": str(r["end_time"]),
             "location": r["location"], "notes": r["notes"] or "",

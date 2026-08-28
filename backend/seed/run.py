@@ -49,7 +49,6 @@ SEEDABLE_TABLES = [
     "fmb_options",
     "serving_unit_options",
     "dietary_information_options",
-    "water_normal_options",
     "campus_tour_type_options",
     "campus_tour_start_options",
     "sound_light_options",
@@ -244,7 +243,6 @@ def seed_options(cur) -> None:
     insert_simple("serving_unit_options", None, D.SERVING_UNIT_OPTIONS)
     insert_simple("campus_tour_start_options", "campusTour", D.CAMPUS_TOUR_START_OPTIONS)
     insert_simple("campus_tour_type_options", "campusTour", D.CAMPUS_TOUR_TYPE_OPTIONS)
-    insert_simple("water_normal_options", "waterNormal", D.WATER_NORMAL_OPTIONS)
 
     main_ids: dict[str, int] = {}
     for label, description, finance_code in D.FUNDING_MAIN_OPTIONS:
@@ -274,12 +272,13 @@ def seed_options(cur) -> None:
         )
     }
     for unit_code, items in D.FMB_MENU.items():
-        for label, description, serving_label, dietary_label in items:
+        for label, description, serving_label, dietary_label, price in items:
             cur.execute(
                 """INSERT INTO fmb_options
                        (requirement_id, unit_code, label, description,
-                        serving_unit_option_id, dietary_information_option_id, active)
-                   VALUES (%s, %s, %s, %s, %s, %s, TRUE)""",
+                        serving_unit_option_id, dietary_information_option_id,
+                        unit_price_rm, active)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE)""",
                 (
                     req["fmb"],
                     unit_code,
@@ -287,6 +286,7 @@ def seed_options(cur) -> None:
                     description,
                     serving.get(serving_label),
                     dietary.get(dietary_label),
+                    price,
                 ),
             )
 
