@@ -791,6 +791,14 @@ def join_requests_inbox():
     where = ["c.user_id = %s", "j.status = 'pending'"]
     params: list = [principal.user_id]
 
+    # Sorted in SQL, not in the browser: the queue is paginated, so ordering the
+    # rows the client happens to be holding would sort one page of an arbitrary
+    # slice rather than the queue. Ties break on the primary key so a stable page
+    # boundary cannot drop or repeat a row between requests.
+    sort_key = request.args.get("sort", "requested")
+    sort_column = _JOIN_REQUEST_SORT_COLUMNS.get(sort_key, _JOIN_REQUEST_SORT_COLUMNS["requested"])
+    order = "ASC" if request.args.get("order", "asc") == "asc" else "DESC"
+
     club_filter = (request.args.get("club") or "").strip()
     if club_filter:
         where.append("c.club_name = %s")
@@ -815,7 +823,8 @@ def join_requests_inbox():
         limit, offset = pagination()
         rows = fetch_all(
             cur,
-            f"{_JOIN_REQUEST_SELECT} WHERE {where_sql} ORDER BY j.created_at LIMIT %s OFFSET %s",
+            f"{_JOIN_REQUEST_SELECT} WHERE {where_sql} "
+            f"ORDER BY {sort_column} {order}, j.club_join_request_id {order} LIMIT %s OFFSET %s",
             [*params, limit, offset],
         )
     return jsonify(paged(_shape_join_requests(rows), total))
@@ -1000,6 +1009,18 @@ _PCR_SELECT = """
       JOIN users np ON np.user_id = r.requested_president_user_id
  LEFT JOIN users rb ON rb.user_id = r.resolved_by_user_id
 """
+
+# Sortable columns on the join-request queues. A whitelist, not interpolation of
+# whatever ?sort= carried, for the same reason _PCR_SORT_COLUMNS is one: the value
+# reaches an ORDER BY clause, and a dictionary lookup is what keeps it from being
+# able to say anything the server did not already choose to allow.
+_JOIN_REQUEST_SORT_COLUMNS = {
+    "requested": "j.created_at",
+    "club": "c.club_name",
+    "requester": "u.full_name",
+    "status": "j.status",
+}
+
 
 _PCR_SORT_COLUMNS = {
     "createdAt": "r.created_at",

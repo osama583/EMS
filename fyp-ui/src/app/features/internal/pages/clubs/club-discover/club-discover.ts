@@ -11,7 +11,7 @@ import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, Inter
 import { FeedbackBannerComponent } from '../../../../../shared/components/feedback-banner/feedback-banner';
 import { ProposalCommentDialogComponent } from '../../../../../shared/components/proposal-comment-dialog/proposal-comment-dialog';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { ViewToggleComponent } from '../../../../../shared/components/view-toggle/view-toggle';
+import { ViewToggleComponent, defaultListViewMode } from '../../../../../shared/components/view-toggle/view-toggle';
 
 type ViewMode = 'table' | 'card';
 
@@ -42,7 +42,7 @@ export class ClubDiscoverComponent {
   readonly categoryFilter = signal('all');
   readonly page = signal(1);
   readonly pageSize = signal(10);
-  readonly viewMode = signal<ViewMode>('card');
+  readonly viewMode = signal<ViewMode>(defaultListViewMode());
   readonly requestingId = signal<string | null>(null);
   readonly requestTarget = signal<ClubRecord | null>(null);
 

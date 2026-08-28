@@ -349,25 +349,34 @@ export class EventProposalComponent implements OnDestroy {
     );
     this.eventTitle.set(record.eventTitle);
     this.shortIntro.set(record.shortIntroduction);
-    this.goals.set(record.goals);
-    this.benefits.set(record.benefits);
-    this.publicity.set(record.publicity);
+    // Every field below the always-present ones is optional on ProposalReviewRecord, because a
+    // LIST row omits them (see that interface's note). This method only ever runs on a detail
+    // record from GET /proposals/{id}, where they are all present - but the type cannot know
+    // that, so each falls back to the same empty value its own signal was declared with. The
+    // fallback is what the form already shows for a field nobody filled in; it never invents one.
+    this.goals.set(record.goals ?? '');
+    this.benefits.set(record.benefits ?? '');
+    this.publicity.set(record.publicity ?? '');
     this.cost.set(record.costAmount ?? null);
     this.bankAccountName.set(record.bankAccountName ?? '');
     this.bankAccountNumber.set(record.bankAccountNumber ?? '');
-    this.pendingCategoryNames.set(record.eventCategories);
-    this.pendingFormatName.set(record.eventFormat);
-    this.eventVisibility.set(record.eventVisibility);
-    this.eventImage.set(record.eventImage);
-    this.registrationMode.set(record.registrationMode === 'Manual' as any ? 'Approval Required' : record.registrationMode);
-    this.coOwners.set(record.coOwners);
-    this.schedule.set(record.scheduleRows);
-    this.organizers.set(record.organizers);
-    this.importantPeople.set(record.importantPeople);
-    this.guests.set(record.guests);
-    this.agenda.set(record.agenda);
-    this.discussions.set(record.discussions);
-    this.selectedRequirements.set(record.selectedRequirements);
+    this.pendingCategoryNames.set(record.eventCategories ?? null);
+    this.pendingFormatName.set(record.eventFormat ?? null);
+    this.eventVisibility.set(record.eventVisibility ?? 'Private');
+    this.eventImage.set(record.eventImage ?? null);
+    this.registrationMode.set(
+      record.registrationMode === ('Manual' as RegistrationMode)
+        ? 'Approval Required'
+        : record.registrationMode ?? 'Automatic',
+    );
+    this.coOwners.set(record.coOwners ?? []);
+    this.schedule.set(record.scheduleRows ?? []);
+    this.organizers.set(record.organizers ?? []);
+    this.importantPeople.set(record.importantPeople ?? []);
+    this.guests.set(record.guests ?? []);
+    this.agenda.set(record.agenda ?? []);
+    this.discussions.set(record.discussions ?? []);
+    this.selectedRequirements.set(record.selectedRequirements ?? []);
     // Use the server's structured per-requirement rows (date/start/end/withLogo/etc. as real
     // fields) rather than reconstructing them from the flattened, display-only `record.requests`
     // strings — that used to silently drop fields the editor needs (e.g. Mineral Water's
@@ -377,7 +386,7 @@ export class EventProposalComponent implements OnDestroy {
     this.requestRows.set({
       logistics: [], transportation: [], photoVideo: [], soundLight: [], fmb: [], campusTour: [], waterNormal: [], fundingPurchase: [],
       ...Object.fromEntries(
-        record.selectedRequirements.map((key) => [key, (structuredRows[key] ?? []).map((row) => ({ ...row }))]),
+        (record.selectedRequirements ?? []).map((key) => [key, (structuredRows[key] ?? []).map((row) => ({ ...row }))]),
       ),
     });
     this.loadRequestOptionCatalog();

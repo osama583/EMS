@@ -62,18 +62,18 @@ interface StagedFmbOrder extends FmbSelectionDraft {
           <app-proposal-section icon="description" title="Event Overview" description="General information, registration and publicity.">
             <div class="prv-grid prv-grid--3">
               <app-proposal-field label="Event Title" [value]="item.eventTitle" span="2" />
-              <app-proposal-field label="Visibility" [value]="item.eventVisibility" />
-              <app-proposal-field label="Format" [value]="item.eventFormat" />
-              <app-proposal-field label="Registration" [value]="item.registrationMode" />
+              <app-proposal-field label="Visibility" [value]="item.eventVisibility ?? ''" />
+              <app-proposal-field label="Format" [value]="item.eventFormat ?? ''" />
+              <app-proposal-field label="Registration" [value]="item.registrationMode ?? ''" />
               <app-proposal-field label="Total Pax" [value]="item.totalPax" />
               <div class="prv-grid-row--2 prv-field--full">
-                <app-proposal-field label="External Pax" [value]="item.externalPax" />
-                <app-proposal-field label="Categories" [value]="item.eventCategories.join(', ')" />
+                <app-proposal-field label="External Pax" [value]="item.externalPax ?? ''" />
+                <app-proposal-field label="Categories" [value]="(item.eventCategories ?? []).join(', ')" />
               </div>
-              <app-proposal-field label="Publicity" [value]="item.publicity" span="full" />
+              <app-proposal-field label="Publicity" [value]="item.publicity ?? ''" span="full" />
               <app-proposal-field label="Short Introduction" [value]="item.shortIntroduction" span="full" />
-              <app-proposal-field label="Goals &amp; Objectives" [value]="item.goals" span="full" />
-              <app-proposal-field label="Expected Benefits" [value]="item.benefits" span="full" />
+              <app-proposal-field label="Goals &amp; Objectives" [value]="item.goals ?? ''" span="full" />
+              <app-proposal-field label="Expected Benefits" [value]="item.benefits ?? ''" span="full" />
             </div>
             @if (item.eventImage) {
               <img class="prv-event-image" [src]="item.eventImage.url" [alt]="item.eventTitle + ' event image'" />
@@ -860,7 +860,10 @@ export class ProposalDepartmentViewComponent {
     const proposal = this.proposal();
     if (!proposal) return [];
     const departments = this.departments();
-    return proposal.requests.filter((request) => !departments.length || departments.includes(request.department)).map((request) => ({ ...request }));
+    // `requests` is detail-only on ProposalReviewRecord (a list row omits it), and this view is
+    // only ever handed a detail record. Empty rather than non-null-asserted: a missing block
+    // renders as "nothing to show", which is true, instead of throwing at runtime.
+    return (proposal.requests ?? []).filter((request) => !departments.length || departments.includes(request.department)).map((request) => ({ ...request }));
   });
 
   constructor() {

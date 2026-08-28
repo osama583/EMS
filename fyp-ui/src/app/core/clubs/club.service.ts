@@ -120,10 +120,14 @@ export class ClubService {
   // club dropdown are real query params, not a client-side filter over the whole set. Always
   // scoped to the caller by the server (see that endpoint's docstring), so no presidentUserId
   // is sent — one never was read server-side either.
-  getInbox(query: { q?: string; club?: string; page: number; pageSize: number }): Observable<ClubJoinRequestPage> {
+  getInbox(query: { q?: string; club?: string; page: number; pageSize: number; sort?: string; order?: 'asc' | 'desc' }): Observable<ClubJoinRequestPage> {
     let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
     if (query.q) params = params.set('q', query.q);
     if (query.club) params = params.set('club', query.club);
+    // Sorting goes to the server because the list is paginated: ordering the rows
+    // this page happens to hold would sort a slice, not the queue.
+    if (query.sort) params = params.set('sort', query.sort);
+    if (query.order) params = params.set('order', query.order);
     return this.http.get<ClubJoinRequestPage>(`${this.baseUrl}/clubs/join-requests/inbox`, { params });
   }
   // Distinct club names with a pending join request, for the inbox's club filter dropdown —

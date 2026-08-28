@@ -314,10 +314,12 @@ export class ProposalReviewerViewComponent {
   readonly requirementTables = computed<readonly RequirementTable[]>(() => {
     const proposal = this.proposal();
     if (!proposal) return [];
-    return proposal.selectedRequirements.map((key) => ({
+    // Both are detail-only fields (see ProposalReviewRecord); this view always receives a detail
+    // record, and an empty list is the honest fallback if it ever does not.
+    return (proposal.selectedRequirements ?? []).map((key) => ({
       key,
       label: REQUIREMENT_LABELS[key],
-      rows: proposal.requests.filter((request) => request.department === key).map((request) => ({ ...request })),
+      rows: (proposal.requests ?? []).filter((request) => request.department === key).map((request) => ({ ...request })),
     }));
   });
 

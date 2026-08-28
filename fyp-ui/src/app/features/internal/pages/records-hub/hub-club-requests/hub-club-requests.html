@@ -5,6 +5,8 @@
   [records]="records()"
   [filters]="filters()"
   [searchValue]="search()"
+  [sort]="sort()"
+  (sortChange)="setSort($event)"
   [loading]="loading()"
   [totalPages]="totalPages()"
   [page]="page()"

@@ -9,7 +9,7 @@ import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, Inter
 import { InternalDataPageComponent } from '../../../../../shared/components/internal-data-page/internal-data-page';
 import { FeedbackBannerComponent } from '../../../../../shared/components/feedback-banner/feedback-banner';
 import { FormModalComponent } from '../../../../../shared/components/form-modal/form-modal';
-import { ViewToggleComponent } from '../../../../../shared/components/view-toggle/view-toggle';
+import { ViewToggleComponent, defaultListViewMode } from '../../../../../shared/components/view-toggle/view-toggle';
 
 type ViewMode = 'table' | 'card';
 // Filter dimension for 'other' rows: who actually clicked approve/reject — the viewer themself
@@ -51,7 +51,7 @@ export class HubHistoryEventsComponent {
   readonly loading = signal(true);
   readonly errorMessage = signal('');
   readonly detailsTarget = signal<RegistrationHistoryRow | null>(null);
-  readonly viewMode = signal<ViewMode>('card');
+  readonly viewMode = signal<ViewMode>(defaultListViewMode());
   readonly search = signal('');
   readonly requesterFilter = signal<'all' | 'me' | 'other'>('all');
   readonly decidedByFilter = signal<DecidedByFilter>('all');

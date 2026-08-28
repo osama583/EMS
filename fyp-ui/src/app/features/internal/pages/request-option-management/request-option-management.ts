@@ -44,7 +44,7 @@ const KIND_LABELS: Readonly<Record<RequestOptionKind, string>> = {
 };
 
 import { ImageUploadFieldComponent } from '../../../../shared/components/image-upload-field/image-upload-field';
-import { ViewToggleComponent } from '../../../../shared/components/view-toggle/view-toggle';
+import { ListViewMode, ViewToggleComponent, defaultListViewMode } from '../../../../shared/components/view-toggle/view-toggle';
 import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 
 const CAFETERIA_OPTION_KINDS: readonly RequestOptionKind[] = ['fmb', 'servingUnit'];
@@ -101,7 +101,7 @@ export class RequestOptionManagementComponent {
   readonly errorMessage = signal('');
   readonly imageError = signal('');
   readonly imageUploading = signal(false);
-  readonly viewMode = signal<'table' | 'card'>('table');
+  readonly viewMode = signal<ListViewMode>(defaultListViewMode());
   readonly deleteTarget = signal<RequestOption | null>(null);
   readonly deletePreview = signal<DeletionPreview | null>(null);
   readonly checkingDeletion = signal(false);

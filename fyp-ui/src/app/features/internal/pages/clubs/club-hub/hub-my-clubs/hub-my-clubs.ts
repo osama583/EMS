@@ -10,7 +10,7 @@ import { InternalDataPageConfig, InternalDataRecord, InternalFilterConfig, Inter
 import { ClubCategoryPickerComponent } from '../../../../../../shared/components/club-category-picker/club-category-picker';
 import { ClubRosterModalComponent } from '../../../../../../shared/components/club-roster-modal/club-roster-modal';
 import { PresidentChangeRequestModalComponent } from '../../../../../../shared/components/president-change-request-modal/president-change-request-modal';
-import { ViewToggleComponent } from '../../../../../../shared/components/view-toggle/view-toggle';
+import { ViewToggleComponent, defaultListViewMode } from '../../../../../../shared/components/view-toggle/view-toggle';
 
 type ViewMode = 'table' | 'card';
 
@@ -36,7 +36,7 @@ export class HubMyClubsComponent {
   // Which card's "⋯" action menu is open, by club id — a plain string rather than a per-card
   // component-local flag, since only one menu should ever be open across the whole grid at once.
   readonly menuOpenFor = signal<string | null>(null);
-  readonly viewMode = signal<ViewMode>('card');
+  readonly viewMode = signal<ViewMode>(defaultListViewMode());
   readonly search = signal('');
   readonly page = signal(1);
   readonly pageSize = signal(10);

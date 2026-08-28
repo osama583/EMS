@@ -24,7 +24,10 @@
             <span>{{ member.user.email }}</span>
           </div>
           <div class="club-roster__meta">
-            <span class="club-roster__role" [attr.data-role]="member.user.role">{{ member.user.role }}</span>
+            <!-- Everyone on a club roster is a member, and the server never sent anything else:
+                 ClubUserSummary.role was dropped because it was always this literal string. The
+                 chip is kept so the row looks exactly as it did. -->
+            <span class="club-roster__role" data-role="Member">Member</span>
             <span class="club-roster__joined">Joined {{ formatDate(member.dateJoined) }}</span>
           </div>
           @if (canAct(member)) {

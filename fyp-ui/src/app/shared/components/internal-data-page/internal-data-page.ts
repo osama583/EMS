@@ -19,7 +19,7 @@ import {
   InternalResetButtonComponent,
   InternalSearchFieldComponent,
 } from './internal-data-page-parts';
-import { ListViewMode, ViewToggleComponent } from '../view-toggle/view-toggle';
+import { ListViewMode, ViewToggleComponent, defaultListViewMode } from '../view-toggle/view-toggle';
 
 @Component({
   selector: 'app-internal-data-page',
@@ -65,10 +65,13 @@ export class InternalDataPageComponent {
   readonly cellClick = output<InternalCellClickEvent>();
   readonly sortChange = output<InternalSortChange>();
 
-  // Local to the component: which view the user picked. Table is the default on desktop, and
-  // narrow viewports always render cards regardless (handled in CSS), so this only decides the
-  // desktop presentation.
-  readonly viewMode = signal<ListViewMode>('table');
+  // Which view the reader is in. Opens on the viewport-appropriate default -
+  // cards on a phone, table on a desktop (defaultListViewMode) - and stays
+  // wherever they put it after that. The comment this replaces said narrow
+  // viewports "always render cards regardless"; they no longer do, since the
+  // toggle became authoritative at every width, which is exactly why the
+  // default has to know how wide the screen is.
+  readonly viewMode = signal<ListViewMode>(defaultListViewMode());
   setViewMode(mode: ListViewMode): void { this.viewMode.set(mode); }
 
   readonly shouldShowClear = computed(() => {

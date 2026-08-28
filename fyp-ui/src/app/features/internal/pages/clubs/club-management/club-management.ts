@@ -21,7 +21,7 @@ import { ToastService, apiErrorMessage } from '../../../../../shared/components/
 import { DeleteConfirmDialogComponent } from '../../../../../shared/components/delete-confirm-dialog/delete-confirm-dialog';
 import { ConfirmDialogComponent } from '../../../../../shared/components/confirm-dialog/confirm-dialog';
 import { DeletionMetadata, DeletionPreview } from '../../../../../shared/models/deletion.models';
-import { ViewToggleComponent } from '../../../../../shared/components/view-toggle/view-toggle';
+import { ViewToggleComponent, defaultListViewMode } from '../../../../../shared/components/view-toggle/view-toggle';
 
 type ViewMode = 'table' | 'card';
 
@@ -69,7 +69,7 @@ export class ClubManagementComponent {
   readonly page = signal(1);
   readonly pageSize = signal(10);
   readonly sort = signal<InternalSortState>({ key: 'name', order: 'asc' });
-  readonly viewMode = signal<ViewMode>('card');
+  readonly viewMode = signal<ViewMode>(defaultListViewMode());
   readonly modalOpen = signal(false);
   readonly editingId = signal<string | null>(null);
   readonly draft = signal<{ name: string; description: string; imageUrl: string; imageFileName: string; presidentUserId: string; categoryIds: readonly string[]; active: boolean }>(this.emptyDraft());

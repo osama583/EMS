@@ -8,7 +8,7 @@ import { InternalDataPageConfig, InternalDataRecord, InternalFilterConfig, Inter
 import { InternalDataPageComponent } from '../../../../../shared/components/internal-data-page/internal-data-page';
 import { FeedbackBannerComponent } from '../../../../../shared/components/feedback-banner/feedback-banner';
 import { FormModalComponent } from '../../../../../shared/components/form-modal/form-modal';
-import { ViewToggleComponent } from '../../../../../shared/components/view-toggle/view-toggle';
+import { ViewToggleComponent, defaultListViewMode } from '../../../../../shared/components/view-toggle/view-toggle';
 
 type ViewMode = 'table' | 'card';
 
@@ -32,7 +32,7 @@ export class HubOngoingClubsComponent {
   readonly loading = signal(true);
   readonly errorMessage = signal('');
   readonly detailsTarget = signal<ClubJoinRequestRecord | null>(null);
-  readonly viewMode = signal<ViewMode>('card');
+  readonly viewMode = signal<ViewMode>(defaultListViewMode());
   readonly search = signal('');
   readonly page = signal(1);
   readonly pageSize = signal(10);
