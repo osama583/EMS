@@ -290,7 +290,6 @@ export class RecordsPageComponent {
     actions: this.definition.actions,
     emptyTitle: this.definition.emptyTitle,
     emptyDescription: this.definition.emptyDescription,
-    pageSizeOptions: [5, 10, 25],
   }));
   readonly filterConfigs = computed<readonly InternalFilterConfig[]>(() => this.kind === 'notifications'
     ? [

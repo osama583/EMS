@@ -39,7 +39,7 @@ from ..security import authenticate_optional, require_auth
 from ..security.passwords import hash_password
 from ..security.principal import current_principal
 from ..services import workflow as wf
-from ._helpers import body, paged, pagination, required
+from ._helpers import body, date_order, paged, pagination, required
 
 bp = Blueprint("events", __name__, url_prefix="/events")
 
@@ -770,7 +770,8 @@ def pending_approvals():
         limit, offset = pagination()
         rows = fetch_all(
             cur,
-            f"{_PENDING_APPROVALS_SELECT} WHERE {where_sql} ORDER BY er.registered_at LIMIT %s OFFSET %s",
+            f"{_PENDING_APPROVALS_SELECT} WHERE {where_sql} "
+            f"ORDER BY {date_order('er.registered_at', 'asc')}, er.event_registration_id ASC LIMIT %s OFFSET %s",
             [*params, limit, offset],
         )
     return jsonify(paged(rows, total))
@@ -966,7 +967,8 @@ def registration_history():
         rows = fetch_all(
             cur,
             f"""SELECT * FROM ({_HISTORY_UNION_SQL}) u WHERE {where_sql}
-                ORDER BY "registeredAt" DESC LIMIT %(limit)s OFFSET %(offset)s""",
+                ORDER BY {date_order('"registeredAt"')}
+                LIMIT %(limit)s OFFSET %(offset)s""",
             {**params, "limit": limit, "offset": offset},
         )
     return jsonify(paged(rows, total))

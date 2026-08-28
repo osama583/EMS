@@ -111,7 +111,7 @@ export class CafeteriaMyStaffComponent {
       { key: 'status', label: 'Suspend / restore', icon: 'toggle_on' },
       { key: 'remove', label: 'Remove staff', icon: 'delete' },
     ],
-    emptyTitle: 'No staff yet', emptyDescription: 'Add a staff member to get started.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No staff yet', emptyDescription: 'Add a staff member to get started.',
   }));
 
   readonly deletedConfig = computed<InternalDataPageConfig>(() => ({
@@ -124,7 +124,7 @@ export class CafeteriaMyStaffComponent {
     search: { ariaLabel: '', placeholder: '' },
     columns: [{ key: 'user', label: 'User' }, { key: 'created', label: 'Deleted' }, { key: 'status', label: 'Permanent deletion' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [{ key: 'restore', label: 'Restore from Deleted', icon: 'restore_from_trash' }],
-    emptyTitle: 'No deleted staff', emptyDescription: 'Staff you remove will appear here for 7 days before being permanently removed.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No deleted staff', emptyDescription: 'Staff you remove will appear here for 7 days before being permanently removed.',
   }));
   readonly deletedRecords = computed<readonly InternalDataRecord[]>(() => this.deletedStaff().map((a) => ({
     id: a.assignmentId,

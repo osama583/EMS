@@ -65,7 +65,7 @@
       <app-internal-pagination
         [paginationLabel]="config().paginationLabel" [rowsPerPageLabel]="config().rowsPerPageLabel"
         [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
-        [pageSizeOptions]="config().pageSizeOptions ?? [5, 10, 25]"
+        [pageSizeOptions]="pageSizeOptions"
         (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)"
       />
     } @else {

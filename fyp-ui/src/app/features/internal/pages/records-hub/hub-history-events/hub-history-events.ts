@@ -5,7 +5,7 @@ import { AuthService } from '../../../../../core/auth/auth.service';
 import { PublishedEventService } from '../../../../../core/events/published-event.service';
 import { RegistrationHistoryRow } from '../../../../../core/events/event-engagement.models';
 import { InternalPageHeaderComponent, InternalResetButtonComponent, InternalSearchFieldComponent, InternalFilterControlsComponent } from '../../../../../shared/components/internal-data-page/internal-data-page-parts';
-import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalPageHeaderConfig, InternalRowActionEvent } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
+import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalPageHeaderConfig, InternalRowActionEvent, InternalSortChange, InternalSortState } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
 import { InternalDataPageComponent } from '../../../../../shared/components/internal-data-page/internal-data-page';
 import { FeedbackBannerComponent } from '../../../../../shared/components/feedback-banner/feedback-banner';
 import { FormModalComponent } from '../../../../../shared/components/form-modal/form-modal';
@@ -57,6 +57,8 @@ export class HubHistoryEventsComponent {
   readonly decidedByFilter = signal<DecidedByFilter>('all');
   readonly page = signal(1);
   readonly pageSize = signal(10);
+  // Most recent first: a history is read newest-first.
+  readonly sort = signal<InternalSortState>({ key: 'date', order: 'desc' });
 
   // The decided-by-me/co-owner split only means anything for someone who could plausibly BE an
   // organiser at all — same "who can be an applicant" eligibility rule records-hub.ts's own
@@ -92,13 +94,18 @@ export class HubHistoryEventsComponent {
     }] : []),
   ]);
 
+  setSort(change: InternalSortChange): void {
+    this.sort.set({ key: change.key, order: change.order });
+    this.page.set(1);
+  }
+
   readonly config = computed<InternalDataPageConfig>(() => ({
     ariaLabel: 'Event registration history', paginationLabel: 'Registration pages', rowsPerPageLabel: 'Registrations per page', mobileListLabel: 'Registration cards',
     header: { title: this.headerConfig().title, description: this.headerConfig().description, countLabel: this.headerConfig().countLabel },
     search: { ariaLabel: 'Search events', placeholder: 'Search event title' },
-    columns: [{ key: 'event', label: 'Event' }, { key: 'requester', label: 'Requester' }, { key: 'outcome', label: 'Outcome' }, { key: 'date', label: 'Date' }, { key: 'actions', label: 'Actions', actions: true }],
+    columns: [{ key: 'event', label: 'Event' }, { key: 'requester', label: 'Requester' }, { key: 'outcome', label: 'Outcome' }, { key: 'date', label: 'Date', sortKey: 'date' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [{ key: 'view', label: 'View details', icon: 'visibility' }],
-    emptyTitle: 'No resolved registrations yet', emptyDescription: 'Resolved event registrations — yours or ones you decided as organiser — will show up here.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No resolved registrations yet', emptyDescription: 'Resolved event registrations — yours or ones you decided as organiser — will show up here.',
   }));
 
   readonly records = computed<readonly InternalDataRecord[]>(() => this.visibleEntries().map((entry) => ({
@@ -128,7 +135,7 @@ export class HubHistoryEventsComponent {
   // Refetch whenever search/requester/decidedBy/page/pageSize change — the same predicate this
   // page used to apply in the browser over the full merged set is now sent to the server instead.
   private readonly query$ = toObservable(computed(() => ({
-    page: this.page(), pageSize: this.pageSize(), q: this.search().trim(),
+    page: this.page(), pageSize: this.pageSize(), q: this.search().trim(), sort: this.sort(),
     requester: this.requesterFilter(),
     decidedBy: this.showDecidedByFilter() ? this.decidedByFilter() : 'all',
   })));
@@ -142,6 +149,7 @@ export class HubHistoryEventsComponent {
           page: q.page, pageSize: q.pageSize, q: q.q || undefined,
           requester: q.requester === 'me' || q.requester === 'other' ? q.requester : undefined,
           decidedBy: q.decidedBy === 'me' || q.decidedBy === 'co-owner' ? q.decidedBy : undefined,
+          order: q.sort.order,
         });
       }),
       takeUntilDestroyed(this.destroyRef),

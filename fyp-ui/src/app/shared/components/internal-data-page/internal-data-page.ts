@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { InternalTableWorkspaceComponent } from '../internal-table-workspace/internal-table-workspace';
-import {
+import { PAGE_SIZE_OPTIONS,
   InternalCellClickEvent,
   InternalDataPageConfig,
   InternalDataRecord,
@@ -38,6 +38,7 @@ import { ListViewMode, ViewToggleComponent, defaultListViewMode } from '../view-
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class InternalDataPageComponent {
+  readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
   readonly config = input.required<InternalDataPageConfig>();
   readonly records = input.required<readonly InternalDataRecord[]>();
   readonly filters = input.required<readonly InternalFilterConfig[]>();

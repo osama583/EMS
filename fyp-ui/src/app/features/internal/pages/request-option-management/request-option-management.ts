@@ -174,7 +174,7 @@ export class RequestOptionManagementComponent {
     search: { ariaLabel: 'Search options', placeholder: 'Search option name or details' },
     columns: [{ key: 'name', label: 'Option' }, { key: 'details', label: 'Configuration' }, { key: 'status', label: 'Status' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [{ key: 'edit', label: 'Edit option', icon: 'edit' }, { key: 'status', label: 'Change active status', icon: 'power_settings_new' }, { key: 'delete', label: 'Delete option', icon: 'delete' }],
-    emptyTitle: 'No options found', emptyDescription: 'Add an option or change the search and status filters.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No options found', emptyDescription: 'Add an option or change the search and status filters.',
   }));
   readonly cardHeaderConfig = computed<InternalPageHeaderConfig>(() => ({
     title: this.config().header.title,
@@ -190,7 +190,7 @@ export class RequestOptionManagementComponent {
     search: { ariaLabel: '', placeholder: '' },
     columns: [{ key: 'name', label: 'Option' }, { key: 'details', label: 'Deleted' }, { key: 'status', label: 'Permanent deletion' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [{ key: 'restore', label: 'Restore', icon: 'restore_from_trash' }],
-    emptyTitle: 'No deleted options', emptyDescription: 'Options you delete will appear here for 7 days before being permanently removed.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No deleted options', emptyDescription: 'Options you delete will appear here for 7 days before being permanently removed.',
   }));
   readonly filters = computed(() => [
     ...(this.permittedKinds.length > 1 ? [{

@@ -78,9 +78,11 @@ export class ClubService {
   }
   // Server-side search/pagination for the /app/club-category management page — filtering, the
   // active/inactive split, and the page slice all happen in SQL, not in the browser.
-  searchCategories(options: { search?: string; includeInactive?: boolean; page: number; pageSize: number }): Observable<ClubCategoryPage> {
+  searchCategories(options: { search?: string; includeInactive?: boolean; page: number; pageSize: number; order?: 'asc' | 'desc' }): Observable<ClubCategoryPage> {
     const params: Record<string, string> = { page: String(options.page), pageSize: String(options.pageSize) };
     if (options.search) params['q'] = options.search;
+    // Created is the only sortable column, so the server needs a direction, not a field.
+    if (options.order) params['order'] = options.order;
     if (options.includeInactive) params['includeInactive'] = 'true';
     return this.http.get<ClubCategoryPage>(`${this.baseUrl}/club-categories/search`, { params });
   }
@@ -135,13 +137,15 @@ export class ClubService {
   getInboxClubOptions(): Observable<readonly string[]> {
     return this.http.get<readonly string[]>(`${this.baseUrl}/clubs/join-requests/inbox/clubs`);
   }
-  getMyRequests(requesterUserId: string): Observable<readonly ClubJoinRequestRecord[]> {
-    return this.http.get<readonly ClubJoinRequestRecord[]>(`${this.baseUrl}/clubs/join-requests/mine`, { params: { requesterUserId } });
+  // `order` sorts on the SERVER (GET /clubs/join-requests/mine). The Requested column is the
+  // only sortable one, so a direction is all the endpoint needs.
+  getMyRequests(requesterUserId: string, order: 'asc' | 'desc' = 'desc'): Observable<readonly ClubJoinRequestRecord[]> {
+    return this.http.get<readonly ClubJoinRequestRecord[]>(`${this.baseUrl}/clubs/join-requests/mine`, { params: { requesterUserId, order } });
   }
   // Requests I have already approved/rejected as President — the resolved counterpart to
   // getInbox(). Feeds History's "decided by me" direction.
-  getDecided(presidentUserId: string): Observable<readonly ClubJoinRequestRecord[]> {
-    return this.http.get<readonly ClubJoinRequestRecord[]>(`${this.baseUrl}/clubs/join-requests/decided`, { params: { presidentUserId } });
+  getDecided(presidentUserId: string, order: 'asc' | 'desc' = 'desc'): Observable<readonly ClubJoinRequestRecord[]> {
+    return this.http.get<readonly ClubJoinRequestRecord[]>(`${this.baseUrl}/clubs/join-requests/decided`, { params: { presidentUserId, order } });
   }
   approveJoinRequest(id: string, resolvedByUserId: string): Observable<ClubJoinRequestRecord> {
     return this.http.post<ClubJoinRequestRecord>(`${this.baseUrl}/clubs/join-requests/${encodeURIComponent(id)}/approve`, { resolvedByUserId });

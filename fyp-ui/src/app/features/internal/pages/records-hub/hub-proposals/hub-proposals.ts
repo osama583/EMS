@@ -169,7 +169,6 @@ export class HubProposalsComponent {
     ],
     emptyTitle: this.copy.empty,
     emptyDescription: 'Try changing your search or status filter.',
-    pageSizeOptions: [5, 10, 25],
   }));
 
   readonly filterConfigs = computed<readonly InternalFilterConfig[]>(() => [

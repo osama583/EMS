@@ -13,8 +13,36 @@
   justify-content: space-between;
 }
 
+/*
+ * THE page title and description, defined on the header component itself.
+ *
+ * These used to live on `.internal-table-workspace__header`, which meant they
+ * only applied when the header happened to be rendered INSIDE the workspace.
+ * Pages that use InternalPageHeaderComponent standalone - /app/ongoing/clubs and
+ * /app/ongoing/events, sitting right beside /app/ongoing/proposals which does
+ * use the workspace - got the browser's default h1 instead, so sibling tabs of
+ * one page showed different title sizes. A component's own typography belongs
+ * on the component, not on an ancestor it may or may not have.
+ *
+ * `.shared-page-header h1` is (0,1,1) against the workspace rule's (0,1,0) -
+ * :where() contributes nothing - so this wins in both places and there is one
+ * title style everywhere.
+ */
 .shared-page-header h1 {
+  margin: 0;
   color: var(--apu-blue-600) !important;
+  font-size: var(--page-title-size);
+  font-weight: var(--page-title-weight);
+  letter-spacing: var(--page-title-tracking);
+  line-height: var(--page-title-leading);
+}
+
+.shared-page-header p {
+  max-width: var(--page-description-measure);
+  margin: var(--page-description-gap) 0 0;
+  color: var(--apu-text-muted);
+  font-size: var(--page-description-size);
+  line-height: var(--page-description-leading);
 }
 
 .shared-page-header__count {
@@ -817,4 +845,16 @@
 
 @media (prefers-reduced-motion: reduce) {
   .shared-page-state__loading span { animation: none; }
+}
+
+/*
+ * For a page that renders the shared header + its own body without going
+ * through the workspace (my-events-tab, reached at /app/ongoing/events and
+ * /app/history/events). It gets the same cap and centring its sibling tabs get,
+ * so the four tabs of one page are the same width.
+ */
+.shared-page-width {
+  width: min(100%, var(--page-max-width));
+  min-width: 0;
+  margin-inline: auto;
 }

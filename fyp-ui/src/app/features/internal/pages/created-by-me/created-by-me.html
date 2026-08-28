@@ -52,8 +52,9 @@
   @if (totalPages() > 1) {
     <app-internal-pagination
       paginationLabel="Event pages" rowsPerPageLabel="Events per page"
-      [totalPages]="totalPages()" [page]="page()" [pageSize]="9" [pageSizeOptions]="[9]"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()" [pageSizeOptions]="pageSizeOptions"
       (pageChange)="setPage($event)"
+        (pageSizeChange)="setPageSize($event)"
     />
   }
 }

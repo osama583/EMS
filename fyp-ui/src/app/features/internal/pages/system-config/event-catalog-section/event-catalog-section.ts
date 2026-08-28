@@ -106,7 +106,7 @@ export class EventCatalogSectionComponent {
       { key: 'status', label: 'Change active status', icon: 'power_settings_new' },
       { key: 'delete', label: `Delete ${this.entityLabel().toLowerCase()}`, icon: 'delete' },
     ],
-    emptyTitle: `No ${this.entityLabelPlural().toLowerCase()} found`, emptyDescription: `Add a ${this.entityLabel().toLowerCase()} or change the current search.`, pageSizeOptions: [5, 10, 25],
+    emptyTitle: `No ${this.entityLabelPlural().toLowerCase()} found`, emptyDescription: `Add a ${this.entityLabel().toLowerCase()} or change the current search.`,
   }));
 
   setSearch(value: string): void { this.search.set(value); this.page.set(1); }
@@ -205,7 +205,7 @@ export class EventCatalogSectionComponent {
       { key: 'restore', label: 'Restore', icon: 'restore_from_trash' },
       { key: 'purge', label: 'Delete forever', icon: 'delete_forever' },
     ],
-    emptyTitle: `No deleted ${this.entityLabelPlural().toLowerCase()}`, emptyDescription: `${this.entityLabelPlural()} you delete will appear here for 7 days before being permanently removed.`, pageSizeOptions: [5, 10, 25],
+    emptyTitle: `No deleted ${this.entityLabelPlural().toLowerCase()}`, emptyDescription: `${this.entityLabelPlural()} you delete will appear here for 7 days before being permanently removed.`,
   }));
 
   setTab(tab: SectionTab): void {

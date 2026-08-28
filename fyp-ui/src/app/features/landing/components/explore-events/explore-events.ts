@@ -1,3 +1,4 @@
+import { PAGE_SIZE_OPTIONS } from '../../../../shared/components/internal-data-page/internal-data-page.models';
 import { DOCUMENT } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -71,6 +72,7 @@ const INTERNAL_PAGE_SIZE = 9;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ExploreEventsComponent {
+  readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
   private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);

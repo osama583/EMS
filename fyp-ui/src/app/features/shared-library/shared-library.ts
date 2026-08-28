@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, signal } from '@angular/core';
-import {
+import { PAGE_SIZE_OPTIONS,
   InternalDataRecord,
   InternalFilterConfig,
   InternalPageHeaderConfig,
@@ -88,6 +88,7 @@ interface LibraryEntry {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SharedLibraryComponent {
+  readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
   readonly query = signal('');
   readonly category = signal('All');
   readonly demoSearch = signal('');

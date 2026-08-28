@@ -118,7 +118,6 @@ export class HubPresidentChangeRequestsComponent {
       emptyDescription: admin
         ? (inbox ? 'Requests to change a club President will appear here for you to decide.' : 'Decided President change requests will appear here.')
         : (ongoing ? 'A request you submit to change your club’s President will appear here while it awaits a decision.' : 'Requests you submit to change your club’s President will appear here.'),
-      pageSizeOptions: [10, 25, 50],
     };
   });
 

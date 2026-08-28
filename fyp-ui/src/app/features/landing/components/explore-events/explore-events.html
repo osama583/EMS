@@ -97,7 +97,7 @@
         [totalPages]="totalPages()"
         [page]="currentPage()"
         [pageSize]="pageSize()"
-        [pageSizeOptions]="variant() === 'internal' ? [9, 18, 27] : [6, 12, 24]"
+        [pageSizeOptions]="pageSizeOptions"
         (pageChange)="goToPage($event)"
         (pageSizeChange)="changePageSize($event)"
       />

@@ -27,10 +27,17 @@ from ..ai import schema_catalog
 from ..db import query, query_one, transaction
 from ..logging_setup import audit
 from ..security import require_admin
+from ._helpers import date_order
 
 bp = Blueprint("ai_admin", __name__, url_prefix="/admin")
 
-PAGE_SIZE = 25
+DEFAULT_PAGE_SIZE = 25
+# The rows-per-page choices the client offers (PAGE_SIZE_OPTIONS in
+# internal-data-page.models.ts). Whitelisted rather than trusted, so a caller
+# cannot ask for a page of a million rows; anything else falls back to the
+# default. The page size used to be fixed here, which is why this log was the
+# one list in the app whose rows-per-page selector had a single option.
+ALLOWED_PAGE_SIZES = (5, 10, 15, 25)
 
 # The outcomes a row can carry. The first four are backend refusals made BEFORE an answer existed;
 # the last three are the security reviewer's verdicts on an answer that HAD been generated (see
@@ -52,6 +59,11 @@ def list_ai_access_log():
         page = max(1, int(request.args.get("page", 1)))
     except ValueError:
         page = 1
+    try:
+        requested_size = int(request.args.get("pageSize", DEFAULT_PAGE_SIZE))
+    except ValueError:
+        requested_size = DEFAULT_PAGE_SIZE
+    page_size = requested_size if requested_size in ALLOWED_PAGE_SIZES else DEFAULT_PAGE_SIZE
     search = (request.args.get("search") or "").strip()
     outcome = (request.args.get("outcome") or "").strip()
 
@@ -73,12 +85,12 @@ def list_ai_access_log():
                required_pages AS "requiredPages", question, ai_response AS "aiResponse",
                outcome, reason, created_at::text AS "createdAt"
           FROM ai_access_denial{where}
-      ORDER BY created_at DESC, denial_id DESC
+      ORDER BY {date_order("created_at")}, denial_id DESC
          LIMIT %(limit)s OFFSET %(offset)s
         """,
-        {**params, "limit": PAGE_SIZE, "offset": (page - 1) * PAGE_SIZE},
+        {**params, "limit": page_size, "offset": (page - 1) * page_size},
     )
-    return jsonify({"rows": rows, "total": total, "page": page, "pageSize": PAGE_SIZE})
+    return jsonify({"rows": rows, "total": total, "page": page, "pageSize": page_size})
 
 
 @bp.delete("/ai-access-log")

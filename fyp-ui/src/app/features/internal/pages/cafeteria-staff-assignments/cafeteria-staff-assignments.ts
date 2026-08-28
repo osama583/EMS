@@ -144,7 +144,7 @@ export class CafeteriaStaffAssignmentsComponent {
       { key: 'status', label: 'Suspend / restore', icon: 'toggle_on' },
       { key: 'remove', label: 'Remove assignment', icon: 'delete' },
     ],
-    emptyTitle: 'No assignments found', emptyDescription: 'Add an assignment or change the current search.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No assignments found', emptyDescription: 'Add an assignment or change the current search.',
   }));
   readonly filters = computed(() => [
     { key: 'role', ariaLabel: 'Filter by role', value: this.roleFilter(), options: [{ value: 'all', label: 'All roles' }, ...ROLE_OPTIONS] },
@@ -159,7 +159,7 @@ export class CafeteriaStaffAssignmentsComponent {
     search: { ariaLabel: '', placeholder: '' },
     columns: [{ key: 'user', label: 'User' }, { key: 'cafeteria', label: 'Cafeteria' }, { key: 'created', label: 'Deleted' }, { key: 'status', label: 'Permanent deletion' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [{ key: 'restore', label: 'Restore', icon: 'restore_from_trash' }],
-    emptyTitle: 'No deleted assignments', emptyDescription: 'Assignments you remove will appear here for 7 days before being permanently removed.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No deleted assignments', emptyDescription: 'Assignments you remove will appear here for 7 days before being permanently removed.',
   }));
   readonly deletedRecords = computed<readonly InternalDataRecord[]>(() => this.deletedAssignments().map((a) => ({
     id: a.assignmentId,

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, model } from '@angular/core';
 import { InternalPaginationComponent } from '../internal-data-page/internal-data-page-parts';
+import { PAGE_SIZE_OPTIONS } from '../internal-data-page/internal-data-page.models';
 
 @Component({
   selector: 'app-internal-table-workspace',
@@ -17,7 +18,7 @@ export class InternalTableWorkspaceComponent {
   readonly paginationLabel = input('Pagination');
   readonly rowsPerPageLabel = input('Rows per page');
   readonly totalPages = input(1);
-  readonly pageSizeOptions = input<readonly number[]>([10, 25, 50, 100]);
+  readonly pageSizeOptions = input<readonly number[]>(PAGE_SIZE_OPTIONS);
   readonly page = model(1);
   readonly pageSize = model(10);
 

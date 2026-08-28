@@ -5,7 +5,7 @@ import { AuthService } from '../../../../../core/auth/auth.service';
 import { ClubService } from '../../../../../core/clubs/club.service';
 import { ClubJoinRequestRecord } from '../../../../../core/clubs/club.models';
 import { InternalPageHeaderComponent, InternalResetButtonComponent, InternalSearchFieldComponent, InternalFilterControlsComponent } from '../../../../../shared/components/internal-data-page/internal-data-page-parts';
-import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalPageHeaderConfig, InternalRowActionEvent } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
+import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalPageHeaderConfig, InternalRowActionEvent, InternalSortChange, InternalSortState } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
 import { InternalDataPageComponent } from '../../../../../shared/components/internal-data-page/internal-data-page';
 import { FeedbackBannerComponent } from '../../../../../shared/components/feedback-banner/feedback-banner';
 import { FormModalComponent } from '../../../../../shared/components/form-modal/form-modal';
@@ -47,6 +47,8 @@ export class HubHistoryClubsComponent {
   readonly requesterFilter = signal<'all' | Requester>('all');
   readonly page = signal(1);
   readonly pageSize = signal(10);
+  // Newest first, matching what this tab showed before it became sortable.
+  readonly sort = signal<InternalSortState>({ key: 'resolved', order: 'desc' });
 
   readonly resolvedEntries = computed(() => {
     const search = this.search().trim().toLowerCase();
@@ -54,7 +56,16 @@ export class HubHistoryClubsComponent {
     return this.entries()
       .filter((entry) => requester === 'all' || entry.requester === requester)
       .filter((entry) => !search || entry.request.clubName.toLowerCase().includes(search))
-      .sort((a, b) => new Date(b.request.resolvedAt ?? b.request.createdAt).getTime() - new Date(a.request.resolvedAt ?? a.request.createdAt).getTime());
+      // This tab MERGES two server-ordered lists (requests I made, and requests I
+      // decided as President), so the interleave has to happen somewhere. The
+      // DIRECTION is the server's - both endpoints were asked for the same
+      // ?order= - and this only merges two already-ordered lists on the same
+      // key, rather than re-deciding the ordering in the browser.
+      .sort((a, b) => {
+        const left = new Date(a.request.resolvedAt ?? a.request.createdAt).getTime();
+        const right = new Date(b.request.resolvedAt ?? b.request.createdAt).getTime();
+        return this.sort().order === 'asc' ? left - right : right - left;
+      });
   });
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.resolvedEntries().length / this.pageSize())));
   readonly visibleEntries = computed(() => this.resolvedEntries().slice((this.page() - 1) * this.pageSize(), this.page() * this.pageSize()));
@@ -80,9 +91,9 @@ export class HubHistoryClubsComponent {
     ariaLabel: 'Club request history', paginationLabel: 'Request pages', rowsPerPageLabel: 'Requests per page', mobileListLabel: 'Request cards',
     header: { title: this.headerConfig().title, description: this.headerConfig().description, countLabel: this.headerConfig().countLabel },
     search: { ariaLabel: 'Search requests', placeholder: 'Search club name' },
-    columns: [{ key: 'club', label: 'Club' }, { key: 'requester', label: 'Requester' }, { key: 'status', label: 'Outcome' }, { key: 'resolved', label: 'Resolved' }, { key: 'actions', label: 'Actions', actions: true }],
+    columns: [{ key: 'club', label: 'Club' }, { key: 'requester', label: 'Requester' }, { key: 'status', label: 'Outcome' }, { key: 'resolved', label: 'Resolved', sortKey: 'resolved' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [{ key: 'view', label: 'View details', icon: 'visibility' }],
-    emptyTitle: 'No resolved requests yet', emptyDescription: 'Resolved club join requests — yours or ones you decided as President — will show up here.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No resolved requests yet', emptyDescription: 'Resolved club join requests — yours or ones you decided as President — will show up here.',
   }));
 
   readonly records = computed<readonly InternalDataRecord[]>(() => this.visibleEntries().map((entry) => ({
@@ -114,8 +125,8 @@ export class HubHistoryClubsComponent {
   private load(): void {
     this.loading.set(true);
     forkJoin({
-      mine: this.clubService.getMyRequests(this.currentUserId),
-      decided: this.clubService.getDecided(this.currentUserId),
+      mine: this.clubService.getMyRequests(this.currentUserId, this.sort().order),
+      decided: this.clubService.getDecided(this.currentUserId, this.sort().order),
     }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: ({ mine, decided }) => {
         const requested: RequestHistoryEntry[] = mine.filter((r) => r.status !== 'pending').map((request) => ({ request, requester: 'me' as const }));
@@ -134,6 +145,12 @@ export class HubHistoryClubsComponent {
   }
 
   setViewMode(mode: ViewMode): void { this.viewMode.set(mode); }
+  setSort(change: InternalSortChange): void {
+    this.sort.set({ key: change.key, order: change.order });
+    this.page.set(1);
+    this.load();
+  }
+
   setSearch(value: string): void { this.search.set(value); this.page.set(1); }
   setFilter(change: InternalFilterChange): void { if (change.key === 'requester') this.requesterFilter.set(change.value as 'all' | Requester); this.page.set(1); }
   reset(): void { this.search.set(''); this.requesterFilter.set('all'); this.page.set(1); }

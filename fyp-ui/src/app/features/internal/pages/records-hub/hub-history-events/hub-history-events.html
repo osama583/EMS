@@ -60,7 +60,8 @@
     }
   } @else {
     <app-internal-data-page
-      [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
+      [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [sort]="sort()" (sortChange)="setSort($event)"
+  [loading]="loading()"
       [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
       [hideHeader]="true"
       [hideControls]="true"

@@ -12,7 +12,7 @@ import { FeedbackBannerComponent } from '../../../../shared/components/feedback-
 import { DeleteConfirmDialogComponent } from '../../../../shared/components/delete-confirm-dialog/delete-confirm-dialog';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
-import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent } from '../../../../shared/components/internal-data-page/internal-data-page.models';
+import { InternalSortChange, InternalSortState, InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent } from '../../../../shared/components/internal-data-page/internal-data-page.models';
 import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 
 // Club category management, on its own page (same shell as My Menu / Dropdown Box Options at
@@ -48,6 +48,9 @@ export class ClubCategoryManagementComponent {
   readonly statusFilter = signal<'active' | 'inactive'>('active');
   readonly page = signal(1);
   readonly pageSize = signal(10);
+  // Created is the only sortable column on this table; oldest first, so the
+  // catalogue reads in the order it was built up.
+  readonly sort = signal<InternalSortState>({ key: 'created', order: 'asc' });
 
   readonly showDeleted = signal(false);
   readonly deletedCategories = signal<readonly (ClubCategoryRecord & DeletionMetadata)[]>([]);
@@ -81,7 +84,7 @@ export class ClubCategoryManagementComponent {
     columns: [
       { key: 'name', label: 'Category' },
       { key: 'status', label: 'Status' },
-      { key: 'created', label: 'Created' },
+      { key: 'created', label: 'Created', sortKey: 'created' },
       { key: 'actions', label: 'Actions', actions: true },
     ],
     actions: [
@@ -91,7 +94,6 @@ export class ClubCategoryManagementComponent {
     ],
     emptyTitle: 'No categories found',
     emptyDescription: 'Add a category or change the search and status filters.',
-    pageSizeOptions: [5, 10, 25],
   }));
 
   readonly deletedConfig = computed<InternalDataPageConfig>(() => ({
@@ -104,7 +106,7 @@ export class ClubCategoryManagementComponent {
     search: { ariaLabel: '', placeholder: '' },
     columns: [{ key: 'name', label: 'Category' }, { key: 'created', label: 'Deleted' }, { key: 'status', label: 'Permanent deletion' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [{ key: 'restore', label: 'Restore', icon: 'restore_from_trash' }],
-    emptyTitle: 'No deleted categories', emptyDescription: 'Categories you delete will appear here for 7 days before being permanently removed.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No deleted categories', emptyDescription: 'Categories you delete will appear here for 7 days before being permanently removed.',
   }));
 
   readonly filters = computed(() => [{
@@ -138,6 +140,12 @@ export class ClubCategoryManagementComponent {
     mobile: { eyebrow: 'Deleted', status: `${category.daysRemaining}d left`, title: category.name, details: [{ icon: 'schedule', text: `Deleted ${this.formatDate(category.deletedAt)}` }] },
   })));
 
+  setSort(change: InternalSortChange): void {
+    this.sort.set({ key: change.key, order: change.order });
+    this.page.set(1);
+    this.triggerReload();
+  }
+
   readonly formValid = computed(() => this.draftName().trim().length > 0);
 
   constructor() {
@@ -150,6 +158,7 @@ export class ClubCategoryManagementComponent {
           includeInactive: this.statusFilter() === 'inactive',
           page: this.page(),
           pageSize: this.pageSize(),
+          order: this.sort().order,
         }).pipe(finalize(() => this.loading.set(false)));
       }),
       takeUntilDestroyed(this.destroyRef),

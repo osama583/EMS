@@ -1,5 +1,5 @@
 :host { display: block; min-width: 0; }
-.option-management { width: min(100%, 82rem); min-width: 0; margin: 0 auto; }
+.option-management { width: min(100%, var(--page-max-width)); min-width: 0; margin: 0 auto; }
 // Two columns so fields marked `half` sit side by side; everything else spans the full width.
 // Fewer rows means a shorter modal and less scrolling to reach the save button.
 .option-management__form {

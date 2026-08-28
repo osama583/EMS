@@ -136,7 +136,6 @@ export class CafeteriaStaffTasksComponent {
         ],
     emptyTitle: this.mode === 'history' ? 'No delivered orders found' : 'No active orders found',
     emptyDescription: this.mode === 'history' ? 'Orders you deliver will appear here.' : 'There are no orders in your cafeteria’s shared pool right now.',
-    pageSizeOptions: [5, 10, 25],
   }));
 
   readonly filters = computed(() => [

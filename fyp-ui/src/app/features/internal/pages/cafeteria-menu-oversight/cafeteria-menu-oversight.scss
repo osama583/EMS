@@ -1,5 +1,5 @@
 :host { display: block; min-width: 0; }
-.cafeteria-menu-oversight { width: min(100%, 82rem); min-width: 0; margin: 0 auto; }
+.cafeteria-menu-oversight { width: min(100%, var(--page-max-width)); min-width: 0; margin: 0 auto; }
 
 .cafeteria-menu-oversight__controls { margin-top: var(--space-4); margin-bottom: var(--space-5); }
 

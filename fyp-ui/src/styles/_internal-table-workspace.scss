@@ -1,6 +1,6 @@
 .internal-table-workspace {
   display: grid;
-  width: min(100%, 82rem);
+  width: min(100%, var(--page-max-width));
   min-width: 0;
   margin: 0 auto;
   gap: 1.5rem;
@@ -15,18 +15,18 @@
 .internal-table-workspace__header :where(h1, h2) {
   margin: 0;
   color: var(--apu-navy-950);
-  font-size: clamp(2rem, 3.5vw, 3rem);
-  font-weight: 800;
-  letter-spacing: -0.045em;
-  line-height: 1.05;
+  font-size: var(--page-title-size);
+  font-weight: var(--page-title-weight);
+  letter-spacing: var(--page-title-tracking);
+  line-height: var(--page-title-leading);
 }
 
 .internal-table-workspace__header :where(p) {
-  max-width: 46rem;
-  margin: 0.75rem 0 0;
+  max-width: var(--page-description-measure);
+  margin: var(--page-description-gap) 0 0;
   color: var(--apu-text-muted);
-  font-size: 1rem;
-  line-height: 1.65;
+  font-size: var(--page-description-size);
+  line-height: var(--page-description-leading);
 }
 
 .internal-table-workspace__controls,

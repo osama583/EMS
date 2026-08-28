@@ -56,3 +56,18 @@ def paged(items: list, total: int) -> dict[str, Any]:
 
 def flag(name: str) -> bool:
     return str(request.args.get(name, "")).lower() in ("1", "true", "yes")
+
+def date_order(column: str, default_order: str = "desc") -> str:
+    """ORDER BY fragment for a sortable DATE column.
+
+    Date columns are the only sortable ones anywhere in this app - the tables
+    offer no other - so an endpoint needs a DIRECTION, not a column vocabulary.
+    The column is fixed by the caller and never read from the query string; only
+    ?order= is, and it is narrowed to one of two literals before it can reach
+    the SQL, so nothing a client sends is interpolated into the clause.
+
+    Callers append their own primary-key tiebreak, so a paginated page boundary
+    cannot drop or repeat a row when two rows share a timestamp.
+    """
+    order = "ASC" if (request.args.get("order") or default_order).lower() == "asc" else "DESC"
+    return f"{column} {order}"

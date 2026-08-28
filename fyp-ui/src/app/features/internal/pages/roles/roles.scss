@@ -1,5 +1,5 @@
 :host { display: block; }
-.roles-page { width: min(100%, 82rem); margin: 0 auto; display: grid; gap: var(--space-5, 1.25rem); }
+.roles-page { width: min(100%, var(--page-max-width)); margin: 0 auto; display: grid; gap: var(--space-5, 1.25rem); }
 .roles-page__form { display: grid; gap: var(--space-4); }
 
 

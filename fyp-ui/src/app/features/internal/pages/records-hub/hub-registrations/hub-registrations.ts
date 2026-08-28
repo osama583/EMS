@@ -7,7 +7,7 @@ import { ConfirmDialogComponent } from '../../../../../shared/components/confirm
 import { FeedbackBannerComponent } from '../../../../../shared/components/feedback-banner/feedback-banner';
 import { FormModalComponent } from '../../../../../shared/components/form-modal/form-modal';
 import { InternalDataPageComponent } from '../../../../../shared/components/internal-data-page/internal-data-page';
-import { InternalCellClickEvent, InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
+import { InternalCellClickEvent, InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent, InternalSortChange, InternalSortState } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
 import { ToastService, apiErrorMessage } from '../../../../../shared/components/toast/toast.service';
 
 // Inbox tab for events whose registration_approval is 'manual': the applicant (or a co-owner)
@@ -87,6 +87,9 @@ export class HubRegistrationsComponent {
   readonly eventFilter = signal('All');
   readonly page = signal(1);
   readonly pageSize = signal(10);
+  // Oldest first: an approval queue is worked front to back, so the request
+  // that has waited longest sits at the top.
+  readonly sort = signal<InternalSortState>({ key: 'requested', order: 'asc' });
   // Bumped after an approve/reject so the query pipeline refetches the current page from the
   // server — with server pagination, splicing the approved/rejected row out of the local array
   // would desync `total`/`totalPages` from what the server actually holds.
@@ -117,6 +120,7 @@ export class HubRegistrationsComponent {
       event: this.eventFilter(),
       page: this.page(),
       pageSize: this.pageSize(),
+      sort: this.sort(),
       reload: this.reloadTick(),
     })))
       .pipe(
@@ -128,6 +132,7 @@ export class HubRegistrationsComponent {
             event: query.event === 'All' ? undefined : query.event,
             page: query.page,
             pageSize: query.pageSize,
+            order: query.sort.order,
           }).pipe(
             // Caught HERE, inside switchMap: an error reaching subscribe()'s error callback ends
             // the outer subscription permanently, so every later filter/search/page change would
@@ -150,6 +155,11 @@ export class HubRegistrationsComponent {
       });
   }
 
+  setSort(change: InternalSortChange): void {
+    this.sort.set({ key: change.key, order: change.order });
+    this.page.set(1);
+  }
+
   readonly config = computed<InternalDataPageConfig>(() => ({
     ariaLabel: 'Pending registrations',
     paginationLabel: 'Registration pages',
@@ -166,7 +176,7 @@ export class HubRegistrationsComponent {
       { key: 'registrant', label: 'Registrant', width: '16rem' },
       { key: 'reason', label: 'Reason for attending', width: '22rem' },
       { key: 'payment', label: 'Payment', width: '10rem' },
-      { key: 'requested', label: 'Requested', width: '12rem' },
+      { key: 'requested', label: 'Requested', width: '12rem', sortKey: 'requested' },
       { key: 'actions', label: 'Actions', actions: true, width: '9rem' },
     ],
     actions: [
@@ -175,7 +185,6 @@ export class HubRegistrationsComponent {
     ],
     emptyTitle: 'No registrations need your approval',
     emptyDescription: 'Registrations for your manual-approval events appear here.',
-    pageSizeOptions: [5, 10, 25],
   }));
 
   readonly filters = computed(() => [{

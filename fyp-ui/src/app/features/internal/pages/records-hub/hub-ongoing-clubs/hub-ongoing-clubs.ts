@@ -4,7 +4,7 @@ import { AuthService } from '../../../../../core/auth/auth.service';
 import { ClubService } from '../../../../../core/clubs/club.service';
 import { ClubJoinRequestRecord } from '../../../../../core/clubs/club.models';
 import { InternalPageHeaderComponent, InternalResetButtonComponent, InternalSearchFieldComponent } from '../../../../../shared/components/internal-data-page/internal-data-page-parts';
-import { InternalDataPageConfig, InternalDataRecord, InternalFilterConfig, InternalPageHeaderConfig, InternalRowActionEvent } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
+import { InternalDataPageConfig, InternalDataRecord, InternalFilterConfig, InternalPageHeaderConfig, InternalRowActionEvent, InternalSortChange, InternalSortState } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
 import { InternalDataPageComponent } from '../../../../../shared/components/internal-data-page/internal-data-page';
 import { FeedbackBannerComponent } from '../../../../../shared/components/feedback-banner/feedback-banner';
 import { FormModalComponent } from '../../../../../shared/components/form-modal/form-modal';
@@ -36,13 +36,17 @@ export class HubOngoingClubsComponent {
   readonly search = signal('');
   readonly page = signal(1);
   readonly pageSize = signal(10);
+  // Newest first, matching what the client-side sort this replaces produced.
+  readonly sort = signal<InternalSortState>({ key: 'requested', order: 'desc' });
 
   readonly pendingRequests = computed(() => {
     const search = this.search().trim().toLowerCase();
     return this.requests()
       .filter((request) => request.status === 'pending')
-      .filter((request) => !search || request.clubName.toLowerCase().includes(search))
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      // No .sort() here: the server returns the rows already ordered by the
+      // Requested column (GET /clubs/join-requests/mine?order=). Re-sorting them
+      // in the browser would silently override the direction the reader chose.
+      .filter((request) => !search || request.clubName.toLowerCase().includes(search));
   });
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.pendingRequests().length / this.pageSize())));
   readonly visibleRequests = computed(() => this.pendingRequests().slice((this.page() - 1) * this.pageSize(), this.page() * this.pageSize()));
@@ -57,9 +61,9 @@ export class HubOngoingClubsComponent {
     ariaLabel: 'Pending club requests', paginationLabel: 'Request pages', rowsPerPageLabel: 'Requests per page', mobileListLabel: 'Request cards',
     header: { title: this.headerConfig().title, description: this.headerConfig().description, countLabel: this.headerConfig().countLabel },
     search: { ariaLabel: 'Search requests', placeholder: 'Search club name' },
-    columns: [{ key: 'club', label: 'Club' }, { key: 'status', label: 'Status' }, { key: 'requested', label: 'Requested' }, { key: 'actions', label: 'Actions', actions: true }],
+    columns: [{ key: 'club', label: 'Club' }, { key: 'status', label: 'Status' }, { key: 'requested', label: 'Requested', sortKey: 'requested' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [{ key: 'view', label: 'View details', icon: 'visibility' }],
-    emptyTitle: 'No pending requests', emptyDescription: 'You have no clubs awaiting a decision right now.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No pending requests', emptyDescription: 'You have no clubs awaiting a decision right now.',
   }));
   readonly filters: readonly InternalFilterConfig[] = [];
 
@@ -83,13 +87,18 @@ export class HubOngoingClubsComponent {
 
   private load(): void {
     this.loading.set(true);
-    this.clubService.getMyRequests(this.currentUserId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.clubService.getMyRequests(this.currentUserId, this.sort().order).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (requests) => { this.requests.set(requests); this.loading.set(false); },
       error: () => { this.errorMessage.set('Your pending requests could not be loaded. Please try again.'); this.loading.set(false); },
     });
   }
 
   setViewMode(mode: ViewMode): void { this.viewMode.set(mode); }
+  setSort(change: InternalSortChange): void {
+    this.sort.set({ key: change.key, order: change.order });
+    this.page.set(1);
+    this.load();
+  }
   setSearch(value: string): void { this.search.set(value); this.page.set(1); }
   reset(): void { this.search.set(''); this.page.set(1); }
   setPage(page: number): void { this.page.set(Math.max(1, Math.min(page, this.totalPages()))); }

@@ -1,7 +1,7 @@
 :host { display: block; min-height: 100%; }
 
-.profile-page { width: min(100%, 82rem); margin: 0 auto; }
-.profile-page > h1 { margin: 0 0 var(--space-5); color: var(--apu-blue-600); font-size: clamp(2.25rem, 4vw, 3.5rem); font-weight: var(--weight-heading); letter-spacing: -.045em; line-height: 1.05; }
+.profile-page { width: min(100%, var(--page-max-width)); margin: 0 auto; }
+.profile-page > h1 { margin: 0 0 var(--space-5); color: var(--apu-blue-600); font-size: var(--page-title-size); font-weight: var(--weight-heading); letter-spacing: -.045em; line-height: 1.05; }
 .profile-card { display: grid; grid-template-columns: minmax(11rem, 20rem) minmax(0, 1fr); gap: clamp(2rem, 5vw, 4.5rem); padding: clamp(1.5rem, 4vw, 3.25rem); border: 1px solid var(--apu-border); border-radius: var(--radius-container); background: var(--apu-surface); box-shadow: var(--shadow-card); }
 .profile-photo { display: grid; align-content: start; gap: var(--space-3); }
 .profile-photo > p { margin: 0; color: var(--apu-navy-900); font-size: var(--type-label); font-weight: var(--weight-label); letter-spacing: .08em; text-transform: uppercase; }

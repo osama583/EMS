@@ -1,7 +1,7 @@
 :host { display: block; }
 
 .ai-access-log-page {
-  width: min(100%, 82rem);
+  width: min(100%, var(--page-max-width));
   margin: 0 auto;
   display: grid;
   gap: var(--space-5, 1.25rem);

@@ -1,3 +1,9 @@
+// The rows-per-page choices, for every paginated list in the app. One constant
+// rather than a literal per page: six different sets had drifted into the
+// configs ([5,10,25], [10,25,50], [10,25,50,100], [9], [9,18,27], [6,12,24]),
+// so two tabs of the same page could offer different page sizes.
+export const PAGE_SIZE_OPTIONS: readonly number[] = [5, 10, 15, 25];
+
 export interface InternalPageHeaderConfig {
   readonly title: string;
   readonly description: string;

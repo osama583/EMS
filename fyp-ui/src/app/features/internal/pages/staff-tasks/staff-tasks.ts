@@ -9,7 +9,7 @@ import { FeedbackBannerComponent } from '../../../../shared/components/feedback-
 import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
-import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent, InternalTableColumn } from '../../../../shared/components/internal-data-page/internal-data-page.models';
+import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent, InternalTableColumn, InternalSortChange, InternalSortState } from '../../../../shared/components/internal-data-page/internal-data-page.models';
 import { TaskCalendarComponent, TaskDateSelection } from '../../../../shared/components/task-calendar/task-calendar';
 
 type PageMode = 'active' | 'history';
@@ -33,16 +33,16 @@ const COMMON_END: readonly InternalTableColumn[] = [{ key: 'assignedTo', label: 
 // requirement kinds — F&B/cafeteria-staff use their own queue page (cafeteria-staff-tasks),
 // routed separately by records-hub.ts's tasksRoute computed.
 const ROLE_PRESENTATION: Readonly<Partial<Record<DepartmentRequestKind, RolePresentation>>> = {
-  logistics: { noun: 'preparation', begin: 'Start Preparation', complete: 'Preparation Completed', beginIcon: 'inventory_2', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Logistics Item', width: '15rem' }, { key: 'quantity', label: 'Requested', width: '11rem' }, { key: 'schedule', label: 'Setup Schedule', width: '17rem' }, { key: 'location', label: 'Location', width: '12rem' }, ...COMMON_END] },
-  campusTour: { noun: 'campus tour', begin: 'Start Tour', complete: 'Tour Completed', beginIcon: 'tour', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Campus Tour', width: '15rem' }, { key: 'quantity', label: 'Visitors', width: '9rem' }, { key: 'schedule', label: 'Tour Schedule', width: '17rem' }, { key: 'location', label: 'Starting Point', width: '12rem' }, ...COMMON_END] },
-  soundLight: { noun: 'setup', begin: 'Start Setup', complete: 'Setup Completed', beginIcon: 'settings_input_component', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'A/V Request', width: '15rem' }, { key: 'schedule', label: 'Setup Window', width: '17rem' }, { key: 'location', label: 'Venue', width: '12rem' }, ...COMMON_END] },
-  photoVideo: { noun: 'coverage', begin: 'Start Coverage', complete: 'Coverage Completed', beginIcon: 'photo_camera', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Coverage', width: '15rem' }, { key: 'schedule', label: 'Coverage Schedule', width: '17rem' }, { key: 'location', label: 'Venue', width: '12rem' }, ...COMMON_END] },
-  transportation: { noun: 'trip', begin: 'Start Trip', complete: 'Trip Completed', beginIcon: 'directions_bus', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Trip', width: '14rem' }, { key: 'quantity', label: 'Pax', width: '9rem' }, { key: 'location', label: 'Route', width: '18rem' }, { key: 'schedule', label: 'Schedule', width: '17rem' }, ...COMMON_END] },
+  logistics: { noun: 'preparation', begin: 'Start Preparation', complete: 'Preparation Completed', beginIcon: 'inventory_2', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Logistics Item', width: '15rem' }, { key: 'quantity', label: 'Requested', width: '11rem' }, { key: 'schedule', label: 'Setup Schedule', width: '17rem', sortKey: 'schedule' }, { key: 'location', label: 'Location', width: '12rem' }, ...COMMON_END] },
+  campusTour: { noun: 'campus tour', begin: 'Start Tour', complete: 'Tour Completed', beginIcon: 'tour', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Campus Tour', width: '15rem' }, { key: 'quantity', label: 'Visitors', width: '9rem' }, { key: 'schedule', label: 'Tour Schedule', width: '17rem', sortKey: 'schedule' }, { key: 'location', label: 'Starting Point', width: '12rem' }, ...COMMON_END] },
+  soundLight: { noun: 'setup', begin: 'Start Setup', complete: 'Setup Completed', beginIcon: 'settings_input_component', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'A/V Request', width: '15rem' }, { key: 'schedule', label: 'Setup Window', width: '17rem', sortKey: 'schedule' }, { key: 'location', label: 'Venue', width: '12rem' }, ...COMMON_END] },
+  photoVideo: { noun: 'coverage', begin: 'Start Coverage', complete: 'Coverage Completed', beginIcon: 'photo_camera', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Coverage', width: '15rem' }, { key: 'schedule', label: 'Coverage Schedule', width: '17rem', sortKey: 'schedule' }, { key: 'location', label: 'Venue', width: '12rem' }, ...COMMON_END] },
+  transportation: { noun: 'trip', begin: 'Start Trip', complete: 'Trip Completed', beginIcon: 'directions_bus', columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Trip', width: '14rem' }, { key: 'quantity', label: 'Pax', width: '9rem' }, { key: 'location', label: 'Route', width: '18rem' }, { key: 'schedule', label: 'Schedule', width: '17rem', sortKey: 'schedule' }, ...COMMON_END] },
 };
 
 const DEFAULT_PRESENTATION: RolePresentation = {
   noun: 'task', begin: 'Start', complete: 'Complete', beginIcon: 'task_alt',
-  columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Request', width: '15rem' }, { key: 'schedule', label: 'Schedule', width: '17rem' }, { key: 'location', label: 'Location', width: '12rem' }, ...COMMON_END],
+  columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Request', width: '15rem' }, { key: 'schedule', label: 'Schedule', width: '17rem', sortKey: 'schedule' }, { key: 'location', label: 'Location', width: '12rem' }, ...COMMON_END],
 };
 
 // Every list control here (search, status filter, date range, page, page size) is a real server
@@ -74,7 +74,9 @@ export class StaffTasksComponent {
   readonly search = signal('');
   private readonly debouncedSearch = signal('');
   readonly statusFilter = signal('all');
-  readonly sort = signal<'schedule' | 'event' | 'status'>('schedule');
+  // Schedule is the only sortable column - it is the only date one. Soonest
+  // first, because a task list is worked in the order the work falls due.
+  readonly sort = signal<InternalSortState>({ key: 'schedule', order: 'asc' });
   readonly page = signal(1);
   readonly pageSize = signal(10);
 
@@ -119,12 +121,10 @@ export class StaffTasksComponent {
         : [{ key: 'view', label: 'View details', icon: 'visibility' }, { key: 'begin', label: presentation.begin, icon: presentation.beginIcon }, { key: 'complete', label: presentation.complete, icon: 'task_alt' }],
       emptyTitle: this.mode === 'history' ? 'No completed tasks found' : 'No active tasks found',
       emptyDescription: this.mode === 'history' ? 'Completed tasks will appear here.' : 'There are no assigned tasks matching the current filters.',
-      pageSizeOptions: [5, 10, 25],
     };
   });
   readonly filters = computed(() => [
     { key: 'status', ariaLabel: 'Filter tasks by status', value: this.statusFilter(), options: [{ value: 'all', label: 'All statuses' }, ...(this.mode === 'history' ? [{ value: 'completed', label: 'Completed' }] : [{ value: 'assigned', label: 'Assigned' }, { value: 'preparing', label: 'Preparing' }])] },
-    { key: 'sort', ariaLabel: 'Sort tasks', value: this.sort(), options: [{ value: 'schedule', label: 'Schedule' }, { value: 'event', label: 'Event A–Z' }, { value: 'status', label: 'Status' }] },
   ]);
 
   constructor() {
@@ -154,7 +154,8 @@ export class StaffTasksComponent {
             q: query.q || undefined,
             dateStart: query.date.start,
             dateEnd: query.date.end ?? undefined,
-            sort: query.sort,
+            sort: query.sort.key as 'schedule',
+            order: query.sort.order,
           });
         }),
       )
@@ -209,11 +210,15 @@ export class StaffTasksComponent {
   onEscape(): void { this.calendarOpen.set(false); }
 
   setSearch(value: string): void { this.search.set(value); }
-  setFilter(change: InternalFilterChange): void { if (change.key === 'status') this.statusFilter.set(change.value); if (change.key === 'sort') this.sort.set(change.value as 'schedule' | 'event' | 'status'); this.page.set(1); }
+  setSort(change: InternalSortChange): void {
+    this.sort.set({ key: change.key, order: change.order });
+    this.page.set(1);
+  }
+  setFilter(change: InternalFilterChange): void { if (change.key === 'status') this.statusFilter.set(change.value); this.page.set(1); }
   setDateFilter(value: TaskDateSelection): void { this.dateFilter.set(value); this.page.set(1); }
   clearDateFilter(): void { this.dateFilter.set({ start: this.today, end: null }); this.page.set(1); }
   toggleCalendar(): void { this.calendarOpen.update((open) => !open); }
-  reset(): void { this.search.set(''); this.debouncedSearch.set(''); this.statusFilter.set('all'); this.sort.set('schedule'); this.dateFilter.set({ start: this.today, end: null }); this.page.set(1); }
+  reset(): void { this.search.set(''); this.debouncedSearch.set(''); this.statusFilter.set('all'); this.sort.set({ key: 'schedule', order: 'asc' }); this.dateFilter.set({ start: this.today, end: null }); this.page.set(1); }
   setPage(value: number): void { this.page.set(Math.max(1, Math.min(value, this.totalPages()))); }
   setPageSize(value: number): void { this.pageSize.set(value); this.page.set(1); }
   handleAction(event: InternalRowActionEvent): void { const task = this.items().find((item) => String(item.id) === event.record.id); if (!task) return; this.selected.set(task); this.pendingStatus.set(event.action.key === 'begin' ? 'preparing' : event.action.key === 'complete' ? 'completed' : null); this.modalOpen.set(true); }

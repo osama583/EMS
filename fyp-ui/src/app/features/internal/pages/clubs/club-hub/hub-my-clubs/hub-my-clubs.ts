@@ -66,7 +66,7 @@ export class HubMyClubsComponent {
       { key: 'categories', label: 'Edit categories', icon: 'tune' },
       { key: 'president-change', label: 'Request President change', icon: 'swap_horiz' },
     ],
-    emptyTitle: 'You haven\'t joined a club yet', emptyDescription: 'Head over to Discover Clubs to find one that fits your interests.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'You haven\'t joined a club yet', emptyDescription: 'Head over to Discover Clubs to find one that fits your interests.',
   }));
   readonly records = computed<readonly InternalDataRecord[]>(() => this.visibleClubs().map((club) => ({
     id: club.id,

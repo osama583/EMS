@@ -42,6 +42,25 @@
   --space-2: 0.75rem;
   --space-3: 1rem;
   --space-4: 1.5rem;
+  /* The width every internal page's content is capped at. Was the literal
+     `min(100%, var(--page-max-width))`, repeated in 23 stylesheets - which is how
+     /app/ongoing/events ended up full-bleed beside three sibling tabs that
+     were capped: the rule was not shared, so one page simply never got it. */
+  --page-max-width: 82rem;
+  /* THE page title. Two scales had drifted apart - the shared header used
+     clamp(2rem, 3.5vw, 3rem) while five hand-rolled page headers used
+     clamp(2.25rem, 4vw, 3.5rem) - so /app/ongoing/proposals and
+     /app/ongoing/clubs showed different-sized titles side by side. */
+  --page-title-size: clamp(2rem, 3.5vw, 3rem);
+  --page-title-weight: 800;
+  --page-title-tracking: -0.045em;
+  --page-title-leading: 1.05;
+  /* ...and the description under it. Same drift: the shared header used
+     46rem/0.75rem/1rem, the hand-rolled ones 42rem/space-3/--type-body. */
+  --page-description-size: 1rem;
+  --page-description-leading: 1.65;
+  --page-description-measure: 46rem;
+  --page-description-gap: 0.75rem;
   --space-5: 2rem;
   --space-6: 3rem;
   --space-7: 4rem;

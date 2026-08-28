@@ -21,6 +21,7 @@ import {
   InternalSortOrder,
   InternalSortState,
   InternalTableColumn,
+  PAGE_SIZE_OPTIONS,
 } from './internal-data-page.models';
 
 @Component({
@@ -457,7 +458,7 @@ export class InternalPaginationComponent {
   readonly totalPages = input(1);
   readonly page = input(1);
   readonly pageSize = input(10);
-  readonly pageSizeOptions = input<readonly number[]>([10, 25, 50, 100]);
+  readonly pageSizeOptions = input<readonly number[]>(PAGE_SIZE_OPTIONS);
   readonly pageChange = output<number>();
   readonly pageSizeChange = output<number>();
 

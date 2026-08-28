@@ -7,7 +7,7 @@
   [totalPages]="totalPages()"
   [page]="page()"
   [pageSize]="pageSize()"
-  [pageSizeOptions]="config().pageSizeOptions ?? [5, 10, 25]"
+  [pageSizeOptions]="config().pageSizeOptions ?? pageSizeOptions"
   [hideHeader]="hideHeader()"
   [hideControls]="hideControls()"
   (pageChange)="pageChange.emit($event)"

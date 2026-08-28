@@ -5,7 +5,7 @@ import { AiAccessDenial, AiAccessLogService } from '../../../../core/admin-direc
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog';
 import { FeedbackBannerComponent } from '../../../../shared/components/feedback-banner/feedback-banner';
 import { InternalDataPageComponent } from '../../../../shared/components/internal-data-page/internal-data-page';
-import { InternalDataPageConfig, InternalDataRecord } from '../../../../shared/components/internal-data-page/internal-data-page.models';
+import { InternalDataPageConfig, InternalDataRecord, InternalSortChange, InternalSortState } from '../../../../shared/components/internal-data-page/internal-data-page.models';
 import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 
 // Audit trail of chat questions the AI assistant refused because Page Visibility does not grant
@@ -32,6 +32,8 @@ export class AiAccessLogComponent {
   readonly total = signal(0);
   readonly pageSize = signal(50);
   readonly page = signal(1);
+  // Newest first: an access log is read from the most recent refusal backwards.
+  readonly sort = signal<InternalSortState>({ key: 'when', order: 'desc' });
   readonly search = signal('');
   readonly outcomeFilter = signal('all');
   readonly loading = signal(true);
@@ -95,14 +97,14 @@ export class AiAccessLogComponent {
       { key: 'question', label: 'Question' },
       { key: 'outcome', label: 'Why refused' },
       { key: 'response', label: 'Assistant said' },
-      { key: 'when', label: 'When' },
+      { key: 'when', label: 'When', sortKey: 'when' },
     ],
     actions: [],
     emptyTitle: 'Nothing logged',
     emptyDescription: 'The assistant has answered everything it was asked, or the log was cleared.',
     // Paging is server-side and fixed at the API's own page size (see AiAccessLogService), so the
     // rows-per-page selector offers only that one value rather than pretending to change it.
-    pageSizeOptions: [this.pageSize()],
+
   }));
 
   /**
@@ -140,11 +142,19 @@ export class AiAccessLogComponent {
     this.load();
   }
 
+  setPageSize(size: number): void { this.pageSize.set(size); this.page.set(1); this.load(); }
+
+  setSort(change: InternalSortChange): void {
+    this.sort.set({ key: change.key, order: change.order });
+    this.page.set(1);
+    this.load();
+  }
+
   load(): void {
     this.loading.set(true);
     this.errorMessage.set('');
     this.service
-      .list(this.page(), this.search(), this.outcomeFilter())
+      .list(this.page(), this.search(), this.outcomeFilter(), this.sort().order, this.pageSize())
       .pipe(finalize(() => this.loading.set(false)), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (result) => {

@@ -176,7 +176,7 @@ export class AdminDirectoryComponent {
       { key: 'actions', label: 'Actions', actions: true },
     ],
     actions: [{ key: 'edit', label: 'Edit assignments', icon: 'edit' }],
-    emptyTitle: 'No assignments found', emptyDescription: 'Add an assignment or change the current search.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No assignments found', emptyDescription: 'Add an assignment or change the current search.',
   }));
   readonly relationshipPopoverGroup = computed(() => this.userAssignmentGroups().find((g) => g.userId === this.relationshipPopoverUserId()) ?? null);
   readonly relationshipPopoverItems = computed<readonly string[]>(() => this.relationshipPopoverGroup()?.rows.map((r) => this.relationshipLabel(r)) ?? []);
@@ -247,7 +247,7 @@ export class AdminDirectoryComponent {
       { key: 'status', label: 'Change active status', icon: 'power_settings_new' },
       { key: 'delete', label: `Delete ${this.entity === 'users' ? 'user' : 'unit'}`, icon: 'delete' },
     ],
-    emptyTitle: `No ${this.entity} found`, emptyDescription: `Add a ${this.entity === 'users' ? 'user' : 'unit'} or change the current search and filters.`, pageSizeOptions: [5, 10, 25],
+    emptyTitle: `No ${this.entity} found`, emptyDescription: `Add a ${this.entity === 'users' ? 'user' : 'unit'} or change the current search and filters.`,
   }));
   readonly filters = computed(() => [
     ...(this.entity === 'users' ? [
@@ -286,7 +286,7 @@ export class AdminDirectoryComponent {
       { key: 'restore', label: 'Restore', icon: 'restore_from_trash' },
       { key: 'purge', label: 'Delete forever', icon: 'delete_forever' },
     ],
-    emptyTitle: `No deleted ${this.entity}`, emptyDescription: `Records you delete will appear here for 7 days before being permanently removed.`, pageSizeOptions: [5, 10, 25],
+    emptyTitle: `No deleted ${this.entity}`, emptyDescription: `Records you delete will appear here for 7 days before being permanently removed.`,
   }));
 
   constructor() {

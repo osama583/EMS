@@ -104,7 +104,7 @@ export class RolesComponent {
       { key: 'actions', label: 'Actions', actions: true },
     ],
     actions: [{ key: 'edit', label: 'Edit role', icon: 'edit' }, { key: 'status', label: 'Change active status', icon: 'power_settings_new' }, { key: 'delete', label: 'Delete role', icon: 'delete' }],
-    emptyTitle: 'No roles found', emptyDescription: 'Add a role or change the current search and filters.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No roles found', emptyDescription: 'Add a role or change the current search and filters.',
   }));
   readonly filters = computed(() => [
     { key: 'kind', ariaLabel: 'Filter roles by kind', value: this.kindFilter(), options: [{ value: 'all', label: 'All kinds' }, { value: 'protected', label: 'Protected' }, { value: 'custom', label: 'Custom' }] },
@@ -137,7 +137,7 @@ export class RolesComponent {
       { key: 'restore', label: 'Restore', icon: 'restore_from_trash' },
       { key: 'purge', label: 'Delete forever', icon: 'delete_forever' },
     ],
-    emptyTitle: 'No deleted roles', emptyDescription: 'Roles you delete will appear here for 7 days before being permanently removed.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No deleted roles', emptyDescription: 'Roles you delete will appear here for 7 days before being permanently removed.',
   }));
 
   constructor() {

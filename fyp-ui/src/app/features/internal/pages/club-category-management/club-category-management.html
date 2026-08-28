@@ -22,7 +22,7 @@
     <app-internal-data-page
       [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
       [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
-      [showViewToggle]="false"
+      [showViewToggle]="false" [sort]="sort()" (sortChange)="setSort($event)"
       (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
       (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
       (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit category', icon: 'edit' }, record: $event })"

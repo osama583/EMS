@@ -90,7 +90,7 @@ export class CafeteriaManageComponent {
       { key: 'status', label: 'Change active status', icon: 'power_settings_new' },
       { key: 'delete', label: 'Delete cafeteria', icon: 'delete' },
     ],
-    emptyTitle: 'No cafeterias found', emptyDescription: 'Add a cafeteria or change the current search and filters.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No cafeterias found', emptyDescription: 'Add a cafeteria or change the current search and filters.',
   }));
   readonly filters = computed(() => [
     { key: 'status', ariaLabel: 'Filter cafeterias by status', value: this.statusFilter(), options: [{ value: 'all', label: 'All statuses' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }] },
@@ -121,7 +121,7 @@ export class CafeteriaManageComponent {
       { key: 'restore', label: 'Restore', icon: 'restore_from_trash' },
       { key: 'purge', label: 'Delete forever', icon: 'delete_forever' },
     ],
-    emptyTitle: 'No deleted cafeterias', emptyDescription: 'Cafeterias you delete will appear here for 7 days before being permanently removed.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No deleted cafeterias', emptyDescription: 'Cafeterias you delete will appear here for 7 days before being permanently removed.',
   }));
 
   // Refetch whenever search/status/page/pageSize change, or the service signals a mutation

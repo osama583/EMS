@@ -1,5 +1,5 @@
 .how-page {
-  width: min(100%, 82rem);
+  width: min(100%, var(--page-max-width));
   margin: 0 auto;
   color: var(--apu-navy-900);
 }

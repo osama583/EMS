@@ -8,7 +8,7 @@ import { SavedEventsService } from '../../../core/events/saved-events.service';
 import { EventCardComponent } from '../../../shared/components/event-card/event-card';
 import { EventDetailsModalComponent } from '../../../shared/components/event-details-modal/event-details-modal';
 import { InternalPageHeaderComponent, InternalPageStateComponent, InternalPaginationComponent } from '../../../shared/components/internal-data-page/internal-data-page-parts';
-import { InternalPageHeaderConfig } from '../../../shared/components/internal-data-page/internal-data-page.models';
+import { PAGE_SIZE_OPTIONS, InternalPageHeaderConfig } from '../../../shared/components/internal-data-page/internal-data-page.models';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 
 export type MyEventsTabMode = 'saved' | 'pending' | 'registered' | 'history';
@@ -18,7 +18,9 @@ interface TabEntry {
   readonly status: RegistrationStatus | null;
 }
 
-const PAGE_SIZE = 9;
+// Default rows per page. The reader can change it - PAGE_SIZE_OPTIONS is the
+// same set of choices every other list in the app offers.
+const DEFAULT_PAGE_SIZE = 10;
 
 // Every scope this component renders (saved/pending/registered/history) is now a real server
 // query: page/pageSize go straight through to events.py's search_saved()/my_registrations(),
@@ -31,6 +33,8 @@ const PAGE_SIZE = 9;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MyEventsTabComponent {
+  readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
+  readonly pageSize = signal(DEFAULT_PAGE_SIZE);
   private readonly auth = inject(AuthService);
   // Public: the template reads savedEvents.savedEventIds() directly (a signal owned by this
   // injected service) rather than through a wrapping isSaved(id) method call — zoneless change
@@ -114,7 +118,7 @@ export class MyEventsTabComponent {
 
   private load(mode: MyEventsTabMode, userEmail: string, page: number) {
     if (mode === 'saved') {
-      return this.savedEvents.searchSavedEvents(page, PAGE_SIZE).pipe(
+      return this.savedEvents.searchSavedEvents(page, this.pageSize()).pipe(
         switchMap((response) => {
           if (response.items.length === 0) {
             return [{ items: [] as readonly TabEntry[], total: response.total, totalPages: response.totalPages }];
@@ -131,10 +135,10 @@ export class MyEventsTabComponent {
       );
     }
     const request = mode === 'pending'
-      ? this.eventService.getPendingApprovalRegistrations(page, PAGE_SIZE)
+      ? this.eventService.getPendingApprovalRegistrations(page, this.pageSize())
       : mode === 'registered'
-        ? this.eventService.getActiveRegistrations(page, PAGE_SIZE)
-        : this.eventService.getRegistrationHistory(page, PAGE_SIZE);
+        ? this.eventService.getActiveRegistrations(page, this.pageSize())
+        : this.eventService.getRegistrationHistory(page, this.pageSize());
     return request.pipe(
       switchMap((response) => [{
         items: response.items.map((item): TabEntry => ({ event: item.event, status: item.status })),
@@ -147,6 +151,8 @@ export class MyEventsTabComponent {
   private triggerReload(): void { this.reloadTick.update((tick) => tick + 1); }
 
   setPage(value: number): void { this.page.set(Math.max(1, Math.min(value, this.totalPages()))); }
+  // Back to page 1: page 3 of 25-row pages is not page 3 of 5-row pages.
+  setPageSize(size: number): void { this.pageSize.set(size); this.page.set(1); }
 
   toggleSaved(eventId: string): void {
     const user = this.auth.user();

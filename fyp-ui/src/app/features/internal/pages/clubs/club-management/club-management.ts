@@ -10,7 +10,7 @@ import { SelectOption } from '../../../../../shared/components/form-controls/for
 import { FormModalComponent } from '../../../../../shared/components/form-modal/form-modal';
 import { InternalDataPageComponent } from '../../../../../shared/components/internal-data-page/internal-data-page';
 import { InternalFilterControlsComponent, InternalPageHeaderComponent, InternalPaginationComponent, InternalResetButtonComponent, InternalSearchFieldComponent } from '../../../../../shared/components/internal-data-page/internal-data-page-parts';
-import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalPageHeaderConfig, InternalRowActionEvent, InternalSortChange, InternalSortState } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
+import { PAGE_SIZE_OPTIONS, InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalPageHeaderConfig, InternalRowActionEvent, InternalSortChange, InternalSortState } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
 import { SearchableDropdownComponent } from '../../../../../shared/components/searchable-dropdown/searchable-dropdown';
 import { StatusToggleComponent } from '../../../../../shared/components/status-toggle/status-toggle';
 import { FeedbackBannerComponent } from '../../../../../shared/components/feedback-banner/feedback-banner';
@@ -38,6 +38,7 @@ type ViewMode = 'table' | 'card';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ClubManagementComponent {
+  readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
   private readonly auth = inject(AuthService);
   private readonly clubService = inject(ClubService);
   private readonly destroyRef = inject(DestroyRef);
@@ -112,10 +113,10 @@ export class ClubManagementComponent {
     header: { title: 'Clubs', description: 'Create clubs and assign a President from eligible students.', countLabel: `${this.total()} club${this.total() === 1 ? '' : 's'}`, primaryActionLabel: 'Add club' },
     search: { ariaLabel: 'Search clubs', placeholder: 'Search club name, description, or president' },
     columns: [
-      { key: 'club', label: 'Club', sortKey: 'name' },
+      { key: 'club', label: 'Club' },
       { key: 'category', label: 'Category' },
-      { key: 'president', label: 'President', sortKey: 'president' },
-      { key: 'members', label: 'Members', sortKey: 'members' },
+      { key: 'president', label: 'President' },
+      { key: 'members', label: 'Members' },
       { key: 'status', label: 'Status' },
       { key: 'actions', label: 'Actions', actions: true },
     ],
@@ -124,7 +125,7 @@ export class ClubManagementComponent {
       { key: 'status', label: 'Change active status', icon: 'power_settings_new' },
       { key: 'delete', label: 'Delete club', icon: 'delete' },
     ],
-    emptyTitle: 'No clubs found', emptyDescription: 'Add a club or change the current search and filters.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No clubs found', emptyDescription: 'Add a club or change the current search and filters.',
   }));
   readonly cardHeaderConfig = computed<InternalPageHeaderConfig>(() => ({ title: this.config().header.title, description: this.config().header.description, countLabel: this.config().header.countLabel }));
   readonly deletedConfig = computed<InternalDataPageConfig>(() => ({
@@ -137,7 +138,7 @@ export class ClubManagementComponent {
     search: { ariaLabel: '', placeholder: '' },
     columns: [{ key: 'club', label: 'Club' }, { key: 'created', label: 'Deleted' }, { key: 'status', label: 'Permanent deletion' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [{ key: 'restore', label: 'Restore', icon: 'restore_from_trash' }],
-    emptyTitle: 'No deleted clubs', emptyDescription: 'Clubs you delete will appear here for 7 days before being permanently removed.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No deleted clubs', emptyDescription: 'Clubs you delete will appear here for 7 days before being permanently removed.',
   }));
   readonly filters = computed(() => [
     { key: 'status', ariaLabel: 'Filter clubs by status', value: this.statusFilter(), options: [{ value: 'all', label: 'All statuses' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }] },

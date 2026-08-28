@@ -28,8 +28,8 @@ h2 {
   font-family: var(--apu-font-family);
   font-size: var(--type-section);
   font-weight: var(--weight-heading);
-  letter-spacing: -0.045em;
-  line-height: 1.05;
+  letter-spacing: var(--page-title-tracking);
+  line-height: var(--page-title-leading);
 }
 
 h2 span {

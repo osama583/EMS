@@ -63,7 +63,7 @@ export class ClubDiscoverComponent {
     search: { ariaLabel: 'Search clubs', placeholder: 'Search club name or description' },
     columns: [{ key: 'club', label: 'Club' }, { key: 'category', label: 'Category' }, { key: 'president', label: 'President' }, { key: 'members', label: 'Members' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [{ key: 'join', label: 'Request to join', icon: 'person_add' }],
-    emptyTitle: 'No clubs found', emptyDescription: 'Try a different search or category filter.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No clubs found', emptyDescription: 'Try a different search or category filter.',
   }));
   readonly cardHeaderConfig = computed<InternalPageHeaderConfig>(() => ({ title: this.config().header.title, description: this.config().header.description, countLabel: this.config().header.countLabel }));
   readonly filters = computed(() => [

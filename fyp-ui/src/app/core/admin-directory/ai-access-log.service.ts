@@ -52,8 +52,9 @@ export interface AiAccessDenialPage {
 export class AiAccessLogService {
   private readonly http = inject(HttpClient);
 
-  list(page: number, search: string, outcome = ''): Observable<AiAccessDenialPage> {
-    let params = new HttpParams().set('page', page);
+  list(page: number, search: string, outcome = '', order: 'asc' | 'desc' = 'desc', pageSize?: number): Observable<AiAccessDenialPage> {
+    let params = new HttpParams().set('page', page).set('order', order);
+    if (pageSize) params = params.set('pageSize', pageSize);
     if (search.trim()) {
       params = params.set('search', search.trim());
     }

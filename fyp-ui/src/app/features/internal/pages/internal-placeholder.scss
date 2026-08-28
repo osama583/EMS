@@ -3,7 +3,7 @@
 }
 
 .internal-page {
-  width: min(100%, 82rem);
+  width: min(100%, var(--page-max-width));
   margin: 0 auto;
 }
 
@@ -18,20 +18,20 @@
 
 .internal-page__header h1 {
   margin: 0;
-  color: var(--apu-navy-950);
-  font-size: clamp(2.25rem, 4vw, 3.5rem);
+  color: var(--apu-blue-600);
+  font-size: var(--page-title-size);
   font-weight: var(--weight-heading);
-  letter-spacing: -0.045em;
-  line-height: 1.05;
+  letter-spacing: var(--page-title-tracking);
+  line-height: var(--page-title-leading);
 }
 
 .internal-page__header > span {
   display: block;
-  max-width: 42rem;
-  margin-top: var(--space-3);
+  max-width: var(--page-description-measure);
+  margin-top: var(--page-description-gap);
   color: var(--apu-text-muted);
-  font-size: var(--type-body);
-  line-height: 1.65;
+  font-size: var(--page-description-size);
+  line-height: var(--page-description-leading);
 }
 
 .internal-page__placeholder {

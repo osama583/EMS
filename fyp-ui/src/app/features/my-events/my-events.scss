@@ -11,7 +11,7 @@
 // Proposals, ...) - the public (guest) layout previously wrapped this in its own centered white
 // card/border/shadow container, which was the odd one out; no other page's title sits in a box.
 .my-events-page__header { padding: 0; text-align: left; }
-.my-events-page__header h1 { margin: 0; color: var(--apu-blue-600); font-size: clamp(2.25rem, 4vw, 3.5rem); font-weight: var(--weight-heading); letter-spacing: -.045em; line-height: 1.05; }
+.my-events-page__header h1 { margin: 0; color: var(--apu-blue-600); font-size: var(--page-title-size); font-weight: var(--weight-heading); letter-spacing: -.045em; line-height: 1.05; }
 .my-events-page__header span { display: block; max-width: 42rem; margin-top: var(--space-3); color: var(--apu-text-muted); font-size: var(--type-body); line-height: 1.65; }
 
 

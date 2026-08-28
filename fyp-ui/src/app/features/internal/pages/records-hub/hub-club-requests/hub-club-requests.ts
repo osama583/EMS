@@ -88,7 +88,6 @@ export class HubClubRequestsComponent {
     ],
     emptyTitle: 'No pending club requests',
     emptyDescription: 'Requests to join your club will appear here for you to approve or reject.',
-    pageSizeOptions: [5, 10, 25],
   }));
 
   readonly filters = computed(() => [{

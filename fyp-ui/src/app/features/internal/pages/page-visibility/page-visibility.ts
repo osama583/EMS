@@ -194,7 +194,7 @@ export class PageVisibilityComponent {
       { key: 'status', label: 'Change active status', icon: 'power_settings_new' },
       { key: 'delete', label: 'Delete page', icon: 'delete' },
     ],
-    emptyTitle: 'No pages found', emptyDescription: 'Add a page or change the current search and filters.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No pages found', emptyDescription: 'Add a page or change the current search and filters.',
   }));
   readonly filters = computed(() => [
     { key: 'type', ariaLabel: 'Filter by entry type', value: this.typeFilter(), options: [{ value: 'all', label: 'All types' }, { value: 'page', label: 'Page' }, { value: 'folder', label: 'Folder' }] },
@@ -411,7 +411,7 @@ export class PageVisibilityComponent {
       { key: 'restore', label: 'Restore', icon: 'restore_from_trash' },
       { key: 'purge', label: 'Delete forever', icon: 'delete_forever' },
     ],
-    emptyTitle: 'No deleted pages', emptyDescription: 'Pages you delete will appear here for 7 days before being permanently removed.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: 'No deleted pages', emptyDescription: 'Pages you delete will appear here for 7 days before being permanently removed.',
   }));
   handleDeletedAction(event: InternalRowActionEvent): void {
     if (event.action.key === 'restore') { this.restoreTarget.set({ id: String(event.record.id), label: restoreLabelFor(event.record) }); return; }
@@ -557,7 +557,7 @@ export class PageVisibilityComponent {
       { key: 'status', label: 'Change active status', icon: 'power_settings_new' },
       { key: 'remove', label: 'Remove permission', icon: 'delete' },
     ],
-    emptyTitle: 'No permissions found', emptyDescription: 'Click "Add page" to grant a page its first permission.', pageSizeOptions: [10, 25, 50],
+    emptyTitle: 'No permissions found', emptyDescription: 'Click "Add page" to grant a page its first permission.',
   }));
   readonly permissionsFilters = computed(() => [
     { key: 'type', ariaLabel: 'Filter by permission type', value: this.permissionsTypeFilter(), options: [{ value: 'all', label: 'All types' }, ...this.grantTypeOptions.map((o) => ({ value: o.value, label: o.label }))] },

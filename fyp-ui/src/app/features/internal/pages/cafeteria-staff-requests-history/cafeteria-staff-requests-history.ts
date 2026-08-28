@@ -106,7 +106,7 @@ export class CafeteriaStaffRequestsHistoryComponent {
       { key: 'when', label: 'Date & Time', width: '13rem', sortKey: 'createdAt' },
     ],
     actions: [],
-    emptyTitle: 'No history found', emptyDescription: 'Staff actions will appear here as they happen.', pageSizeOptions: [10, 25, 50],
+    emptyTitle: 'No history found', emptyDescription: 'Staff actions will appear here as they happen.',
   }));
 
   readonly filters = computed(() => {

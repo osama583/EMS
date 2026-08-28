@@ -1,5 +1,5 @@
 :host { display: block; min-width: 0; }
-.club-page { width: min(100%, 82rem); min-width: 0; margin: 0 auto; }
+.club-page { width: min(100%, var(--page-max-width)); min-width: 0; margin: 0 auto; }
 
 .club-page__controls { margin-top: var(--space-4); margin-bottom: var(--space-5); }
 

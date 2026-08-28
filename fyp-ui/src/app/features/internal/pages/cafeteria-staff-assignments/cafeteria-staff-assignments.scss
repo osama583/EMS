@@ -1,5 +1,5 @@
 :host { display: block; min-width: 0; }
-.cafeteria-staff-assignments { width: min(100%, 82rem); min-width: 0; margin: 0 auto; }
+.cafeteria-staff-assignments { width: min(100%, var(--page-max-width)); min-width: 0; margin: 0 auto; }
 .cafeteria-staff-assignments__form { display: grid; gap: var(--space-4); }
 .cafeteria-staff-assignments__conflict {
   margin: calc(var(--space-2) * -1) 0 0;

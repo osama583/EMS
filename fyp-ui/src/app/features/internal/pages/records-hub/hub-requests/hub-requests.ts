@@ -121,15 +121,15 @@ export class HubRequestsComponent {
     search: { ariaLabel: 'Search requests', placeholder: 'Proposal ID, event title, or item' },
     columns: [
       { key: 'proposalId', label: 'Proposal ID', width: '9rem' },
-      { key: 'eventTitle', label: 'Event Title', width: '15rem', sortKey: 'event' },
+      { key: 'eventTitle', label: 'Event Title', width: '15rem' },
       { key: 'item', label: 'Item Requested', width: '15rem' },
       { key: 'assignedTo', label: 'Assigned To', width: '13rem' },
       { key: 'schedule', label: 'Schedule', width: '15rem', sortKey: 'schedule' },
       { key: 'location', label: 'Location', width: '11rem' },
-      { key: 'status', label: 'Status', width: '13rem', sortKey: 'status' },
+      { key: 'status', label: 'Status', width: '13rem' },
     ],
     actions: [],
-    emptyTitle: this.copy.empty, emptyDescription: 'There are no requests matching this view.', pageSizeOptions: [5, 10, 25],
+    emptyTitle: this.copy.empty, emptyDescription: 'There are no requests matching this view.',
   }));
 
   constructor() {

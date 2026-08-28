@@ -89,11 +89,13 @@ export class PublishedEventService implements EventRegistrationApi {
   // paginated server-side (events.py's pending_approvals()) — the Registrations inbox's search
   // box and event dropdown are real query params, not a client-side filter over the whole set.
   getMyPendingRegistrations(query: {
-    q?: string; event?: string; page: number; pageSize: number;
+    q?: string; event?: string; page: number; pageSize: number; order?: 'asc' | 'desc';
   }): Observable<PendingEventRegistrationPage> {
     let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
     if (query.q) params = params.set('q', query.q);
     if (query.event) params = params.set('event', query.event);
+    // Requested is the only sortable column, so the server takes a direction.
+    if (query.order) params = params.set('order', query.order);
     return this.http.get<PendingEventRegistrationPage>(`${this.baseUrl}/me/pending-approvals`, { params });
   }
   // Distinct event titles with a pending registration, for the Registrations inbox's event
@@ -224,6 +226,8 @@ export class PublishedEventService implements EventRegistrationApi {
     if (query.q) params = params.set('q', query.q);
     if (query.requester) params = params.set('requester', query.requester);
     if (query.decidedBy) params = params.set('decidedBy', query.decidedBy);
+    // Date is the only sortable column here, so the server takes a direction.
+    if (query.order) params = params.set('order', query.order);
     return this.http.get<RegistrationHistoryPage>(`${this.baseUrl}/me/registration-history`, { params });
   }
 }

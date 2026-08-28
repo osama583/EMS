@@ -6,7 +6,8 @@
     [records]="records()"
     [filters]="filters()"
     [searchValue]="search()"
-    [loading]="loading()"
+    [sort]="sort()" (sortChange)="setSort($event)"
+  [loading]="loading()"
     [totalPages]="totalPages()"
     [page]="page()"
     [pageSize]="pageSize()"
@@ -14,6 +15,7 @@
     (filterChange)="setOutcomeFilter($event.value)"
     (reset)="reset()"
     (pageChange)="setPage($event)"
+  (pageSizeChange)="setPageSize($event)"
     (primaryAction)="openClear()"
   />
 </section>

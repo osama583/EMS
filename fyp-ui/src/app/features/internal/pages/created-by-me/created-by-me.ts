@@ -5,7 +5,7 @@ import { EventRegistration, PublishedEvent } from '../../../../core/events/publi
 import { PublishedEventService } from '../../../../core/events/published-event.service';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
 import { InternalFilterControlsComponent, InternalPageStateComponent, InternalPaginationComponent, InternalSearchFieldComponent } from '../../../../shared/components/internal-data-page/internal-data-page-parts';
-import { InternalFilterChange } from '../../../../shared/components/internal-data-page/internal-data-page.models';
+import { PAGE_SIZE_OPTIONS, InternalFilterChange } from '../../../../shared/components/internal-data-page/internal-data-page.models';
 import { EVENT_IMAGE_PLACEHOLDER } from '../../../../shared/event-image-placeholder';
 
 // A registered attendee, or one still awaiting the organiser's decision (manual-approval events).
@@ -13,7 +13,9 @@ import { EVENT_IMAGE_PLACEHOLDER } from '../../../../shared/event-image-placehol
 // they never counted toward capacity and add nothing an organiser needs to act on or report on.
 const VISIBLE_STATUSES: readonly EventRegistration['status'][] = ['confirmed', 'pending', 'rejected'];
 
-const PAGE_SIZE = 9;
+// Default rows per page. The reader can change it - PAGE_SIZE_OPTIONS is the
+// same set of choices every other list in the app offers.
+const DEFAULT_PAGE_SIZE = 10;
 
 // Created by Me: events this organiser proposed (or co-owns) that are published, server-side
 // searched/filtered/paginated — search/status/page/pageSize are real query params to
@@ -27,6 +29,8 @@ const PAGE_SIZE = 9;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CreatedByMeComponent {
+  readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
+  readonly pageSize = signal(DEFAULT_PAGE_SIZE);
   readonly placeholder = EVENT_IMAGE_PLACEHOLDER;
   private readonly events = inject(PublishedEventService);
   private readonly destroyRef = inject(DestroyRef);
@@ -79,7 +83,7 @@ export class CreatedByMeComponent {
             q: query.q || undefined,
             status: query.status === 'upcoming' || query.status === 'ended' ? query.status : undefined,
             page: query.page,
-            pageSize: PAGE_SIZE,
+            pageSize: this.pageSize(),
           }).pipe(finalize(() => this.loading.set(false)));
         }),
       )
@@ -99,6 +103,8 @@ export class CreatedByMeComponent {
     this.page.set(1);
   }
   setPage(page: number): void { this.page.set(Math.max(1, Math.min(page, this.totalPages()))); }
+  // Back to page 1: page 3 of 25-row pages is not page 3 of 5-row pages.
+  setPageSize(size: number): void { this.pageSize.set(size); this.page.set(1); }
 
   openInfo(event: PublishedEvent): void {
     this.infoTarget.set(event);

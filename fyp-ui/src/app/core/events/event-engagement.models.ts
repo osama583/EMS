@@ -55,6 +55,7 @@ export interface RegistrationHistoryRow {
 }
 
 export interface RegistrationHistoryQuery {
+  readonly order?: 'asc' | 'desc';
   readonly page: number;
   readonly pageSize: number;
   readonly q?: string;

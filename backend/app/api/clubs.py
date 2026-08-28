@@ -34,7 +34,7 @@ from ..errors import BadRequest, Conflict, Forbidden, NotFound
 from ..logging_setup import audit
 from ..security import require_auth, require_internal
 from ..security.principal import current_principal
-from ._helpers import body, flag, pagination, paged, required
+from ._helpers import body, date_order, flag, paged, pagination, required
 
 bp = Blueprint("clubs", __name__, url_prefix="/clubs")
 
@@ -285,7 +285,8 @@ def search_categories():
         limit, offset = pagination()
         rows = fetch_all(
             cur,
-            f"{_CATEGORY_SELECT} WHERE {where_sql} ORDER BY name LIMIT %s OFFSET %s",
+            f"{_CATEGORY_SELECT} WHERE {where_sql} "
+            f"ORDER BY {date_order('created_at', 'asc')}, club_category_id ASC LIMIT %s OFFSET %s",
             [*params, limit, offset],
         )
     for row in rows:
@@ -857,7 +858,7 @@ def join_requests_decided():
     principal = current_principal()
     rows = query(
         _JOIN_REQUEST_SELECT + " WHERE c.user_id = %s AND j.status <> 'pending' "
-        "ORDER BY j.resolved_at DESC",
+        f"ORDER BY {date_order('j.resolved_at')}, j.club_join_request_id DESC",
         (principal.user_id,),
     )
     return jsonify(_shape_join_requests(rows))
@@ -868,7 +869,8 @@ def join_requests_decided():
 def join_requests_mine():
     principal = current_principal()
     rows = query(
-        _JOIN_REQUEST_SELECT + " WHERE j.requester_user_id = %s ORDER BY j.created_at DESC",
+        _JOIN_REQUEST_SELECT + " WHERE j.requester_user_id = %s "
+        f"ORDER BY {date_order('j.created_at')}, j.club_join_request_id DESC",
         (principal.user_id,),
     )
     return jsonify(_shape_join_requests(rows))
