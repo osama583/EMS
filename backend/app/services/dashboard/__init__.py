@@ -292,9 +292,12 @@ def build_document(
         ordered_ids = (
             [layout["hero"]]
             + list(layout["kpis"])
-            + [layout["signature"]]
+            + ([layout["signature"]] if layout.get("signature") else [])
             + list(layout["panels"])
-            + [layout["alerts"]]
+            # "alerts" is optional in the same way "counts" is: a profile whose
+            # alerts would only restate a band it already carries sets it None
+            # rather than shipping a rail that says nothing new.
+            + ([layout["alerts"]] if layout.get("alerts") else [])
         )
         # "counts" is optional - only the profiles carrying the Inbox/Ongoing/
         # Completed/Late strip (widgets/department.py's dept_request_counts)
@@ -344,9 +347,9 @@ def build_document(
             "requestCounts": results.get(layout["counts"]) if layout.get("counts") else None,
             "hero": results[layout["hero"]],
             "kpis": [results[widget_id] for widget_id in layout["kpis"]],
-            "signature": results[layout["signature"]],
+            "signature": results[layout["signature"]] if layout.get("signature") else None,
             "panels": [results[widget_id] for widget_id in layout["panels"]],
-            "alerts": results[layout["alerts"]],
+            "alerts": results[layout["alerts"]] if layout.get("alerts") else None,
             "quickActions": actions,
             "mobile": {"kpiOrder": list(layout.get("mobileKpis", []))},
             "extras": {
@@ -409,8 +412,8 @@ def build_widget_only(
         layout = layout_for(active.key, variant)
         allowed = {
             layout["hero"],
-            layout["signature"],
-            layout["alerts"],
+            *([layout["signature"]] if layout.get("signature") else []),
+            *([layout["alerts"]] if layout.get("alerts") else []),
             *layout["kpis"],
             *layout["panels"],
             *layout.get("mobileKpis", []),

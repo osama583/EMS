@@ -3,9 +3,12 @@ fallback for a unit with no known detail table.
 
 A/V, Logistics, Transport, Student Services and Photography no longer carry
 their own per-department widget module - they were unified onto this one
-shared shape (a "jobs at risk" hero, a plain Risk List, who's-carrying-what-
-work, and what's-used-most), so a head reading a different department's
-dashboard sees the same page shape, not a bespoke instrument per lane. F&B
+shared shape (a "jobs at risk" hero, an on-time and a push-back tile,
+who's-carrying-what-work, and what's-used-most), so a head reading a different
+department's dashboard sees the same page shape, not a bespoke instrument per
+lane. The two panels are deliberately the same forms the Cafeteria Manager
+carries - a column chart and a ring - because they answer the same two
+questions for a different role. F&B
 (widgets/fmb.py) is not yet part of that unification - see its own module
 docstring.
 
@@ -65,12 +68,30 @@ def _requests_route(scope: Scope, bucket: str = "inbox") -> str:
     return f"/app/{bucket}/requests"
 
 
+def _humanise_minutes(minutes: float) -> str:
+    """A signed minute count as the unit a person would say it in.
+
+    Departments close jobs weeks ahead of the booked window, so the raw figure
+    is routinely five digits: "median 77179 min early" is arithmetically right
+    and communicates nothing. The unit steps up with the magnitude, which is
+    what makes the number readable at both ends of that range.
+    """
+    magnitude = abs(minutes)
+    if magnitude < 90:
+        return f"{magnitude:.0f} min"
+    if magnitude < 48 * 60:
+        return f"{magnitude / 60:.0f}h"
+    return f"{magnitude / 1440:.0f} days"
+
+
 @widget("dept_jobs_at_risk")
 def jobs_at_risk(cur, scope: Scope) -> dict[str, Any]:
-    """Hero — plain count of jobs at risk right now, reading the exact same
-    rows risk_list() below lists. Kept as one function call shared by both so
-    the hero number can never drift from what the Risk List panel shows -
-    the two are the same query, read once.
+    """Hero — plain count of jobs at risk right now.
+
+    Reads `risk.risk_list()`, which is also what the Risk List *panel* used to
+    render before it was removed from these profiles. The metric stays: the
+    count is the useful part and it belongs on one tile, not restated as a
+    twenty-five-row list a band further down.
     """
     department = spec(scope)
     result = risk.risk_list(cur, scope, department)
@@ -109,7 +130,9 @@ def request_counts(cur, scope: Scope) -> dict[str, Any]:
             {"key": "inbox", "label": "Inbox", "value": counts["inbox"], "status": "unknown", "drill": drill(_requests_route(scope, "inbox"), requestKind=requirement_of(scope))},
             {"key": "ongoing", "label": "Ongoing", "value": counts["ongoing"], "status": "unknown", "drill": drill(_requests_route(scope, "ongoing"), requestKind=requirement_of(scope))},
             {"key": "completed", "label": "Completed", "value": counts["completed"], "status": "good", "drill": drill(_requests_route(scope, "history"), requestKind=requirement_of(scope))},
-            {"key": "late", "label": "Late", "value": late, "status": "critical" if late else "good", "drill": drill(_requests_route(scope, "ongoing"), requestKind=requirement_of(scope), risk="true")},
+            # Always critical, matching caf_request_counts: a green zero trains
+            # the eye to skim the one tile on the strip worth stopping for.
+            {"key": "late", "label": "Late", "value": late, "status": "critical", "drill": drill(_requests_route(scope, "ongoing"), requestKind=requirement_of(scope), risk="true")},
         ],
     }
 
@@ -117,33 +140,63 @@ def request_counts(cur, scope: Scope) -> dict[str, Any]:
 # --- Panels ---------------------------------------------------------------
 
 
-@widget("dept_risk_list")
-def risk_list(cur, scope: Scope) -> dict[str, Any]:
-    """The plain Risk List: named jobs that have not started and whose own
-    deadline is inside this department's threshold (or already passed).
+@widget("dept_on_time_completion")
+def on_time_completion(cur, scope: Scope) -> dict[str, Any]:
+    """The department twin of the cafeteria's on-time delivery tile.
 
-    Reads risk.risk_list(), the mixed-unit (minutes/hours/day), per-department
-    threshold version - not risk.at_risk_tasks()/M70, which is a single
-    days-wide window shared by every department regardless of how far in
-    advance that department's work is normally staffed.
+    Every department promised someone a time, and until now none of the five
+    simplified profiles carried a number saying whether it was kept. What
+    "the time" *is* differs by lane and is resolved in `sla.task_deadline_sql`,
+    so the caption names the basis rather than leaving a head to assume their
+    number means the same as Transport's.
     """
     department = spec(scope)
-    result = risk.risk_list(cur, scope, department)
-    return panel(
-        title="Risk list",
-        subtitle="Jobs that have not started and are due soon",
-        chart="alert-list",
-        data={"items": result["items"], "stalled": None, "cancellationLocked": 0},
-        table_view=table(
-            [
-                {"key": "date", "label": "Due", "format": "datetime"},
-                {"key": "eventTitle", "label": "Event", "format": "text"},
-                {"key": "status", "label": "Status", "format": "text"},
-            ],
-            result["items"],
+    result = sla.task_punctuality(cur, scope, department)
+    median = result["medianMinutes"]
+    return kpi(
+        label="On-time completion",
+        value=result["rate"],
+        fmt=FMT_PERCENT,
+        secondary=f"measured against {result['basis']}",
+        caption=(
+            f"{result['late']} of {result['completed']} completed jobs finished late"
+            if result["completed"]
+            else "No jobs completed in this period"
+        )
+        + (
+            f" · median {_humanise_minutes(median)} {'late' if median > 0 else 'early'}"
+            if median is not None
+            else ""
         ),
-        empty="Nothing unstarted is due soon.",
-        drill_to=drill("/app/inbox/requests", requestKind=department.requirement, risk="true"),
+        target={"min": 0.95, "label": "Goal: 95% or higher"},
+        status=status_for(result["rate"], minimum=0.95, critical=0.85, higher_is_better=True),
+        definition=f"Completed tasks resolved on or before {result['basis']}",
+        drill_to=drill(_requests_route(scope, "history"), requestKind=requirement_of(scope)),
+    )
+
+
+@widget("dept_pushback_rate")
+def pushback_rate(cur, scope: Scope) -> dict[str, Any]:
+    """M20 read from the department side - work this unit handed back to the
+    applicant rather than doing.
+
+    Not a failure number on its own: a send-back is often the right call on a
+    proposal that arrived unusable. It is a *cost* number - every push-back is
+    a round trip the applicant pays for - which is why the target is a ceiling
+    rather than a floor and the caption gives the count behind the rate.
+    """
+    result = quality.send_back_rate(cur, scope)
+    previous = quality.send_back_rate(cur, scope, previous=True)
+    return kpi(
+        label="Push-back rate",
+        value=result["rate"],
+        fmt=FMT_PERCENT,
+        caption=f"{result['count']} of {result['sample']} jobs sent back to the applicant",
+        delta=delta(result["rate"], previous["rate"], higher_is_better=False),
+        target={"max": 0.10, "label": "target <= 10%"},
+        status=status_for(result["rate"], warn=0.10, critical=0.25),
+        definition="M20 — tasks this unit returned to the applicant for correction",
+        drill_to=drill(_requests_route(scope, "history"), requestKind=requirement_of(scope), taskStatus="resubmitted"),
     )
 
 
@@ -157,19 +210,26 @@ def staff_balance(cur, scope: Scope) -> dict[str, Any]:
     return panel(
         title="Who's carrying how much work",
         subtitle="Jobs currently assigned to each staff member",
-        chart="bar-chart",
+        # Vertical columns, matching caf_staff_workload (widgets/cafeteria.py).
+        # The two panels answer the same question for two roles and had drifted
+        # into two shapes; one column per person compares heights, which is the
+        # comparison this panel exists to make.
+        chart="column-chart",
         series_list=[
             series(
                 "staff",
                 "Staff",
                 1,
                 [
-                    {"x": s["value"], "label": s["name"], "userId": s["userId"], "completed": s["completed"]}
+                    {"x": s["name"], "y": s["value"], "userId": s["userId"], "completed": s["completed"]}
                     for s in staff
                 ],
             )
         ],
-        axes={"x": {"type": "linear", "label": "Jobs assigned", "format": FMT_COUNT}},
+        axes={
+            "x": {"type": "category", "label": "Staff"},
+            "y": {"type": "linear", "label": "Jobs assigned", "format": FMT_COUNT},
+        },
         table_view=table(
             [
                 {"key": "name", "label": "Staff", "format": "text"},
@@ -194,22 +254,27 @@ def catalogue_health(cur, scope: Scope) -> dict[str, Any]:
     usage = capacity.catalogue_usage(cur, scope, department)
     off = quality.off_catalogue_rate(cur, scope, department)
     dead = [item for item in usage if item["value"] == 0]
+    # Same ring as caf_menu_performance (widgets/cafeteria.py): the top seven by
+    # share, everything else folded into one "Other" wedge. Folding rather than
+    # drawing forty slivers is what keeps the legend a ranking instead of a
+    # colour key nobody can read - and the table view below still carries every
+    # row, including the dead options the caption counts.
+    ordered = sorted(usage, key=lambda item: item["value"], reverse=True)
+    top = [item for item in ordered if item["value"] > 0][:7]
+    other_total = sum(item["value"] for item in ordered[len(top) :] if item["value"] > 0)
+    segments = [{"label": item["label"], "value": item["value"], "optionId": item["optionId"]} for item in top]
+    if other_total:
+        segments.append({"label": "Other options", "value": other_total})
     return panel(
         title="Most used",
         subtitle="What's requested most from your catalogue",
-        chart="bar-chart",
-        series_list=[
-            series(
-                "selections",
-                "Times requested",
-                1,
-                [
-                    {"x": item["value"], "label": item["label"], "optionId": item["optionId"], "dead": item["value"] == 0}
-                    for item in usage
-                ],
-            )
-        ],
-        axes={"x": {"type": "linear", "label": "Times requested", "format": FMT_COUNT}},
+        chart="donut-chart",
+        data={
+            "segments": segments,
+            "total": sum(item["value"] for item in usage),
+            "totalLabel": "Selections this period",
+            "format": FMT_COUNT,
+        },
         table_view=table(
             [
                 {"key": "label", "label": "Item", "format": "text"},
@@ -226,34 +291,6 @@ def catalogue_health(cur, scope: Scope) -> dict[str, Any]:
         empty="No options are configured for this department yet.",
         drill_to=drill(department.catalogue_route or "/app/dropdown-options"),
         mobile="ranked-list",
-    )
-
-
-@widget("dept_at_risk")
-def at_risk(cur, scope: Scope) -> dict[str, Any]:
-    department = spec(scope)
-    risky = risk.at_risk_tasks(cur, scope, department)
-    latency = sla.decision_latency(cur, scope)
-    stalled = risk.stalled_tasks(cur, scope, median_decision_hours=latency["median"])
-    return panel(
-        title="At risk this week",
-        subtitle=f"Open work inside the next {risky['windowDays']} days",
-        chart="alert-list",
-        data={
-            "items": risky["items"],
-            "stalled": stalled,
-            "cancellationLocked": risk.cancellation_window_exposure(cur, scope),
-        },
-        table_view=table(
-            [
-                {"key": "date", "label": "Date", "format": "date"},
-                {"key": "eventTitle", "label": "Event", "format": "text"},
-                {"key": "status", "label": "Task status", "format": "text"},
-            ],
-            risky["items"],
-        ),
-        empty="Nothing in this unit falls inside the risk window.",
-        drill_to=drill("/app/inbox/requests", requestKind=department.requirement, risk="true"),
     )
 
 

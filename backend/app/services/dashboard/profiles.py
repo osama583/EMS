@@ -223,12 +223,16 @@ PROFILES: dict[str, dict[str, Any]] = {
     "hod_av": {
         "counts": "dept_request_counts",
         "hero": "dept_jobs_at_risk",
-        "kpis": [],
-        "signature": "dept_risk_list",
+        "kpis": ["dept_on_time_completion", "dept_pushback_rate"],
+        # No signature panel and no alerts rail. The Risk List and "At risk this
+        # week" both restated the hero - the same rows, counted on the tile and
+        # then listed twice below it - so the page now says it once. Both fields
+        # are optional, the way "counts" already was.
+        "signature": None,
         "panels": ["dept_staff_balance", "dept_catalogue_health"],
-        "alerts": "dept_at_risk",
+        "alerts": None,
         "quickActions": ["review_inbox", "assign_work", "catalogue"],
-        "mobileKpis": [],
+        "mobileKpis": ["dept_on_time_completion", "dept_pushback_rate"],
     },
     # -------------------------------------------------------- Logistics --
     # The one department whose constraint is a day total rather than an hour:
@@ -237,12 +241,16 @@ PROFILES: dict[str, dict[str, Any]] = {
     "hod_logistics": {
         "counts": "dept_request_counts",
         "hero": "dept_jobs_at_risk",
-        "kpis": [],
-        "signature": "dept_risk_list",
+        "kpis": ["dept_on_time_completion", "dept_pushback_rate"],
+        # No signature panel and no alerts rail. The Risk List and "At risk this
+        # week" both restated the hero - the same rows, counted on the tile and
+        # then listed twice below it - so the page now says it once. Both fields
+        # are optional, the way "counts" already was.
+        "signature": None,
         "panels": ["dept_staff_balance", "dept_catalogue_health"],
-        "alerts": "dept_at_risk",
+        "alerts": None,
         "quickActions": ["review_inbox", "assign_work", "catalogue"],
-        "mobileKpis": [],
+        "mobileKpis": ["dept_on_time_completion", "dept_pushback_rate"],
     },
     # -------------------------------------------------------- Transport --
     # Two ceilings, vehicles and drivers. A single ratio is a lie here: reading
@@ -251,12 +259,16 @@ PROFILES: dict[str, dict[str, Any]] = {
     "hod_transport": {
         "counts": "dept_request_counts",
         "hero": "dept_jobs_at_risk",
-        "kpis": [],
-        "signature": "dept_risk_list",
+        "kpis": ["dept_on_time_completion", "dept_pushback_rate"],
+        # No signature panel and no alerts rail. The Risk List and "At risk this
+        # week" both restated the hero - the same rows, counted on the tile and
+        # then listed twice below it - so the page now says it once. Both fields
+        # are optional, the way "counts" already was.
+        "signature": None,
         "panels": ["dept_staff_balance", "dept_catalogue_health"],
-        "alerts": "dept_at_risk",
+        "alerts": None,
         "quickActions": ["review_inbox", "assign_work", "catalogue"],
-        "mobileKpis": [],
+        "mobileKpis": ["dept_on_time_completion", "dept_pushback_rate"],
     },
     # ------------------------------------------------ Student Services --
     # The only department whose capacity requirement is computed rather than
@@ -264,12 +276,16 @@ PROFILES: dict[str, dict[str, Any]] = {
     "hod_student_services": {
         "counts": "dept_request_counts",
         "hero": "dept_jobs_at_risk",
-        "kpis": [],
-        "signature": "dept_risk_list",
+        "kpis": ["dept_on_time_completion", "dept_pushback_rate"],
+        # No signature panel and no alerts rail. The Risk List and "At risk this
+        # week" both restated the hero - the same rows, counted on the tile and
+        # then listed twice below it - so the page now says it once. Both fields
+        # are optional, the way "counts" already was.
+        "signature": None,
         "panels": ["dept_staff_balance", "dept_catalogue_health"],
-        "alerts": "dept_at_risk",
+        "alerts": None,
         "quickActions": ["review_inbox", "assign_work", "catalogue"],
-        "mobileKpis": [],
+        "mobileKpis": ["dept_on_time_completion", "dept_pushback_rate"],
     },
     # ------------------------------------------------------ Photography --
     # The only department that accumulates work *after* the event. Forward
@@ -278,12 +294,16 @@ PROFILES: dict[str, dict[str, Any]] = {
     "hod_photography": {
         "counts": "dept_request_counts",
         "hero": "dept_jobs_at_risk",
-        "kpis": [],
-        "signature": "dept_risk_list",
+        "kpis": ["dept_on_time_completion", "dept_pushback_rate"],
+        # No signature panel and no alerts rail. The Risk List and "At risk this
+        # week" both restated the hero - the same rows, counted on the tile and
+        # then listed twice below it - so the page now says it once. Both fields
+        # are optional, the way "counts" already was.
+        "signature": None,
         "panels": ["dept_staff_balance", "dept_catalogue_health"],
-        "alerts": "dept_at_risk",
+        "alerts": None,
         "quickActions": ["review_inbox", "assign_work", "catalogue"],
-        "mobileKpis": [],
+        "mobileKpis": ["dept_on_time_completion", "dept_pushback_rate"],
     },
     # ------------------------------------------------------------- F&B --
     # A gatekeeper, a department lane, and a supply orchestrator at once. The
@@ -419,7 +439,11 @@ PROFILES: dict[str, dict[str, Any]] = {
         "kpis": ["caf_on_time", "caf_pushback_rate"],
         "signature": "caf_service_board",
         "panels": ["caf_staff_workload", "caf_menu_performance"],
-        "alerts": "caf_at_risk",
+        # No alerts rail. Everything caf_at_risk used to raise is already on
+        # this page a band higher - the hero is the live at-risk count, and the
+        # Late tile on the counts strip is the same queue - so the rail only
+        # restated it further down.
+        "alerts": None,
         "quickActions": [],
         "mobileKpis": ["caf_on_time", "caf_pushback_rate"],
     },

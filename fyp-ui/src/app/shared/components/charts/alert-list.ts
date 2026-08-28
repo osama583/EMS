@@ -19,23 +19,27 @@ import { formatValue } from './viz';
   selector: 'app-alert-list',
   imports: [],
   template: `
-    <ul class="viz-alerts">
-      @for (row of rows(); track row.key) {
-        <li class="viz-alert" [class]="'viz-alert--' + row.tone">
-          <span class="material-symbols-rounded viz-alert__icon" aria-hidden="true">{{ row.icon }}</span>
-          <span class="viz-alert__body">
-            <span class="viz-alert__title">{{ row.title }}</span>
-            @if (row.detail) { <span class="viz-alert__detail">{{ row.detail }}</span> }
-          </span>
-          <span class="viz-alert__count">{{ row.count }}</span>
-        </li>
-      } @empty {
-        <li class="viz-alert viz-alert--clear">
-          <span class="material-symbols-rounded viz-alert__icon" aria-hidden="true">check_circle</span>
-          <span class="viz-alert__body"><span class="viz-alert__title">Nothing needs attention right now.</span></span>
-        </li>
-      }
-    </ul>
+    @if (rows().length) {
+      <ul class="viz-alerts">
+        @for (row of rows(); track row.key) {
+          <li class="viz-alert" [class]="'viz-alert--' + row.tone">
+            <span class="material-symbols-rounded viz-alert__icon" aria-hidden="true">{{ row.icon }}</span>
+            <span class="viz-alert__body">
+              <span class="viz-alert__title">{{ row.title }}</span>
+              @if (row.detail) { <span class="viz-alert__detail">{{ row.detail }}</span> }
+            </span>
+            <span class="viz-alert__count">{{ row.count }}</span>
+          </li>
+        }
+      </ul>
+    } @else {
+      <!-- The same neutral viz-empty container every other panel uses when it
+           has nothing to draw. A green "all clear" card reads as a result —
+           the one positive-coloured block on a page whose colours otherwise all
+           mean "act on me" — and it drew the eye hardest when it had the least
+           to say. Empty is empty, in every panel, in the same grey. -->
+      <p class="viz-empty">Nothing needs attention right now.</p>
+    }
 
     @if (items().length) {
       <ul class="viz-alerts__items">

@@ -105,14 +105,14 @@
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: var(--space-3);
-  // Cards size to their content rather than stretching to the tallest in the
-  // row: a short panel padded out to match a long one is mostly empty border.
-  align-items: start;
+  // Cards in a row share a height. Two panels sitting side by side with
+  // different heights read as a layout mistake before they read as an honest
+  // use of space — the top edges line up and the bottom edges do not, so the
+  // borders disagree across the gap. Whitespace inside the shorter card costs
+  // less than that. `app-chart-frame` is already `height: 100%`, so its border
+  // fills whatever the row gives it.
+  align-items: stretch;
 }
-
-// Band 1 is the exception — the hero and the KPI row are one visual unit and
-// have to share a baseline.
-.dash__band--signal { align-items: stretch; }
 
 .dash__band > * { min-width: 0; }
 
