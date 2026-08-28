@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from .admin import bp as admin_bp
+from .ai import bp as ai_bp
+from .ai_admin import bp as ai_admin_bp
 from .auth import bp as auth_bp
 from .cafeterias import bp as cafeterias_bp
 from .catalog import bp as catalog_bp
@@ -29,4 +31,6 @@ BLUEPRINTS = (
     clubs_bp,
     club_categories_bp,
     uploads_bp,
+    ai_bp,
+    ai_admin_bp,
 )

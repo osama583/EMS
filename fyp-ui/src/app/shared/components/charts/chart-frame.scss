@@ -37,42 +37,6 @@
   line-height: 1.45;
 }
 
-.dash-panel__tools {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  flex: none;
-}
-
-.dash-panel__tool {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  min-height: 2rem;
-  padding: 0.3rem 0.55rem;
-  border: 1px solid var(--apu-border);
-  border-radius: var(--radius-control);
-  background: var(--apu-surface);
-  color: var(--viz-ink-secondary);
-  font: inherit;
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  transition: border-color var(--internal-transition), color var(--internal-transition);
-
-  .material-symbols-rounded { font-size: 1.05rem; }
-
-  &:hover { border-color: var(--internal-control-border-hover); color: var(--apu-blue-700); }
-  &:focus-visible { outline: none; box-shadow: var(--internal-focus-ring); }
-}
-
-.dash-panel__tool--on {
-  border-color: var(--apu-blue-700);
-  color: var(--apu-blue-700);
-  background: rgb(23 105 214 / 6%);
-}
-
 .dash-panel__legend { margin: 0; padding: 0; list-style: none; }
 
 .dash-swatch--dashed {
@@ -101,10 +65,3 @@
 }
 
 .dash-caption--footnote { font-style: italic; }
-
-@media (max-width: 48rem) {
-  // Icon-only tools on a phone: the two words cost a third of the header row
-  // and the icons are unambiguous next to a chart.
-  .dash-panel__tool-text { display: none; }
-  .dash-panel__tool { min-width: 2.75rem; justify-content: center; }
-}

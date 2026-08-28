@@ -17,7 +17,6 @@ from typing import Any
 
 from ...db import fetch_all, read_cursor
 from ...security.principal import Principal
-from . import insights as insight_engine
 from . import widgets as widget_package
 from .profiles import (
     GENERIC_DEPARTMENT_PROFILE,
@@ -297,6 +296,11 @@ def build_document(
             + list(layout["panels"])
             + [layout["alerts"]]
         )
+        # "counts" is optional - only the profiles carrying the Inbox/Ongoing/
+        # Completed/Late strip (widgets/department.py's dept_request_counts)
+        # set it; every other profile is unaffected.
+        if layout.get("counts"):
+            ordered_ids = [layout["counts"]] + ordered_ids
         # Sequential, one cursor. See the module docstring.
         for widget_id in ordered_ids:
             results[widget_id] = build_widget(widget_id, cur, scope)
@@ -308,7 +312,6 @@ def build_document(
             if widget_id not in results:
                 results[widget_id] = build_widget(widget_id, cur, scope)
 
-        cards = insight_engine.evaluate(cur, scope, list(layout["insights"]), results)
         actions = _quick_actions(cur, scope, list(layout["quickActions"]), results)
 
         document = {
@@ -338,12 +341,12 @@ def build_document(
                 "activeOutlet": outlet if outlet in scope.outlets and len(scope.outlets) == 1 else "all",
             },
             "period": scope.period.as_json(),
+            "requestCounts": results.get(layout["counts"]) if layout.get("counts") else None,
             "hero": results[layout["hero"]],
             "kpis": [results[widget_id] for widget_id in layout["kpis"]],
             "signature": results[layout["signature"]],
             "panels": [results[widget_id] for widget_id in layout["panels"]],
             "alerts": results[layout["alerts"]],
-            "insights": cards,
             "quickActions": actions,
             "mobile": {"kpiOrder": list(layout.get("mobileKpis", []))},
             "extras": {
@@ -411,6 +414,7 @@ def build_widget_only(
             *layout["kpis"],
             *layout["panels"],
             *layout.get("mobileKpis", []),
+            *([layout["counts"]] if layout.get("counts") else []),
         }
         if widget_id not in allowed:
             return {"id": widget_id, "kind": "panel", "state": "error", "message": "Unknown widget."}

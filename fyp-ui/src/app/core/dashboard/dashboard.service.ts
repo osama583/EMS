@@ -117,11 +117,6 @@ export class DashboardService {
       .pipe(catchError(() => of(null)));
   }
 
-  exportUrl(widgetId: string): string {
-    const params = this.buildParams(false).set('widget', widgetId);
-    return `${this.baseUrl}/export?${params.toString()}`;
-  }
-
   private buildParams(refresh?: boolean): HttpParams {
     let params = new HttpParams().set('period', this.period());
     const profile = this.profileId();

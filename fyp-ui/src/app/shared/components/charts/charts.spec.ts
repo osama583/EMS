@@ -1,12 +1,10 @@
 import { Component, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { InsightCard, PanelWidget, Series, StatWidget } from '../../../core/dashboard/dashboard.models';
+import { PanelWidget, Series, StatWidget } from '../../../core/dashboard/dashboard.models';
 import { ChartFrameComponent } from './chart-frame';
 import { ChartPanelComponent } from './chart-panel';
-import { InsightCardComponent } from './insight-card';
 import { StatTileComponent } from './stat-tile';
-import { TableViewComponent } from './table-view';
 import { formatValue, niceDomain, rampColor, slotColor } from './viz';
 
 function panel(overrides: Partial<PanelWidget> = {}): PanelWidget {
@@ -21,7 +19,6 @@ function panel(overrides: Partial<PanelWidget> = {}): PanelWidget {
     series: [],
     axes: { x: { type: 'date' }, y: { type: 'linear', format: 'hours' } },
     annotations: [],
-    tableView: { columns: [{ key: 'x', label: 'Week', format: 'date' }], rows: [] },
     caption: null,
     caveat: null,
     empty: 'No tasks have completed a full cycle in this period yet.',
@@ -71,7 +68,7 @@ function series(count: number): Series[] {
 @Component({
   selector: 'app-frame-host',
   imports: [ChartFrameComponent],
-  template: `<app-chart-frame [panel]="current()" [empty]="empty()"><p class="chart-body">chart</p><div data-slot="table"><p class="table-body">table</p></div></app-chart-frame>`,
+  template: `<app-chart-frame [panel]="current()" [empty]="empty()"><p class="chart-body">chart</p></app-chart-frame>`,
 })
 class FrameHost {
   readonly current = signal<PanelWidget>(panel());
@@ -113,14 +110,11 @@ describe('chart-frame', () => {
     expect(fixture.nativeElement.querySelector('.dash-panel__retry')).not.toBeNull();
   });
 
-  it('ships the table view behind a toggle, never behind a fetch', () => {
+  it('renders the chart body with no table/CSV escape hatch', () => {
     fixture.componentInstance.current.set(panel({ series: series(1) }));
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.chart-body')).not.toBeNull();
-
-    fixture.nativeElement.querySelector('.dash-panel__tool').click();
-    fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.table-body')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.dash-panel__tool')).toBeNull();
   });
 });
 
@@ -251,90 +245,6 @@ describe('stat-tile', () => {
     );
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.dash-sparkline')).not.toBeNull();
-  });
-});
-
-@Component({
-  selector: 'app-table-host',
-  imports: [TableViewComponent],
-  template: `<app-table-view [view]="view()" />`,
-})
-class TableHost {
-  readonly view = signal(panel().tableView);
-}
-
-describe('table-view', () => {
-  it('carries every value the chart shows', async () => {
-    await TestBed.configureTestingModule({ imports: [TableHost] }).compileComponents();
-    const fixture = TestBed.createComponent(TableHost);
-    fixture.componentInstance.view.set({
-      columns: [
-        { key: 'x', label: 'Week', format: 'date' },
-        { key: 'decision', label: 'Decision (h)', format: 'hours' },
-        { key: 'assignment', label: 'Assignment lag (h)', format: 'hours' },
-      ],
-      rows: [
-        { x: '2026-08-03', decision: 12, assignment: 4 },
-        { x: '2026-08-10', decision: 18, assignment: 6 },
-      ],
-    });
-    fixture.detectChanges();
-    const cells = [...fixture.nativeElement.querySelectorAll('tbody td')].map((cell: HTMLElement) => cell.textContent!.trim());
-    expect(cells).toHaveLength(6);
-    expect(cells).toContain('12h');
-    expect(cells).toContain('6h');
-  });
-
-  it('renders a suppressed bucket as an em dash while keeping its label', async () => {
-    await TestBed.configureTestingModule({ imports: [TableHost] }).compileComponents();
-    const fixture = TestBed.createComponent(TableHost);
-    fixture.componentInstance.view.set({
-      columns: [
-        { key: 'school', label: 'School', format: 'text' },
-        { key: 'value', label: 'Cost per pax', format: 'currency' },
-      ],
-      rows: [{ school: 'School of Business', value: null, suppressed: true }],
-    });
-    fixture.detectChanges();
-    const cells = [...fixture.nativeElement.querySelectorAll('tbody td')].map((cell: HTMLElement) => cell.textContent!.trim());
-    expect(cells[0]).toBe('School of Business');
-    expect(cells[1]).toBe('—');
-  });
-});
-
-describe('insight-card', () => {
-  it('renders evidence always, and omits the button where there is no action', async () => {
-    @Component({
-      selector: 'app-insight-host',
-      imports: [InsightCardComponent],
-      template: `<app-insight-card [card]="card()" />`,
-    })
-    class InsightHost {
-      readonly card = signal<InsightCard>({
-        id: 'AI-31',
-        code: 'STRANDED_AT_GATE',
-        severity: 'critical' as const,
-        title: '2 proposals are stranded with no qualifying reviewer',
-        body: 'Nobody can act on them.',
-        evidence: { metric: 'M78', value: 2 },
-        action: null,
-      });
-    }
-
-    await TestBed.configureTestingModule({ imports: [InsightHost] }).compileComponents();
-    const fixture = TestBed.createComponent(InsightHost);
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.querySelector('.dash-insight__evidence').textContent).toContain('M78');
-    expect(fixture.nativeElement.querySelector('.dash-insight__action')).toBeNull();
-    expect(fixture.nativeElement.querySelector('.dash-insight__no-action')).not.toBeNull();
-
-    fixture.componentInstance.card.update((card) => ({
-      ...card,
-      action: { label: 'Assign it', route: '/app/ongoing/requests', params: {} },
-    }));
-    fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.dash-insight__action').textContent).toContain('Assign it');
   });
 });
 

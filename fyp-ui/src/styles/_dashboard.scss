@@ -94,7 +94,7 @@
 .dash {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
   width: 100%;
   max-width: var(--layout-max);
   margin-inline: auto;
@@ -104,7 +104,7 @@
 .dash__band {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: var(--space-4);
+  gap: var(--space-3);
   // Cards size to their content rather than stretching to the tallest in the
   // row: a short panel padded out to match a long one is mostly empty border.
   align-items: start;
@@ -132,7 +132,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3);
   background: var(--viz-surface);
   border: 1px solid var(--apu-border);
   border-radius: var(--radius-card);
@@ -353,8 +353,7 @@
 
 @media print {
   .dash__filters,
-  .dash__actions,
-  .dash-panel__tools { display: none !important; }
+  .dash__actions { display: none !important; }
 
   .dash__band { display: block; }
   .dash-card {

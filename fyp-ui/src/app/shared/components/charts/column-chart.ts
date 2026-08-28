@@ -78,7 +78,7 @@ import { categoriesOf, columnPath, linearScale, niceDomain, stackedTotals, thinL
       </svg>
     </div>
     @if (scrollable()) {
-      <p class="viz-scroll__hint">Scroll sideways for earlier buckets · the table view carries all of them.</p>
+      <p class="viz-scroll__hint">Scroll sideways for earlier buckets.</p>
     }
 
     @if (hovered(); as active) {
@@ -111,7 +111,7 @@ export class ColumnChartComponent extends VizChartBase {
   });
 
   readonly domain = computed(() => {
-    const values = this.stacked() || this.series().length > 1 ? stackedTotals(this.series()) : [];
+    const values = this.stacked() ? stackedTotals(this.series()) : [];
     for (const entry of this.series()) {
       for (const point of entry.points) values.push(Number(point.y ?? 0));
     }
@@ -130,20 +130,43 @@ export class ColumnChartComponent extends VizChartBase {
     const categories = this.categories();
     if (!categories.length) return [];
     const slotWidth = this.innerWidth() / categories.length;
-    const barWidth = Math.min(24, Math.max(4, slotWidth * 0.62));
     const y = this.y();
     const baseline = this.baseline();
     const lowest = Math.min(...this.thresholds().map((t) => t.value ?? Infinity), Infinity);
     const keptLabels = thinLabels(categories, this.isNarrow() ? 4 : 8);
+    const grouped = !this.stacked() && this.series().length > 1;
+
+    // Grouped: each series gets its own bar, side by side, with a 4px gap
+    // between them — three bars that read as three separate quantities rather
+    // than the stacked total this shape is deliberately not.
+    const groupGap = 4;
+    const barWidth = grouped
+      ? Math.min(24, Math.max(4, (slotWidth * 0.72 - groupGap * (this.series().length - 1)) / this.series().length))
+      : Math.min(24, Math.max(4, slotWidth * 0.62));
+    const groupWidth = grouped ? barWidth * this.series().length + groupGap * (this.series().length - 1) : barWidth;
 
     return categories.map((category, index) => {
-      const x = this.padding().left + slotWidth * index + (slotWidth - barWidth) / 2;
+      const groupX = this.padding().left + slotWidth * index + (slotWidth - groupWidth) / 2;
       let cursor = baseline;
       let total = 0;
-      const segments = this.series().map((entry) => {
+      const segments = this.series().map((entry, seriesIndex) => {
         const point = entry.points.find((candidate) => String(candidate.x ?? '') === category) ?? { x: category, y: 0 };
         const value = Number(point.y ?? 0);
         total += value;
+        if (grouped) {
+          const x = groupX + seriesIndex * (barWidth + groupGap);
+          const height = Math.max(0, baseline - y(value));
+          const top = baseline - height;
+          return {
+            seriesKey: entry.key,
+            label: entry.label,
+            colorSlot: entry.colorSlot,
+            dashed: !!entry.dashed,
+            value,
+            point,
+            path: columnPath(x, top, barWidth, height, 4),
+          };
+        }
         const rawHeight = baseline - y(value);
         // 2px surface gap between stack segments.
         const height = Math.max(0, rawHeight - (this.series().length > 1 ? 2 : 0));
@@ -156,15 +179,15 @@ export class ColumnChartComponent extends VizChartBase {
           dashed: !!entry.dashed,
           value,
           point,
-          path: columnPath(x, top, barWidth, height, 4),
+          path: columnPath(groupX, top, barWidth, height, 4),
         };
       });
       return {
         key: category,
         label: this.axisLabel(category, 'x'),
-        x,
-        width: barWidth,
-        top: y(total),
+        x: groupX,
+        width: groupWidth,
+        top: grouped ? y(Math.max(...segments.map((s) => s.value), 0)) : y(total),
         breached: Number.isFinite(lowest) && total > lowest,
         showLabel: keptLabels[index] !== null,
         segments,

@@ -54,7 +54,7 @@ def on_time_delivery(cur, scope: Scope) -> dict[str, Any]:
             if minutes is not None
             else f"{result['delivered']} delivered in period"
         ),
-        target={"min": 0.95, "label": "target >= 95%"},
+        target={"min": 0.95, "label": "Goal: 95% or higher"},
         status=status_for(result["rate"], minimum=0.95, critical=0.85, higher_is_better=True),
         definition="M19 — delivered_at on or before request_fmb.date + serve_time",
         empty="No orders have been delivered in this period.",
@@ -464,7 +464,7 @@ def order_lifecycle(cur, scope: Scope) -> dict[str, Any]:
     return panel(
         title="Order lifecycle latency",
         subtitle="Median hours per week: accept, prepare, deliver",
-        chart="stacked-bar",
+        chart="column-chart",
         series_list=[
             series("accept", "Accept", 1, [{"x": r["x"], "y": r["accept"]} for r in data]),
             series("prepare", "Prepare", 2, [{"x": r["x"], "y": r["prepare"]} for r in data]),

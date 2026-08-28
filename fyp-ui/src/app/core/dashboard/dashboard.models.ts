@@ -40,6 +40,7 @@ export type ChartKind =
   | 'timeline-chart'
   | 'dot-plot'
   | 'funnel'
+  | 'donut-chart'
   | 'meter'
   | 'alert-list';
 
@@ -109,17 +110,6 @@ export interface Annotation {
   style?: 'solid' | 'long-dash';
 }
 
-export interface TableColumn {
-  key: string;
-  label: string;
-  format: ValueFormat;
-}
-
-export interface TableView {
-  columns: TableColumn[];
-  rows: Record<string, unknown>[];
-}
-
 interface WidgetBase {
   id: string;
   kind: WidgetKind;
@@ -157,9 +147,6 @@ export interface PanelWidget extends WidgetBase {
   series: Series[];
   axes: Axes;
   annotations: Annotation[];
-  /** Ships with every panel. The screen-reader path, the CSV source, and the
-   *  fallback when a chart cannot render. */
-  tableView: TableView | null;
   caption?: string | null;
   caveat?: string | null;
   empty?: string | null;
@@ -173,19 +160,21 @@ export interface PanelWidget extends WidgetBase {
   suppressed?: number;
 }
 
-export type DashboardWidget = StatWidget | PanelWidget;
-
-export interface InsightCard {
-  id: string;
-  code: string;
-  severity: 'critical' | 'serious' | 'warning' | 'info';
-  title: string;
-  body: string;
-  evidence: Record<string, unknown>;
-  /** Absent where the viewer can do nothing about it — a button that leads
-   *  somewhere the API refuses is worse than no button. */
-  action: { label: string; route: string; params: Record<string, unknown> } | null;
+/** One count chip in the Request Counts strip (Inbox / Ongoing / Completed / Late). */
+export interface CountItem {
+  key: string;
+  label: string;
+  value: number;
+  status: VizStatus;
+  drill?: Drill | null;
 }
+
+export interface CountsWidget {
+  kind: 'counts';
+  items: CountItem[];
+}
+
+export type DashboardWidget = StatWidget | PanelWidget;
 
 export interface QuickAction {
   key: string;
@@ -238,12 +227,12 @@ export interface DashboardDocument {
   reason?: string;
   message?: string;
   period: DashboardPeriod;
+  requestCounts: CountsWidget | null;
   hero: StatWidget;
   kpis: StatWidget[];
   signature: PanelWidget;
   panels: PanelWidget[];
   alerts: PanelWidget;
-  insights: InsightCard[];
   quickActions: QuickAction[];
   mobile: { kpiOrder: string[] };
   extras: Record<string, DashboardWidget>;

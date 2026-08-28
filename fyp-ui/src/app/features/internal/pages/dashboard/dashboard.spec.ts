@@ -50,7 +50,6 @@ function panel(id: string, overrides: Partial<PanelWidget> = {}): PanelWidget {
     ],
     axes: { x: { type: 'linear', format: 'count' } },
     annotations: [],
-    tableView: { columns: [{ key: 'label', label: 'Item', format: 'text' }], rows: [{ label: 'One' }] },
     caption: null,
     caveat: null,
     empty: 'Nothing here yet.',
@@ -63,7 +62,7 @@ function panel(id: string, overrides: Partial<PanelWidget> = {}): PanelWidget {
 }
 
 /** A profile nothing in the client has heard of: unknown key, unknown widget
- *  ids, unknown insight code. */
+ *  ids. */
 function inventedDocument(): DashboardDocument {
   return {
     profile: {
@@ -86,22 +85,12 @@ function inventedDocument(): DashboardDocument {
       to: '2026-08-28',
       comparedTo: { from: '2026-06-29', to: '2026-07-29', label: 'previous 30 days' },
     },
+    requestCounts: null,
     hero: stat('hyd_nutrient_balance', { kind: 'hero', label: 'Nutrient balance', value: 0.94, format: 'ratio' }),
     kpis: [stat('hyd_ph_drift'), stat('hyd_light_hours'), stat('hyd_yield')],
     signature: panel('hyd_bed_occupancy', { signature: true, title: 'Bed occupancy', chart: 'heatmap', data: { rows: ['Bed 1'], columns: ['2026-08-27'], cells: [{ label: 'Bed 1', date: '2026-08-27', ratio: 0.4 }], threshold: 1 } }),
     panels: [panel('hyd_flow_rate'), panel('hyd_harvest_window', { chart: 'column-chart' })],
     alerts: panel('hyd_at_risk', { chart: 'alert-list', title: 'At risk', data: { stalled: { count: 3, thresholdHours: 96 } } }),
-    insights: [
-      {
-        id: 'AI-99',
-        code: 'NUTRIENT_DRIFT',
-        severity: 'serious',
-        title: 'Nutrient balance has drifted for three weeks',
-        body: 'Explanation.',
-        evidence: { metric: 'M99', value: 0.94 },
-        action: { label: 'Open the log', route: '/app/inbox/requests', params: {} },
-      },
-    ],
     quickActions: [{ key: 'review_inbox', label: 'Review inbox', icon: 'inbox', route: '/app/inbox/requests', params: {}, badge: 4 }],
     mobile: { kpiOrder: ['hyd_yield', 'hyd_ph_drift', 'hyd_light_hours'] },
     extras: {},
@@ -146,13 +135,8 @@ describe('DashboardComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('app-stat-tile')).toHaveLength(4);
     expect(text).toContain('Nutrient balance');
     // Signature, two supporting panels, and the alerts rail.
-    expect(fixture.nativeElement.querySelectorAll('app-chart-panel').length).toBeGreaterThanOrEqual(4);
+    expect(fixture.nativeElement.querySelectorAll('app-chart-panel').length).toBeGreaterThanOrEqual(3);
     expect(text).toContain('Bed occupancy');
-    // An insight code the client has never heard of still renders with its
-    // evidence and its action.
-    expect(text).toContain('Nutrient balance has drifted for three weeks');
-    expect(text).toContain('M99');
-    expect(text).toContain('Open the log');
   });
 
   it('renders the R8 footnote when the server withheld buckets', () => {
@@ -202,6 +186,24 @@ describe('DashboardComponent', () => {
     expect(fixture.nativeElement.querySelector('.dash__banner--error')).not.toBeNull();
   });
 
+  it('renders the request counts strip when the server sends one', () => {
+    const document = inventedDocument();
+    document.requestCounts = {
+      kind: 'counts',
+      items: [
+        { key: 'inbox', label: 'Inbox', value: 3, status: 'unknown', drill: null },
+        { key: 'ongoing', label: 'Ongoing', value: 5, status: 'unknown', drill: null },
+        { key: 'completed', label: 'Completed', value: 40, status: 'good', drill: null },
+        { key: 'late', label: 'Late', value: 1, status: 'critical', drill: null },
+      ],
+    };
+    flush(document as unknown as Record<string, unknown>);
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Inbox');
+    expect(text).toContain('Late');
+    expect(fixture.nativeElement.querySelectorAll('.dash-counts__item')).toHaveLength(4);
+  });
+
   it('scrolls to an in-page anchor rather than navigating for a panel drill', () => {
     flush(inventedDocument() as unknown as Record<string, unknown>);
     // The rendered signature panel carries its own anchor id, which is what a
@@ -215,14 +217,6 @@ describe('DashboardComponent', () => {
 
     fixture.componentInstance.navigate({ route: '#panel-hyd_bed_occupancy', params: {} });
     expect(scrolled).toBe(true);
-  });
-
-  it('exposes a CSV export URL per panel carrying the active filters', () => {
-    flush(inventedDocument() as unknown as Record<string, unknown>);
-    const href = fixture.componentInstance.exportHref(panel('hyd_flow_rate'));
-    expect(href).toContain('/dashboard/export?');
-    expect(href).toContain('widget=hyd_flow_rate');
-    expect(href).toContain('period=30d');
   });
 
   afterEach(() => {

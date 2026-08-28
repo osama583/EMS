@@ -88,11 +88,16 @@
       </p>
     </div>
 
+    <!-- Request counts · Inbox / Ongoing / Completed / Late, compact strip -->
+    @if (requestCounts(); as counts) {
+      <app-counts-strip [counts]="counts" (drill)="navigate($event)" />
+    }
+
     <!-- Alerts rail · first on a phone, band 4 on a desktop -->
     @if (isNarrow() && alerts(); as rail) {
       <div class="dash__band dash__band--mobile-alerts">
         <div class="dash-col-12">
-          <app-chart-panel [panel]="rail" [exportHref]="exportHref(rail)" (drill)="navigate($event)" (retry)="retry()" />
+          <app-chart-panel [panel]="rail" (drill)="navigate($event)" (retry)="retry()" />
         </div>
       </div>
     }
@@ -134,7 +139,6 @@
         <div class="dash-col-12">
           <app-chart-panel
             [panel]="signaturePanel"
-            [exportHref]="exportHref(signaturePanel)"
             (drill)="navigate($event)"
             (retry)="retry()"
           />
@@ -161,7 +165,6 @@
                 <div class="dash-panel__body">
                   <app-chart-panel
                     [panel]="panel"
-                    [exportHref]="exportHref(panel)"
                     (drill)="navigate($event)"
                     (retry)="retry()"
                   />
@@ -171,7 +174,6 @@
           } @else {
             <app-chart-panel
               [panel]="panel"
-              [exportHref]="exportHref(panel)"
               (drill)="navigate($event)"
               (retry)="retry()"
             />
@@ -180,27 +182,14 @@
       }
     </div>
 
-    <!-- Band 4 · Decision support -->
-    <div class="dash__band">
-      <div class="dash-col-8 dash__insights">
-        <h2 class="dash__section-title">What needs a decision</h2>
-        @if (insights().length) {
-          <div class="dash__insight-grid">
-            @for (card of insights(); track card.id) {
-              <app-insight-card [card]="card" (act)="onInsight($event)" />
-            }
-          </div>
-        } @else {
-          <p class="viz-empty">Nothing in this period crossed a threshold worth raising.</p>
-        }
-      </div>
-
-      @if (!isNarrow() && alerts(); as rail) {
-        <div class="dash-col-4">
-          <app-chart-panel [panel]="rail" [exportHref]="exportHref(rail)" (drill)="navigate($event)" (retry)="retry()" />
+    <!-- Band 4 · Alerts -->
+    @if (!isNarrow() && alerts(); as rail) {
+      <div class="dash__band">
+        <div class="dash-col-12">
+          <app-chart-panel [panel]="rail" (drill)="navigate($event)" (retry)="retry()" />
         </div>
-      }
-    </div>
+      </div>
+    }
 
     <!-- Band 5 · Quick actions -->
     @if (!isNarrow() && quickActions().length) {

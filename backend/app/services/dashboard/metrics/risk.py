@@ -6,6 +6,7 @@ not a metric, and does not belong on a dashboard.
 """
 from __future__ import annotations
 
+import datetime as dt
 import statistics
 from typing import Any
 
@@ -51,6 +52,88 @@ def at_risk_tasks(cur, scope: Scope, spec: DepartmentSpec) -> dict[str, Any]:
                 "status": r["status"],
                 "date": r["soonest"].isoformat(),
                 "eventTitle": r["event_title"],
+            }
+            for r in rows
+        ],
+    }
+
+
+# The Risk List's threshold, per department, in the unit its own deadline is
+# naturally read in - minutes for a same-day dispatch job (transport, campus
+# tour, photo/video), hours for food (prep starts shortly before serve, never
+# ten hours out), a day for the rest, where the crew has genuine multi-day
+# lead time. A single days-wide window (see at_risk_tasks above) would flag
+# every transport job as "at risk" always, since none of them are ever booked
+# more than a day out to begin with - the threshold has to match how far in
+# advance the work is normally staffed, not one global number.
+_RISK_THRESHOLD_MINUTES: dict[str, int] = {
+    "transport_services": 10,
+    "student_services": 10,
+    "photography_services": 10,
+    "food_beverage_services": 4 * 60,
+}
+_DEFAULT_RISK_THRESHOLD_MINUTES = 24 * 60  # everyone else: one day
+
+
+def risk_list(cur, scope: Scope, spec: DepartmentSpec) -> dict[str, Any]:
+    """The plain job-by-job Risk List: work that has not started (no row/task
+    assignee yet) whose own deadline - date plus the department's start-time
+    column - is inside this department's threshold, or has already passed.
+
+    Deliberately independent of at_risk_tasks()/M70 above: that one metric is
+    a fixed days-wide window shared by every department, which is exactly the
+    wrong shape once thresholds are department-specific and mixed-unit
+    (minutes for same-day dispatch work, hours for food, a day for the rest -
+    see _RISK_THRESHOLD_MINUTES). Any hero/count reusing this list's `count`
+    stays in sync with what the list itself shows by construction, since both
+    read the same rows.
+    """
+    minutes = _RISK_THRESHOLD_MINUTES.get(spec.unit_code, _DEFAULT_RISK_THRESHOLD_MINUTES)
+    # student_services (campus tours) carries no time-of-day column at all - the
+    # date itself, at midnight, is the only deadline the schema has.
+    deadline_expr = f'(d."date" + d.{spec.start_column})' if spec.start_column else 'd."date"::timestamp'
+    rows = fetch_all(
+        cur,
+        f"""
+        SELECT t.request_task_id AS task_id,
+               t.request_id AS request_id,
+               t.status AS status,
+               min({deadline_expr}) AS deadline,
+               r.event_title AS event_title,
+               r.request_code AS request_code
+          FROM request_task t
+          JOIN request r ON r.request_id = t.request_id
+          JOIN {spec.table} d ON d.request_id = t.request_id
+         WHERE t.assigned_unit_code = %(unit)s
+           AND t.status NOT IN ('completed', 'cancelled')
+           AND r.status <> ALL(%(non_committed)s)
+           AND NOT EXISTS (
+                SELECT 1 FROM request_row_assignment ra
+                 WHERE ra.requirement_name = %(requirement)s AND ra.row_id = d.{spec.pk}
+           )
+           AND NOT EXISTS (
+                SELECT 1 FROM task_assignment ta WHERE ta.request_task_id = t.request_task_id
+           )
+      GROUP BY 1, 2, 3, 5, 6
+        HAVING min({deadline_expr}) <= now() + (%(minutes)s || ' minutes')::interval
+      ORDER BY 4
+         LIMIT 25
+        """,
+        scope.params(non_committed=list(NON_COMMITTED_STATUSES), requirement=spec.requirement, minutes=minutes),
+    )
+    now = dt.datetime.now(r["deadline"].tzinfo) if rows and rows[0]["deadline"].tzinfo else dt.datetime.now()
+    return {
+        "count": len(rows),
+        "thresholdMinutes": minutes,
+        "items": [
+            {
+                "taskId": r["task_id"],
+                "requestId": r["request_id"],
+                "requestCode": r["request_code"],
+                "status": r["status"],
+                "date": r["deadline"].isoformat(),
+                "eventTitle": r["event_title"],
+                "late": r["deadline"] < now,
             }
             for r in rows
         ],

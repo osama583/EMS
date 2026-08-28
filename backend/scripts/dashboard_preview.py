@@ -33,7 +33,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 from app.security.principal import Principal  # noqa: E402
 from app.services.dashboard import QUICK_ACTIONS, _quick_actions  # noqa: E402
-from app.services.dashboard.insights import evaluate  # noqa: E402
 from app.services.dashboard.profiles import PROFILES, layout_for  # noqa: E402
 from app.services.dashboard.scope import DashboardConfig, Scope, resolve_period  # noqa: E402
 from app.services.dashboard.widgets.base import build as build_widget  # noqa: E402
@@ -114,6 +113,12 @@ class SyntheticCursor:
             return base
         if lowered.endswith("_at") or lowered in ("at", "oldest", "approved_at"):
             return dt.datetime.now() - dt.timedelta(hours=index * 6 + 3)
+        if lowered == "deadline":
+            # risk.risk_list()'s `min(date + start_column)` (or `date::timestamp`
+            # for a department with no time-of-day column) - always a real
+            # timestamp, never a date alone, so the naive tzinfo check in
+            # risk_list() has something to call .tzinfo on.
+            return dt.datetime.now() + dt.timedelta(hours=index * 3 - 6)
         if lowered in ("start_time", "end_time", "serve_time", "moving_time", "a_start", "a_end", "b_start", "b_end"):
             hour = 8 + (index * 2) % 10
             extra = 2 if lowered.startswith(("end", "a_end", "b_end")) else 0
@@ -212,7 +217,6 @@ def build_preview(profile_key: str, period: str = "30d", variant: str | None = N
     layout = layout_for(profile_key, variant)
     ids = [layout["hero"], *layout["kpis"], layout["signature"], *layout["panels"], layout["alerts"], *layout.get("mobileKpis", [])]
     results = {widget_id: build_widget(widget_id, cur, scope) for widget_id in dict.fromkeys(ids)}
-    cards = evaluate(cur, scope, list(layout["insights"]), results)
     actions = _quick_actions(cur, scope, list(layout["quickActions"]), results)
     title = unit_label or ("Institutional finance" if profile_key == "cfo" else "Cafeteria operations")
 
@@ -239,7 +243,6 @@ def build_preview(profile_key: str, period: str = "30d", variant: str | None = N
         "signature": results[layout["signature"]],
         "panels": [results[widget_id] for widget_id in layout["panels"]],
         "alerts": results[layout["alerts"]],
-        "insights": cards,
         "quickActions": actions,
         "mobile": {"kpiOrder": list(layout.get("mobileKpis", []))},
         "extras": {wid: results[wid] for wid in layout.get("mobileKpis", []) if wid not in layout["kpis"]},
@@ -302,7 +305,7 @@ def check() -> int:
             populated = [p for p in panels if p.get("series") or (p.get("data") or {})]
             print(
                 f"  {name:28s} {len(widgets):2d} widgets · {len(populated):2d}/{len(panels)} panels populated "
-                f"· {len(document['insights'])} insight(s) · {document['meta']['suppressedBuckets']} suppressed"
+                f"· {document['meta']['suppressedBuckets']} suppressed"
             )
 
     if failures:

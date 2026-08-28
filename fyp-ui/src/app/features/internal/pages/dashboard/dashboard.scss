@@ -181,25 +181,6 @@
   align-content: stretch;
 }
 
-// --- Insights -------------------------------------------------------------
-
-.dash__insights { display: flex; flex-direction: column; gap: var(--space-2); }
-
-.dash__section-title {
-  margin: 0;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--viz-ink-muted);
-}
-
-.dash__insight-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
-  gap: var(--space-3);
-}
-
 // --- Quick actions --------------------------------------------------------
 
 .dash__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
@@ -298,7 +279,6 @@
   .dash__kpis { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2); }
   .dash__actions--mobile { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .dash__action { justify-content: center; }
-  .dash__insight-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media print {

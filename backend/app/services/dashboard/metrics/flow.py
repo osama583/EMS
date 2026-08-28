@@ -10,7 +10,7 @@ from typing import Any
 
 from ....db import fetch_all, fetch_one
 from ..scope import Scope, num, ratio
-from .common import iso_week_start
+from .common import DepartmentSpec, iso_week_start
 
 
 def intake_volume(cur, scope: Scope, *, previous: bool = False) -> int:
@@ -173,6 +173,70 @@ def order_volume(cur, scope: Scope, *, previous: bool = False) -> int:
            AND sel.created_at >= %({lo})s AND sel.created_at < %({hi})s
         """,
         scope.base_params,
+    )
+    return int(row["n"]) if row else 0
+
+
+def request_bucket_counts(cur, scope: Scope) -> dict[str, int]:
+    """Plain counts of this unit's requests by where they sit right now:
+    inbox (awaiting this head's decision), ongoing (decided and being worked),
+    completed, and late (ongoing work whose own deadline has already passed).
+
+    Mirrors the Inbox/Ongoing/History vocabulary used everywhere else in the
+    app (the sidebar's own routes, /app/inbox|ongoing|history/requests) rather
+    than introducing new terms - a head reading "3 in your inbox" already
+    knows what that means from the rest of the product.
+
+    `late` reuses the same "no assignee yet, past its own start-time deadline"
+    definition as risk_list() below, so a request that's overdue shows up
+    consistently whether the head is reading the Risk List or this count.
+    """
+    row = fetch_one(
+        cur,
+        """
+        SELECT count(*) FILTER (WHERE t.status = 'pending') AS inbox,
+               count(*) FILTER (WHERE t.status IN ('approved', 'preparing', 'resubmitted')) AS ongoing,
+               count(*) FILTER (WHERE t.status = 'completed') AS completed
+          FROM request_task t
+         WHERE t.assigned_unit_code = %(unit)s
+        """,
+        scope.base_params,
+    )
+    return {
+        "inbox": int(row["inbox"]) if row else 0,
+        "ongoing": int(row["ongoing"]) if row else 0,
+        "completed": int(row["completed"]) if row else 0,
+    }
+
+
+def late_request_count(cur, scope: Scope, spec: DepartmentSpec | None) -> int:
+    """Ongoing work whose own deadline (date + the department's start-time
+    column) has already passed with nobody assigned to it yet - the same
+    "not started, deadline gone" test risk_list() applies, just counted
+    without the day/hour/minute window, since "late" has no threshold at all:
+    the deadline has simply already gone.
+    """
+    if spec is None:
+        return 0
+    deadline_expr = f'(d."date" + d.{spec.start_column})' if spec.start_column else 'd."date"::timestamp'
+    row = fetch_one(
+        cur,
+        f"""
+        SELECT count(DISTINCT t.request_task_id) AS n
+          FROM request_task t
+          JOIN {spec.table} d ON d.request_id = t.request_id
+         WHERE t.assigned_unit_code = %(unit)s
+           AND t.status NOT IN ('completed', 'cancelled')
+           AND {deadline_expr} < now()
+           AND NOT EXISTS (
+                SELECT 1 FROM request_row_assignment ra
+                 WHERE ra.requirement_name = %(requirement)s AND ra.row_id = d.{spec.pk}
+           )
+           AND NOT EXISTS (
+                SELECT 1 FROM task_assignment ta WHERE ta.request_task_id = t.request_task_id
+           )
+        """,
+        scope.params(requirement=spec.requirement),
     )
     return int(row["n"]) if row else 0
 

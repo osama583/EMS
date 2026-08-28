@@ -33,6 +33,7 @@ export class AiAccessLogComponent {
   readonly pageSize = signal(50);
   readonly page = signal(1);
   readonly search = signal('');
+  readonly outcomeFilter = signal('all');
   readonly loading = signal(true);
   readonly errorMessage = signal('');
   readonly clearOpen = signal(false);
@@ -54,8 +55,11 @@ export class AiAccessLogComponent {
         primary: this.outcomeLabel(row.outcome),
         secondary: row.requiredPages || row.reason || undefined,
         badge: true,
-        tone: row.outcome === 'page_denied' || row.outcome === 'how_to_page_denied' ? 'warning' : 'neutral',
+        tone: this.outcomeTone(row.outcome),
       },
+      // Only a reviewer rejection has a generated answer to show; the pre-generation refusals
+      // never produced one, so an em dash is the truth rather than a missing value.
+      response: { primary: row.aiResponse ?? '—', secondary: row.userRoles ?? undefined },
       when: { primary: this.formatDate(row.createdAt) },
     },
     mobile: {
@@ -65,6 +69,7 @@ export class AiAccessLogComponent {
       identity: row.userEmail ?? 'Guest',
       details: [
         { icon: 'lock', text: row.requiredPages ? `Needs any of: ${row.requiredPages}` : (row.reason ?? 'No page would grant this') },
+        ...(row.aiResponse ? [{ icon: 'smart_toy', text: row.aiResponse }] : []),
         { icon: 'schedule', text: this.formatDate(row.createdAt) },
       ],
     },
@@ -77,7 +82,7 @@ export class AiAccessLogComponent {
     mobileListLabel: 'Denial cards',
     header: {
       title: 'AI Access Log',
-      description: 'Questions the AI assistant did not answer, and why. Either Page Visibility does not grant that person the pages the answer would come from — grant the page — or the assistant does not support the question yet, which is a capability gap rather than a permissions one.',
+      description: 'Questions the AI assistant did not answer, and why. Page Visibility may not grant that person the pages the answer would come from — grant the page — or the assistant does not support the question yet, which is a capability gap rather than a permissions one. Rows flagged by the security reviewer also show the answer it blocked.',
       countLabel: `${this.total()} denial${this.total() === 1 ? '' : 's'}`,
       countIcon: 'gpp_maybe',
       primaryActionLabel: 'Clear log',
@@ -89,6 +94,7 @@ export class AiAccessLogComponent {
       { key: 'topic', label: 'Topic' },
       { key: 'question', label: 'Question' },
       { key: 'outcome', label: 'Why refused' },
+      { key: 'response', label: 'Assistant said' },
       { key: 'when', label: 'When' },
     ],
     actions: [],
@@ -99,7 +105,38 @@ export class AiAccessLogComponent {
     pageSizeOptions: [this.pageSize()],
   }));
 
+  /**
+   * The category filter, offering exactly the outcomes the backend can write (see
+   * api/ai_admin.VALID_OUTCOMES). Grouped in the labels by what an admin would DO about each: the
+   * two "no access" values are fixed by granting a page, the middle two by building something, and
+   * the last two are the assistant correctly declining - a blocked attack is the system working,
+   * not a defect to fix.
+   */
+  readonly filters = computed(() => [
+    {
+      key: 'outcome',
+      ariaLabel: 'Filter by why the assistant refused',
+      value: this.outcomeFilter(),
+      options: [
+        { value: 'all', label: 'All reasons' },
+        { value: 'page_denied', label: 'No access to that page' },
+        { value: 'how_to_page_denied', label: 'No access to that action' },
+        { value: 'out_of_scope', label: 'Outside scope' },
+        { value: 'unsupported', label: 'Not supported yet' },
+        { value: 'harmful', label: 'Blocked as harmful' },
+        { value: 'unrelated_question', label: 'Unrelated question' },
+      ],
+    },
+  ]);
+
   constructor() {
+    this.load();
+  }
+
+  setOutcomeFilter(value: string): void {
+    this.outcomeFilter.set(value);
+    // Same reasoning as setSearch: a narrower result set makes the current offset an empty page.
+    this.page.set(1);
     this.load();
   }
 
@@ -107,7 +144,7 @@ export class AiAccessLogComponent {
     this.loading.set(true);
     this.errorMessage.set('');
     this.service
-      .list(this.page(), this.search())
+      .list(this.page(), this.search(), this.outcomeFilter())
       .pipe(finalize(() => this.loading.set(false)), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (result) => {
@@ -134,6 +171,7 @@ export class AiAccessLogComponent {
 
   reset(): void {
     this.search.set('');
+    this.outcomeFilter.set('all');
     this.page.set(1);
     this.load();
   }
@@ -177,8 +215,21 @@ export class AiAccessLogComponent {
       case 'how_to_page_denied': return 'No access to that action';
       case 'out_of_scope': return 'Outside scope';
       case 'unsupported': return 'Not supported yet';
+      case 'harmful': return 'Blocked as harmful';
+      case 'unrelated_question': return 'Unrelated question';
       default: return outcome;
     }
+  }
+
+  /**
+   * How loudly a row should read. `harmful` is the only one that means someone tried something -
+   * the rest are the assistant declining correctly, which is routine and should not look alarming
+   * enough to bury the one row that matters.
+   */
+  private outcomeTone(outcome: string): 'warning' | 'danger' | 'neutral' {
+    if (outcome === 'harmful') return 'danger';
+    if (outcome === 'page_denied' || outcome === 'how_to_page_denied') return 'warning';
+    return 'neutral';
   }
 
   private formatDate(value: string): string {

@@ -144,6 +144,31 @@ def nav_tree_for(user_id: int, roles: list[dict[str, Any]] | None = None) -> lis
     return build(None)
 
 
+def has_page_access(assignments: tuple[tuple[str, str | None], ...], page_code: str) -> bool:
+    """Would `page_code` be visible in the sidebar for a caller holding `assignments`?
+
+    The same _satisfies_grant() predicate nav_tree_for() applies per page, exposed for callers that
+    hold a Principal's (role_code, unit_code) tuple rather than the roles_for() dict shape - the AI
+    assistant's authorization gate (ai/topic_access.py) being the reason it exists. Sharing the
+    predicate is the entire point: the chat and the sidebar must never disagree about what a page
+    grants, and a second implementation is how they would.
+
+    MULTI-ROLE: true if ANY assignment satisfies ANY grant on the page - the union, never the
+    intersection, matching nav_tree_for().
+
+    FAILS CLOSED: a page with zero grant rows is visible to nobody, same as the sidebar.
+
+    Deliberately checks only this page's OWN grants, not its parent folder's. nav_tree_for() hides
+    a folder's children when the folder itself is not visible, which is a NAVIGATION concern (an
+    unreachable link is confusing); for authorization, the page's own grant is the decision, and
+    inheriting a folder's absence would refuse a topic an administrator explicitly granted."""
+    grants = [g for g in query(_NAV_GRANTS_SQL) if g["page_code"] == page_code]
+    if not grants:
+        return False
+    roles = [{"roleCode": role, "unitCode": unit} for role, unit in (assignments or ())]
+    return any(_satisfies_grant(roles, grant) for grant in grants)
+
+
 def users_with_page_access(page_code: str) -> list[dict[str, Any]]:
     """Active internal users who can see `page_code` in their sidebar, per its
     nav_page_grants rows - the same predicate nav_tree_for() uses per-user, run

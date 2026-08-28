@@ -4,13 +4,12 @@ import { DashboardService } from '../../../../core/dashboard/dashboard.service';
 import {
   DashboardWidget,
   Drill,
-  InsightCard,
   PERIOD_OPTIONS,
   PanelWidget,
   StatWidget,
 } from '../../../../core/dashboard/dashboard.models';
 import { ChartPanelComponent } from '../../../../shared/components/charts/chart-panel';
-import { InsightCardComponent } from '../../../../shared/components/charts/insight-card';
+import { CountsStripComponent } from '../../../../shared/components/charts/counts-strip';
 import { StatTileComponent } from '../../../../shared/components/charts/stat-tile';
 import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
 
@@ -34,7 +33,7 @@ import { LoadingStateComponent } from '../../../../shared/components/loading-sta
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [ChartPanelComponent, InsightCardComponent, StatTileComponent, LoadingStateComponent],
+  imports: [ChartPanelComponent, CountsStripComponent, StatTileComponent, LoadingStateComponent],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -91,10 +90,10 @@ export class DashboardComponent {
   readonly noAccess = computed(() => !this.loading() && !!this.document() && !this.document()!.profile);
   readonly isNarrow = computed(() => this.narrow());
 
+  readonly requestCounts = computed(() => this.document()?.requestCounts ?? null);
   readonly hero = computed(() => this.document()?.hero ?? null);
   readonly signature = computed(() => this.document()?.signature ?? null);
   readonly alerts = computed(() => this.document()?.alerts ?? null);
-  readonly insights = computed(() => this.document()?.insights ?? []);
   readonly quickActions = computed(() => this.document()?.quickActions ?? []);
   readonly meta = computed(() => this.document()?.meta ?? null);
 
@@ -192,10 +191,6 @@ export class DashboardComponent {
     this.service.load({ refresh: true });
   }
 
-  exportHref(panel: PanelWidget): string {
-    return this.service.exportUrl(panel.id);
-  }
-
   retry(): void {
     this.service.load({ refresh: true });
   }
@@ -220,11 +215,6 @@ export class DashboardComponent {
 
   onStat(stat: StatWidget): void {
     this.navigate(stat.drill);
-  }
-
-  onInsight(card: InsightCard): void {
-    if (!card.action) return;
-    this.navigate({ route: card.action.route, params: card.action.params as Record<string, string> });
   }
 
   onQuickAction(action: { route: string | null; params: Record<string, string | number | boolean> }): void {

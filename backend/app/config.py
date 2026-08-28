@@ -56,6 +56,17 @@ class Config:
     log_level: str = os.getenv("LOG_LEVEL", "INFO").upper()
     log_format: str = os.getenv("LOG_FORMAT", "console").lower()
 
+    # --- AI assistant (the ai-orb widget, POST /ai/ask) ---
+    # There is no AI_DATABASE_URL: the Text-to-SQL refactor removed the separate pgvector store,
+    # and structured answers now come from the primary database through the normal pool. The only
+    # thing the feature needs is a Gemini key.
+    #
+    # gemini_api_key_2 is an optional FAILOVER key, not a second tenant: every call starts on the
+    # primary and only switches once the primary is confirmed rate-limited (see gemini.py's
+    # _generate_content). Unset, every call simply uses the one client that exists.
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    gemini_api_key_2: str = os.getenv("GEMINI_API_KEY_2", "")
+
     # --- Demo login picker (TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)) ---
     # Gates GET /auth/dev-users. Off by default; a deployed environment that
     # never sets DEMO_MODE serves nothing from that route regardless of what
@@ -66,6 +77,14 @@ class Config:
     @property
     def is_development(self) -> bool:
         return self.env == "development"
+
+    @property
+    def ai_enabled(self) -> bool:
+        """The assistant is available iff a Gemini key is configured. Deliberately a derived
+        property rather than its own AI_ENABLED flag: a deployment with the flag on and no key
+        would fail on the first question instead of at the endpoint's own guard, which is a
+        confusing 500 rather than the clear "not configured on this server" it should be."""
+        return bool(self.gemini_api_key)
 
     def validate(self) -> None:
         missing = [

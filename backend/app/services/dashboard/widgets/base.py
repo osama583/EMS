@@ -39,17 +39,29 @@ def build(widget_id: str, cur, scope: Scope) -> dict[str, Any]:
 
     A widget whose query fails must not blank the page. One bad aggregate should
     cost a department head one panel, not their morning.
+
+    All widgets share one cursor/transaction (see the package docstring), so a
+    failed query leaves Postgres in an aborted-transaction state that would
+    otherwise fail every later statement on this same connection with
+    "current transaction is aborted" - not just this widget's panel, but the
+    rest of the page too. A SAVEPOINT scopes that abort to this widget alone:
+    on failure we roll back to the savepoint (clearing the abort) instead of
+    the whole transaction, so the next widget's queries run clean.
     """
     fn = WIDGET_REGISTRY.get(widget_id)
     if fn is None:
         return {"id": widget_id, "kind": "panel", "state": "error", "message": "Unknown widget."}
+    savepoint = f"sp_{widget_id}"
+    cur.execute(f'SAVEPOINT "{savepoint}"')
     try:
         result = fn(cur, scope)
         result.setdefault("id", widget_id)
         result.setdefault("state", "ok")
+        cur.execute(f'RELEASE SAVEPOINT "{savepoint}"')
         return result
     except Exception:
         log.exception("dashboard.widget.failed", extra={"widget": widget_id, "profile": scope.profile_key})
+        cur.execute(f'ROLLBACK TO SAVEPOINT "{savepoint}"')
         return {
             "id": widget_id,
             "kind": "panel",
@@ -206,10 +218,6 @@ def panel(
         # tells a reader nothing about which chart is incomplete.
         "suppressed": suppressed,
     }
-
-
-def insight_action(label: str, route: str, **params: Any) -> dict[str, Any]:
-    return {"label": label, **drill(route, **params)}
 
 
 # --- Formatting vocabulary ------------------------------------------------

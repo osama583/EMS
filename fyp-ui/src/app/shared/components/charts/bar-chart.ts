@@ -84,8 +84,7 @@ export class BarChartComponent extends VizChartBase {
   readonly plotWidth = computed(() => Math.max(40, this.width() - this.labelWidth() - 72));
 
   /** Rows come from the server already ordered descending; the cap keeps a
-   *  120-item catalogue from becoming a scrolling wall. The table view carries
-   *  the tail. */
+   *  120-item catalogue from becoming a scrolling wall. */
   readonly rowKeys = computed(() => {
     const first = this.series()[0];
     if (!first) return [];
@@ -157,7 +156,7 @@ export class BarChartComponent extends VizChartBase {
     });
   });
 
-  readonly ariaLabel = computed(() => `${this.rowKeys().length} ranked bars. The table view carries every value.`);
+  readonly ariaLabel = computed(() => `${this.rowKeys().length} ranked bars. Each bar is focusable and names its own value.`);
 
   seriesLabel(key: string): string {
     return this.series().find((entry) => entry.key === key)?.label ?? key;

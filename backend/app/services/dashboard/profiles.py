@@ -221,133 +221,69 @@ PROFILES: dict[str, dict[str, Any]] = {
     # overlapping event windows, so the signature panel is a collision timeline
     # rather than an inventory chart.
     "hod_av": {
-        "hero": "av_crew_coverage",
-        "kpis": [
-            "av_rig_collisions",
-            "dept_decision_latency",
-            "dept_unassigned_work",
-            "dept_send_back_rate",
-            "dept_prep_runway",
-        ],
-        "signature": "av_collision_timeline",
-        "panels": [
-            "dept_lane_time",
-            "av_hour_demand",
-            "dept_staff_balance",
-            "dept_catalogue_health",
-            "dept_rework_profile",
-        ],
+        "counts": "dept_request_counts",
+        "hero": "dept_jobs_at_risk",
+        "kpis": [],
+        "signature": "dept_risk_list",
+        "panels": ["dept_staff_balance", "dept_catalogue_health"],
         "alerts": "dept_at_risk",
-        "insights": ["AI-02", "AI-03", "AI-05", "AI-08", "AI-11", "AI-14", "AI-19", "AI-22", "AI-27", "AI-31"],
         "quickActions": ["review_inbox", "assign_work", "catalogue"],
-        "mobileKpis": ["av_rig_collisions", "dept_unassigned_work", "dept_decision_latency"],
+        "mobileKpis": [],
     },
     # -------------------------------------------------------- Logistics --
     # The one department whose constraint is a day total rather than an hour:
     # an item issued in the morning is not back by the afternoon. Hence a
     # heatmap where A/V gets a timeline.
     "hod_logistics": {
-        "hero": "log_peak_commitment",
-        "kpis": [
-            "log_items_over_capacity",
-            "log_venue_conflicts",
-            "dept_decision_latency",
-            "dept_unassigned_work",
-            "dept_off_catalogue",
-        ],
-        "signature": "log_inventory_heatmap",
-        "panels": [
-            "log_stock_runway",
-            "dept_lane_time",
-            "log_venue_turnaround",
-            "dept_staff_balance",
-            "dept_catalogue_health",
-            "dept_forward_demand",
-        ],
+        "counts": "dept_request_counts",
+        "hero": "dept_jobs_at_risk",
+        "kpis": [],
+        "signature": "dept_risk_list",
+        "panels": ["dept_staff_balance", "dept_catalogue_health"],
         "alerts": "dept_at_risk",
-        "insights": ["AI-01", "AI-02", "AI-05", "AI-08", "AI-10", "AI-13", "AI-14", "AI-22", "AI-27", "AI-31"],
         "quickActions": ["review_inbox", "assign_work", "catalogue"],
-        "mobileKpis": ["log_items_over_capacity", "log_venue_conflicts", "dept_unassigned_work"],
+        "mobileKpis": [],
     },
     # -------------------------------------------------------- Transport --
     # Two ceilings, vehicles and drivers. A single ratio is a lie here: reading
     # "1.5" without knowing whether it means no bus or no driver sends the head
     # to the wrong meeting, so the hero names which one binds.
     "hod_transport": {
-        "hero": "trn_binding_constraint",
-        "kpis": [
-            "trn_seat_fill",
-            "trn_driver_bound_days",
-            "trn_consolidation",
-            "dept_decision_latency",
-            "dept_unassigned_work",
-        ],
-        "signature": "trn_roster_board",
-        "panels": [
-            "trn_seat_fill_distribution",
-            "trn_route_concentration",
-            "trn_fleet_utilisation",
-            "dept_staff_balance",
-            "dept_lane_time",
-            "trn_forward_demand",
-        ],
+        "counts": "dept_request_counts",
+        "hero": "dept_jobs_at_risk",
+        "kpis": [],
+        "signature": "dept_risk_list",
+        "panels": ["dept_staff_balance", "dept_catalogue_health"],
         "alerts": "dept_at_risk",
-        "insights": ["AI-02", "AI-05", "AI-07", "AI-11", "AI-13", "AI-19", "AI-22", "AI-27", "AI-30", "AI-31"],
         "quickActions": ["review_inbox", "assign_work", "catalogue"],
-        "mobileKpis": ["trn_driver_bound_days", "dept_unassigned_work", "trn_seat_fill"],
+        "mobileKpis": [],
     },
     # ------------------------------------------------ Student Services --
     # The only department whose capacity requirement is computed rather than
     # observed: a day that looks like three tours can be eleven guides.
     "hod_student_services": {
-        "hero": "sts_guide_coverage",
-        "kpis": [
-            "sts_tours_needing_split",
-            "sts_start_point_congestion",
-            "dept_decision_latency",
-            "dept_unassigned_work",
-            "sts_uncapped_start_points",
-        ],
-        "signature": "sts_guide_demand",
-        "panels": [
-            "sts_start_point_heatmap",
-            "sts_group_sizes",
-            "sts_tour_type_mix",
-            "dept_staff_balance",
-            "dept_lane_time",
-            "sts_forward_demand",
-        ],
+        "counts": "dept_request_counts",
+        "hero": "dept_jobs_at_risk",
+        "kpis": [],
+        "signature": "dept_risk_list",
+        "panels": ["dept_staff_balance", "dept_catalogue_health"],
         "alerts": "dept_at_risk",
-        "insights": ["AI-02", "AI-05", "AI-08", "AI-11", "AI-22", "AI-25", "AI-27", "AI-28", "AI-29", "AI-31"],
         "quickActions": ["review_inbox", "assign_work", "catalogue"],
-        "mobileKpis": ["sts_tours_needing_split", "sts_start_point_congestion", "dept_unassigned_work"],
+        "mobileKpis": [],
     },
     # ------------------------------------------------------ Photography --
     # The only department that accumulates work *after* the event. Forward
     # panels show a shot as done; the deliverable has not shipped. Hence a
     # funnel, and a four-segment lane bar where everyone else has three.
     "hod_photography": {
-        "hero": "pho_delivery_backlog",
-        "kpis": [
-            "pho_coverage_gap",
-            "pho_turnaround",
-            "pho_double_booked",
-            "dept_decision_latency",
-            "pho_roster_resilience",
-        ],
-        "signature": "pho_pipeline",
-        "panels": [
-            "pho_shoot_calendar",
-            "pho_turnaround_distribution",
-            "pho_photographer_load",
-            "dept_catalogue_health",
-            "pho_lane_time",
-            "dept_forward_demand",
-        ],
+        "counts": "dept_request_counts",
+        "hero": "dept_jobs_at_risk",
+        "kpis": [],
+        "signature": "dept_risk_list",
+        "panels": ["dept_staff_balance", "dept_catalogue_health"],
         "alerts": "dept_at_risk",
-        "insights": ["AI-05", "AI-11", "AI-14", "AI-16", "AI-18", "AI-19", "AI-21", "AI-22", "AI-24", "AI-31"],
         "quickActions": ["review_inbox", "assign_work", "catalogue"],
-        "mobileKpis": ["pho_coverage_gap", "pho_delivery_backlog_kpi", "pho_double_booked"],
+        "mobileKpis": [],
     },
     # ------------------------------------------------------------- F&B --
     # A gatekeeper, a department lane, and a supply orchestrator at once. The
@@ -372,7 +308,6 @@ PROFILES: dict[str, dict[str, Any]] = {
             "fmb_order_lifecycle",
         ],
         "alerts": "fmb_at_risk",
-        "insights": ["AI-04", "AI-06", "AI-09", "AI-12", "AI-15", "AI-17", "AI-20", "AI-23", "AI-26", "AI-31"],
         "quickActions": ["review_inbox", "review_gate", "menu_oversight"],
         "mobileKpis": ["fmb_orders_at_risk", "fmb_gate_queue", "fmb_pushback_rate"],
     },
@@ -381,14 +316,18 @@ PROFILES: dict[str, dict[str, Any]] = {
     # people only: no detail table is known for it, so nothing that depends on
     # one is offered.
     "hod_generic": {
+        # No detail table is known for this unit (see maybe_spec()), so neither
+        # dept_jobs_at_risk/dept_risk_list (needs a department spec to find a
+        # deadline column) nor dept_catalogue_health (needs an option table)
+        # can run here - this profile keeps the flow/quality fallback shape.
+        "counts": "dept_request_counts",
         "hero": "gen_clearance_rate",
-        "kpis": ["dept_decision_latency", "gen_open_backlog", "dept_send_back_rate", "gen_first_pass_yield"],
+        "kpis": ["gen_open_backlog", "gen_first_pass_yield"],
         "signature": "gen_backlog_age",
-        "panels": ["dept_lane_time", "gen_throughput", "dept_staff_balance", "dept_rework_profile"],
+        "panels": ["dept_staff_balance"],
         "alerts": "gen_stalled",
-        "insights": ["AI-05", "AI-27", "AI-31"],
         "quickActions": ["review_inbox", "assign_work"],
-        "mobileKpis": ["gen_open_backlog", "dept_decision_latency", "dept_send_back_rate"],
+        "mobileKpis": ["gen_open_backlog", "gen_first_pass_yield"],
     },
     # ----------------------------------------------------------- School --
     # One profile, two shapes. The signature panel and three of the KPIs are
@@ -433,10 +372,6 @@ PROFILES: dict[str, dict[str, Any]] = {
             ],
         },
         "alerts": "hos_at_risk",
-        "insights": {
-            "service": ["AI-05", "AI-11", "AI-16", "AI-20", "AI-26", "AI-31", "AI-32", "AI-33", "AI-34"],
-            "commercial": ["AI-04", "AI-16", "AI-20", "AI-23", "AI-26", "AI-31", "AI-33", "AI-35", "AI-36", "AI-37"],
-        },
         "quickActions": ["review_gate", "school_history"],
         "mobileKpis": {
             "service": ["hos_gate_latency", "hos_stall_rate", "hos_end_to_end_kpi"],
@@ -467,7 +402,6 @@ PROFILES: dict[str, dict[str, Any]] = {
             "cfo_finance_catalogue",
         ],
         "alerts": "cfo_at_risk",
-        "insights": ["AI-04", "AI-20", "AI-22", "AI-23", "AI-31", "AI-33", "AI-36", "AI-38", "AI-39", "AI-40"],
         "quickActions": ["review_gate", "menu_oversight", "funding_catalogue"],
         "mobileKpis": ["cfo_gate_queue", "cfo_collection", "cfo_forward_spend_kpi"],
     },
@@ -475,27 +409,19 @@ PROFILES: dict[str, dict[str, Any]] = {
     # A shift tool, not an analysis tool. The most-used of the ten and the only
     # one whose hero is a live count rather than a rate.
     "cafeteria_manager": {
+        # Orders at Risk / Risk List does not apply here (see caf_orders_at_risk
+        # and cafeteria.py's module docstring: assignment happens right before
+        # prep starts, not on approval, so the "unstarted work due soon" shape
+        # the HOD Risk List looks for is never a real signal for this role) -
+        # caf_orders_at_risk stays this profile's own hero.
+        "counts": "caf_request_counts",
         "hero": "caf_orders_at_risk",
-        "kpis": [
-            "caf_claim_latency",
-            "caf_on_time",
-            "caf_menu_readiness",
-            "caf_staff_availability",
-            "caf_pushback_rate",
-        ],
+        "kpis": ["caf_on_time", "caf_pushback_rate"],
         "signature": "caf_service_board",
-        "panels": [
-            "caf_claim_distribution",
-            "caf_order_lifecycle",
-            "caf_menu_performance",
-            "caf_dietary_coverage",
-            "caf_staffing_timeline",
-            "caf_forward_demand",
-        ],
+        "panels": ["caf_staff_workload", "caf_menu_performance"],
         "alerts": "caf_at_risk",
-        "insights": ["AI-06", "AI-15", "AI-17", "AI-22", "AI-23", "AI-41", "AI-42", "AI-43", "AI-44", "AI-45"],
-        "quickActions": ["cafeteria_orders", "my_staff", "menu"],
-        "mobileKpis": ["caf_claim_latency", "caf_staff_availability", "caf_on_time"],
+        "quickActions": [],
+        "mobileKpis": ["caf_on_time", "caf_pushback_rate"],
     },
 }
 

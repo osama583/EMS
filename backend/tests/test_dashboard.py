@@ -25,7 +25,6 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 from app.security.principal import Principal  # noqa: E402
 from app.services.dashboard import QUICK_ACTIONS, _quick_actions, build_document  # noqa: E402
-from app.services.dashboard.insights import MAX_CARDS, RULES, evaluate  # noqa: E402
 from app.services.dashboard.metrics.common import DEPARTMENT_SPEC  # noqa: E402
 from app.services.dashboard.profiles import (  # noqa: E402
     DEPARTMENT_PROFILE,
@@ -150,12 +149,6 @@ def test_every_profile_names_registered_widgets():
             assert widget_id in WIDGET_REGISTRY, f"{key}/{variant} names unknown widget {widget_id}"
 
 
-def test_every_profile_names_registered_insight_rules():
-    for key, variant, layout in _layouts():
-        for rule_id in layout["insights"]:
-            assert rule_id in RULES, f"{key}/{variant} names unknown rule {rule_id}"
-
-
 def test_every_profile_names_registered_quick_actions():
     for key, variant, layout in _layouts():
         for action in layout["quickActions"]:
@@ -164,11 +157,22 @@ def test_every_profile_names_registered_quick_actions():
 
 def test_no_two_profiles_share_a_signature_panel():
     """The whole premise of ten dashboards rather than one with ten titles: band
-    two is the role's own instrument."""
+    two is the role's own instrument.
+
+    dept_risk_list is a deliberate exception: the HOD simplification unifies
+    every service department (A/V, Logistics, Transport, Student Services,
+    Photography) on the same plain "jobs at risk" signature panel, on purpose
+    - a head reading a different department's dashboard should see the same
+    shape, not a bespoke instrument per lane. CFO, School, F&B and Cafeteria
+    are untouched by that simplification and still keep their own.
+    """
+    _SHARED_BY_DESIGN = {"dept_risk_list", "gen_backlog_age"}
     signatures = {}
     for key, variant, layout in _layouts():
         name = f"{key}:{variant}" if variant else key
         signature = layout["signature"]
+        if signature in _SHARED_BY_DESIGN:
+            continue
         assert signature not in signatures, (
             f"{name} shares its signature panel {signature} with {signatures[signature]}"
         )
@@ -183,10 +187,21 @@ def test_every_department_profile_has_a_spec():
 
 def test_mobile_kpi_order_is_three_tiles():
     """Three tiles is what a phone shows above the fold after the hero. More is
-    a scroll; fewer wastes the row."""
+    a scroll; fewer wastes the row.
+
+    Only applies to a profile that actually carries a KPI row at all - the
+    simplified HOD profiles (hero + Request Counts + Risk List + two panels,
+    no KPI tiles) have nothing for mobileKpis to reorder, so an empty list
+    there is the correct answer, not a shortfall.
+    """
     for key, variant, layout in _layouts():
+        kpi_count = len(layout.get("kpis") or [])
+        if kpi_count == 0:
+            assert not layout.get("mobileKpis"), f"{key}/{variant} lists mobileKpis but has no kpis"
+            continue
+        expected = min(3, kpi_count)
         order = layout.get("mobileKpis", [])
-        assert len(order) == 3, f"{key}/{variant} lists {len(order)} mobile KPIs"
+        assert len(order) == expected, f"{key}/{variant} lists {len(order)} mobile KPIs, expected {expected}"
 
 
 # --- Empty database -------------------------------------------------------
@@ -205,7 +220,7 @@ def test_widget_survives_an_empty_database(widget_id):
     scope = make_scope(profile_key, unit_code, outlets)
     result = build_widget(widget_id, FakeCursor(), scope)
     assert result["state"] != "error", f"{widget_id} errored on an empty database"
-    assert result["kind"] in ("hero", "kpi", "panel")
+    assert result["kind"] in ("hero", "kpi", "panel", "counts")
     if result["kind"] == "panel":
         assert result["tableView"] is not None, f"{widget_id} ships no table view"
 
@@ -220,6 +235,8 @@ def _profile_for_widget(widget_id: str) -> str:
             *layout["panels"],
             *layout.get("mobileKpis", []),
         }
+        if layout.get("counts"):
+            ids.add(layout["counts"])
         if widget_id in ids:
             return key
     raise AssertionError(f"{widget_id} is registered but no profile uses it")
@@ -231,58 +248,6 @@ def test_every_registered_widget_is_used_by_a_profile():
         _profile_for_widget(widget_id)
 
 
-# AI-19 is the one rule that should fire on an empty roster, and it is not a
-# false positive: a lane with nobody active in it genuinely is a single point of
-# failure, and that is a standing condition rather than an event. Suppressing it
-# to make this test uniform would hide the one thing worth saying about an
-# unstaffed department.
-FIRES_ON_EMPTY = {"AI-19"}
-
-
-@pytest.mark.parametrize("rule_id", sorted(RULES))
-def test_insight_rule_stays_silent_on_an_empty_database(rule_id):
-    """A rule that fires on no data is a rule that will fire on every dashboard
-    on day one, and the rail trains people to ignore it."""
-    profile_key = next(
-        (key for key, _, layout in _layouts() if rule_id in layout["insights"]),
-        "hod_av",
-    )
-    unit_code, outlets = SCOPE_FOR_PROFILE[profile_key]
-    scope = make_scope(profile_key, unit_code, outlets)
-    cards = evaluate(FakeCursor(), scope, [rule_id], {})
-    if rule_id in FIRES_ON_EMPTY:
-        assert cards and cards[0]["evidence"], f"{rule_id} should report an unstaffed lane"
-        return
-    assert cards == [], f"{rule_id} fired with no data"
-
-
-def test_insight_rail_caps_at_five():
-    scope = make_scope("hod_av", "a_v_services")
-    every_rule = sorted(RULES)
-    assert len(evaluate(FakeCursor(), scope, every_rule, {})) <= MAX_CARDS
-
-
-def test_insight_bodies_carry_evidence():
-    """Every card declares the metric and value it fired on, so a reader can
-    disagree with it on the merits rather than on faith."""
-    from app.services.dashboard.insights import Insight
-
-    sample = Insight(
-        id="AI-01", code="X", severity="warning", title="t", body="b", evidence={"metric": "M30", "value": 1}
-    )
-    payload = sample.as_json()
-    assert payload["evidence"]["metric"]
-    assert "value" in payload["evidence"]
-
-
-def test_ai31_offers_no_action():
-    """AI-31 detects a routing defect nobody can fix from a dashboard. A button
-    here would lead somewhere the API refuses."""
-    rows = [{"unit_code": "a_v_services", "unit_label": "A/V Services", "n": 2, "oldest": None}]
-    cur = FakeCursor({"hos_hod_review": rows})
-    scope = make_scope("hod_av", "a_v_services")
-    cards = evaluate(cur, scope, ["AI-31"], {})
-    assert cards and cards[0]["action"] is None
 
 
 # --- Profile resolution ---------------------------------------------------
@@ -564,5 +529,5 @@ def test_generic_profile_survives_a_unit_with_no_detail_table():
     assert all(w.get("state") != "error" for w in widgets)
     # Its drills land on an unfiltered list rather than one filtered by a
     # requirement the unit does not have.
-    latency = next(w for w in document["kpis"] if w["id"] == "dept_decision_latency")
-    assert "requestKind" not in latency["drill"]["params"]
+    backlog = next(w for w in document["kpis"] if w["id"] == "gen_open_backlog")
+    assert "requestKind" not in backlog["drill"]["params"]

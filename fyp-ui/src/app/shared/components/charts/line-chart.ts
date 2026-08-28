@@ -221,7 +221,7 @@ export class LineChartComponent extends VizChartBase {
 
   readonly ariaLabel = computed(() => {
     const names = this.series().map((entry) => entry.label).join(', ');
-    return `${names} over ${this.categories().length} points. The table view below carries every value.`;
+    return `${names} over ${this.categories().length} points. Hover or focus a point for its exact value.`;
   });
 
   seriesLabel(key: string): string {

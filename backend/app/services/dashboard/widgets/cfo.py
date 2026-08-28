@@ -200,7 +200,7 @@ def price_coverage(cur, scope: Scope) -> dict[str, Any]:
             else None
         ),
         caption=f"{result['priced']} of {result['items']} active menu items priced",
-        target={"min": 0.95, "label": "target >= 95%"},
+        target={"min": 0.95, "label": "Goal: 95% or higher"},
         status=(
             "critical"
             if result["unpricedWithLiveOrders"]

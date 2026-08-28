@@ -262,7 +262,7 @@ export class TimelineChartComponent extends VizChartBase {
   }
 
   readonly ariaLabel = computed(
-    () => `Timeline with ${this.lanes().length} lanes. The table view carries every row.`,
+    () => `Timeline with ${this.lanes().length} lanes. Each bar is focusable and names its own details.`,
   );
 
   private truncate(label: string): string {

@@ -165,5 +165,5 @@ export class DotPlotComponent extends VizChartBase {
     return parts.join(' · ');
   }
 
-  readonly ariaLabel = computed(() => `${this.allPoints().length} points. The table view carries every value.`);
+  readonly ariaLabel = computed(() => `${this.allPoints().length} points. Each point is focusable and names its own value.`);
 }

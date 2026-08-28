@@ -263,7 +263,11 @@ export function categoriesOf(series: Series[]): string[] {
 }
 
 export function hasData(series: Series[]): boolean {
-  return series.some((entry) => entry.points.some((point) => point.y !== null && point.y !== undefined));
+  return series.some((entry) =>
+    entry.points.some(
+      (point) => (point.y !== null && point.y !== undefined) || (point.x !== null && point.x !== undefined),
+    ),
+  );
 }
 
 export function pointsHaveValues(points: Point[]): boolean {

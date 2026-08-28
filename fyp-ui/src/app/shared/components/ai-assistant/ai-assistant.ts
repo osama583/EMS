@@ -488,9 +488,15 @@ export class AiAssistantComponent implements OnDestroy {
     this.closePanel();
   }
 
-  openClubFromCard(_clubId: string): void {
+  // Carries the club id through as `?club=<id>`, which Discover Clubs uses to open that club's
+  // join dialog on arrival (see ClubDiscoverComponent.openClubFromQueryParam). The id used to be
+  // discarded entirely - the card dropped you on the unfiltered list to find the club again
+  // yourself, which makes a suggestion card no more useful than a plain sentence.
+  openClubFromCard(clubId: string): void {
     const underApp = this.router.url.startsWith('/app');
-    void this.router.navigate([underApp ? '/app/clubs/discover' : '/login']);
+    void this.router.navigate([underApp ? '/app/clubs/discover' : '/login'], {
+      queryParams: underApp && clubId ? { club: clubId } : undefined,
+    });
     this.closePanel();
   }
   // Same route/query shape hub-proposals.ts's own row click uses: readOnly is true for any

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute } from '@angular/router';
 import { finalize, forkJoin } from 'rxjs';
 import { AuthService } from '../../../../../core/auth/auth.service';
 import { ClubService } from '../../../../../core/clubs/club.service';
@@ -30,6 +31,7 @@ export class ClubDiscoverComponent {
   private readonly clubService = inject(ClubService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
   private readonly currentUserId = this.auth.user()?.id ?? '';
 
   readonly clubs = signal<readonly ClubRecord[]>([]);
@@ -90,9 +92,31 @@ export class ClubDiscoverComponent {
     forkJoin({ clubs: this.clubService.getClubs({ activeOnly: true, viewerUserId: this.currentUserId }), categories: this.clubService.getCategories({ activeOnly: true }) })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: ({ clubs, categories }) => { this.clubs.set(clubs); this.categories.set(categories); this.loading.set(false); },
+        next: ({ clubs, categories }) => {
+          this.clubs.set(clubs);
+          this.categories.set(categories);
+          this.loading.set(false);
+          this.openClubFromQueryParam();
+        },
         error: () => { this.errorMessage.set('Clubs could not be loaded. Please try again.'); this.loading.set(false); },
       });
+  }
+
+  /**
+   * `?club=<id>` opens that club's join dialog straight away — the landing point for the AI
+   * assistant's club suggestion cards, which are only useful if clicking one actually gets you to
+   * the join action rather than dropping you on an unfiltered list to find it again yourself.
+   *
+   * Runs after the clubs have loaded, because the dialog needs the real record, not just an id.
+   * Silently does nothing when the id is unknown or the club is not joinable (already a member, a
+   * pending request, or the president): `discoverClubs` is the joinable set, and landing on the
+   * full list is the correct outcome for a club that has no join action to offer.
+   */
+  private openClubFromQueryParam(): void {
+    const clubId = this.route.snapshot.queryParamMap.get('club');
+    if (!clubId) return;
+    const club = this.discoverClubs().find((item) => item.id === clubId);
+    if (club) this.openRequestDialog(club);
   }
 
   setSearch(value: string): void { this.search.set(value); this.page.set(1); }

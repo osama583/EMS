@@ -4,12 +4,12 @@ import { AlertListComponent } from './alert-list';
 import { BarChartComponent } from './bar-chart';
 import { ChartFrameComponent } from './chart-frame';
 import { ColumnChartComponent } from './column-chart';
+import { DonutChartComponent } from './donut-chart';
 import { DotPlotComponent } from './dot-plot';
 import { FunnelComponent } from './funnel';
 import { HeatmapComponent } from './heatmap';
 import { LineChartComponent } from './line-chart';
 import { MeterComponent } from './meter';
-import { TableViewComponent } from './table-view';
 import { TimelineChartComponent } from './timeline-chart';
 import { MarkEvent } from './viz-chart.base';
 import { hasData } from './viz';
@@ -32,10 +32,10 @@ import { hasData } from './viz';
   selector: 'app-chart-panel',
   imports: [
     ChartFrameComponent,
-    TableViewComponent,
     LineChartComponent,
     ColumnChartComponent,
     BarChartComponent,
+    DonutChartComponent,
     HeatmapComponent,
     TimelineChartComponent,
     DotPlotComponent,
@@ -44,7 +44,7 @@ import { hasData } from './viz';
     AlertListComponent,
   ],
   template: `
-    <app-chart-frame [panel]="panel()" [empty]="isEmpty()" [exportHref]="exportHref()" [suppressed]="panel().suppressed ?? 0" (retry)="retry.emit($event)">
+    <app-chart-frame [panel]="panel()" [empty]="isEmpty()" [suppressed]="panel().suppressed ?? 0" (retry)="retry.emit($event)">
       @switch (form()) {
         @case ('line') {
           <app-line-chart mode="line" [series]="panel().series" [axes]="panel().axes" [annotations]="panel().annotations" (markSelect)="onMark($event)" />
@@ -53,7 +53,7 @@ import { hasData } from './viz';
           <app-line-chart mode="area" [series]="panel().series" [axes]="panel().axes" [annotations]="panel().annotations" (markSelect)="onMark($event)" />
         }
         @case ('column') {
-          <app-column-chart [series]="panel().series" [axes]="panel().axes" [annotations]="panel().annotations" [data]="panel().data ?? null" [stacked]="panel().series.length > 1" (markSelect)="onMark($event)" />
+          <app-column-chart [series]="panel().series" [axes]="panel().axes" [annotations]="panel().annotations" [data]="panel().data ?? null" [stacked]="panel().chart === 'stacked-bar'" (markSelect)="onMark($event)" />
         }
         @case ('bar') {
           <app-bar-chart [series]="panel().series" [axes]="panel().axes" [annotations]="panel().annotations" [stacked]="panel().series.length > 1" (markSelect)="onMark($event)" />
@@ -70,6 +70,9 @@ import { hasData } from './viz';
         @case ('funnel') {
           <app-funnel [data]="panel().data ?? null" (markSelect)="onMark($event)" />
         }
+        @case ('donut') {
+          <app-donut-chart [data]="panel().data ?? null" [axes]="panel().axes" (markSelect)="onMark($event)" />
+        }
         @case ('meter') {
           <app-meter [data]="panel().data ?? null" (markSelect)="onMark($event)" />
         }
@@ -77,10 +80,6 @@ import { hasData } from './viz';
           <app-alert-list [data]="panel().data ?? null" (open)="drill.emit($event)" (markSelect)="onMark($event)" />
         }
       }
-
-      <div data-slot="table">
-        <app-table-view [view]="panel().tableView" [caption]="tableCaption()" />
-      </div>
     </app-chart-frame>
   `,
   styles: [':host { display: block; height: 100%; } app-chart-frame { height: 100%; }'],
@@ -88,7 +87,6 @@ import { hasData } from './viz';
 })
 export class ChartPanelComponent {
   readonly panel = input.required<PanelWidget>();
-  readonly exportHref = input<string | null>(null);
   readonly drill = output<Drill>();
   readonly retry = output<string>();
 
@@ -115,6 +113,8 @@ export class ChartPanelComponent {
         return 'dot';
       case 'funnel':
         return 'funnel';
+      case 'donut-chart':
+        return 'donut';
       case 'meter':
         return 'meter';
       case 'alert-list':
@@ -132,12 +132,11 @@ export class ChartPanelComponent {
     if (form === 'heatmap') return !((panel.data?.['cells'] as unknown[]) ?? []).length;
     if (form === 'timeline') return !((panel.data?.['lanes'] as unknown[]) ?? []).length;
     if (form === 'funnel') return !((panel.data?.['stages'] as { value: number | null }[]) ?? []).some((s) => s.value);
+    if (form === 'donut') return !((panel.data?.['segments'] as { value: number | null }[]) ?? []).some((s) => s.value);
     if (form === 'meter') return !((panel.data?.['meters'] as unknown[]) ?? []).length;
     if (form === 'alerts') return false; // The rail renders its own "nothing needs attention".
-    return !(panel.tableView?.rows ?? []).length;
+    return true; // An unrecognised chart kind has nothing to render.
   });
-
-  readonly tableCaption = computed(() => `${this.panel().title} — every value in the panel above.`);
 
   onMark(event: MarkEvent): void {
     const panel = this.panel();
