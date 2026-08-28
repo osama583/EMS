@@ -1,0 +1,6 @@
+[
+{"id":"RG6-a","as":"student.computing2@demo.apu.edu.my","q":"any club less than 20?","intent":"THE FAILING CASE - invented membership","expect":"club sizes, NO membership claim; all 5 clubs"},
+{"id":"RG6-b","as":"student.computing2@demo.apu.edu.my","q":"which clubs have fewer than 20 members?","intent":"variation","expect":"all 5 clubs, no membership claim"},
+{"id":"RG6-c","as":"student.computing2@demo.apu.edu.my","q":"which clubs am i a member of?","intent":"the REAL membership question must still work","expect":"APU Photography Club, Single Clubs, 1"},
+{"id":"RG6-d","as":"student.computing@demo.apu.edu.my","q":"am i the president of any club?","intent":"D6 no regression","expect":"Single Clubs + APU Coding Society"}
+]

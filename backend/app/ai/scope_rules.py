@@ -53,6 +53,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+# The "you may aggregate but not identify" marker, proved by sql_guard's rule 7b. Module-level
+# because two unrelated topic blocks below now grant it (event registrations and club members) and
+# a question about only one of them must not depend on the other block having run.
+_COUNT_ONLY = "PUBLIC_COUNT_ONLY"
+
 
 @dataclass(frozen=True)
 class Scope:
@@ -173,7 +178,7 @@ def build_scope(principal, topics: set[str]) -> Scope:
         # below is checked in sql_guard, which rejects any query using that predicate while
         # selecting an identifying column. A predicate cannot express "you may aggregate but not
         # project", so the guard does that half.
-        count_only = "PUBLIC_COUNT_ONLY"
+        count_only = _COUNT_ONLY
         if user_id is not None:
             owner_of_event = (
                 "EXISTS (SELECT 1 FROM request r_own WHERE r_own.request_id = "
@@ -184,7 +189,7 @@ def build_scope(principal, topics: set[str]) -> Scope:
             predicates["event_registration"] = (
                 f"event_registration.user_id = {user_id}",
                 owner_of_event,
-                count_only,
+                _COUNT_ONLY,
             )
             predicates["saved_event"] = (f"saved_event.user_id = {user_id}",)
         else:
@@ -236,9 +241,17 @@ def build_scope(principal, topics: set[str]) -> Scope:
                 f"EXISTS (SELECT 1 FROM clubs c_pres WHERE c_pres.user_id = {user_id}"
                 " AND c_pres.club_id = {table}.club_id)"
             )
+            # Same split as event_registration above, for the same reason: HOW MANY members a club
+            # has is public - `GET /clubs` is @require_auth and returns "memberCount" for every
+            # club to any signed-in caller, and the Discover Clubs UI even sorts by it. Restricting
+            # club_members to self/president made the assistant refuse a number the asker can read
+            # on screen ("I don't have access to club membership details"), which is the
+            # over-refusal half of the same bug as leaking a roster. WHO is in a club stays private;
+            # sql_guard's rule 7b enforces the count/identify split by column.
             predicates["club_members"] = (
                 f"club_members.user_id = {user_id}",
                 president_of.format(table="club_members"),
+                _COUNT_ONLY,
             )
             predicates["club_join_requests"] = (
                 f"club_join_requests.requester_user_id = {user_id}",
@@ -250,9 +263,15 @@ def build_scope(principal, topics: set[str]) -> Scope:
                 president_of.format(table="club_president_change_requests"),
             )
             notes.append(
-                "The asker is NOT a club administrator. They may see club MEMBERSHIP, JOIN "
-                "REQUESTS and PRESIDENT-CHANGE REQUESTS only for themselves, or for a club they "
-                "are the President of. Never for anyone else, and never club-wide."
+                "The asker is NOT a club administrator. They may see WHO is in a club, and JOIN "
+                "REQUESTS and PRESIDENT-CHANGE REQUESTS, only for themselves or for a club they "
+                "are the President of. Never for anyone else.\n"
+                "    HOW MANY members a club has is different, and is PUBLIC - the same number "
+                "Discover Clubs shows every signed-in user. To answer a member-count question "
+                "(\"which club has the most members\", \"any club under 20\"), write an aggregate "
+                "(COUNT) query over club_members and add the marker condition PUBLIC_COUNT_ONLY to "
+                "its WHERE clause. Such a query may return counts and club names, and NOTHING that "
+                "identifies a person. Never refuse a member-COUNT question for lack of access."
             )
             if not is_student:
                 notes.append(

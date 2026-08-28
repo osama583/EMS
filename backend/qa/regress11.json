@@ -1,0 +1,8 @@
+[
+{"id":"RGB-a","as":"student.computing@demo.apu.edu.my","q":"how many events am i organising and how many people signed up for them","intent":"THE FAILING CASE - ownership swallowed","expect":"2 events, 5 registrations"},
+{"id":"RGB-b","as":"student.computing@demo.apu.edu.my","q":"what events did i create?","intent":"variation of ownership","expect":"Career Fair + Hackathon Kickoff only"},
+{"id":"RGB-c","as":"student.computing2@demo.apu.edu.my","q":"show me clubs about photography","intent":"THE FAILING CASE - topical club search","expect":"APU Photography Club"},
+{"id":"RGB-d","as":"student.business@demo.apu.edu.my","q":"any clubs about business?","intent":"variation topical search","expect":"Business Leaders Circle"},
+{"id":"RGB-e","as":"student.computing@demo.apu.edu.my","q":"which event has the most people registered?","intent":"no regression on public counts","expect":"Career Fair (5)"},
+{"id":"RGB-f","as":"student.business@demo.apu.edu.my","q":"how many events are there in total?","intent":"no regression - NOT an ownership question","expect":"8 visible (not narrowed to his own)"}
+]

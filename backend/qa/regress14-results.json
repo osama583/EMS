@@ -1,0 +1,115 @@
+[
+  {
+    "id": "RGE-a",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "THE FAILING CASE",
+    "expect": "'here are the events' - NO registration claim",
+    "exchanges": [
+      {
+        "q": "Show me events in October.",
+        "answer": "Here are the events taking place in October:\n\n- School of Computing Research Symposium on 2026-10-01\n- AI & Data Science Career Fair on 2026-10-06\n- APU Cultural Night on 2026-10-11\n- Annual Hackathon Kickoff on 2026-10-16\n- Case Competition Finals on 2026-10-16\n- Members-Only Photowalk Briefing on 2026-10-16",
+        "sources": [
+          "School of Computing Research Symposium",
+          "Annual Hackathon Kickoff",
+          "Case Competition Finals",
+          "Members-Only Photowalk Briefing",
+          "APU Cultural Night",
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 8206
+      }
+    ]
+  },
+  {
+    "id": "RGE-b",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "variation - browse",
+    "expect": "no personal framing",
+    "exchanges": [
+      {
+        "q": "list events sorted by date",
+        "answer": "Here are the events sorted by date:\n\n- Business Society Networking Lunch: 2026-09-21\n- School of Computing Research Symposium: 2026-10-01\n- AI & Data Science Career Fair: 2026-10-06\n- APU Cultural Night: 2026-10-11\n- Case Competition Finals: 2026-10-16\n- Members-Only Photowalk Briefing: 2026-10-16\n- Annual Hackathon Kickoff: 2026-10-16\n- new test: 2026-08-21",
+        "sources": [
+          "School of Computing Research Symposium",
+          "Business Society Networking Lunch",
+          "Annual Hackathon Kickoff",
+          "Case Competition Finals",
+          "Members-Only Photowalk Briefing",
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 5923
+      }
+    ]
+  },
+  {
+    "id": "RGE-c",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "the REAL registration question must still say so",
+    "expect": "Career Fair, framed as registered",
+    "exchanges": [
+      {
+        "q": "what am i registered for?",
+        "answer": "Aina, you are currently registered for the AI & Data Science Career Fair on October 6, 2026.",
+        "sources": [
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 4634
+      }
+    ]
+  },
+  {
+    "id": "RGE-d",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "clubs browse no regression",
+    "expect": "club list, no membership claim",
+    "exchanges": [
+      {
+        "q": "Show me the clubs.",
+        "answer": "Here are the clubs:\n- 1\n- APU Coding Society\n- APU Photography Club\n- Business Leaders Circle\n- Single Clubs",
+        "sources": [],
+        "clubs": [
+          "APU Photography Club",
+          "Business Leaders Circle",
+          "Single Clubs",
+          "APU Coding Society"
+        ],
+        "navigation": [],
+        "ms": 7010
+      },
+      {
+        "q": "which one has the most members?",
+        "answer": "The Business Leaders Circle has 2 members.",
+        "sources": [],
+        "clubs": [
+          "Business Leaders Circle"
+        ],
+        "navigation": [],
+        "ms": 5055
+      }
+    ]
+  },
+  {
+    "id": "RGE-e",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "D7 no regression",
+    "expect": "own-only hedge",
+    "exchanges": [
+      {
+        "q": "who registered for the AI & Data Science Career Fair?",
+        "answer": "I can only see your own registration for the AI & Data Science Career Fair, which you completed on August 22, 2026.",
+        "sources": [
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 5117
+      }
+    ]
+  }
+]

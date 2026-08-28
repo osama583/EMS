@@ -1,0 +1,94 @@
+[
+  {
+    "id": "RG3-a",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "THE FAILING CASE - scoped-partial roster",
+    "expect": "Must NOT imply Daniel is the only registrant",
+    "exchanges": [
+      {
+        "q": "who registered for the AI & Data Science Career Fair?",
+        "answer": "I can only see your own registration for the AI & Data Science Career Fair, which you completed on August 22, 2026.",
+        "sources": [
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 7245
+      }
+    ]
+  },
+  {
+    "id": "RG3-b",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "ORGANISER - must still get full roster",
+    "expect": "All 5 names (Aina organises it)",
+    "exchanges": [
+      {
+        "q": "who registered for the AI & Data Science Career Fair?",
+        "answer": "I can only show you the people who registered for this event:\n\n- Adel Zeinab\n- Kumar Selvam\n- Aina Rahman\n- Mei Ling Tan\n- Daniel Wong",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "My Events"
+        ],
+        "ms": 4924
+      }
+    ]
+  },
+  {
+    "id": "RG3-c",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "D6 fix must NOT regress",
+    "expect": "YES: Single Clubs + APU Coding Society",
+    "exchanges": [
+      {
+        "q": "am i the president of any club?",
+        "answer": "Yes, you are the president of Single Clubs and the APU Coding Society.",
+        "sources": [],
+        "clubs": [
+          "Single Clubs",
+          "APU Coding Society"
+        ],
+        "navigation": [],
+        "ms": 3670
+      }
+    ]
+  },
+  {
+    "id": "RG3-d",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "true negative must NOT regress",
+    "expect": "none",
+    "exchanges": [
+      {
+        "q": "do i have any pending join requests?",
+        "answer": "I don't have any pending join requests to show you for your account.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "My Clubs",
+          "Discover Clubs"
+        ],
+        "ms": 4609
+      }
+    ]
+  },
+  {
+    "id": "RG3-e",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "own data - scoped but question IS about self",
+    "expect": "Career Fair; must not hedge as incomplete",
+    "exchanges": [
+      {
+        "q": "what am i registered for?",
+        "answer": "You are registered for the AI & Data Science Career Fair on October 6, 2026, starting at 10:00 AM.",
+        "sources": [
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 4521
+      }
+    ]
+  }
+]

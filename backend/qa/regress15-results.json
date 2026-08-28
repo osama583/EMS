@@ -1,0 +1,78 @@
+[
+  {
+    "id": "RGF-a",
+    "as": "guest",
+    "intent": "THE FAILING CASE",
+    "expect": "must NOT claim none exist",
+    "exchanges": [
+      {
+        "q": "show me the private events",
+        "answer": "I don't have access to view private events, so I can't show those to you.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [],
+        "ms": 11187
+      }
+    ]
+  },
+  {
+    "id": "RGF-b",
+    "as": "guest",
+    "intent": "guest browse no regression",
+    "expect": "public events listed",
+    "exchanges": [
+      {
+        "q": "what events are coming up?",
+        "answer": "Here are the upcoming events:\n\n- Business Society Networking Lunch on 2026-09-21 at 12:00:00 in Hall A\n- School of Computing Research Symposium on 2026-10-01 at 09:00:00 in Seminar Room 2\n- AI & Data Science Career Fair on 2026-10-06 at 10:00:00 in Main Hall\n- APU Cultural Night on 2026-10-11 at 18:00:00 in Grand Hall\n- Annual Hackathon Kickoff on 2026-10-16 at 13:00:00 in Multipurpose Hall\n- Case Competition Finals on 2026-10-16 at 13:00:00 in Multipurpose Hall\n- Members-Only Photowalk Briefing on 2026-10-16 at 13:00:00 in Multipurpose Hall",
+        "sources": [
+          "School of Computing Research Symposium",
+          "Business Society Networking Lunch",
+          "Annual Hackathon Kickoff",
+          "Case Competition Finals",
+          "Members-Only Photowalk Briefing",
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 10614
+      }
+    ]
+  },
+  {
+    "id": "RGF-c",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "legit zero must still be stated",
+    "expect": "none, stated plainly",
+    "exchanges": [
+      {
+        "q": "do i have any pending join requests?",
+        "answer": "I don't have any pending join requests to show you for your account.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "My Clubs",
+          "Discover Clubs"
+        ],
+        "ms": 5303
+      }
+    ]
+  },
+  {
+    "id": "RGF-d",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "no regression",
+    "expect": "Career Fair 5",
+    "exchanges": [
+      {
+        "q": "which event has the most people registered?",
+        "answer": "The AI & Data Science Career Fair has the most registrations, with 5 people signed up.",
+        "sources": [
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 7431
+      }
+    ]
+  }
+]

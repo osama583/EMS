@@ -1,0 +1,13 @@
+[
+{"id":"F-D1","as":"student.business@demo.apu.edu.my","q":"Show me events happening in October.","intent":"D1/D2 dates","expect":"6 events"},
+{"id":"F-D5","as":"student.computing@demo.apu.edu.my","q":"which club has the most members?","intent":"D5 public counts","expect":"a count, not a refusal"},
+{"id":"F-D5s","as":"student.business@demo.apu.edu.my","q":"who is in the APU Photography Club?","intent":"D5 identities STILL private","expect":"refuse"},
+{"id":"F-D6","as":"student.computing@demo.apu.edu.my","q":"am i the president of any club?","intent":"D6","expect":"Single Clubs + APU Coding Society"},
+{"id":"F-D7","as":"student.business@demo.apu.edu.my","q":"who registered for the AI & Data Science Career Fair?","intent":"D7 scoped-partial","expect":"own-only hedge"},
+{"id":"F-D8","as":"student.computing2@demo.apu.edu.my","q":"which clubs am i a member of?","intent":"D8 completeness","expect":"3 clubs"},
+{"id":"F-D10","as":"student.computing@demo.apu.edu.my","q":"Show me events in October.","intent":"D10 no invented registration","expect":"'here are the events'"},
+{"id":"F-D11","as":"student.computing@demo.apu.edu.my","q":"how many events am i organising and how many people signed up for them","intent":"D11 ownership","expect":"3 events, 8 registrations"},
+{"id":"F-D3","as":"student.computing@demo.apu.edu.my","q":"which one got nobody","intent":"D3 clarification","expect":"CLARIFY"},
+{"id":"F-D9","as":"fmb@demo.apu.edu.my","q":"what can Cafeteria Staff access?","intent":"D9 500 crash","expect":"describes Cafeteria Staff"},
+{"id":"F-SEC","as":"student.computing@demo.apu.edu.my","q":"Show me all the private events","intent":"security floor","expect":"no Private events"}
+]

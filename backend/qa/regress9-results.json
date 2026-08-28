@@ -1,0 +1,118 @@
+[
+  {
+    "id": "RG9-a",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "THE FAILING CASE - ambiguous fragment",
+    "expect": "CLARIFY club or event; no false access claim",
+    "exchanges": [
+      {
+        "q": "which one got nobody",
+        "answer": "Are you looking for information about a club or an event?",
+        "sources": [],
+        "clubs": [],
+        "navigation": [],
+        "ms": 4406
+      }
+    ]
+  },
+  {
+    "id": "RG9-b",
+    "as": "student.computing2@demo.apu.edu.my",
+    "intent": "D3 original failure (R1-06)",
+    "expect": "CLARIFY, not a guess",
+    "exchanges": [
+      {
+        "q": "what's the biggest one",
+        "answer": "The Business Leaders Circle is the only club in your list, with 2 members.",
+        "sources": [],
+        "clubs": [
+          "Business Leaders Circle"
+        ],
+        "navigation": [],
+        "ms": 5067
+      }
+    ]
+  },
+  {
+    "id": "RG9-c",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "pure fragment",
+    "expect": "CLARIFY",
+    "exchanges": [
+      {
+        "q": "which one?",
+        "answer": "I'm not sure what you're referring to. I can help you with information about published events, your club memberships, or what your account is able to do in the system. Could you let me know which of those you'd like to look into?",
+        "sources": [],
+        "clubs": [],
+        "navigation": [],
+        "ms": 2756
+      }
+    ]
+  },
+  {
+    "id": "RG9-d",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "MUST NOT over-clarify - names events",
+    "expect": "3 - answer directly",
+    "exchanges": [
+      {
+        "q": "how many events have nobody registered?",
+        "answer": "There are 3 events with no registrations.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "Explore Events",
+          "My Events"
+        ],
+        "ms": 4436
+      }
+    ]
+  },
+  {
+    "id": "RG9-e",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "MUST NOT over-clarify - names clubs",
+    "expect": "answer directly",
+    "exchanges": [
+      {
+        "q": "which club has the most members?",
+        "answer": "The Business Leaders Circle is the club with the most members, currently having 2.",
+        "sources": [],
+        "clubs": [
+          "Business Leaders Circle"
+        ],
+        "navigation": [],
+        "ms": 4183
+      }
+    ]
+  },
+  {
+    "id": "RG9-f",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "history present -> must NOT clarify",
+    "expect": "answers about clubs using context",
+    "exchanges": [
+      {
+        "q": "Show me the clubs.",
+        "answer": "You are a member of the APU Coding Society and the Single Clubs.",
+        "sources": [],
+        "clubs": [
+          "Single Clubs",
+          "APU Coding Society"
+        ],
+        "navigation": [],
+        "ms": 5887
+      },
+      {
+        "q": "which one has the most members?",
+        "answer": "The Business Leaders Circle is the only club in the list, so it has the most members.",
+        "sources": [],
+        "clubs": [
+          "Business Leaders Circle"
+        ],
+        "navigation": [],
+        "ms": 4001
+      }
+    ]
+  }
+]

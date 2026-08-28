@@ -1,0 +1,87 @@
+[
+  {
+    "id": "RGA-a",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "THE REGRESSION",
+    "expect": "turn1 lists all 5 clubs (not memberships); turn2 a count answer",
+    "exchanges": [
+      {
+        "q": "Show me the clubs.",
+        "answer": "Here are the clubs you can see:\n\n- APU Coding Society: Weekly hackathons, workshops, and competitive programming.\n- Single Clubs: did you fail at love ? you still have a chance with friendship, join us !\n- APU Photography Club: Photowalks, critique nights, and exhibitions.\n- Business Leaders Circle: Case competitions, networking, and speaker sessions.\n- 1: 1",
+        "sources": [],
+        "clubs": [
+          "APU Photography Club",
+          "Business Leaders Circle",
+          "Single Clubs",
+          "APU Coding Society"
+        ],
+        "navigation": [],
+        "ms": 7119
+      },
+      {
+        "q": "which one has the most members?",
+        "answer": "The Business Leaders Circle has 2 members.",
+        "sources": [],
+        "clubs": [
+          "Business Leaders Circle"
+        ],
+        "navigation": [],
+        "ms": 6098
+      }
+    ]
+  },
+  {
+    "id": "RGA-b",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "real membership question must still work",
+    "expect": "APU Coding Society (her actual membership)",
+    "exchanges": [
+      {
+        "q": "which clubs am i a member of?",
+        "answer": "You are a member of the Business Leaders Circle and the APU Coding Society.",
+        "sources": [],
+        "clubs": [
+          "Business Leaders Circle",
+          "APU Coding Society"
+        ],
+        "navigation": [],
+        "ms": 4374
+      }
+    ]
+  },
+  {
+    "id": "RGA-c",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "D6 no regression",
+    "expect": "Single Clubs + APU Coding Society",
+    "exchanges": [
+      {
+        "q": "am i the president of any club?",
+        "answer": "You are the president of the Single Clubs and the APU Coding Society.",
+        "sources": [],
+        "clubs": [
+          "Single Clubs",
+          "APU Coding Society"
+        ],
+        "navigation": [],
+        "ms": 4057
+      }
+    ]
+  },
+  {
+    "id": "RGA-d",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "D3 fix no regression",
+    "expect": "CLARIFY",
+    "exchanges": [
+      {
+        "q": "which one got nobody",
+        "answer": "Are you looking for information about a club or an event?",
+        "sources": [],
+        "clubs": [],
+        "navigation": [],
+        "ms": 2719
+      }
+    ]
+  }
+]

@@ -1,0 +1,5 @@
+[
+{"id":"F-1","as":"student.computing2@demo.apu.edu.my","q":"which clubs am i a member of?","intent":"repeat 1","expect":"3 clubs"},
+{"id":"F-2","as":"student.computing2@demo.apu.edu.my","q":"which clubs am i a member of?","intent":"repeat 2","expect":"3 clubs"},
+{"id":"F-3","as":"student.computing2@demo.apu.edu.my","q":"list all the clubs i belong to","intent":"variation","expect":"3 clubs"}
+]

@@ -25,9 +25,12 @@ the result in, because a bare follow-up ("is it active", "what about that one") 
 words. The model is given the recent turns directly and resolves the reference itself, which is
 the thing it is actually good at.
 
-FAILURE MODE: an API failure returns an empty set, and an empty set means "nothing matched", which
-api/ai.py already handles as the honest out-of-scope path (refuse, log, do not retrieve). A
-classifier outage therefore degrades to refusing rather than to answering something unverified.
+FAILURE MODE: an outage refuses rather than guesses - but it refuses AS AN OUTAGE. Returning an
+empty set on an API error used to conflate "the classifier could not run" with "the classifier ran
+and matched nothing"; api/ai.py can only read the latter, so a rate-limited call told the asker
+their ordinary question was outside what the assistant covers, and filed it in the AI access log as
+an unsupported capability gap. Failure now raises ClassificationUnavailable; only a real empty
+result returns an empty set.
 """
 from __future__ import annotations
 
@@ -41,7 +44,15 @@ from .query_router import CLASS_DESCRIPTIONS, how_to_topic, named_role  # noqa: 
 
 log = logging.getLogger(__name__)
 
-__all__ = ["CLASS_DESCRIPTIONS", "classify", "how_to_topic", "named_role"]
+__all__ = ["CLASS_DESCRIPTIONS", "ClassificationUnavailable", "classify", "how_to_topic", "named_role"]
+
+
+class ClassificationUnavailable(RuntimeError):
+    """The classifier could not run at all - a rate limit, a network fault, a malformed response.
+
+    Distinct from "the classifier ran and matched nothing", which is a real answer meaning the
+    question is out of scope. Conflating the two reported an infrastructure outage to the user as
+    a judgement about their question."""
 
 
 def _system_instruction() -> str:
@@ -120,8 +131,9 @@ def _suppress_incidental_how_to_topics(question: str, classes: set[str]) -> set[
 def classify(question: str, history: list[dict] | None = None) -> set[str]:
     """Every class this question touches, resolved against the recent conversation.
 
-    Never raises: any failure (API error, malformed JSON) returns an empty set, which api/ai.py
-    treats as "no topic matched" - the honest refuse-and-log path, never a silent guess."""
+    An empty set means the classifier RAN and nothing matched - the honest out-of-scope path.
+    Raises ClassificationUnavailable when it could not run at all, so the caller can say so instead
+    of blaming the question. Never guesses in either case."""
     prior = ""
     if history:
         prior = (
@@ -163,4 +175,11 @@ def classify(question: str, history: list[dict] | None = None) -> set[str]:
         return _suppress_incidental_how_to_topics(question, resolved)
     except Exception as exc:  # noqa: BLE001 - see docstring: a classifier failure refuses, never guesses
         log.warning("ai.classify.failed", extra={"error": str(exc)})
-        return set()
+        # Refusing is right; refusing with the WRONG REASON is not, and returning an empty set here
+        # said "no class matched", which api/ai.py can only read as "genuinely outside what this
+        # assistant covers". A rate-limited classifier therefore told a caller their perfectly
+        # ordinary question ("which event has the most people registered?") was out of scope, and
+        # recorded it in the AI access log as an unsupported capability gap - misleading the user
+        # and corrupting the one log an admin uses to decide what to build next. The caller needs
+        # to tell these apart, so the failure is raised rather than flattened into a valid answer.
+        raise ClassificationUnavailable(str(exc)) from exc

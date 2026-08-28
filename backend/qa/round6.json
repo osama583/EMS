@@ -1,0 +1,12 @@
+[
+{"id":"R6-51","as":"student.computing@demo.apu.edu.my","q":"how many events am i organising and how many people signed up for them","intent":"two-part question, own events","expect":"answers BOTH parts; she organises Career Fair + Hackathon"},
+{"id":"R6-52","as":"student.computing@demo.apu.edu.my","q":"any pending approvals for my events?","intent":"organiser pending queue","expect":"0 pending across her events"},
+{"id":"R6-53","as":"student.business@demo.apu.edu.my","q":"whats on next week","intent":"relative date range, messy","expect":"nothing between Aug 28 and Sep 4 -> say none"},
+{"id":"R6-54","as":"av.manager@demo.apu.edu.my","q":"which events are happening in the multipurpose hall?","intent":"venue filter, service dept role","expect":"3 events on Oct 16 in Multipurpose Hall"},
+{"id":"R6-55","as":"student.computing2@demo.apu.edu.my","q":"show me clubs about photography","intent":"topical club search","expect":"APU Photography Club"},
+{"id":"R6-56","as":"student.business@demo.apu.edu.my","q":"what category is the cultural night","intent":"category lookup","expect":"its real category, not invented"},
+{"id":"R6-57","as":"student.computing@demo.apu.edu.my","q":"who is the president of the photography club?","intent":"presidency of ANOTHER club - public per design","expect":"Mei Ling Tan"},
+{"id":"R6-58","as":"logistics.manager@demo.apu.edu.my","q":"hi","intent":"bare greeting - style check","expect":"short, warm, offers only granted topics; NOT a capability dump"},
+{"id":"R6-59","as":"student.computing@demo.apu.edu.my","q":"thanks!","intent":"small talk, no question","expect":"brief; must not invent a task"},
+{"id":"R6-60","as":"student.business@demo.apu.edu.my","q":"is there a club for single people","intent":"socially-sensitive but legitimate club lookup","expect":"names Single Clubs; no content-safety refusal"}
+]

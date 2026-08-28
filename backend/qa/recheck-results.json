@@ -1,0 +1,78 @@
+[
+  {
+    "id": "RC-D1",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "D1/D2 date bug",
+    "expect": "6 October events",
+    "exchanges": [
+      {
+        "q": "Show me events happening in October.",
+        "answer": "You have six events coming up in October:\n\n- School of Computing Research Symposium on 2026-10-01\n- AI & Data Science Career Fair on 2026-10-06\n- APU Cultural Night on 2026-10-11\n- Annual Hackathon Kickoff on 2026-10-16\n- Case Competition Finals on 2026-10-16\n- Members-Only Photowalk Briefing on 2026-10-16",
+        "sources": [
+          "School of Computing Research Symposium",
+          "Annual Hackathon Kickoff",
+          "Case Competition Finals",
+          "Members-Only Photowalk Briefing",
+          "APU Cultural Night",
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 5974
+      }
+    ]
+  },
+  {
+    "id": "RC-D6",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "D6 false negative",
+    "expect": "YES: Single Clubs + APU Coding Society",
+    "exchanges": [
+      {
+        "q": "am i the president of any club?",
+        "answer": "Yes, you are the president of the Single Clubs and the APU Coding Society.",
+        "sources": [],
+        "clubs": [
+          "Single Clubs",
+          "APU Coding Society"
+        ],
+        "navigation": [],
+        "ms": 4314
+      }
+    ]
+  },
+  {
+    "id": "RC-D7",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "D7 scoped-partial",
+    "expect": "must not imply Daniel is the only one",
+    "exchanges": [
+      {
+        "q": "who registered for the AI & Data Science Career Fair?",
+        "answer": "I can only show you your own registration for that event, which was on August 22, 2026.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "My Events"
+        ],
+        "ms": 4737
+      }
+    ]
+  },
+  {
+    "id": "RC-D5",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "D5 over-refusal",
+    "expect": "should answer - memberCount is public in REST",
+    "exchanges": [
+      {
+        "q": "which club has the most members?",
+        "answer": "I do not have access to club administration, so I cannot provide information about club membership counts. Please contact an administrator if you believe you should have access to this information.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [],
+        "ms": 2870
+      }
+    ]
+  }
+]

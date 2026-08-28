@@ -1,0 +1,7 @@
+[
+{"id":"RGE-a","as":"student.computing@demo.apu.edu.my","q":"Show me events in October.","intent":"THE FAILING CASE","expect":"'here are the events' - NO registration claim"},
+{"id":"RGE-b","as":"student.business@demo.apu.edu.my","q":"list events sorted by date","intent":"variation - browse","expect":"no personal framing"},
+{"id":"RGE-c","as":"student.computing@demo.apu.edu.my","q":"what am i registered for?","intent":"the REAL registration question must still say so","expect":"Career Fair, framed as registered"},
+{"id":"RGE-d","as":"student.computing@demo.apu.edu.my","turns":["Show me the clubs.","which one has the most members?"],"intent":"clubs browse no regression","expect":"club list, no membership claim"},
+{"id":"RGE-e","as":"student.business@demo.apu.edu.my","q":"who registered for the AI & Data Science Career Fair?","intent":"D7 no regression","expect":"own-only hedge"}
+]

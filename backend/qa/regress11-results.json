@@ -1,0 +1,113 @@
+[
+  {
+    "id": "RGB-a",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "THE FAILING CASE - ownership swallowed",
+    "expect": "2 events, 5 registrations",
+    "exchanges": [
+      {
+        "q": "how many events am i organising and how many people signed up for them",
+        "answer": "You are currently organising 3 events, and there are 8 people signed up for them in total.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "My Events",
+          "Explore Events"
+        ],
+        "ms": 14027
+      }
+    ]
+  },
+  {
+    "id": "RGB-b",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "variation of ownership",
+    "expect": "Career Fair + Hackathon Kickoff only",
+    "exchanges": [
+      {
+        "q": "what events did i create?",
+        "answer": "You have created the following events:\n- Annual Hackathon Kickoff on 2026-10-16 at 13:00:00 in the Multipurpose Hall\n- AI & Data Science Career Fair on 2026-10-06 at 10:00:00 in the Main Hall",
+        "sources": [
+          "Annual Hackathon Kickoff",
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 4843
+      }
+    ]
+  },
+  {
+    "id": "RGB-c",
+    "as": "student.computing2@demo.apu.edu.my",
+    "intent": "THE FAILING CASE - topical club search",
+    "expect": "APU Photography Club",
+    "exchanges": [
+      {
+        "q": "show me clubs about photography",
+        "answer": "The APU Photography Club is the only photography-focused club I can show you. They host photowalks, critique nights, and exhibitions.",
+        "sources": [],
+        "clubs": [
+          "APU Photography Club"
+        ],
+        "navigation": [],
+        "ms": 12029
+      }
+    ]
+  },
+  {
+    "id": "RGB-d",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "variation topical search",
+    "expect": "Business Leaders Circle",
+    "exchanges": [
+      {
+        "q": "any clubs about business?",
+        "answer": "You might be interested in the Business Leaders Circle, which focuses on case competitions, networking, and speaker sessions. Would you like to see more details about this club or perhaps look for other business-related options?",
+        "sources": [],
+        "clubs": [
+          "Business Leaders Circle"
+        ],
+        "navigation": [],
+        "ms": 7170
+      }
+    ]
+  },
+  {
+    "id": "RGB-e",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "no regression on public counts",
+    "expect": "Career Fair (5)",
+    "exchanges": [
+      {
+        "q": "which event has the most people registered?",
+        "answer": "The AI & Data Science Career Fair has 5 people registered.",
+        "sources": [
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 4321
+      }
+    ]
+  },
+  {
+    "id": "RGB-f",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "no regression - NOT an ownership question",
+    "expect": "8 visible (not narrowed to his own)",
+    "exchanges": [
+      {
+        "q": "how many events are there in total?",
+        "answer": "There are 8 events in total.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "Explore Events",
+          "My Events"
+        ],
+        "ms": 4836
+      }
+    ]
+  }
+]

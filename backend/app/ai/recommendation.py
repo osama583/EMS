@@ -126,6 +126,48 @@ def stage_for(question: str, history: list[dict] | None) -> str:
     return "ask"
 
 
+# The two data domains a question can land in. A question that lands in BOTH without naming
+# either is not a question yet - it is a fragment whose antecedent is missing.
+_CLUB_CLASSES = frozenset({"clubs", "clubs_mine", "clubs_admin", "president_change"})
+_EVENT_CLASSES = frozenset({"events", "my_registrations", "event_organiser", "event_organiser_decisions"})
+
+
+# Referents that point at something said earlier and carry no meaning without it. Kept to phrases
+# that are unresolvable BY CONSTRUCTION - "this or that" names two things while identifying
+# neither - so a question containing one with no conversation behind it cannot have been answered,
+# only guessed at. Bare "which one" is deliberately absent: it already reaches the no-topic path
+# and clarifies there, and catching it here would fire on "which one has the most members".
+_DANGLING_REFERENT = re.compile(
+    r"\bthis or that\b|\bthe other one\b|\bthat one\b|\bthis one\b|\bthe one with\b",
+    re.IGNORECASE,
+)
+
+
+def domain_ambiguous(question: str, history: list[dict] | None, data_classes: set[str]) -> bool:
+    """Should this question be answered with a clarifying question instead of a query?
+
+    True only for the genuinely unanswerable shape: a question with NO conversation behind it that
+    lands in both the club and the event domain while naming neither. "which one got nobody" is the
+    real example - it classified as {clubs, events}, was queried across both, and came back as
+    "I don't have access to information about event attendance or registration counts", which is
+    false twice over (registration counts are public, and the asker was never told which domain the
+    assistant had picked). Guessing produced a wrong answer; asking costs one short sentence.
+
+    Deliberately narrow. History present means the antecedent is resolvable and the classifier has
+    already used it, and naming either domain means there is nothing to disambiguate - so an
+    ordinary question like "how many events have nobody registered" never reaches this.
+    """
+    if history:
+        return False
+    # A dangling referent is unanswerable even inside ONE domain: "which has more ppl this or that"
+    # classifies cleanly as events, and was answered by comparing two events the asker never named.
+    if _DANGLING_REFERENT.search(question):
+        return True
+    if not (data_classes & _CLUB_CLASSES and data_classes & _EVENT_CLASSES):
+        return False
+    return named_domain(question) is None
+
+
 def history_document(user_id: int | None) -> str | None:
     """The asker's REAL history - events they registered for, clubs they asked to join.
 

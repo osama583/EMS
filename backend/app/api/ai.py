@@ -257,7 +257,21 @@ def ask():
     # ai/classifier.py's docstring for why); named_role/how_to_topic remain lookups against known
     # fixed sets rather than model guesses.
     step_started_at = time.perf_counter()
-    classes = classifier.classify(question, history)
+    try:
+        classes = classifier.classify(question, history)
+    except classifier.ClassificationUnavailable as exc:
+        # The classifier could not RUN (rate limit, network). That is an outage, not a verdict on
+        # the question, and the two used to be indistinguishable here: an empty class set fell
+        # through to step 6 and told the asker their question was outside what the assistant covers
+        # - while also filing it in the AI access log as an unsupported capability gap, which is the
+        # row an admin reads to decide what to build. Say what is actually true and log nothing.
+        log.warning("ai.ask.classifier_unavailable", extra={"error": str(exc)})
+        return jsonify({
+            "answer": (
+                "Sorry - I couldn't process that just now. Please try again in a moment."
+            ),
+            **_EMPTY_PAYLOAD,
+        }), 503
     role = classifier.named_role(question) if "role_capability" in classes else None
     if "role_capability" in classes and role is None and history:
         # A bare follow-up ("its role", "what about that role") names no role of its own; walk
@@ -404,6 +418,37 @@ def ask():
     # yet, because the thing that decides what to look up has not been established. Running the SQL
     # pipeline first and then asking a question would waste two model calls to produce a reply that
     # never uses their result.
+    # --- Step 7a: an antecedent-free fragment that could mean either domain ---------------------
+    # Same principle as the recommendation "clarify" stage below, applied to plain lookups: a
+    # question with no conversation behind it that lands in BOTH clubs and events, naming neither,
+    # has not actually been asked yet. Querying it anyway produced "which one got nobody" ->
+    # "I don't have access to information about event attendance or registration counts" - false
+    # twice, since counts are public and the asker was never told which domain was assumed. Returns
+    # WITHOUT querying, for the same reason the stages below do: there is nothing to look up until
+    # the thing that decides what to look up exists.
+    if recommendation.domain_ambiguous(question, history, data_classes):
+        step_started_at = time.perf_counter()
+        answer = generate_sql_answer(
+            question,
+            "No data was retrieved - you are asking the asker what they meant, not answering "
+            "them. Their question refers to something that was never established: either it "
+            "could mean clubs or events and says neither, or it points at 'this one'/'the other "
+            "one' with nothing before it to point AT. Ask, in one short sentence, for the "
+            "specific thing they mean - naming clubs vs events if that is the open question, or "
+            "asking which items they are comparing if it is a dangling reference. Do not guess, "
+            "do not answer for both, and do not claim you lack access.",
+            history=history,
+            asker=principal,
+        )
+        _step("7a", "Ambiguous domain: asked which, no query run", step_started_at)
+        _review(
+            question, answer, principal,
+            user_context=user_context,
+            data_summary="Ambiguous club/event fragment: asked which was meant, no data read.",
+        )
+        log.info("ai.ask.complete", extra={"total_elapsed_ms": round((time.perf_counter() - request_started_at) * 1000, 1)})
+        return jsonify({"answer": answer, **_EMPTY_PAYLOAD})
+
     recommendation_stage = recommendation.stage_for(question, history)
     if recommendation_stage in ("ask", "clarify"):
         step_started_at = time.perf_counter()

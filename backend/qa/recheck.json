@@ -1,0 +1,6 @@
+[
+{"id":"RC-D1","as":"student.business@demo.apu.edu.my","q":"Show me events happening in October.","intent":"D1/D2 date bug","expect":"6 October events"},
+{"id":"RC-D6","as":"student.computing@demo.apu.edu.my","q":"am i the president of any club?","intent":"D6 false negative","expect":"YES: Single Clubs + APU Coding Society"},
+{"id":"RC-D7","as":"student.business@demo.apu.edu.my","q":"who registered for the AI & Data Science Career Fair?","intent":"D7 scoped-partial","expect":"must not imply Daniel is the only one"},
+{"id":"RC-D5","as":"student.computing@demo.apu.edu.my","q":"which club has the most members?","intent":"D5 over-refusal","expect":"should answer - memberCount is public in REST"}
+]

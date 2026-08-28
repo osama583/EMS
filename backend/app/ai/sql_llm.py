@@ -21,6 +21,7 @@ import json
 import logging
 import re
 import time
+from datetime import date
 
 from google.genai import types
 
@@ -48,15 +49,41 @@ ABSOLUTE RULES:
   what the question needs, return the single word IMPOSSIBLE instead of guessing.
 - Join only along the relationships the schema states.
 - Always qualify columns with their table or alias (request.event_title, not event_title).
+- ALIAS EVERY COLUMN TO SAY WHAT IT MEANS in this particular result, because the step that writes
+  the answer sees your column NAMES and nothing else - not your joins, not your WHERE clause. A
+  bare `full_name` returned beside a club is ambiguous, and it was read as "a club you are a member
+  of" for a row that actually held the club's PRESIDENT - a false statement about the asker built
+  from a correct query. Write `u.full_name AS president_name`, `COUNT(*) AS member_count`,
+  `es.date AS event_date`. The alias is what the answer will call the value, so name it accordingly.
 - Apply the REQUIRED CONDITIONS from the access scope exactly as written, copied verbatim, for
   every table that has them. A query missing them is rejected and the asker gets no answer, so
   never omit one and never plan to "filter afterwards" - the restriction must be in the query.
 - Never query a table listed as FORBIDDEN for this asker.
+- THE REQUIRED CONDITIONS ARE A PERMISSION FLOOR, NOT THE QUESTION'S FILTER. They say what you are
+  allowed to see; they never say what was asked. The events condition is an OR that already admits
+  every public event, so "how many events am I organising" satisfied it while filtering nothing -
+  and the answer came back "you are organising 8 events" to someone who organises two. Whenever the
+  question narrows to the asker themselves ("my events", "events I organise", "the ones I created",
+  "my clubs"), add that ownership condition yourself, ANDed alongside the required one:
+      ... AND (<required condition>) AND request.applicant_user_id = <the asker's id>
+  Carrying the required condition is necessary, never sufficient.
 - Return only the columns needed to answer the question. Prefer aggregates (COUNT, MIN, MAX) when
   the question asks how many / when / which is earliest. Never SELECT *.
 - Include a LIMIT on any query that could return many rows.
 - Resolve people by users.full_name; never guess a user_id.
 - Order results sensibly: dates ascending for upcoming events, most recent first for history.
+- DATES: you do not know what year it is from your own training, and guessing one is how a question
+  about "October" became `es.date BETWEEN '2024-10-01' AND '2024-10-31'` against a table whose rows
+  are all in 2026 - zero rows, and the assistant then reported a confident, WRONG "there are no
+  events in October". This is the same failure as the title rule below: a wrong filter reads as an
+  empty result, not as an error. Never write a year you inferred rather than one you were given.
+  Build every relative or partial date from CURRENT_DATE (and the TODAY line in the prompt):
+      "in October"       -> EXTRACT(MONTH FROM es.date) = 10 AND es.date >= CURRENT_DATE
+      "tomorrow"         -> es.date = CURRENT_DATE + 1
+      "this week"        -> es.date BETWEEN CURRENT_DATE AND CURRENT_DATE + 7
+      "next month"       -> es.date BETWEEN CURRENT_DATE AND CURRENT_DATE + 31
+      "upcoming"/"soon"  -> es.date >= CURRENT_DATE
+  Write a literal date ONLY when the asker stated it in full themselves ("on 2026-10-16").
 - NEVER match a title with `=`, and never ILIKE the whole phrase either. People paraphrase: they
   type "AI and Data Science Career Fair" for an event actually called "AI & Data Science Career
   Fair", or "the hackathon" for "Annual Hackathon Kickoff". Both `= 'AI and Data Science Career
@@ -70,6 +97,14 @@ ABSOLUTE RULES:
   Choose the rarest words in the phrase and drop everything else - punctuation, "the", "and",
   "&", and any generic word. If two words are needed, AND two separate ILIKE conditions rather
   than putting both in one pattern, since their ORDER may differ from what the asker typed.
+  A TOPICAL search ("clubs about photography", "events about AI") matches the NAME and the
+  DESCRIPTION, never the CATEGORY table. "show me clubs about photography" was answered with
+  `club_categories.name ILIKE '%photography%'` and an inner join to the category link table, which
+  returned nothing and reported "I don't have any photography clubs to show you" while the APU
+  Photography Club sat in the table - the category is a fixed catalogue that need not contain the
+  asker's word, and joining it at all silently drops every row that has no category. Write
+  `(c.club_name ILIKE '%photography%' OR c.description ILIKE '%photography%')` and do not join the
+  category tables unless the question actually names a category.
 
 REGISTRATION COUNTS vs REGISTRANT IDENTITIES - two different permissions, do not confuse them:
 - "How many people registered for X", "which event is most popular", "is X full" ask for a COUNT.
@@ -128,7 +163,10 @@ def generate_sql(
             f"Previous SQL:\n{previous_sql}\n\nWhy it failed:\n{error}\n"
             "Write a corrected query that resolves exactly this problem.\n"
         )
-    prompt = f"{schema_document}\n\n{scope_document}\n\n{prior}QUESTION:\n{question}{correction}"
+    # The model has no clock, and a year guessed from training data produces an empty result
+    # rather than an error (see the DATES rule in the system instruction above).
+    today = f"TODAY IS {date.today().isoformat()}.\n\n"
+    prompt = f"{today}{schema_document}\n\n{scope_document}\n\n{prior}QUESTION:\n{question}{correction}"
     response = _generate_content(
         model=GENERATION_MODEL,
         contents=[types.Content(role="user", parts=[types.Part(text=prompt)])],
@@ -215,6 +253,11 @@ RECOMMENDATION STAGE telling you which of these you are in. Follow it exactly.
 NEVER DUMP THE FULL LIST. Not for a recommendation, and not for a vague browse question either. If
 they ask something broad, give the few most relevant and offer to show more - the complete list is
 only appropriate when they explicitly ask for all of them.
+  THIS DOES NOT APPLY TO THE ASKER'S OWN DATA. "Which clubs am I a member of", "what am I
+  registered for", "which clubs do I run" are not browse questions: the set is theirs, it is
+  small, and completeness is the entire point. Name EVERY row you were given, whether or not they
+  said "all" - answering "you are a member of the APU Photography Club" when three rows came back
+  is a wrong answer, not a concise one.
 
 SKIP PLACEHOLDER ROWS when suggesting. Real data contains test and placeholder records - a club
 named "1", an event called "new test", anything with a one-word or obviously meaningless title or
