@@ -140,38 +140,33 @@ export class ChartPanelComponent {
     return true; // An unrecognised chart kind has nothing to render.
   });
 
+  /**
+   * A chart mark never navigates.
+   *
+   * Hovering a mark tells you what it is worth; clicking one keeps you on the
+   * dashboard. Clicking used to leave the page entirely - a bar went to a
+   * filtered list, a mark carrying a requestId went to that proposal - which
+   * meant the commonest gesture on a chart was also the one that threw away
+   * everything the reader had on screen, usually by accident while trying to
+   * read a value.
+   *
+   * The one interaction that survives is CROSS-FILTERING, because it is the
+   * opposite thing: it narrows a sibling panel and stays put. Funding main
+   * items -> funding sub-items is the case it exists for.
+   */
   onMark(event: MarkEvent): void {
     const panel = this.panel();
-    const point = event.point as Record<string, unknown>;
-    // A filtering panel never navigates: clicking one of its marks narrows the
-    // panel it names. Checked before every other branch, so a mark that also
-    // carries a requestId cannot navigate out from under the filter.
     const cross = panel.crossFilter;
-    if (cross) {
-      const value = point[cross.pointKey];
-      if (value === null || value === undefined) return;
-      this.filterSelect.emit({
-        source: panel.id,
-        target: cross.target,
-        targetKey: cross.targetKey,
-        value: value as string | number,
-        label: String(point[cross.labelKey] ?? value),
-      });
-      return;
-    }
-    // A mark's own identity wins over the panel default, so clicking one bar
-    // lands on that item rather than the panel's unfiltered list.
-    if (typeof point['requestId'] === 'number') {
-      this.drill.emit({ route: `/app/proposals/review/${point['requestId']}`, params: {} });
-      return;
-    }
-    if (!panel.drill) return;
-    const params: Record<string, string | number | boolean> = { ...panel.drill.params };
-    if (point['date']) params['date'] = String(point['date']);
-    else if (typeof point['x'] === 'string' && panel.axes.x?.type === 'date') params['date'] = point['x'];
-    if (typeof point['optionId'] === 'number') params['item'] = point['optionId'];
-    if (typeof point['userId'] === 'number') params['assignee'] = point['userId'];
-    if (point['code']) params['outlet'] = String(point['code']);
-    this.drill.emit({ route: panel.drill.route, params });
+    if (!cross) return;
+    const point = event.point as Record<string, unknown>;
+    const value = point[cross.pointKey];
+    if (value === null || value === undefined) return;
+    this.filterSelect.emit({
+      source: panel.id,
+      target: cross.target,
+      targetKey: cross.targetKey,
+      value: value as string | number,
+      label: String(point[cross.labelKey] ?? value),
+    });
   }
 }

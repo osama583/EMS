@@ -66,6 +66,8 @@ interface HeatCell {
               [style.background]="cell ? fill(cell) : 'transparent'"
               [attr.aria-label]="describe(row, column, cell)"
               [title]="describe(row, column, cell)"
+              (mouseenter)="cell && hover('heatmap', cell)"
+              (focus)="cell && hover('heatmap', cell)"
               (click)="cell && select('heatmap', cell)"
             >
               @if (cell?.suppressed) { <span class="viz-heat__dash">—</span> }
@@ -83,11 +85,28 @@ interface HeatCell {
         <span class="viz-heat__scale-label">high</span>
       </div>
     }
+
+    @if (hovered(); as active) {
+      <p class="viz-tooltip" role="status">
+        <strong>{{ tipName(active.point) }}</strong>
+        {{ tipValue(active.point) }}
+      </p>
+    }
   `,
   styleUrl: './heatmap.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HeatmapComponent extends VizChartBase {
+  tipName(point: Record<string, unknown>): string {
+    const row = point?.['row'] ?? point?.['y'];
+    const column = point?.['column'] ?? point?.['x'];
+    return [row, column].filter((part) => part !== null && part !== undefined).join(' · ') || 'Cell';
+  }
+
+  tipValue(point: Record<string, unknown>): string {
+    return formatValue(Number(point?.['value'] ?? 0), this.axes().y?.format ?? 'count');
+  }
+
   readonly rampFloor = input(100);
   protected readonly NARROW_DAYS = 4;
 

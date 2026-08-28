@@ -31,7 +31,7 @@ interface FunnelStage {
   selector: 'app-funnel',
   imports: [],
   template: `
-    <ol class="viz-funnel">
+    <ol class="viz-funnel" (mouseleave)="clearHover()">
       @for (stage of stages(); track stage.key) {
         <li class="viz-funnel__step">
           <div class="viz-funnel__head">
@@ -45,6 +45,8 @@ interface FunnelStage {
               [style.width.%]="stage.percent"
               [style.background]="stage.fill"
               [attr.aria-label]="stage.aria"
+              (mouseenter)="hover('funnel', stage.raw)"
+              (focus)="hover('funnel', stage.raw)"
               (click)="select('funnel', stage.raw)"
             ></button>
           </div>
@@ -71,11 +73,28 @@ interface FunnelStage {
         Net position {{ netText() }}
       </p>
     }
+
+    @if (hovered(); as active) {
+      <p class="viz-tooltip" role="status">
+        <strong>{{ tipName(active.point) }}</strong>
+        {{ tipValue(active.point) }}
+      </p>
+    }
   `,
   styleUrl: './funnel.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FunnelComponent extends VizChartBase {
+  /** Every stage already prints its value, but the hover contract is the same
+   *  on every chart in the system: point at a mark, read its exact figure. */
+  tipName(point: Record<string, unknown>): string {
+    return String(point?.['label'] ?? point?.['name'] ?? point?.['stage'] ?? 'Stage');
+  }
+
+  tipValue(point: Record<string, unknown>): string {
+    return formatValue(Number(point?.['value'] ?? 0), (point?.['format'] as ValueFormat) ?? 'count');
+  }
+
   protected plotHeight(): number {
     return 0; // Flow-laid-out; height follows content.
   }

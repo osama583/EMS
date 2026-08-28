@@ -310,18 +310,12 @@ PROFILES: dict[str, dict[str, Any]] = {
     # signature panel is the routing decision: which outlet should take the next
     # order, judged on measured behaviour rather than capacity on paper.
     "hod_fmb": {
-        # Rebuilt to the shape F&B actually asked for. Every row reuses a
-        # component the Cafeteria Manager profile already ships:
-        #   counts  - the Inbox/Ongoing/Completed strip, with CANCELLED where
-        #             that page has LATE (see fmb_request_counts on why).
-        #   kpis    - the four money-and-rework tiles.
-        #   panels  - the gate, then where the orders went, then water.
-        # fmb_committed_cost and fmb_pushback_rate are gone: the new Total cost
-        # and Cafeteria request change rate tiles are the same two metrics under
-        # clearer labels, and keeping both would have been the duplicate logic
-        # this rebuild was meant to avoid.
+        # Four bands, no hero. The on-time delivery rate that used to lead the
+        # page is gone, and nothing was promoted in its place: the counts strip
+        # is the page's opening statement now, and the four money tiles below it
+        # reflow into the width the hero card used to take.
         "counts": "fmb_request_counts",
-        "hero": "fmb_on_time_delivery",
+        "hero": None,
         "kpis": [
             "fmb_total_cost",
             "fmb_cafeteria_cost",
@@ -330,17 +324,10 @@ PROFILES: dict[str, dict[str, Any]] = {
         ],
         "signature": "fmb_gate_outcomes",
         "panels": [
-            # The two the spec asks for lead the row; the analysis panels that
-            # were already here follow underneath, unchanged.
             "fmb_order_distribution",
             "fmb_water_usage",
-            "fmb_cost_by_outlet",
-            "fmb_fanout_board",
-            "fmb_outlet_balance",
-            "fmb_dietary_coverage",
-            "fmb_order_lifecycle",
         ],
-        "alerts": "fmb_at_risk",
+        "alerts": None,
         "quickActions": [],
         "mobileKpis": ["fmb_total_cost", "fmb_cafeteria_cost", "fmb_change_rate"],
     },
@@ -413,11 +400,13 @@ PROFILES: dict[str, dict[str, Any]] = {
     # Every panel here is an R7 aggregate, and the signature panel exists to
     # quantify exactly what the gate does not see.
     "cfo": {
-        # Row 1 is the status strip, row 2 the three financial headline figures,
-        # row 3 the two funding charts that read as a pair. The rest of the CFO
-        # instrument follows underneath, unchanged.
+        # Reduced to the money question and the gate behind it. The forward-spend
+        # hero, the coverage/collection/queue tiles, the gate matrix and the four
+        # analysis panels are gone, and so is the attention rail with its quick
+        # actions - the page is now the status strip, four figures, the two
+        # funding charts that read as a pair, and gate decisions.
         "counts": "cfo_request_counts",
-        "hero": "cfo_forward_spend",
+        "hero": None,
         "kpis": [
             "cfo_total_spend",
             # Directly under the total it is part of, so the relationship reads
@@ -425,35 +414,20 @@ PROFILES: dict[str, dict[str, Any]] = {
             "cfo_cafeteria_cost",
             "cfo_cost_per_pax",
             "cfo_total_pax",
-            "cfo_gate_coverage",
-            "cfo_collection",
-            "cfo_gate_queue",
-            "cfo_price_coverage",
         ],
-        "signature": "cfo_gate_matrix",
-        # The funding pair leads: they are the two halves of one question and
-        # spanFor() gives the first two panels half the row each, so they land
-        # side by side with the sub-item chart to the right of the main one it
-        # is filtered by.
+        "signature": None,
+        # The funding pair leads: two halves of one question, and spanFor()
+        # gives the first two panels half the row each, so the sub-item chart
+        # lands beside the main chart that filters it.
         "panels": [
             "cfo_funding_main_usage",
             "cfo_funding_sub_usage",
-            "cfo_spend_by_category",
-            "cfo_runway",
-            "cfo_cost_per_pax_schools",
-            "cfo_revenue_funnel",
             "cfo_gate_decisions",
         ],
-        "alerts": "cfo_at_risk",
-        "quickActions": ["review_gate", "menu_oversight", "funding_catalogue"],
-        # Row 2, in its desktop order. cfo_forward_spend_kpi used to sit here
-        # restating the hero as a tile, which the hero card already does on
-        # every screen size - it is gone rather than duplicated.
-        "mobileKpis": ["cfo_total_spend", "cfo_cost_per_pax", "cfo_total_pax"],
+        "alerts": None,
+        "quickActions": [],
+        "mobileKpis": ["cfo_total_spend", "cfo_cafeteria_cost", "cfo_cost_per_pax"],
     },
-    # ------------------------------------------------- Cafeteria Manager --
-    # A shift tool, not an analysis tool. The most-used of the ten and the only
-    # one whose hero is a live count rather than a rate.
     "cafeteria_manager": {
         # Orders at Risk / Risk List does not apply here (see caf_orders_at_risk
         # and cafeteria.py's module docstring: assignment happens right before

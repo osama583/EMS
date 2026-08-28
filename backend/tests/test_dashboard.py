@@ -138,7 +138,7 @@ def test_every_profile_names_registered_widgets():
     widget that does not exist, the data is not trustworthy."""
     for key, variant, layout in _layouts():
         ids = [
-            layout["hero"],
+            *([layout["hero"]] if layout.get("hero") else []),
             *([layout["signature"]] if layout.get("signature") else []),
             *([layout["alerts"]] if layout.get("alerts") else []),
             *layout["kpis"],
@@ -230,7 +230,7 @@ def test_widget_survives_an_empty_database(widget_id):
 def _profile_for_widget(widget_id: str) -> str:
     for key, variant, layout in _layouts():
         ids = {
-            layout["hero"],
+            *([layout["hero"]] if layout.get("hero") else []),
             *([layout["signature"]] if layout.get("signature") else []),
             *([layout["alerts"]] if layout.get("alerts") else []),
             *layout["kpis"],
@@ -498,7 +498,7 @@ def _preview():
 def test_profile_builds_with_populated_data(profile_key, variant):
     document = _preview().build_preview(profile_key, variant=variant)
     widgets = [
-        document["hero"],
+        *([document["hero"]] if document["hero"] else []),
         *document["kpis"],
         *([document["signature"]] if document["signature"] else []),
         *document["panels"],

@@ -65,7 +65,7 @@ interface DonutSegment {
     @if (hovered(); as active) {
       <p class="viz-tooltip" role="status">
         <strong>{{ active.point.label }}</strong>
-        {{ valueLabel(active.point.y) }}
+        {{ segmentValueText(active.point.y) }} · {{ sharePercent(active.point.y) }}
       </p>
     }
   `,
@@ -85,7 +85,7 @@ export class DonutChartComponent extends VizChartBase {
   readonly totalLabel = computed(() => (this.data()?.['totalLabel'] as string) ?? 'Total');
   readonly format = computed(() => (this.data()?.['format'] as ValueFormat) ?? 'count');
 
-  private readonly total = computed(() => {
+  protected readonly total = computed(() => {
     const override = this.totalOverride();
     if (override !== null) return override;
     return this.rawSegments().reduce((sum, segment) => sum + Math.max(0, Number(segment.value ?? 0)), 0);
@@ -127,6 +127,18 @@ export class DonutChartComponent extends VizChartBase {
       };
     });
   });
+
+  /** The donut declares its own `format` in `data`; a donut sets no y-axis, so
+   *  valueLabel() would fall back to a bare number and print "5" for what the
+   *  ring itself labels "5 orders". */
+  segmentValueText(value: unknown): string {
+    return formatValue(Number(value ?? 0), this.format());
+  }
+
+  sharePercent(value: unknown): string {
+    const total = this.total();
+    return total > 0 ? formatValue(Number(value ?? 0) / total, 'percent') : '—';
+  }
 
   readonly ariaLabel = computed(
     () => `${this.segments().length} segment(s) of ${this.totalText()} ${this.totalLabel().toLowerCase()}.`,

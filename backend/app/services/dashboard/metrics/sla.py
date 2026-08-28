@@ -384,65 +384,6 @@ def lead_time_distribution(cur, scope: Scope, spec: DepartmentSpec) -> list[dict
 # presenting the figure as measured.
 
 
-def order_accept_latency(cur, scope: Scope, *, outlet: str | None = None) -> dict[str, Any]:
-    """M17 - order created to manager acceptance, in hours."""
-    row = fetch_one(
-        cur,
-        """
-        SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY hours) AS p50,
-               percentile_cont(0.9) WITHIN GROUP (ORDER BY hours) AS p90,
-               count(*) AS n
-          FROM (
-            SELECT EXTRACT(epoch FROM sel.approved_at - sel.created_at) / 3600.0 AS hours
-              FROM request_fmb_selection sel
-             WHERE sel.unit_code = ANY(%(outlets)s)
-               AND (%(outlet)s IS NULL OR sel.unit_code = %(outlet)s)
-               AND sel.created_at >= %(from)s AND sel.created_at < %(to)s
-               AND sel.approved_at IS NOT NULL
-               AND sel.approved_at >= sel.created_at
-          ) s
-        """,
-        scope.params(outlet=outlet),
-    )
-    return _pair(row)
-
-
-def order_claim_latency(cur, scope: Scope, *, outlet: str | None = None) -> dict[str, Any]:
-    """M18 - accepted to claimed, in hours.
-
-    How long an approved order sat unclaimed in the shared pool. This is the
-    metric that exposes an understaffed outlet, and it exists nowhere else in
-    the application - a manager cannot assign an order, only staff the pool.
-    """
-    row = fetch_one(
-        cur,
-        """
-        SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY hours) AS p50,
-               percentile_cont(0.9) WITHIN GROUP (ORDER BY hours) AS p90,
-               count(*) AS n
-          FROM (
-            SELECT EXTRACT(epoch FROM claim.at - sel.approved_at) / 3600.0 AS hours
-              FROM request_fmb_selection sel
-              JOIN request_fmb f ON f.request_fmb_id = sel.request_fmb_id
-              JOIN LATERAL (
-                    SELECT min(h.created_at) AS at
-                      FROM workflow_history h
-                     WHERE h.request_id = f.request_id
-                       AND h.action = 'claim-selection'
-                       AND h.created_at >= sel.approved_at
-              ) claim ON TRUE
-             WHERE sel.unit_code = ANY(%(outlets)s)
-               AND (%(outlet)s IS NULL OR sel.unit_code = %(outlet)s)
-               AND sel.approved_at IS NOT NULL
-               AND sel.approved_at >= %(from)s AND sel.approved_at < %(to)s
-               AND claim.at IS NOT NULL
-          ) s
-        """,
-        scope.params(outlet=outlet),
-    )
-    return _pair(row)
-
-
 def task_deadline_sql(spec: DepartmentSpec, alias: str = "d") -> tuple[str, str]:
     """A department's own "done by when", and the sentence that explains it.
 
@@ -567,12 +508,6 @@ _G1_LONG = (
     "derived from request-level history, which cannot tell sibling orders on one proposal apart. "
     "Newer orders are measured directly."
 )
-
-
-def approximate_since(scope: Scope, *, short: bool = False) -> str:
-    """The caveat every M17/M18 widget carries, naming gap G1 rather than
-    hiding it (docs/dashboards/02-metric-catalog.md)."""
-    return _G1_SHORT if short else _G1_LONG
 
 
 def month_floor(day: dt.date) -> dt.date:

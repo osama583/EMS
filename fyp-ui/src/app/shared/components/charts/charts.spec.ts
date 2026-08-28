@@ -167,7 +167,7 @@ describe('chart-panel', () => {
     expect(component.isEmpty()).toBe(false);
   });
 
-  it('prefers a mark own identity over the panel default when drilling', () => {
+  it('never navigates from a chart mark, whatever identity the point carries', () => {
     const component = fixture.debugElement.children[0].componentInstance as ChartPanelComponent;
     const seen: { route: string; params: Record<string, unknown> }[] = [];
     component.drill.subscribe((event) => seen.push(event));
@@ -177,12 +177,36 @@ describe('chart-panel', () => {
     );
     fixture.detectChanges();
 
+    // A point carrying a requestId used to go straight to that proposal, and a
+    // point carrying an optionId used to go to the panel's filtered list. Both
+    // now stay on the dashboard: clicking a mark is how a reader inspects a
+    // value, not how they leave the page.
     component.onMark({ seriesKey: 's0', point: { requestId: 42, label: 'x' } });
-    expect(seen[0].route).toBe('/app/proposals/review/42');
-
     component.onMark({ seriesKey: 's0', point: { optionId: 7, label: 'Speakers' } });
-    expect(seen[1].route).toBe('/app/inbox/requests');
-    expect(seen[1].params).toEqual({ requestKind: 'soundLight', item: 7 });
+    expect(seen).toEqual([]);
+  });
+
+  it('still cross-filters a sibling panel, which is the one click that stays put', () => {
+    const component = fixture.debugElement.children[0].componentInstance as ChartPanelComponent;
+    const drilled: unknown[] = [];
+    const filtered: { target: string; value: string | number; label: string }[] = [];
+    component.drill.subscribe((event) => drilled.push(event));
+    component.filterSelect.subscribe((event) => filtered.push(event));
+
+    fixture.componentInstance.current.set(
+      panel({
+        chart: 'bar-chart',
+        drill: { route: '/app/inbox/requests', params: {} },
+        crossFilter: { target: 'cfo_funding_sub_usage', pointKey: 'optionId', targetKey: 'mainOptionId', labelKey: 'label' },
+      }),
+    );
+    fixture.detectChanges();
+
+    component.onMark({ seriesKey: 's0', point: { optionId: 7, label: 'Speaker & Talent' } });
+    expect(drilled).toEqual([]);
+    expect(filtered[0].target).toBe('cfo_funding_sub_usage');
+    expect(filtered[0].value).toBe(7);
+    expect(filtered[0].label).toBe('Speaker & Talent');
   });
 });
 

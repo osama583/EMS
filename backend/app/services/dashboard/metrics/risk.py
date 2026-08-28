@@ -227,36 +227,6 @@ def cancellation_window_exposure(cur, scope: Scope) -> int:
     return int(row["n"]) if row else 0
 
 
-def unpriced_ordered_items(cur, scope: Scope, *, outlets: list[str] | None = None) -> list[dict[str, Any]]:
-    """M75 - live orders against menu items with no price.
-
-    Each one silently understates committed food cost, which is why it is a
-    named work list and not just a percentage.
-    """
-    targets = outlets if outlets is not None else list(scope.outlets)
-    rows = fetch_all(
-        cur,
-        """
-        SELECT o.fmb_option_id AS option_id,
-               o.label AS label,
-               o.unit_code AS outlet,
-               count(*) AS orders
-          FROM request_fmb_selection s
-          JOIN fmb_options o ON o.fmb_option_id = s.fmb_option_id
-         WHERE o.unit_price_rm IS NULL
-           AND s.status NOT IN ('cancelled', 'fulfilled')
-           AND (%(all_outlets)s OR s.unit_code = ANY(%(target_outlets)s))
-      GROUP BY 1, 2, 3
-      ORDER BY 4 DESC
-        """,
-        scope.params(all_outlets=not targets, target_outlets=targets or [""]),
-    )
-    return [
-        {"optionId": r["option_id"], "label": r["label"], "outlet": r["outlet"], "orders": int(r["orders"])}
-        for r in rows
-    ]
-
-
 def venue_conflicts(cur, scope: Scope, spec: DepartmentSpec) -> list[dict[str, Any]]:
     """Two bookings at one normalised location with a gap under the teardown
     window - or overlapping outright.

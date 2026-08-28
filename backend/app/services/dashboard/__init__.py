@@ -290,7 +290,11 @@ def build_document(
 
         results: dict[str, Any] = {}
         ordered_ids = (
-            [layout["hero"]]
+            # "hero" is optional in the same way "signature" and "alerts" are. A
+            # profile whose headline figure was removed does not get a promoted
+            # stand-in: the band above it simply becomes the page's opening
+            # statement, and the tiles below reflow into the freed width.
+            ([layout["hero"]] if layout.get("hero") else [])
             + list(layout["kpis"])
             + ([layout["signature"]] if layout.get("signature") else [])
             + list(layout["panels"])
@@ -345,7 +349,7 @@ def build_document(
             },
             "period": scope.period.as_json(),
             "requestCounts": results.get(layout["counts"]) if layout.get("counts") else None,
-            "hero": results[layout["hero"]],
+            "hero": results[layout["hero"]] if layout.get("hero") else None,
             "kpis": [results[widget_id] for widget_id in layout["kpis"]],
             "signature": results[layout["signature"]] if layout.get("signature") else None,
             "panels": [results[widget_id] for widget_id in layout["panels"]],
@@ -411,7 +415,7 @@ def build_widget_only(
         variant = school_signature(cur, active.unit_code) if active.key == "hos_school" and active.unit_code else None
         layout = layout_for(active.key, variant)
         allowed = {
-            layout["hero"],
+            *([layout["hero"]] if layout.get("hero") else []),
             *([layout["signature"]] if layout.get("signature") else []),
             *([layout["alerts"]] if layout.get("alerts") else []),
             *layout["kpis"],

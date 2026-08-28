@@ -44,6 +44,8 @@ interface MeterSpec {
               [style.width.%]="meter.width"
               [style.background]="meter.color"
               [attr.aria-label]="meter.aria"
+              (mouseenter)="hover('meter', meter.raw)"
+              (focus)="hover('meter', meter.raw)"
               (click)="select('meter', meter.raw)"
             ></button>
             @if (meter.overflow) {
@@ -62,11 +64,32 @@ interface MeterSpec {
         <li class="viz-meter__empty">Nothing is configured to measure here yet.</li>
       }
     </ul>
+
+    @if (hovered(); as active) {
+      <p class="viz-tooltip" role="status">
+        <strong>{{ tipName(active.point) }}</strong>
+        {{ tipValue(active.point) }}
+      </p>
+    }
   `,
   styleUrl: './meter.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MeterComponent extends VizChartBase {
+  tipName(point: Record<string, unknown>): string {
+    return String(point?.['label'] ?? 'Meter');
+  }
+
+  /** Committed against available is the pair this form exists to compare, so
+   *  the tooltip states both rather than the fill percentage alone. */
+  tipValue(point: Record<string, unknown>): string {
+    const committed = Number(point?.['committed'] ?? point?.['value'] ?? 0);
+    const available = point?.['available'];
+    return available === null || available === undefined
+      ? formatValue(committed, 'count')
+      : `${formatValue(committed, 'count')} of ${formatValue(Number(available), 'count')}`;
+  }
+
   protected plotHeight(): number {
     return 0;
   }

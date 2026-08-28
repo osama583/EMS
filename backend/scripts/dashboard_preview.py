@@ -215,7 +215,7 @@ def build_preview(profile_key: str, period: str = "30d", variant: str | None = N
         today=TODAY,
     )
     layout = layout_for(profile_key, variant)
-    ids = [layout["hero"], *layout["kpis"], *([layout["signature"]] if layout.get("signature") else []), *layout["panels"], *([layout["alerts"]] if layout.get("alerts") else []), *layout.get("mobileKpis", [])]
+    ids = [*([layout["hero"]] if layout.get("hero") else []), *layout["kpis"], *([layout["signature"]] if layout.get("signature") else []), *layout["panels"], *([layout["alerts"]] if layout.get("alerts") else []), *layout.get("mobileKpis", [])]
     results = {widget_id: build_widget(widget_id, cur, scope) for widget_id in dict.fromkeys(ids)}
     actions = _quick_actions(cur, scope, list(layout["quickActions"]), results)
     title = unit_label or ("Institutional finance" if profile_key == "cfo" else "Cafeteria operations")
@@ -238,7 +238,7 @@ def build_preview(profile_key: str, period: str = "30d", variant: str | None = N
             "activeOutlet": "all",
         },
         "period": scope.period.as_json(),
-        "hero": results[layout["hero"]],
+        "hero": results[layout["hero"]] if layout.get("hero") else None,
         "kpis": [results[widget_id] for widget_id in layout["kpis"]],
         "signature": results[layout["signature"]] if layout.get("signature") else None,
         "panels": [results[widget_id] for widget_id in layout["panels"]],
@@ -289,7 +289,7 @@ def check() -> int:
                 failures.append(f"{name}: build failed — {error!r}")
                 continue
 
-            widgets = [document["hero"], *document["kpis"], *([document["signature"]] if document["signature"] else []), *document["panels"], *([document["alerts"]] if document["alerts"] else [])]
+            widgets = [*([document["hero"]] if document["hero"] else []), *document["kpis"], *([document["signature"]] if document["signature"] else []), *document["panels"], *([document["alerts"]] if document["alerts"] else [])]
             for widget in widgets:
                 if widget.get("state") == "error":
                     failures.append(f"{name}: widget {widget['id']} returned state=error")

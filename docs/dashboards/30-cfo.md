@@ -22,6 +22,44 @@
 
 ---
 
+## 0. What this page shows now (supersedes the layout sections below)
+
+Reduced to the money question and the gate behind it. Every metric described
+below is still defined correctly; most of them are simply no longer on the page.
+
+| Band | Widget | Notes |
+|---|---|---|
+| Counts | `cfo_request_counts` | Unchanged. |
+| KPIs | `cfo_total_spend` | **Budget cost + cafeteria food cost** (`finance.total_cost_split`). |
+| | `cfo_cafeteria_cost` | The cafeteria half alone - the same number F&B shows as Total cafeteria cost. |
+| | `cfo_cost_per_pax` | Total spend over `total_pax`. |
+| | `cfo_total_pax` | Unchanged. |
+| Panels | `cfo_funding_main_usage` | Bar chart. Clicking a bar still cross-filters the sub-item chart beside it. |
+| | `cfo_funding_sub_usage` | Bar chart, filtered by the panel above. |
+| | `cfo_gate_decisions` | Approved / sent back / rejected at `cfo_review`, as **grouped** columns rather than one stacked column. |
+
+**No hero and no signature.** `cfo_forward_spend` and `cfo_gate_matrix` are
+gone, and nothing was promoted into either slot; both fields are now optional
+in the profile contract.
+
+**Removed.** `cfo_gate_coverage`, `cfo_collection`, `cfo_gate_queue`,
+`cfo_price_coverage`, `cfo_forward_spend`, `cfo_gate_matrix`,
+`cfo_spend_by_category`, `cfo_runway`, `cfo_cost_per_pax_schools`,
+`cfo_revenue_funnel`, and the `cfo_at_risk` attention rail with its three quick
+actions.
+
+**One cost definition.** `finance.total_cost_split` is shared with the F&B
+dashboard, so Total spend here and Total cost there are the same number rather
+than two totals that differ by what each happened to count. The two halves come
+from different tables - `request_funding_purchase` for budget,
+`request_fmb_selection` for cafeteria food - so adding them double-counts
+nothing.
+
+**Charts do not navigate.** Clicking a mark keeps the reader on the dashboard;
+hovering gives the exact value. Cross-filtering is the one click that survives.
+
+---
+
 ## 1. Dashboard objective
 
 **Responsible for:** the `cfo_review` gate; the Funding Main Items and Funding

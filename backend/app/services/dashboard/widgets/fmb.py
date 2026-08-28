@@ -37,94 +37,6 @@ from .base import (
 ALL_OUTLETS: list[str] = []
 
 
-@widget("fmb_on_time_delivery")
-def on_time_delivery(cur, scope: Scope) -> dict[str, Any]:
-    """Hero — every other number on this page is a means to this end. Food that
-    arrives after the session it was ordered for did not happen, whatever the
-    order status says."""
-    result = sla.delivery_punctuality(cur, scope)
-    minutes = result["medianMinutes"]
-    return hero(
-        label="On-time delivery rate",
-        value=result["rate"],
-        fmt=FMT_PERCENT,
-        caption=(
-            f"{result['delivered']} delivered · {result['late']} late · median "
-            f"{abs(minutes):.0f} min {'late' if minutes and minutes > 0 else 'early'}"
-            if minutes is not None
-            else f"{result['delivered']} delivered in period"
-        ),
-        target={"min": 0.95, "label": "Goal: 95% or higher"},
-        status=status_for(result["rate"], minimum=0.95, critical=0.85, higher_is_better=True),
-        definition="M19 — delivered_at on or before request_fmb.date + serve_time",
-        empty="No orders have been delivered in this period.",
-        drill_to=drill("/app/history/requests", requestKind="fmb", delivery="late"),
-    )
-
-
-@widget("fmb_fanout_board")
-def fanout_board(cur, scope: Scope) -> dict[str, Any]:
-    """Signature panel — one row per outlet, the order lifecycle as a stacked
-    bar, with acceptance, claim and push-back beside it."""
-    outlets = capacity.order_pipeline_by_outlet(cur, scope, outlets=ALL_OUTLETS)
-    pushbacks = {o["code"]: o for o in quality.pushback_by_outlet(cur, scope)}
-    rows = []
-    for outlet in outlets:
-        accept = sla.order_accept_latency(cur, scope, outlet=outlet["code"])
-        claim = sla.order_claim_latency(cur, scope, outlet=outlet["code"])
-        rows.append(
-            {
-                **outlet,
-                "acceptMedian": accept["median"],
-                "claimMedian": claim["median"],
-                "pushbackRate": pushbacks.get(outlet["code"], {}).get("rate"),
-            }
-        )
-    cancelled = sum(o["cancelled"] for o in outlets)
-    stages = ("pending", "approved", "preparing", "ready", "fulfilled")
-    return panel(
-        title="Order fan-out board",
-        subtitle="Every outlet's live order mix, with measured acceptance and claim times",
-        chart="stacked-bar",
-        series_list=[
-            series(
-                stage,
-                stage.capitalize(),
-                index,
-                [{"x": row[stage], "label": row["label"], "code": row["code"]} for row in rows],
-                rampStep=250 + index * 75,
-            )
-            for index, stage in enumerate(stages, start=1)
-        ],
-        axes={"x": {"type": "linear", "label": "Orders", "format": FMT_COUNT}, "y": {"type": "category", "label": "Outlet"}},
-        data={"rows": rows},
-        table_view=table(
-            [
-                {"key": "label", "label": "Outlet", "format": "text"},
-                {"key": "pending", "label": "Pending", "format": FMT_COUNT},
-                {"key": "approved", "label": "Approved", "format": FMT_COUNT},
-                {"key": "preparing", "label": "Preparing", "format": FMT_COUNT},
-                {"key": "ready", "label": "Ready", "format": FMT_COUNT},
-                {"key": "fulfilled", "label": "Fulfilled", "format": FMT_COUNT},
-                {"key": "acceptMedian", "label": "Accept p50 (h)", "format": FMT_HOURS},
-                {"key": "claimMedian", "label": "Claim p50 (h)", "format": FMT_HOURS},
-                {"key": "pushbackRate", "label": "Push-back", "format": FMT_PERCENT},
-            ],
-            rows,
-        ),
-        caption=(
-            f"{cancelled} cancelled order(s) are excluded from the bars — a cancellation is not a stage anything "
-            "passes through."
-        ),
-        caveat=sla.approximate_since(scope),
-        empty="No orders have been placed with any outlet in this period.",
-        filters=["outlet", "menuItem"],
-        drill_to=drill("/app/inbox/requests", requestKind="fmb"),
-        signature=True,
-        mobile="ranked-list",
-    )
-
-
 @widget("fmb_gate_outcomes")
 def gate_outcomes(cur, scope: Scope) -> dict[str, Any]:
     """The only department dashboard carrying a rejection series, because it is
@@ -133,7 +45,12 @@ def gate_outcomes(cur, scope: Scope) -> dict[str, Any]:
     return panel(
         title="Gate outcomes",
         subtitle="Decisions at fmb_review, per week",
-        chart="stacked-bar",
+        # Grouped columns, not stacked. Approved / sent back / rejected are three
+        # separate outcomes of one decision, not parts of a total worth adding
+        # up, and stacking them put all three inside a single column that read as
+        # one bar. column-chart draws a bar per series side by side whenever it
+        # is not stacked (see its `grouped` branch).
+        chart="column-chart",
         series_list=[
             series("approved", "Approved", 1, [{"x": r["x"], "y": r["approved"]} for r in rows]),
             series("sentBack", "Sent back", 2, [{"x": r["x"], "y": r["sentBack"]} for r in rows]),
@@ -153,228 +70,6 @@ def gate_outcomes(cur, scope: Scope) -> dict[str, Any]:
         drill_to=drill("/app/history/proposals", stage="fmb-review"),
         mobile="scroll",
     )
-
-
-@widget("fmb_outlet_balance")
-def outlet_balance(cur, scope: Scope) -> dict[str, Any]:
-    """F&B chooses the split, so a drift is a decision worth seeing."""
-    rows = capacity.outlet_load_balance(cur, scope)
-    weeks = sorted({r["week"] for r in rows})
-    totals: dict[str, int] = {}
-    labels: dict[str, str] = {}
-    for row in rows:
-        totals[row["code"]] = totals.get(row["code"], 0) + row["value"]
-        labels[row["code"]] = row["label"]
-    ranked = sorted(({"label": code, "value": value} for code, value in totals.items()), key=lambda r: -r["value"])
-    kept = fold_tail(scope, ranked, limit=3)
-    kept_codes = [r["label"] for r in kept if not r.get("isOther")]
-
-    def points_for(codes: set[str]) -> list[dict[str, Any]]:
-        out = []
-        for week in weeks:
-            in_week = [r for r in rows if r["week"] == week]
-            total = sum(r["value"] for r in in_week) or None
-            value = sum(r["value"] for r in in_week if r["code"] in codes)
-            out.append({"x": week, "y": ratio(value, total)})
-        return out
-
-    series_list = [
-        series(code, labels[code], index, points_for({code}))
-        for index, code in enumerate(kept_codes, start=1)
-    ]
-    if any(r.get("isOther") for r in kept):
-        series_list.append(series("other", "Other", 4, points_for(set(totals) - set(kept_codes))))
-
-    return panel(
-        title="Outlet allocation balance",
-        subtitle="Share of orders per outlet, per week",
-        chart="line-chart",
-        series_list=series_list,
-        axes={"x": {"type": "date", "label": "Week"}, "y": {"type": "linear", "label": "Share", "format": FMT_PERCENT}},
-        table_view=table(
-            [
-                {"key": "week", "label": "Week", "format": "date"},
-                {"key": "label", "label": "Outlet", "format": "text"},
-                {"key": "value", "label": "Orders", "format": FMT_COUNT},
-            ],
-            rows,
-        ),
-        empty="No orders have been placed with any outlet in this period.",
-    )
-
-
-@widget("fmb_cost_by_outlet")
-def cost_by_outlet(cur, scope: Scope) -> dict[str, Any]:
-    rows = finance.cost_by_outlet(cur, scope, outlets=ALL_OUTLETS)
-    thin = [r for r in rows if r["coverage"] is not None and r["coverage"] < 0.8]
-    return panel(
-        title="Committed food cost by outlet",
-        subtitle="Ordered quantity × menu price, this period",
-        chart="bar-chart",
-        series_list=[
-            series(
-                "cost",
-                "Committed cost",
-                1,
-                [
-                    {
-                        "x": r["value"],
-                        "label": r["label"],
-                        "code": r["code"],
-                        "annotation": f"{r['coverage']:.0%} priced" if r["coverage"] is not None else None,
-                        "warn": bool(r["coverage"] is not None and r["coverage"] < 0.8),
-                    }
-                    for r in rows
-                ],
-            )
-        ],
-        axes={"x": {"type": "linear", "label": "RM", "format": FMT_CURRENCY}},
-        table_view=table(
-            [
-                {"key": "label", "label": "Outlet", "format": "text"},
-                {"key": "value", "label": "Committed cost", "format": FMT_CURRENCY},
-                {"key": "coverage", "label": "Price coverage", "format": FMT_PERCENT},
-            ],
-            rows,
-        ),
-        caption=(
-            f"{len(thin)} outlet(s) are under 80% priced — those bars understate by an unknown amount."
-            if thin
-            else None
-        ),
-        empty="No orders have been placed with any outlet in this period.",
-        drill_to=drill("/app/cafeterias/menu-oversight"),
-        mobile="ranked-list",
-    )
-
-
-@widget("fmb_dietary_coverage")
-def dietary_coverage(cur, scope: Scope) -> dict[str, Any]:
-    """An outlet with no halal or no vegetarian item cannot serve a large share
-    of campus events, and nothing else in the application surfaces that."""
-    matrix = capacity.menu_dietary_coverage(cur, scope, outlets=ALL_OUTLETS)
-    filled = {(c["outlet"], c["tag"]) for c in matrix["cells"] if c["value"]}
-    gaps = [
-        {"outlet": o["label"], "tag": t["label"]}
-        for o in matrix["outlets"]
-        for t in matrix["tags"]
-        if (o["code"], t["id"]) not in filled
-    ]
-    return panel(
-        title="Dietary coverage across outlets",
-        subtitle="Active menu items carrying each dietary tag",
-        chart="heatmap",
-        data={
-            "rows": [o["label"] for o in matrix["outlets"]],
-            "rowKeys": [o["code"] for o in matrix["outlets"]],
-            "columns": [t["label"] for t in matrix["tags"]],
-            "columnKeys": [t["id"] for t in matrix["tags"]],
-            "cells": matrix["cells"],
-            "emptyIsBreach": True,
-        },
-        axes={"x": {"type": "category", "label": "Dietary tag"}, "y": {"type": "category", "label": "Outlet"}},
-        table_view=table(
-            [
-                {"key": "outlet", "label": "Outlet", "format": "text"},
-                {"key": "tag", "label": "Uncovered tag", "format": "text"},
-            ],
-            gaps,
-        ),
-        caption=f"{len(gaps)} outlet/tag combination(s) have no menu item at all — each carries a ring and a glyph.",
-        empty="No active menu items are configured.",
-        drill_to=drill("/app/cafeterias/menu-oversight"),
-        mobile="breach-list",
-    )
-
-
-@widget("fmb_order_lifecycle")
-def order_lifecycle(cur, scope: Scope) -> dict[str, Any]:
-    """Names which segment is degrading: accept is the manager's, claim is the
-    roster's, prepare is the kitchen's. Three different remedies."""
-    from ....db import fetch_all
-
-    rows = fetch_all(
-        cur,
-        """
-        SELECT date_trunc('week', sel.created_at)::date AS week,
-               percentile_cont(0.5) WITHIN GROUP (
-                   ORDER BY EXTRACT(epoch FROM sel.approved_at - sel.created_at) / 3600.0) AS accept_h,
-               percentile_cont(0.5) WITHIN GROUP (
-                   ORDER BY EXTRACT(epoch FROM sel.ready_at - sel.approved_at) / 3600.0) AS prepare_h,
-               percentile_cont(0.5) WITHIN GROUP (
-                   ORDER BY EXTRACT(epoch FROM sel.delivered_at - sel.ready_at) / 3600.0) AS deliver_h,
-               count(*) AS n
-          FROM request_fmb_selection sel
-         WHERE sel.created_at >= %(from)s AND sel.created_at < %(to)s
-      GROUP BY 1
-      ORDER BY 1
-        """,
-        scope.base_params,
-    )
-    data = [
-        {
-            "x": r["week"].isoformat(),
-            "accept": max(0.0, float(r["accept_h"] or 0)),
-            "prepare": max(0.0, float(r["prepare_h"] or 0)),
-            "deliver": max(0.0, float(r["deliver_h"] or 0)),
-            "sample": int(r["n"]),
-        }
-        for r in rows
-    ]
-    return panel(
-        title="Order lifecycle latency",
-        subtitle="Median hours per week: accept, prepare, deliver",
-        chart="column-chart",
-        series_list=[
-            series("accept", "Accept", 1, [{"x": r["x"], "y": r["accept"]} for r in data]),
-            series("prepare", "Prepare", 2, [{"x": r["x"], "y": r["prepare"]} for r in data]),
-            series("deliver", "Deliver", 3, [{"x": r["x"], "y": r["deliver"]} for r in data]),
-        ],
-        axes={"x": {"type": "date", "label": "Week"}, "y": {"type": "linear", "label": "Hours", "format": FMT_HOURS}},
-        table_view=table(
-            [
-                {"key": "x", "label": "Week", "format": "date"},
-                {"key": "accept", "label": "Accept (h)", "format": FMT_HOURS},
-                {"key": "prepare", "label": "Prepare (h)", "format": FMT_HOURS},
-                {"key": "deliver", "label": "Deliver (h)", "format": FMT_HOURS},
-            ],
-            data,
-        ),
-        caveat=sla.approximate_since(scope),
-        empty="No orders have been placed in this period.",
-    )
-
-
-@widget("fmb_at_risk")
-def at_risk(cur, scope: Scope) -> dict[str, Any]:
-    result = risk.orders_at_risk(cur, scope, outlets=ALL_OUTLETS)
-    unpriced = risk.unpriced_ordered_items(cur, scope, outlets=ALL_OUTLETS)
-    stranded = risk.stranded_at_gate(cur, scope)
-    return panel(
-        title="At risk right now",
-        subtitle=f"Live orders inside the next {result['windowHours'] / 24:.0f} days",
-        chart="alert-list",
-        data={
-            "counts": result,
-            "unpriced": unpriced,
-            "stranded": stranded,
-        },
-        table_view=table(
-            [
-                {"key": "label", "label": "Unpriced item with live orders", "format": "text"},
-                {"key": "orders", "label": "Orders", "format": FMT_COUNT},
-            ],
-            unpriced,
-        ),
-        empty="Nothing is inside the risk window.",
-        drill_to=drill("/app/inbox/requests", requestKind="fmb", risk="true"),
-    )
-
-
-# --- The dashboard as specified ------------------------------------------
-# Row 1 counts, row 2 money, row 3 gate outcomes beside order distribution,
-# then water. Everything below reuses the Cafeteria Manager's own components:
-# the same counts strip, the same donut, the same stat tile.
 
 
 @widget("fmb_request_counts")
@@ -429,21 +124,19 @@ def request_counts(cur, scope: Scope) -> dict[str, Any]:
 def total_cost(cur, scope: Scope) -> dict[str, Any]:
     """Row 2, tile 1 - every ringgit F&B is on the hook for this period.
 
-    Cafeteria orders plus purchase lines filed under the Food & Beverage budget
-    category. Both are F&B money; only the first is an outlet's doing, which is
-    what the tile beside this one separates out.
+    Budget cost plus cafeteria food cost - the shared definition in
+    finance.total_cost_split, so this tile and the CFO's Total spend are the
+    same number rather than two totals that differ by what each counted.
 
-    Deliberately not the CFO's Total Spend and always smaller than it: that
-    figure is every category's funding plus all food, and this is F&B's slice
-    of the same money, not a second count of it.
+    The tile beside this one is the cafeteria half on its own.
     """
-    spend = finance.fnb_spend(cur, scope)
+    spend = finance.total_cost_split(cur, scope)
     return kpi(
         label="Total cost",
         value=spend["total"],
         fmt=FMT_CURRENCY,
-        secondary=f"RM {spend['funding']:,.0f} bought outside the cafeterias" if spend["funding"] else None,
-        caption="Cafeteria orders plus Food & Beverage funding lines",
+        secondary=f"RM {spend['budget']:,.0f} budget + RM {spend['cafeteria']:,.0f} cafeteria",
+        caption="Budget cost plus cafeteria food requests",
         status="unknown",
         caveat=(
             f"Based on {spend['coverage']:.0%} of ordered items carrying a price - "
@@ -451,7 +144,7 @@ def total_cost(cur, scope: Scope) -> dict[str, Any]:
             if spend["coverage"] is not None and spend["coverage"] < 1
             else None
         ),
-        definition="M50 committed food cost plus FIN-FNB funding lines, over live proposals",
+        definition="M51 budget commitment plus M50 committed food cost, over live proposals",
         drill_to=drill("#panel-fmb_order_distribution"),
     )
 
@@ -460,12 +153,12 @@ def total_cost(cur, scope: Scope) -> dict[str, Any]:
 def cafeteria_cost(cur, scope: Scope) -> dict[str, Any]:
     """Row 2, tile 2 - the part of Total Cost the outlets actually cooked.
 
-    Kept apart from the total because the two answer different questions. Total
-    cost is what F&B spent; this is what F&B spent THROUGH ITS OWN OUTLETS, and
-    only the second moves when a fan-out decision changes. The same number is
-    what the CFO's Cafeteria total cost tile shows.
+    Food requested from the cafeterias, and nothing else - the budget half of
+    the total is deliberately excluded here. Only this number moves when a
+    fan-out decision changes, and it is the same figure the CFO's Cafeteria
+    total cost tile shows.
     """
-    spend = finance.fnb_spend(cur, scope)
+    spend = finance.total_cost_split(cur, scope)
     share = ratio(spend["cafeteria"], spend["total"])
     return kpi(
         label="Total cafeteria cost",
@@ -544,7 +237,6 @@ def order_distribution(cur, scope: Scope) -> dict[str, Any]:
     """
     rows = finance.cafeteria_order_distribution(cur, scope)
     total = sum(r["orders"] for r in rows)
-    lead = ratio(rows[0]["orders"], total) if rows and total else None
     return panel(
         title="Cafeteria order distribution",
         subtitle="Orders placed with each outlet this period",
@@ -564,13 +256,10 @@ def order_distribution(cur, scope: Scope) -> dict[str, Any]:
             ],
             rows,
         ),
-        caption=(
-            f"{rows[0]['label']} is carrying {lead:.0%} of the orders."
-            if lead is not None
-            else None
-        ),
+        # No caption. It restated the chart in prose ("Atrium Cafeteria is
+        # carrying 71% of the orders"), which the hover tooltip now answers
+        # exactly, per segment, without a second block of text to keep in sync.
         empty="No orders were placed with any outlet in this period.",
-        drill_to=drill("/app/history/requests", requestKind="fmb"),
     )
 
 
@@ -597,11 +286,12 @@ def water_usage(cur, scope: Scope) -> dict[str, Any]:
         title="Water requested",
         subtitle="Bottles asked for this period, by branding",
         chart="bar-chart",
-        series_list=[series("bottles", "Bottles", 1, [{"x": b["label"], "y": b["value"]} for b in bars])],
-        axes={
-            "x": {"type": "category", "label": "Branding"},
-            "y": {"type": "linear", "label": "Bottles", "format": FMT_COUNT},
-        },
+        # A horizontal bar reads its MAGNITUDE from `x` and its category from
+        # `label` (see bar-chart.ts's rows()). Emitting {x: "With logo", y: 12}
+        # made every bar Number("With logo") - NaN - and printed the category
+        # where the value belongs, which is what made this panel look broken.
+        series_list=[series("bottles", "Bottles", 1, [{"x": b["value"], "label": b["label"]} for b in bars])],
+        axes={"x": {"type": "linear", "label": "Bottles", "format": FMT_COUNT}},
         table_view=table(
             [
                 {"key": "label", "label": "Branding", "format": "text"},

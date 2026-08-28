@@ -20,11 +20,6 @@ from ..scope import Scope, num, ratio
 # Proposals whose money is not a commitment.
 _DEAD = "('cancelled', 'completed_rejected', 'draft')"
 
-# The Food & Beverage budget category, matched on its finance code because the
-# LABEL is editable in /app/dropdown-options and the code is what accounting
-# reconciles against. Seeded by seed/data.FUNDING_MAIN_OPTIONS.
-_FNB_FINANCE_CODE = "FIN-FNB"
-
 
 def committed_food_cost(cur, scope: Scope, *, request_filter: str = "", previous: bool = False, extra: dict | None = None) -> dict[str, Any]:
     """M50 - ordered quantity times menu price, over live proposals.
@@ -59,51 +54,33 @@ def committed_food_cost(cur, scope: Scope, *, request_filter: str = "", previous
     }
 
 
-def fnb_spend(cur, scope: Scope, *, previous: bool = False) -> dict[str, Any]:
-    """What F&B costs, split into the two places the money actually comes from.
+def total_cost_split(cur, scope: Scope, *, previous: bool = False) -> dict[str, Any]:
+    """THE cost definition, shared by the F&B and CFO dashboards.
 
-    The F&B dashboard shows both halves and the CFO shows the cafeteria half
-    beside its own totals, so the split is computed once here rather than twice
-    in two widget modules that could drift apart.
+        total     = budget + cafeteria
+        budget    = request_funding_purchase - quantity x unit price, every
+                    budget category. This is the money the applicant planned for
+                    on the proposal's funding/purchase table.
+        cafeteria = request_fmb_selection x fmb_options.unit_price_rm - food the
+                    cafeterias were actually asked to make.
 
-      cafeteria - orders placed on a cafeteria's own menu
-                  (request_fmb_selection x fmb_options.unit_price_rm). This is
-                  the "food spend requests submitted by cafeterias" figure, and
-                  it is the ONLY part an outlet is accountable for.
-      funding   - purchase lines the applicant filed under the Food & Beverage
-                  budget category. Real F&B money, but bought outside the
-                  cafeterias entirely (external caterers, supermarket runs), so
-                  no outlet can be held to it.
+    The two are disjoint by construction: they come from different tables filled
+    in by different people at different points, so adding them double-counts
+    nothing. Food bought through a caterer is a budget line and never becomes a
+    cafeteria order; a cafeteria order is never re-entered as a budget line.
 
-    Matched on budget_category_finance_code rather than the label, because the
-    label is editable in /app/dropdown-options and the finance code is the
-    stable identifier accounting actually reconciles against.
-
-    Both halves are already inside the CFO's Total Spend - `cafeteria` through
-    committed_food_cost and `funding` through funding_commitment - so this adds
-    no new money to that total; it only says which part of it is F&B's.
+    Both dashboards call THIS, rather than each computing a total from the same
+    two halves. F&B previously counted only the Food & Beverage budget category
+    against its total, which made its "total cost" a different quantity from the
+    CFO's "total spend" while both were labelled a total - the mismatch this
+    function exists to prevent.
     """
     cafeteria = committed_food_cost(cur, scope, previous=previous)
-    lo, hi = ("prev_from", "prev_to") if previous else ("from", "to")
-    row = fetch_one(
-        cur,
-        f"""
-        SELECT sum(p.quantity * p.unit_price_rm) AS total
-          FROM request_funding_purchase p
-          JOIN request r ON r.request_id = p.request_id
-          LEFT JOIN funding_main_options m
-                 ON m.funding_main_option_id = p.main_option_id
-         WHERE r.status NOT IN {_DEAD}
-           AND m.budget_category_finance_code = %(fnb_code)s
-           AND r.submitted_at >= %({lo})s AND r.submitted_at < %({hi})s
-        """,
-        scope.params(fnb_code=_FNB_FINANCE_CODE),
-    )
-    funding = num(row["total"], 0.0) if row else 0.0
+    budget = funding_commitment(cur, scope, previous=previous)
     return {
+        "budget": round(budget, 2),
         "cafeteria": round(cafeteria["total"], 2),
-        "funding": round(funding, 2),
-        "total": round(cafeteria["total"] + funding, 2),
+        "total": round(budget + cafeteria["total"], 2),
         "pricedItems": cafeteria["pricedItems"],
         "totalItems": cafeteria["totalItems"],
         "coverage": cafeteria["coverage"],
@@ -113,12 +90,11 @@ def fnb_spend(cur, scope: Scope, *, previous: bool = False) -> dict[str, Any]:
 def fnb_cost_per_pax(cur, scope: Scope) -> dict[str, Any]:
     """F&B spend over the attendance behind it.
 
-    Deliberately the same shape as cost_per_pax (M55) - same denominator, same
-    live-proposal window - so the F&B figure and the CFO's institutional one are
-    comparable rather than two different calculations that happen to share a
-    name. The only difference is the numerator: F&B money, not all money.
+    Same numerator and denominator as the CFO's cost-per-pax tile, because both
+    now read total_cost_split. The two pages therefore show the SAME number, not
+    two figures that differ by which slice of spend each happened to count.
     """
-    spend = fnb_spend(cur, scope)
+    spend = total_cost_split(cur, scope)
     row = fetch_one(
         cur,
         f"""
@@ -331,6 +307,8 @@ def cost_per_pax(cur, scope: Scope, *, request_filter: str = "", extra: dict | N
     one a CFO can put in front of a school head. Always defined, unlike a
     recovery ratio on a term with no paid events.
     """
+    # Same two halves as total_cost_split, kept here in the filtered form the
+    # school/department slices need (total_cost_split takes no request_filter).
     food = committed_food_cost(cur, scope, request_filter=request_filter, extra=extra)
     funding = funding_commitment(cur, scope, request_filter=request_filter, extra=extra)
     row = fetch_one(
@@ -410,150 +388,6 @@ def cost_per_pax_by_school(cur, scope: Scope) -> list[dict[str, Any]]:
     ]
 
 
-def gate_coverage(cur, scope: Scope) -> dict[str, Any]:
-    """M56 - the share of proposals crossing HIGH_PAX_THRESHOLD, and the share
-    of committed spend those proposals carry.
-
-    Two numbers on one tile, deliberately: "4% of proposals, 31% of spend". If
-    the gate sees 4% of events and 31% of the money the threshold is roughly
-    doing its job; if it sees 4% and 9%, it is not. That comparison is the whole
-    argument for retuning it, and the CFO is the person who can request that.
-    """
-    threshold = scope.config.number("HIGH_PAX_THRESHOLD", 50)
-    row = fetch_one(
-        cur,
-        f"""
-        SELECT count(*) AS proposals,
-               count(*) FILTER (WHERE r.total_pax > %(threshold)s) AS above,
-               coalesce(sum(cost.total), 0) AS spend,
-               coalesce(sum(cost.total) FILTER (WHERE r.total_pax > %(threshold)s), 0) AS spend_above
-          FROM request r
-          LEFT JOIN LATERAL (
-                SELECT coalesce((SELECT sum(s.quantity * o.unit_price_rm)
-                                   FROM request_fmb_selection s
-                                   JOIN fmb_options o ON o.fmb_option_id = s.fmb_option_id
-                                   JOIN request_fmb f ON f.request_fmb_id = s.request_fmb_id
-                                  WHERE f.request_id = r.request_id AND s.status <> 'cancelled'), 0)
-                     + coalesce((SELECT sum(p.quantity * p.unit_price_rm)
-                                   FROM request_funding_purchase p
-                                  WHERE p.request_id = r.request_id), 0) AS total
-          ) cost ON TRUE
-         WHERE r.status NOT IN {_DEAD}
-           AND r.submitted_at >= %(from)s AND r.submitted_at < %(to)s
-        """,
-        scope.params(threshold=threshold),
-    )
-    return {
-        "threshold": threshold,
-        "proposalShare": ratio(row["above"], row["proposals"]) if row else None,
-        "spendShare": ratio(row["spend_above"], row["spend"]) if row else None,
-        "proposalsAbove": int(row["above"]) if row else 0,
-        "proposals": int(row["proposals"]) if row else 0,
-        "spendAbove": num(row["spend_above"], 0.0) if row else 0.0,
-        "spend": num(row["spend"], 0.0) if row else 0.0,
-    }
-
-
-def gate_coverage_matrix(cur, scope: Scope) -> list[dict[str, Any]]:
-    """The CFO's signature panel: pax bands against committed-cost bands.
-
-    An R7 aggregate over every proposal in the period - counts and sums only,
-    no identifier of any kind. What it quantifies is exactly what the current
-    threshold misses: how many proposals, carrying how much money, pass below
-    the gate. That figure exists nowhere else in the application.
-    """
-    rows = fetch_all(
-        cur,
-        f"""
-        SELECT pax_band, cost_band, count(*) AS n, sum(total_cost) AS cost, sum(pax) AS pax
-          FROM (
-            SELECT CASE WHEN r.total_pax < 20 THEN '0-19'
-                        WHEN r.total_pax < 50 THEN '20-49'
-                        WHEN r.total_pax < 100 THEN '50-99'
-                        WHEN r.total_pax < 250 THEN '100-249'
-                        ELSE '250+' END AS pax_band,
-                   CASE WHEN cost.total < 500 THEN 'RM 0-499'
-                        WHEN cost.total < 2000 THEN 'RM 500-1,999'
-                        WHEN cost.total < 10000 THEN 'RM 2,000-9,999'
-                        ELSE 'RM 10,000+' END AS cost_band,
-                   cost.total AS total_cost,
-                   r.total_pax AS pax
-              FROM request r
-              LEFT JOIN LATERAL (
-                    SELECT coalesce((SELECT sum(s.quantity * o.unit_price_rm)
-                                       FROM request_fmb_selection s
-                                       JOIN fmb_options o ON o.fmb_option_id = s.fmb_option_id
-                                       JOIN request_fmb f ON f.request_fmb_id = s.request_fmb_id
-                                      WHERE f.request_id = r.request_id AND s.status <> 'cancelled'), 0)
-                         + coalesce((SELECT sum(p.quantity * p.unit_price_rm)
-                                       FROM request_funding_purchase p
-                                      WHERE p.request_id = r.request_id), 0) AS total
-              ) cost ON TRUE
-             WHERE r.status NOT IN {_DEAD}
-               AND r.submitted_at >= %(from)s AND r.submitted_at < %(to)s
-          ) banded
-      GROUP BY 1, 2
-        """,
-        scope.base_params,
-    )
-    return [
-        {
-            "paxBand": r["pax_band"],
-            "costBand": r["cost_band"],
-            "n": int(r["n"]),
-            "cost": num(r["cost"], 0.0),
-            "pax": num(r["pax"], 0.0),
-        }
-        for r in rows
-    ]
-
-
-def threshold_preview(cur, scope: Scope, candidates: list[int]) -> list[dict[str, Any]]:
-    """Coverage and queue cost at hypothetical HIGH_PAX_THRESHOLD values.
-
-    Computed server-side and changing nothing: the CFO sees that moving the
-    threshold from 50 to 35 brings 41% of spend under the gate instead of 31%
-    and adds roughly six proposals a month to their queue - both sides of the
-    trade, before asking an administrator to change anything.
-    """
-    out = []
-    for candidate in candidates:
-        row = fetch_one(
-            cur,
-            f"""
-            SELECT count(*) FILTER (WHERE r.total_pax > %(candidate)s) AS above,
-                   count(*) AS proposals,
-                   coalesce(sum(cost.total), 0) AS spend,
-                   coalesce(sum(cost.total) FILTER (WHERE r.total_pax > %(candidate)s), 0) AS spend_above
-              FROM request r
-              LEFT JOIN LATERAL (
-                    SELECT coalesce((SELECT sum(s.quantity * o.unit_price_rm)
-                                       FROM request_fmb_selection s
-                                       JOIN fmb_options o ON o.fmb_option_id = s.fmb_option_id
-                                       JOIN request_fmb f ON f.request_fmb_id = s.request_fmb_id
-                                      WHERE f.request_id = r.request_id AND s.status <> 'cancelled'), 0)
-                         + coalesce((SELECT sum(p.quantity * p.unit_price_rm)
-                                       FROM request_funding_purchase p
-                                      WHERE p.request_id = r.request_id), 0) AS total
-              ) cost ON TRUE
-             WHERE r.status NOT IN {_DEAD}
-               AND r.submitted_at >= %(from)s AND r.submitted_at < %(to)s
-            """,
-            scope.params(candidate=candidate),
-        )
-        days = max(1, scope.period.days)
-        above = int(row["above"]) if row else 0
-        out.append(
-            {
-                "threshold": candidate,
-                "proposalShare": ratio(row["above"], row["proposals"]) if row else None,
-                "spendShare": ratio(row["spend_above"], row["spend"]) if row else None,
-                "queuePerMonth": round(above * 30.0 / days, 1),
-            }
-        )
-    return out
-
-
 def forward_commitment(cur, scope: Scope, *, request_filter: str = "", months: int = 6, extra: dict | None = None) -> list[dict[str, Any]]:
     """M57 - committed spend by month for approved events not yet run.
 
@@ -601,89 +435,6 @@ def forward_commitment(cur, scope: Scope, *, request_filter: str = "", months: i
             "funding": num(r["funding"], 0.0),
             "value": num(r["food"], 0.0) + num(r["funding"], 0.0),
             "proposals": int(r["proposals"]),
-        }
-        for r in rows
-    ]
-
-
-def price_coverage(cur, scope: Scope, *, outlets: list[str] | None = None) -> dict[str, Any]:
-    """M58 - active menu items carrying a price, over active menu items.
-
-    Displayed beside every currency figure that depends on it. A CFO reading
-    RM 128,400 needs to know whether that is 95% of the truth or 60%.
-    """
-    targets = outlets if outlets is not None else list(scope.outlets)
-    row = fetch_one(
-        cur,
-        """
-        SELECT count(*) FILTER (WHERE o.unit_price_rm IS NOT NULL) AS priced,
-               count(*) AS items
-          FROM fmb_options o
-         WHERE o.active AND o.archived_at IS NULL
-           AND (%(all_outlets)s OR o.unit_code = ANY(%(target_outlets)s))
-        """,
-        scope.params(all_outlets=not targets, target_outlets=targets or [""]),
-    )
-    unpriced_live = fetch_one(
-        cur,
-        f"""
-        SELECT count(*) AS n
-          FROM request_fmb_selection s
-          JOIN fmb_options o ON o.fmb_option_id = s.fmb_option_id
-          JOIN request_fmb f ON f.request_fmb_id = s.request_fmb_id
-          JOIN request r ON r.request_id = f.request_id
-         WHERE o.unit_price_rm IS NULL
-           AND s.status NOT IN ('cancelled', 'fulfilled')
-           AND r.status NOT IN {_DEAD}
-           AND (%(all_outlets)s OR s.unit_code = ANY(%(target_outlets)s))
-        """,
-        scope.params(all_outlets=not targets, target_outlets=targets or [""]),
-    )
-    return {
-        "coverage": ratio(row["priced"], row["items"]) if row else None,
-        "priced": int(row["priced"]) if row else 0,
-        "items": int(row["items"]) if row else 0,
-        "unpricedWithLiveOrders": int(unpriced_live["n"]) if unpriced_live else 0,
-    }
-
-
-def cost_by_outlet(cur, scope: Scope, *, outlets: list[str] | None = None) -> list[dict[str, Any]]:
-    """M50 per outlet, each with its own M58 coverage.
-
-    Coverage per outlet rather than one institutional figure: an outlet at 40%
-    priced makes its own bar meaningless, and averaging that into a single
-    caption would hide which one.
-    """
-    targets = outlets if outlets is not None else list(scope.outlets)
-    rows = fetch_all(
-        cur,
-        f"""
-        SELECT s.unit_code AS code,
-               coalesce(u.description, u.code) AS label,
-               sum(s.quantity * o.unit_price_rm) AS total,
-               count(*) FILTER (WHERE o.unit_price_rm IS NOT NULL) AS priced,
-               count(*) AS items
-          FROM request_fmb_selection s
-          JOIN fmb_options o ON o.fmb_option_id = s.fmb_option_id
-          JOIN unit u ON u.code = s.unit_code
-          JOIN request_fmb f ON f.request_fmb_id = s.request_fmb_id
-          JOIN request r ON r.request_id = f.request_id
-         WHERE s.status <> 'cancelled'
-           AND r.status NOT IN {_DEAD}
-           AND coalesce(s.created_at, r.submitted_at) >= %(from)s
-           AND coalesce(s.created_at, r.submitted_at) < %(to)s
-           AND (%(all_outlets)s OR s.unit_code = ANY(%(target_outlets)s))
-      GROUP BY 1, 2
-      ORDER BY 3 DESC NULLS LAST
-        """,
-        scope.params(all_outlets=not targets, target_outlets=targets or [""]),
-    )
-    return [
-        {
-            "code": r["code"],
-            "label": r["label"],
-            "value": num(r["total"], 0.0),
-            "coverage": ratio(r["priced"], r["items"]),
         }
         for r in rows
     ]
