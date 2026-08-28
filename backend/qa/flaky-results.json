@@ -1,0 +1,57 @@
+[
+  {
+    "id": "F-1",
+    "as": "student.computing2@demo.apu.edu.my",
+    "intent": "repeat 1",
+    "expect": "3 clubs",
+    "exchanges": [
+      {
+        "q": "which clubs am i a member of?",
+        "answer": "You are a member of the APU Photography Club.",
+        "sources": [],
+        "clubs": [
+          "APU Photography Club"
+        ],
+        "navigation": [],
+        "ms": 3687
+      }
+    ]
+  },
+  {
+    "id": "F-2",
+    "as": "student.computing2@demo.apu.edu.my",
+    "intent": "repeat 2",
+    "expect": "3 clubs",
+    "exchanges": [
+      {
+        "q": "which clubs am i a member of?",
+        "answer": "You are a member of the APU Photography Club.",
+        "sources": [],
+        "clubs": [
+          "APU Photography Club"
+        ],
+        "navigation": [],
+        "ms": 4036
+      }
+    ]
+  },
+  {
+    "id": "F-3",
+    "as": "student.computing2@demo.apu.edu.my",
+    "intent": "variation",
+    "expect": "3 clubs",
+    "exchanges": [
+      {
+        "q": "list all the clubs i belong to",
+        "answer": "You are a member of the APU Photography Club, 1, and Single Clubs.",
+        "sources": [],
+        "clubs": [
+          "APU Photography Club",
+          "Single Clubs"
+        ],
+        "navigation": [],
+        "ms": 4593
+      }
+    ]
+  }
+]

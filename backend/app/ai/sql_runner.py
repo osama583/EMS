@@ -105,6 +105,45 @@ def execute(sql: str) -> list[dict]:
             raise SqlExecutionError(message, schema_related=schema_related) from exc
 
 
+# Tables whose rows belong to ONE person. A query restricted to the asker's rows in one of these
+# cannot answer a question about everybody, however complete its result looks.
+_PERSONAL_TABLES = (
+    "event_registration", "club_members", "club_join_requests", "club_president_change_requests",
+)
+# A user-id equality, with or without a table alias in front of it - the model writes
+# `er.user_id = 37` as readily as `event_registration.user_id = 37`, and a literal-substring check
+# missed the aliased form entirely.
+_USER_FILTER = re.compile(
+    r"\b(?:(\w+)\.)?(applicant_user_id|requester_user_id|user_id)\s*=\s*\d+", re.IGNORECASE
+)
+
+
+def _restricted_to_one_person(sql: str) -> bool:
+    """Was this query narrowed to a single person's rows in a personal table?
+
+    Deliberately NOT "does the SQL mention a user id". The events visibility predicate always
+    carries `applicant_user_id = <id>`, and the staff/co-owner join inside it carries
+    `s_request.user_id = <id>` - that whole clause is how an OWNER sees their own Private event,
+    not a narrowing of the result to one person. Counting it flagged every signed-in event query,
+    and "Show me events in October" came back as "You are registered for these events in October"
+    for six events the asker is not registered for.
+
+    So: the query must touch a personal table AND carry a user-id filter that is not part of that
+    ownership clause - identified by the `applicant_` column and the `s_`/`co_` alias prefixes
+    scope_rules._owner_clause generates.
+    """
+    lowered = sql.lower()
+    if not any(table in lowered for table in _PERSONAL_TABLES):
+        return False
+    for qualifier, column in _USER_FILTER.findall(sql):
+        if column.lower() == "applicant_user_id":
+            continue
+        if (qualifier or "").lower().startswith(("s_", "co_")):
+            continue
+        return True
+    return False
+
+
 def rows_to_document(rows: list[dict], *, sql: str) -> str:
     """The DATABASE RESULT block handed to the answering model.
 
@@ -115,6 +154,25 @@ def rows_to_document(rows: list[dict], *, sql: str) -> str:
     plenty of questions ("do I have any pending registrations?"). That distinction is spelled
     out again in the answer prompt; this is the half that makes it possible to honour.
     """
+    # Did the query have to carry a personal ownership condition to run at all? An access-scoped
+    # result misleads whether it comes back empty or partial, but the two branches need DIFFERENT
+    # sensitivities, so they get different marker sets.
+    lowered = (sql or "").lower()
+
+    # EMPTY: deliberately broad, and errs toward caution. Saying "you have none to show" when the
+    # rows were merely public-and-absent is a small loss; saying "nobody has registered" when the
+    # roster was simply not yours to read is a false statement about the world.
+    #
+    # The visibility clause counts too, and it is the only marker a GUEST query ever carries: with
+    # no user id anywhere in their SQL, every empty guest result was being reported as a fact about
+    # the world. Asked "show me the private events", a signed-out visitor was told "there are no
+    # private events" - there are three; they are simply not a guest's to see.
+    scoped_empty = any(
+        marker in lowered for marker in ("user_id =", "applicant_user_id", "requester_user_id")
+    ) or "event_visibility in" in lowered
+
+    scoped_partial = _restricted_to_one_person(sql or "")
+
     if not rows:
         # WHY the result is empty changes what the honest answer is, and conflating the two
         # produced a false statement: "who registered for the Career Fair?" returned no rows
@@ -125,8 +183,7 @@ def rows_to_document(rows: list[dict], *, sql: str) -> str:
         # The distinction is drawn from the query itself rather than guessed. A query that had to
         # carry a personal ownership condition to run at all ("= <my id>", "events I organise") is
         # scoped-empty; a query over publicly visible rows is genuinely empty.
-        scoped = any(marker in (sql or "").lower() for marker in ("user_id =", "applicant_user_id", "requester_user_id"))
-        if scoped:
+        if scoped_empty:
             return (
                 "DATABASE RESULT: the query ran successfully and returned NO ROWS, but the query "
                 "was RESTRICTED TO WHAT THIS ASKER MAY SEE. So this means 'none that you have "
@@ -142,7 +199,48 @@ def rows_to_document(rows: list[dict], *, sql: str) -> str:
             "are none/none found. Do NOT say you lack access or could not look it up."
         )
     columns = list(rows[0].keys())
-    lines = [f"DATABASE RESULT ({len(rows)} row{'s' if len(rows) != 1 else ''}):"]
+    # WHAT the rows mean lives in the query's conditions, not in its column names, and only the
+    # column names survive into this block. Asked "am I president of any club?", the model was
+    # handed `club_name: APU Coding Society` - a bare club name with nothing saying the asker
+    # presides over it - and answered "No, you are not listed as the president of any club" while
+    # holding the two rows that prove otherwise. It was following ANSWER ONLY FROM THE DATABASE
+    # RESULT correctly; the block simply did not carry the fact that the filter had already been
+    # applied. Generalises past presidency to every question whose answer is in the WHERE clause
+    # ("clubs I'm in", "events I organise"), where the columns look identical either way.
+    lines = [
+        f"DATABASE RESULT ({len(rows)} row{'s' if len(rows) != 1 else ''}):",
+        "  These rows ARE the answer to this question - the conditions the question asked for have"
+        " ALREADY been applied in selecting them. If the asker asked which clubs they are President"
+        " of, these are exactly those clubs; if they asked what they are registered for, these are"
+        " exactly those registrations. Do not re-judge whether a row qualifies, and never answer"
+        " negatively ('you are not', 'you have none') while rows are present just because no column"
+        " restates the question's wording."
+        " The converse is equally binding: they answer the question ACTUALLY asked and nothing"
+        " more. Never attach a personal relationship the question did not ask about - rows"
+        " returned for 'which clubs have under 20 members' are club SIZES, and calling them"
+        " 'clubs you are a member of' invents a membership fact about the asker. The asker's OWN"
+        " NAME appearing in a row does not make the row about them either: a club listed next to"
+        " its president, who happens to be the asker, is still an entry in the club LIST, not a"
+        " membership of theirs. Describe each row by the column it is actually in, never by a"
+        " relationship you inferred from a name you recognised. The same trap on the events side:"
+        " rows returned for 'show me events in October' are the EVENT LIST, and opening with 'you"
+        " are registered for these events' asserts six registrations the asker does not have. If a"
+        " row does not carry the relationship, do not name one - say 'here are the events', 'here"
+        " are the clubs'.",
+    ]
+    if scoped_partial:
+        # The partial twin of the scoped-empty case above. Asked "who registered for the Career
+        # Fair?" about an event he does NOT organise, the asker got back the one row that was his
+        # to see - his own registration - and was told "Daniel Wong registered for the AI & Data
+        # Science Career Fair", which reads as the complete roster when five people are on it.
+        # Nothing leaked; the answer was still false. Rows restricted to the asker cannot answer a
+        # question about everyone.
+        lines.append(
+            "  SCOPE: these rows were RESTRICTED TO WHAT THIS ASKER MAY SEE, so they may be only"
+            " their own slice of a larger set. If the question asked about OTHER people or about"
+            " everyone ('who registered', 'who is in this club'), do NOT present these rows as the"
+            " full answer or imply the list is complete - say you can only show them their own."
+        )
     for row in rows:
         lines.append("  - " + "; ".join(f"{col}: {row.get(col)}" for col in columns))
     if len(rows) >= MAX_ROWS:

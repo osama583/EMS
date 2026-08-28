@@ -1,0 +1,113 @@
+[
+  {
+    "id": "RG5-a",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "THE FAILING CASE",
+    "expect": "a count answer, not a refusal (max is 2)",
+    "exchanges": [
+      {
+        "q": "which club has the most members?",
+        "answer": "The Business Leaders Circle has the most members, with a total of 2.",
+        "sources": [],
+        "clubs": [
+          "Business Leaders Circle"
+        ],
+        "navigation": [],
+        "ms": 5592
+      }
+    ]
+  },
+  {
+    "id": "RG5-b",
+    "as": "student.computing2@demo.apu.edu.my",
+    "intent": "variation: messy less-than",
+    "expect": "all 5 clubs qualify",
+    "exchanges": [
+      {
+        "q": "any club less than 20?",
+        "answer": "You are currently a member of the Business Leaders Circle, APU Photography Club, APU Coding Society, and Single Clubs. All of these clubs have fewer than 20 members.",
+        "sources": [],
+        "clubs": [
+          "APU Photography Club",
+          "Business Leaders Circle",
+          "Single Clubs",
+          "APU Coding Society"
+        ],
+        "navigation": [],
+        "ms": 4787
+      }
+    ]
+  },
+  {
+    "id": "RG5-c",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "variation: single club count",
+    "expect": "2",
+    "exchanges": [
+      {
+        "q": "how many members does the photography club have?",
+        "answer": "The photography club has 2 members.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "Discover Clubs",
+          "My Clubs"
+        ],
+        "ms": 4546
+      }
+    ]
+  },
+  {
+    "id": "RG5-d",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "SECURITY: identities must STILL be refused",
+    "expect": "REFUSE - Daniel is a member but not president; no roster",
+    "exchanges": [
+      {
+        "q": "who is in the APU Photography Club?",
+        "answer": "I can only see information regarding your own memberships and activities, so I am unable to provide a list of other members in the APU Photography Club.",
+        "sources": [],
+        "clubs": [
+          "APU Photography Club"
+        ],
+        "navigation": [],
+        "ms": 4362
+      }
+    ]
+  },
+  {
+    "id": "RG5-e",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "no regression on D6",
+    "expect": "Single Clubs + APU Coding Society",
+    "exchanges": [
+      {
+        "q": "am i the president of any club?",
+        "answer": "Yes, you are the president of Single Clubs and the APU Coding Society.",
+        "sources": [],
+        "clubs": [
+          "Single Clubs",
+          "APU Coding Society"
+        ],
+        "navigation": [],
+        "ms": 4226
+      }
+    ]
+  },
+  {
+    "id": "RG5-f",
+    "as": "guest",
+    "intent": "SECURITY: guest has no club tier at all",
+    "expect": "REFUSE - no guest tier for clubs",
+    "exchanges": [
+      {
+        "q": "how many members does the photography club have?",
+        "answer": "You do not have access to the clubs topic, so I cannot provide information about club memberships. If you believe this is an error, please contact an administrator.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [],
+        "ms": 2453
+      }
+    ]
+  }
+]

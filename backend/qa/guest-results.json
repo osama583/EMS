@@ -1,0 +1,59 @@
+[
+  {
+    "id": "G-1",
+    "as": "guest",
+    "intent": "guest event browse - documented public tier",
+    "expect": "Public + Club Only events",
+    "exchanges": [
+      {
+        "q": "what events are coming up?",
+        "answer": "Here are the events coming up:\n\n- Business Society Networking Lunch on 2026-09-21 at 12:00:00 in Hall A\n- School of Computing Research Symposium on 2026-10-01 at 09:00:00 in Seminar Room 2\n- AI & Data Science Career Fair on 2026-10-06 at 10:00:00 in Main Hall\n- APU Cultural Night on 2026-10-11 at 18:00:00 in Grand Hall\n- Annual Hackathon Kickoff on 2026-10-16 at 13:00:00 in Multipurpose Hall\n- Case Competition Finals on 2026-10-16 at 13:00:00 in Multipurpose Hall\n- Members-Only Photowalk Briefing on 2026-10-16 at 13:00:00 in Multipurpose Hall",
+        "sources": [
+          "School of Computing Research Symposium",
+          "Business Society Networking Lunch",
+          "Annual Hackathon Kickoff",
+          "Case Competition Finals",
+          "Members-Only Photowalk Briefing",
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 16217
+      }
+    ]
+  },
+  {
+    "id": "G-2",
+    "as": "guest",
+    "intent": "guest public count",
+    "expect": "a count answer",
+    "exchanges": [
+      {
+        "q": "which event has the most people registered?",
+        "answer": "The AI & Data Science Career Fair has the most people registered, with 5 attendees.",
+        "sources": [
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 7512
+      }
+    ]
+  },
+  {
+    "id": "G-3",
+    "as": "guest",
+    "intent": "guest must NOT see Private",
+    "expect": "refuse",
+    "exchanges": [
+      {
+        "q": "show me the private events",
+        "answer": "There are no private events.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [],
+        "ms": 11300
+      }
+    ]
+  }
+]

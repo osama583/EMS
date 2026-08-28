@@ -1,0 +1,185 @@
+[
+  {
+    "id": "R6-51",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "two-part question, own events",
+    "expect": "answers BOTH parts; she organises Career Fair + Hackathon",
+    "exchanges": [
+      {
+        "q": "how many events am i organising and how many people signed up for them",
+        "answer": "You are currently organizing 8 events, and there are 13 total registrations across all of them.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "My Events",
+          "Explore Events"
+        ],
+        "ms": 6088
+      }
+    ]
+  },
+  {
+    "id": "R6-52",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "organiser pending queue",
+    "expect": "0 pending across her events",
+    "exchanges": [
+      {
+        "q": "any pending approvals for my events?",
+        "answer": "I don't have any pending event approvals to show you for your account.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "My Events"
+        ],
+        "ms": 7254
+      }
+    ]
+  },
+  {
+    "id": "R6-53",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "relative date range, messy",
+    "expect": "nothing between Aug 28 and Sep 4 -> say none",
+    "exchanges": [
+      {
+        "q": "whats on next week",
+        "answer": "I don't have any events to show you for next week.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "Explore Events",
+          "My Events"
+        ],
+        "ms": 4218
+      }
+    ]
+  },
+  {
+    "id": "R6-54",
+    "as": "av.manager@demo.apu.edu.my",
+    "intent": "venue filter, service dept role",
+    "expect": "3 events on Oct 16 in Multipurpose Hall",
+    "exchanges": [
+      {
+        "q": "which events are happening in the multipurpose hall?",
+        "answer": "The following events are scheduled in the Multipurpose Hall:\n\n- Annual Hackathon Kickoff\n- Case Competition Finals\n- Members-Only Photowalk Briefing",
+        "sources": [
+          "Annual Hackathon Kickoff",
+          "Case Competition Finals",
+          "Members-Only Photowalk Briefing"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 4598
+      }
+    ]
+  },
+  {
+    "id": "R6-55",
+    "as": "student.computing2@demo.apu.edu.my",
+    "intent": "topical club search",
+    "expect": "APU Photography Club",
+    "exchanges": [
+      {
+        "q": "show me clubs about photography",
+        "answer": "I don't have any photography clubs to show you.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "Discover Clubs",
+          "My Clubs"
+        ],
+        "ms": 5955
+      }
+    ]
+  },
+  {
+    "id": "R6-56",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "category lookup",
+    "expect": "its real category, not invented",
+    "exchanges": [
+      {
+        "q": "what category is the cultural night",
+        "answer": "The cultural night falls under the Culture & Community category.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "Explore Events",
+          "My Events"
+        ],
+        "ms": 4224
+      }
+    ]
+  },
+  {
+    "id": "R6-57",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "presidency of ANOTHER club - public per design",
+    "expect": "Mei Ling Tan",
+    "exchanges": [
+      {
+        "q": "who is the president of the photography club?",
+        "answer": "The president of the Photography Club is Mei Ling Tan.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "Discover Clubs",
+          "My Clubs"
+        ],
+        "ms": 6179
+      }
+    ]
+  },
+  {
+    "id": "R6-58",
+    "as": "logistics.manager@demo.apu.edu.my",
+    "intent": "bare greeting - style check",
+    "expect": "short, warm, offers only granted topics; NOT a capability dump",
+    "exchanges": [
+      {
+        "q": "hi",
+        "answer": "Hi! I can help you with information about published events, your own event registrations and saved events, as well as managing registrations for events you organize. What would you like to know?",
+        "sources": [],
+        "clubs": [],
+        "navigation": [],
+        "ms": 3476
+      }
+    ]
+  },
+  {
+    "id": "R6-59",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "small talk, no question",
+    "expect": "brief; must not invent a task",
+    "exchanges": [
+      {
+        "q": "thanks!",
+        "answer": "You're very welcome! Let me know if you'd like to look up any published events, check your club memberships, or need help with an action in the system.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [],
+        "ms": 2943
+      }
+    ]
+  },
+  {
+    "id": "R6-60",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "socially-sensitive but legitimate club lookup",
+    "expect": "names Single Clubs; no content-safety refusal",
+    "exchanges": [
+      {
+        "q": "is there a club for single people",
+        "answer": "Yes, there is a club called Single Clubs, which is for people looking for friendship.",
+        "sources": [],
+        "clubs": [
+          "Single Clubs"
+        ],
+        "navigation": [],
+        "ms": 4220
+      }
+    ]
+  }
+]

@@ -139,6 +139,122 @@ describe('DashboardComponent', () => {
     expect(text).toContain('Bed occupancy');
   });
 
+  /**
+   * The CFO's funding pair. The behaviour under test is the *toggle*: a reader
+   * who narrows the sub-item chart has to be able to get back out of it, and a
+   * one-way filter with no exit is the failure mode worth a test.
+   */
+  describe('cross-filtered panels', () => {
+    function fundingDocument(): DashboardDocument {
+      const main = panel('cfo_funding_main_usage', {
+        title: 'Funding main items',
+        crossFilter: {
+          target: 'cfo_funding_sub_usage',
+          pointKey: 'optionId',
+          targetKey: 'mainOptionId',
+          labelKey: 'label',
+        },
+        series: [
+          {
+            key: 'selections',
+            label: 'Selections',
+            colorSlot: 1,
+            points: [
+              { x: 3, label: 'Equipment Rental', optionId: 5 },
+              { x: 1, label: 'Speaker & Talent', optionId: 4 },
+            ],
+          },
+        ],
+      });
+      const sub = panel('cfo_funding_sub_usage', {
+        title: 'Funding sub-items',
+        series: [
+          {
+            key: 'selections',
+            label: 'Selections',
+            colorSlot: 2,
+            points: [
+              { x: 2, label: 'AV Equipment Hire', optionId: 9, mainOptionId: 5 },
+              { x: 1, label: 'Furniture Hire', optionId: 10, mainOptionId: 5 },
+              { x: 1, label: 'Speaker Honorarium', optionId: 7, mainOptionId: 4 },
+            ],
+          },
+        ],
+      });
+      return { ...inventedDocument(), panels: [main, sub] };
+    }
+
+    function subPoints() {
+      return fixture.componentInstance.panels().find((p) => p.id === 'cfo_funding_sub_usage')!.series[0].points;
+    }
+
+    const selectEquipmentRental = {
+      source: 'cfo_funding_main_usage',
+      target: 'cfo_funding_sub_usage',
+      targetKey: 'mainOptionId',
+      value: 5,
+      label: 'Equipment Rental',
+    };
+
+    it('shows every sub-item until a main item is selected', () => {
+      flush(fundingDocument() as unknown as Record<string, unknown>);
+      expect(subPoints()).toHaveLength(3);
+    });
+
+    it('narrows the sub-items to the selected main item', () => {
+      flush(fundingDocument() as unknown as Record<string, unknown>);
+      fixture.componentInstance.onFilterSelect(selectEquipmentRental);
+      fixture.detectChanges();
+
+      const points = subPoints();
+      expect(points).toHaveLength(2);
+      expect(points.map((p) => p.label)).toEqual(['AV Equipment Hire', 'Furniture Hire']);
+      // Every survivor belongs to the selected main item.
+      expect(points.every((p) => p['mainOptionId'] === 5)).toBe(true);
+    });
+
+    it('says which main item is in force, and how to leave', () => {
+      flush(fundingDocument() as unknown as Record<string, unknown>);
+      fixture.componentInstance.onFilterSelect(selectEquipmentRental);
+      fixture.detectChanges();
+
+      const sub = fixture.componentInstance.panels().find((p) => p.id === 'cfo_funding_sub_usage')!;
+      expect(sub.subtitle).toContain('Equipment Rental');
+      expect(sub.subtitle).toContain('select it again');
+    });
+
+    it('mutes the unselected bars on the panel doing the filtering', () => {
+      flush(fundingDocument() as unknown as Record<string, unknown>);
+      fixture.componentInstance.onFilterSelect(selectEquipmentRental);
+      fixture.detectChanges();
+
+      const main = fixture.componentInstance.panels().find((p) => p.id === 'cfo_funding_main_usage')!;
+      expect(main.series[0].points.map((p) => p['muted'])).toEqual([false, true]);
+    });
+
+    it('restores the overall view when the same main item is selected again', () => {
+      flush(fundingDocument() as unknown as Record<string, unknown>);
+      fixture.componentInstance.onFilterSelect(selectEquipmentRental);
+      fixture.detectChanges();
+      expect(subPoints()).toHaveLength(2);
+
+      fixture.componentInstance.onFilterSelect(selectEquipmentRental);
+      fixture.detectChanges();
+      expect(subPoints()).toHaveLength(3);
+    });
+
+    it('replaces the selection when a different main item is chosen', () => {
+      flush(fundingDocument() as unknown as Record<string, unknown>);
+      fixture.componentInstance.onFilterSelect(selectEquipmentRental);
+      fixture.componentInstance.onFilterSelect({ ...selectEquipmentRental, value: 4, label: 'Speaker & Talent' });
+      fixture.detectChanges();
+
+      const points = subPoints();
+      expect(points).toHaveLength(1);
+      expect(points[0].label).toBe('Speaker Honorarium');
+    });
+  });
+
   it('renders the R8 footnote when the server withheld buckets', () => {
     flush(inventedDocument() as unknown as Record<string, unknown>);
     const footer = fixture.nativeElement.querySelector('.dash__footer').textContent as string;

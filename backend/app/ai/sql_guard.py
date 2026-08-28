@@ -126,6 +126,11 @@ _STRING_LITERAL = re.compile(r"'(?:[^']|'')*'")
 # Table references: the name following FROM / JOIN / UPDATE-style clauses. Deliberately broad -
 # over-matching produces a false rejection (safe), under-matching would let a table past (unsafe).
 _TABLE_REF = re.compile(r"\b(?:from|join)\s+([a-zA-Z_][a-zA-Z0-9_]*)", re.IGNORECASE)
+# EXTRACT / SUBSTRING / TRIM / OVERLAY take FROM as an ARGUMENT SEPARATOR, not as a table clause.
+# These four are the whole set in PostgreSQL, which is what makes blanking them safe to enumerate.
+_FUNCTION_FROM = re.compile(
+    r"\b(?:extract|substring|trim|overlay)\s*\([^()]*?\bfrom\b", re.IGNORECASE
+)
 _QUALIFIED_COLUMN = re.compile(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)\b")
 # Aliases, so `FROM request r` / `JOIN users u ON` resolves r.x and u.y to their real tables
 # before the column check runs. Without this every aliased query would fail rule 5.
@@ -161,6 +166,16 @@ def _normalise(text: str) -> str:
     """Whitespace-collapsed, lowercased - the form predicate matching compares in, so the model
     reformatting a required predicate across two lines does not fail an otherwise valid query."""
     return re.sub(r"\s+", " ", text).strip().lower()
+
+
+def _blank_function_from(sql: str) -> str:
+    """Blank the FROM that EXTRACT/SUBSTRING/TRIM/OVERLAY use as an argument separator.
+
+    Replaces only the four-letter keyword, with four spaces, so the string keeps its length and
+    every other identifier rule sees the same offsets. The column reference itself is left intact,
+    so rule 5 still validates `event_schedule.date` exactly as before - this removes a false table
+    reference, never a real check."""
+    return _FUNCTION_FROM.sub(lambda m: m.group(0)[:-4] + "    ", sql)
 
 
 def _alias_map(sql: str) -> dict[str, str]:
@@ -238,6 +253,13 @@ def validate(sql: str, *, allowed_tables: tuple[str, ...], scope) -> str:
     # predicate check further down deliberately keeps the original, since a required predicate
     # contains literals of its own that must match verbatim.
     structural = _STRING_LITERAL.sub(lambda m: "'" + " " * (len(m.group(0)) - 2) + "'", cleaned)
+    # ...and with the argument-separator FROM blanked, so a date-part expression is not read as a
+    # table clause. `EXTRACT(MONTH FROM event_schedule.date)` made _TABLE_REF capture the column's
+    # qualifier as a table, which rejected every "which events are in October" query (three
+    # attempts, all correct) and answered a confident, wrong "there are no events in October".
+    # Length-preserving, so every rule below still works on the same offsets, and narrow enough
+    # that a FROM in any other position is still a real table reference and still checked.
+    structural = _blank_function_from(structural)
 
     allowed = {t.lower() for t in allowed_tables}
     aliases = _alias_map(structural)

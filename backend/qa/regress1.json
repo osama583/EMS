@@ -1,0 +1,7 @@
+[
+{"id":"RG1-a","as":"student.business@demo.apu.edu.my","q":"Show me events happening in October.","intent":"THE FAILING CASE","expect":"6 October events, not 'none'"},
+{"id":"RG1-b","as":"student.computing@demo.apu.edu.my","q":"which events are in october?","intent":"variation: lowercase/messy","expect":"6 October events"},
+{"id":"RG1-c","as":"student.computing@demo.apu.edu.my","q":"anything happening next month?","intent":"variation: relative month (Sept from Aug 28)","expect":"September events (Business Society Networking Lunch Sep 21)"},
+{"id":"RG1-d","as":"student.computing@demo.apu.edu.my","q":"what events are coming up?","intent":"PREVIOUSLY PASSING - must not regress","expect":"upcoming events listed"},
+{"id":"RG1-e","as":"student.computing@demo.apu.edu.my","q":"which event has the most people registered?","intent":"PREVIOUSLY PASSING - must not regress","expect":"AI & Data Science Career Fair (5)"}
+]

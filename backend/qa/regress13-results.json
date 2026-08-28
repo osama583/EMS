@@ -1,0 +1,98 @@
+[
+  {
+    "id": "RGD-a",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "THE FAILING CASE - false 'you are registered'",
+    "expect": "lists 6 October events, NO registration claim",
+    "exchanges": [
+      {
+        "q": "Show me events in October.",
+        "answer": "You are registered for the following events in October:\n\n- School of Computing Research Symposium on 2026-10-01\n- AI & Data Science Career Fair on 2026-10-06\n- APU Cultural Night on 2026-10-11\n- Annual Hackathon Kickoff on 2026-10-16\n- Case Competition Finals on 2026-10-16\n- Members-Only Photowalk Briefing on 2026-10-16",
+        "sources": [
+          "School of Computing Research Symposium",
+          "Annual Hackathon Kickoff",
+          "Case Competition Finals",
+          "Members-Only Photowalk Briefing",
+          "APU Cultural Night",
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 6486
+      }
+    ]
+  },
+  {
+    "id": "RGD-b",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "D7 must STILL hold (non-organiser)",
+    "expect": "only-your-own hedge, not a full roster claim",
+    "exchanges": [
+      {
+        "q": "who registered for the AI & Data Science Career Fair?",
+        "answer": "I can only show you your own registration for that event, which was on August 22, 2026.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "My Events"
+        ],
+        "ms": 4887
+      }
+    ]
+  },
+  {
+    "id": "RGD-c",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "organiser still gets roster",
+    "expect": "5 names",
+    "exchanges": [
+      {
+        "q": "who registered for the AI & Data Science Career Fair?",
+        "answer": "I can only show you the attendees for this event that you have access to:\n\n- Adel Zeinab\n- Kumar Selvam\n- Aina Rahman\n- Mei Ling Tan\n- Daniel Wong",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "My Events"
+        ],
+        "ms": 5122
+      }
+    ]
+  },
+  {
+    "id": "RGD-d",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "scoped-empty must still hedge correctly",
+    "expect": "none, phrased as their own",
+    "exchanges": [
+      {
+        "q": "do i have any pending join requests?",
+        "answer": "I don't have any pending join requests to show you for your account.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "My Clubs",
+          "Discover Clubs"
+        ],
+        "ms": 4431
+      }
+    ]
+  },
+  {
+    "id": "RGD-e",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "own registrations still correct",
+    "expect": "Career Fair",
+    "exchanges": [
+      {
+        "q": "what am i registered for?",
+        "answer": "You are registered for the AI & Data Science Career Fair on October 6, 2026.",
+        "sources": [
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 5366
+      }
+    ]
+  }
+]

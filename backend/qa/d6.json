@@ -1,0 +1,5 @@
+[
+{"id":"D6-a","as":"applicant@demo.apu.edu.my","q":"am i the president of any club?","intent":"club named '1' - degenerate name","expect":"YES, club named '1'"},
+{"id":"D6-b","as":"student.computing@demo.apu.edu.my","q":"am i the president of any club?","intent":"normal club names - control","expect":"YES: APU Coding Society and Single Clubs"},
+{"id":"D6-c","as":"applicant@demo.apu.edu.my","q":"what clubs do i run?","intent":"same fact, different phrasing","expect":"club '1'"}
+]

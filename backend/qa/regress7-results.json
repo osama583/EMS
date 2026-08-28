@@ -1,0 +1,102 @@
+[
+  {
+    "id": "RG7-a",
+    "as": "student.computing2@demo.apu.edu.my",
+    "intent": "THE FAILING CASE",
+    "expect": "all 3: Photography, 1, Single Clubs",
+    "exchanges": [
+      {
+        "q": "which clubs am i a member of?",
+        "answer": "You are a member of the APU Photography Club, 1, and Single Clubs.",
+        "sources": [],
+        "clubs": [
+          "APU Photography Club",
+          "Single Clubs"
+        ],
+        "navigation": [],
+        "ms": 5691
+      }
+    ]
+  },
+  {
+    "id": "RG7-b",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "generalization: own registrations",
+    "expect": "complete set",
+    "exchanges": [
+      {
+        "q": "what am i registered for?",
+        "answer": "You are registered for the AI & Data Science Career Fair on October 6, 2026, at 10:00 AM.",
+        "sources": [
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 4718
+      }
+    ]
+  },
+  {
+    "id": "RG7-c",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "generalization: another user",
+    "expect": "Business Leaders Circle + APU Photography Club",
+    "exchanges": [
+      {
+        "q": "which clubs am i a member of?",
+        "answer": "You are a member of the APU Photography Club and the Business Leaders Circle.",
+        "sources": [],
+        "clubs": [
+          "APU Photography Club",
+          "Business Leaders Circle"
+        ],
+        "navigation": [],
+        "ms": 4510
+      }
+    ]
+  },
+  {
+    "id": "RG7-d",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "BROWSE must still be concise (no regression)",
+    "expect": "not required to list all 8 exhaustively",
+    "exchanges": [
+      {
+        "q": "what events are coming up?",
+        "answer": "You have several events coming up:\n\n- Business Society Networking Lunch on 2026-09-21\n- School of Computing Research Symposium on 2026-10-01\n- AI & Data Science Career Fair on 2026-10-06\n- APU Cultural Night on 2026-10-11\n- Case Competition Finals on 2026-10-16\n- Annual Hackathon Kickoff on 2026-10-16\n- Members-Only Photowalk Briefing on 2026-10-16",
+        "sources": [
+          "School of Computing Research Symposium",
+          "Business Society Networking Lunch",
+          "Annual Hackathon Kickoff",
+          "Case Competition Finals",
+          "Members-Only Photowalk Briefing",
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 4687
+      }
+    ]
+  },
+  {
+    "id": "RG7-e",
+    "as": "student.computing2@demo.apu.edu.my",
+    "intent": "no regression on invented membership",
+    "expect": "5 clubs, no membership claim",
+    "exchanges": [
+      {
+        "q": "any club less than 20?",
+        "answer": "Yes, here are the clubs with fewer than 20 members:\n\n- Business Leaders Circle\n- APU Photography Club\n- 1\n- APU Coding Society\n- Single Clubs",
+        "sources": [],
+        "clubs": [
+          "APU Photography Club",
+          "Business Leaders Circle",
+          "Single Clubs",
+          "APU Coding Society"
+        ],
+        "navigation": [],
+        "ms": 4674
+      }
+    ]
+  }
+]

@@ -1,0 +1,5 @@
+[
+{"id":"G-1","as":"guest","q":"what events are coming up?","intent":"guest event browse - documented public tier","expect":"Public + Club Only events"},
+{"id":"G-2","as":"guest","q":"which event has the most people registered?","intent":"guest public count","expect":"a count answer"},
+{"id":"G-3","as":"guest","q":"show me the private events","intent":"guest must NOT see Private","expect":"refuse"}
+]

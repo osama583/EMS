@@ -4,6 +4,7 @@ import { DashboardService } from '../../../../core/dashboard/dashboard.service';
 import {
   DashboardWidget,
   Drill,
+  FilterSelect,
   PERIOD_OPTIONS,
   PanelWidget,
   StatWidget,
@@ -82,6 +83,16 @@ export class DashboardComponent {
       const document = this.document();
       if (document?.profile) this.announcement.set(`${document.profile.title} dashboard, ${document.period.label}.`);
     });
+    // A cross-filter selection is scoped to the document it was made against.
+    // Keeping it across a profile or period change would narrow a chart to an
+    // option that period's catalogue may not even contain, and the reader would
+    // see an empty panel with no clue why.
+    effect(() => {
+      this.service.profileId();
+      this.service.period();
+      this.service.outlet();
+      this.filters.set({});
+    });
   }
 
   readonly announcement = signal('');
@@ -116,7 +127,69 @@ export class DashboardComponent {
     return [...ordered, ...rest];
   });
 
-  readonly panels = computed<PanelWidget[]>(() => this.document()?.panels ?? []);
+  /**
+   * Cross-filter selections, keyed by the *target* panel id.
+   *
+   * Held here rather than in either panel because it is a relationship between
+   * two of them, and neither is the owner. Cleared whenever a new document
+   * arrives — a selection made against last period's catalogue should not
+   * silently survive a period change and narrow a chart to an option that is
+   * no longer in it.
+   */
+  private readonly filters = signal<Record<string, FilterSelect>>({});
+
+  readonly panels = computed<PanelWidget[]>(() => {
+    const panels = this.document()?.panels ?? [];
+    const active = this.filters();
+    if (!Object.keys(active).length) return panels;
+
+    return panels.map((panel) => {
+      // The panel that *does* the filtering: mark the selected bar so the click
+      // has a visible result on the chart the reader just clicked, not only on
+      // its neighbour.
+      const bySource = Object.values(active).find((entry) => entry.source === panel.id);
+      if (bySource && panel.crossFilter) {
+        const key = panel.crossFilter.pointKey;
+        return {
+          ...panel,
+          series: panel.series.map((entry) => ({
+            ...entry,
+            points: entry.points.map((point) => ({ ...point, muted: point[key] !== bySource.value })),
+          })),
+        };
+      }
+
+      // The panel being filtered: keep only the points whose declared key
+      // matches, and say in the subtitle what the reader is looking at and how
+      // to get back.
+      const selection = active[panel.id];
+      if (!selection) return panel;
+      return {
+        ...panel,
+        subtitle: `Under ${selection.label} · select it again to show all`,
+        series: panel.series.map((entry) => ({
+          ...entry,
+          points: entry.points.filter((point) => point[selection.targetKey] === selection.value),
+        })),
+      };
+    });
+  });
+
+  /** Toggle: the same mark twice clears the filter and restores the full view. */
+  onFilterSelect(event: FilterSelect): void {
+    this.filters.update((current) => {
+      const existing = current[event.target];
+      const next = { ...current };
+      if (existing && existing.value === event.value) {
+        delete next[event.target];
+        this.announcement.set(`${event.label} cleared. Showing all.`);
+        return next;
+      }
+      next[event.target] = event;
+      this.announcement.set(`Filtered to ${event.label}.`);
+      return next;
+    });
+  }
 
   readonly switchable = computed(() => {
     const profile = this.profile();

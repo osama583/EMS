@@ -404,26 +404,40 @@ PROFILES: dict[str, dict[str, Any]] = {
     # Every panel here is an R7 aggregate, and the signature panel exists to
     # quantify exactly what the gate does not see.
     "cfo": {
+        # Row 1 is the status strip, row 2 the three financial headline figures,
+        # row 3 the two funding charts that read as a pair. The rest of the CFO
+        # instrument follows underneath, unchanged.
+        "counts": "cfo_request_counts",
         "hero": "cfo_forward_spend",
         "kpis": [
-            "cfo_gate_coverage",
+            "cfo_total_spend",
             "cfo_cost_per_pax",
+            "cfo_total_pax",
+            "cfo_gate_coverage",
             "cfo_collection",
             "cfo_gate_queue",
             "cfo_price_coverage",
         ],
         "signature": "cfo_gate_matrix",
+        # The funding pair leads: they are the two halves of one question and
+        # spanFor() gives the first two panels half the row each, so they land
+        # side by side with the sub-item chart to the right of the main one it
+        # is filtered by.
         "panels": [
+            "cfo_funding_main_usage",
+            "cfo_funding_sub_usage",
             "cfo_spend_by_category",
             "cfo_runway",
             "cfo_cost_per_pax_schools",
             "cfo_revenue_funnel",
             "cfo_gate_decisions",
-            "cfo_finance_catalogue",
         ],
         "alerts": "cfo_at_risk",
         "quickActions": ["review_gate", "menu_oversight", "funding_catalogue"],
-        "mobileKpis": ["cfo_gate_queue", "cfo_collection", "cfo_forward_spend_kpi"],
+        # Row 2, in its desktop order. cfo_forward_spend_kpi used to sit here
+        # restating the hero as a tile, which the hero card already does on
+        # every screen size - it is gone rather than duplicated.
+        "mobileKpis": ["cfo_total_spend", "cfo_cost_per_pax", "cfo_total_pax"],
     },
     # ------------------------------------------------- Cafeteria Manager --
     # A shift tool, not an analysis tool. The most-used of the ten and the only

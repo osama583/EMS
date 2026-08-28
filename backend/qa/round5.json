@@ -1,0 +1,12 @@
+[
+{"id":"R5-41","as":"student.computing@demo.apu.edu.my","turns":["can u suggest an event for me","i like coding and building things"],"intent":"recommendation ask-then-recommend flow","expect":"turn1 ASKS (no list); turn2 <=3 with real reasons"},
+{"id":"R5-42","as":"student.business@demo.apu.edu.my","q":"compare the two events with the most registrations","intent":"comparison of top-2","expect":"Career Fair 5 vs new test 3 (or Networking Lunch 2)"},
+{"id":"R5-43","as":"student.computing@demo.apu.edu.my","q":"which events have between 1 and 3 registrations?","intent":"range filter","expect":"new test 3, Networking Lunch 2, Symposium 1, Case Comp 1"},
+{"id":"R5-44","as":"student.computing2@demo.apu.edu.my","q":"list events sorted by date","intent":"sorting","expect":"chronological, Sep 21 first"},
+{"id":"R5-45","as":"student.computing@demo.apu.edu.my","q":"which one got nobody","intent":"messy zero filter","expect":"3 zero-registration visible events"},
+{"id":"R5-46","as":"club.admin@demo.apu.edu.my","q":"how many clubs are inactive?","intent":"clubs_admin analytics (legit for this role)","expect":"0 inactive - all 5 active"},
+{"id":"R5-47","as":"student.business@demo.apu.edu.my","q":"whats happening on the 16th of october","intent":"specific date, messy","expect":"3 events on 2026-10-16"},
+{"id":"R5-48","as":"transport.manager@demo.apu.edu.my","q":"what can i ask you about?","intent":"askable, unusual role","expect":"only topics his grants allow"},
+{"id":"R5-49","as":"student.computing@demo.apu.edu.my","q":"is the hackathon full?","intent":"capacity question - max_pax is NULL","expect":"must NOT invent a capacity"},
+{"id":"R5-50","as":"student.computing@demo.apu.edu.my","q":"tell me about the carrer fair","intent":"typo in event name","expect":"resolves to AI & Data Science Career Fair"}
+]

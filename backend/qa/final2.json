@@ -1,0 +1,5 @@
+[
+{"id":"F-D3","as":"student.computing@demo.apu.edu.my","q":"which one got nobody","intent":"D3 clarification","expect":"CLARIFY"},
+{"id":"F-D9","as":"fmb@demo.apu.edu.my","q":"what can Cafeteria Staff access?","intent":"D9 500 crash fix","expect":"describes Cafeteria Staff"},
+{"id":"F-D8b","as":"student.computing2@demo.apu.edu.my","q":"list all the clubs i belong to","intent":"D8 completeness (3 clubs incl '1')","expect":"Photography, Single Clubs, 1"}
+]

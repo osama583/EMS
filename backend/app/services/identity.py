@@ -169,6 +169,29 @@ def has_page_access(assignments: tuple[tuple[str, str | None], ...], page_code: 
     return any(_satisfies_grant(roles, grant) for grant in grants)
 
 
+def role_has_page_grant(role_code: str, page_code: str) -> bool:
+    """Is `role_code` named in ANY active grant on `page_code`, whatever the unit?
+
+    The ROLE-level counterpart to has_page_access(), which answers the same question for one
+    account. ai/knowledge_base.role_capability_document() needs this one because "what can a
+    Cafeteria Manager do" has no asker to resolve a unit-scoped grant against - there is no single
+    unit that question is about - so a capability counts as reachable when the role appears in a
+    grant for that page at all. That makes it an overview of what the role is DESIGNED to reach,
+    deliberately not a claim about any particular account's current, unit-scoped access.
+
+    A 'unit' grant is excluded on purpose: it names units and no roles, so it grants the page by
+    where someone works rather than by what they are, and no role is "designed" to reach it.
+
+    FAILS CLOSED, exactly like has_page_access(): a page with no grant rows is reachable by nobody.
+    """
+    return any(
+        grant["page_code"] == page_code
+        and grant["grant_type"] != "unit"
+        and role_code in set(grant["role_codes"] or ())
+        for grant in query(_NAV_GRANTS_SQL)
+    )
+
+
 def users_with_page_access(page_code: str) -> list[dict[str, Any]]:
     """Active internal users who can see `page_code` in their sidebar, per its
     nav_page_grants rows - the same predicate nav_tree_for() uses per-user, run

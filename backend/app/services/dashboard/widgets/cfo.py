@@ -41,6 +41,72 @@ from .base import (
 _THRESHOLD_CANDIDATES = (20, 35, 50, 75, 100)
 
 
+@widget("cfo_request_counts")
+def request_counts(cur, scope: Scope) -> dict[str, Any]:
+    """The status strip, in the CFO's own nouns.
+
+    Same compact four-tile shape every other profile carries, counting
+    proposals rather than tasks because a proposal is the CFO's unit of work.
+    The fourth tile is **Cancelled**, not Late: a CFO is not chasing an overdue
+    task, and a cancelled event is the one bucket that changes what every spend
+    figure on this page means - money committed and then released.
+    """
+    counts = finance.proposal_bucket_counts(cur, scope)
+    return {
+        "kind": "counts",
+        "items": [
+            {"key": "inbox", "label": "Inbox", "value": counts["inbox"], "status": "unknown", "drill": drill("/app/inbox/proposals", stage="cfo-review")},
+            {"key": "ongoing", "label": "Ongoing", "value": counts["ongoing"], "status": "unknown", "drill": drill("/app/ongoing/proposals")},
+            {"key": "completed", "label": "Completed", "value": counts["completed"], "status": "good", "drill": drill("/app/history/proposals", status="completed-approved")},
+            # Red whether or not anything is cancelled, matching the Late tile
+            # on every other strip: a green zero trains the eye to skip the one
+            # tile worth stopping for.
+            {"key": "cancelled", "label": "Cancelled", "value": counts["cancelled"], "status": "critical", "drill": drill("/app/history/proposals", status="cancelled")},
+        ],
+    }
+
+
+@widget("cfo_total_spend")
+def total_spend(cur, scope: Scope) -> dict[str, Any]:
+    """Committed food plus funding, over the period and filters in force.
+
+    The numerator of the cost-per-pax tile beside it, shown in its own right
+    because "what did we commit" and "what did it cost per head" are two
+    questions and a reader should not have to multiply to get the first.
+    """
+    result = finance.cost_per_pax(cur, scope)
+    return kpi(
+        label="Total spend",
+        value=result["cost"],
+        fmt=FMT_CURRENCY,
+        caption=f"across {result['proposals']} live proposal(s) in this period",
+        status="unknown",
+        caveat=(
+            f"Food component based on {result['coverage']:.0%} of items priced (gap G4)."
+            if result["coverage"] is not None and result["coverage"] < 1
+            else None
+        ),
+        definition="M50 committed food cost plus M52 funding commitment",
+        drill_to=drill("#panel-cfo_spend_by_category"),
+    )
+
+
+@widget("cfo_total_pax")
+def total_pax(cur, scope: Scope) -> dict[str, Any]:
+    """Total attendance behind the spend - the denominator, shown in its own
+    right for the same reason the numerator is."""
+    result = finance.cost_per_pax(cur, scope)
+    return kpi(
+        label="Total pax served",
+        value=result["pax"],
+        fmt=FMT_COUNT,
+        caption=f"across {result['proposals']} live proposal(s) in this period",
+        status="unknown",
+        definition="Sum of request.total_pax over live proposals in the period",
+        drill_to=drill("#panel-cfo_cost_per_pax_schools"),
+    )
+
+
 @widget("cfo_forward_spend")
 def forward_spend(cur, scope: Scope) -> dict[str, Any]:
     """Hero — money committed to approved events that have not yet happened.
@@ -72,21 +138,6 @@ def forward_spend(cur, scope: Scope) -> dict[str, Any]:
         definition="M57 — committed food plus funding for approved proposals with a future event date",
         empty="No approved event is still to run.",
         drill_to=drill("#panel-cfo_runway"),
-    )
-
-
-@widget("cfo_forward_spend_kpi")
-def forward_spend_kpi(cur, scope: Scope) -> dict[str, Any]:
-    result = forward_spend(cur, scope)
-    return kpi(
-        label="Forward spend",
-        value=result["value"],
-        fmt=FMT_CURRENCY,
-        caption=result["caption"],
-        status=result["status"],
-        caveat=result["caveat"],
-        definition=result["definition"],
-        drill_to=result["drill"],
     )
 
 
@@ -515,17 +566,26 @@ def gate_decisions(cur, scope: Scope) -> dict[str, Any]:
     )
 
 
-@widget("cfo_finance_catalogue")
-def finance_catalogue(cur, scope: Scope) -> dict[str, Any]:
-    """The CFO owns this catalogue. A high off-catalogue rate means spend is
-    being recorded outside the finance codes it is meant to roll up to, which
-    quietly breaks the category panel above."""
+@widget("cfo_funding_main_usage")
+def funding_main_usage(cur, scope: Scope) -> dict[str, Any]:
+    """Funding **main** items ranked by how often they are picked.
+
+    Horizontal bars, not columns: these labels are finance categories, and
+    "Printing & Marketing Materials" rotated under a column is a label a reader
+    has to tilt their head for. Dead codes stay on the chart, muted - a code
+    nobody picks still lengthens the applicant's form, and it is only visible
+    when it is drawn.
+
+    Clicking a bar narrows the sub-item chart beside it rather than navigating
+    away; `cross_filter` declares that, and clicking the same bar again clears
+    it. See `panel()` in widgets/base.py for the contract.
+    """
     rows = finance.funding_catalogue_usage(cur, scope)
     off = finance.funding_off_catalogue(cur, scope)
     dead = [r for r in rows if r["value"] == 0]
     return panel(
-        title="Finance catalogue health",
-        subtitle="Funding main options by selections in the period",
+        title="Funding main items",
+        subtitle="Most used, by selections in this period",
         chart="bar-chart",
         series_list=[
             series(
@@ -547,7 +607,7 @@ def finance_catalogue(cur, scope: Scope) -> dict[str, Any]:
         axes={"x": {"type": "linear", "label": "Selections", "format": FMT_COUNT}},
         table_view=table(
             [
-                {"key": "label", "label": "Funding item", "format": "text"},
+                {"key": "label", "label": "Funding main item", "format": "text"},
                 {"key": "code", "label": "Finance code", "format": "text"},
                 {"key": "value", "label": "Selections", "format": FMT_COUNT},
                 {"key": "amount", "label": "Committed", "format": FMT_CURRENCY},
@@ -555,14 +615,78 @@ def finance_catalogue(cur, scope: Scope) -> dict[str, Any]:
             rows,
         ),
         caption=(
-            f"{len(dead)} dead code(s). Off-catalogue rate {off['rate']:.0%} — that spend never reaches a finance code."
+            f"Select a bar to break it down by sub-item. {len(dead)} dead code(s). "
+            f"Off-catalogue rate {off['rate']:.0%} — that spend never reaches a finance code."
             if off["rate"] is not None
-            else f"{len(dead)} code(s) with no selections in the period."
+            else f"Select a bar to break it down by sub-item. {len(dead)} code(s) with no selections in the period."
         ),
-        empty="No funding options are configured.",
+        empty="No funding main options are configured.",
+        cross_filter={
+            "target": "cfo_funding_sub_usage",
+            # The field a *mark here* carries its identity in, and the field the
+            # target's own points carry that same identity in. Naming both keeps
+            # the client from having to know which two panels these are.
+            "pointKey": "optionId",
+            "targetKey": "mainOptionId",
+            "labelKey": "label",
+        },
         drill_to=drill("/app/dropdown-options/fundingMain"),
         mobile="ranked-list",
     )
+
+
+@widget("cfo_funding_sub_usage")
+def funding_sub_usage(cur, scope: Scope) -> dict[str, Any]:
+    """Funding **sub**-items ranked by how often they are picked.
+
+    Ships every active sub-item, each tagged with the main option it hangs off.
+    The default view is the overall ranking across all mains; selecting a bar on
+    the panel beside this one hides everything outside that main. Each count is
+    final as it leaves the server - the selection chooses which bars to draw,
+    it does not recompute any of them.
+    """
+    rows = finance.funding_sub_usage(cur, scope)
+    dead = [r for r in rows if r["value"] == 0]
+    return panel(
+        title="Funding sub-items",
+        subtitle="Most used across all main items",
+        chart="bar-chart",
+        series_list=[
+            series(
+                "selections",
+                "Selections",
+                2,
+                [
+                    {
+                        "x": r["value"],
+                        "label": r["label"],
+                        "optionId": r["optionId"],
+                        "mainOptionId": r["mainOptionId"],
+                        "mainLabel": r["mainLabel"],
+                        "annotation": r["code"],
+                        "muted": r["value"] == 0,
+                    }
+                    for r in rows
+                ],
+            )
+        ],
+        axes={"x": {"type": "linear", "label": "Selections", "format": FMT_COUNT}},
+        table_view=table(
+            [
+                {"key": "label", "label": "Funding sub-item", "format": "text"},
+                {"key": "mainLabel", "label": "Under main item", "format": "text"},
+                {"key": "code", "label": "Procurement code", "format": "text"},
+                {"key": "value", "label": "Selections", "format": FMT_COUNT},
+                {"key": "amount", "label": "Committed", "format": FMT_CURRENCY},
+            ],
+            rows,
+        ),
+        caption=f"{len(dead)} sub-item(s) with no selections in the period.",
+        empty="No funding sub-options are configured.",
+        drill_to=drill("/app/dropdown-options/fundingSub"),
+        mobile="ranked-list",
+    )
+
 
 
 @widget("cfo_at_risk")

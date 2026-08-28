@@ -1,0 +1,12 @@
+[
+{"id":"R4-31","as":"student.computing@demo.apu.edu.my","turns":["Show me technology events.","which has the most people?"],"intent":"multi-turn narrowed context","expect":"turn2 stays within turn1's set"},
+{"id":"R4-32","as":"student.business@demo.apu.edu.my","q":"which one?","intent":"D3: pure fragment, no context at all","expect":"CLARIFY - must not guess"},
+{"id":"R4-33","as":"student.business@demo.apu.edu.my","q":"what about the other one?","intent":"D3: fragment, no antecedent","expect":"CLARIFY"},
+{"id":"R4-34","as":"cafeteria.admin@demo.apu.edu.my","q":"what can i do here?","intent":"self_capability for an admin role","expect":"cafeteria admin capabilities, not student ones"},
+{"id":"R4-35","as":"fmb@demo.apu.edu.my","q":"what can Cafeteria Staff access?","intent":"role_capability about ANOTHER role","expect":"describes Cafeteria Staff, not the asker's own role"},
+{"id":"R4-36","as":"student.computing@demo.apu.edu.my","q":"how do i submit an event proposal?","intent":"how_to with page access","expect":"steps + navigation card"},
+{"id":"R4-37","as":"cafeteria.staff@demo.apu.edu.my","q":"how do i submit an event proposal?","intent":"how_to WITHOUT page access","expect":"refuse steps - no proposal-form grant"},
+{"id":"R4-38","as":"student.computing@demo.apu.edu.my","q":"which events are free?","intent":"filter on cost field","expect":"cost=0 events; must not invent a price"},
+{"id":"R4-39","as":"adelmohamad214@gmail.com","q":"what events can i see?","intent":"external user role scope","expect":"public tier only"},
+{"id":"R4-40","as":"student.computing@demo.apu.edu.my","q":"whats the weather tomorrow and which event has most ppl","intent":"mixed out-of-scope + in-scope in ONE message","expect":"refuse weather, answer the event part"}
+]

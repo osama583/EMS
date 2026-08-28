@@ -1,0 +1,81 @@
+[
+  {
+    "id": "RG6-a",
+    "as": "student.computing2@demo.apu.edu.my",
+    "intent": "THE FAILING CASE - invented membership",
+    "expect": "club sizes, NO membership claim; all 5 clubs",
+    "exchanges": [
+      {
+        "q": "any club less than 20?",
+        "answer": "Yes, there are several clubs with fewer than 20 members:\n\n- Business Leaders Circle\n- APU Photography Club\n- 1\n- APU Coding Society\n- Single Clubs",
+        "sources": [],
+        "clubs": [
+          "APU Photography Club",
+          "Business Leaders Circle",
+          "Single Clubs",
+          "APU Coding Society"
+        ],
+        "navigation": [],
+        "ms": 5818
+      }
+    ]
+  },
+  {
+    "id": "RG6-b",
+    "as": "student.computing2@demo.apu.edu.my",
+    "intent": "variation",
+    "expect": "all 5 clubs, no membership claim",
+    "exchanges": [
+      {
+        "q": "which clubs have fewer than 20 members?",
+        "answer": "The clubs with fewer than 20 members are:\n- Single Clubs\n- APU Coding Society\n- APU Photography Club\n- 1\n- Business Leaders Circle",
+        "sources": [],
+        "clubs": [
+          "APU Photography Club",
+          "Business Leaders Circle",
+          "Single Clubs",
+          "APU Coding Society"
+        ],
+        "navigation": [],
+        "ms": 4631
+      }
+    ]
+  },
+  {
+    "id": "RG6-c",
+    "as": "student.computing2@demo.apu.edu.my",
+    "intent": "the REAL membership question must still work",
+    "expect": "APU Photography Club, Single Clubs, 1",
+    "exchanges": [
+      {
+        "q": "which clubs am i a member of?",
+        "answer": "You are a member of the APU Photography Club.",
+        "sources": [],
+        "clubs": [
+          "APU Photography Club"
+        ],
+        "navigation": [],
+        "ms": 13211
+      }
+    ]
+  },
+  {
+    "id": "RG6-d",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "D6 no regression",
+    "expect": "Single Clubs + APU Coding Society",
+    "exchanges": [
+      {
+        "q": "am i the president of any club?",
+        "answer": "Yes, you are the president of Single Clubs and the APU Coding Society.",
+        "sources": [],
+        "clubs": [
+          "Single Clubs",
+          "APU Coding Society"
+        ],
+        "navigation": [],
+        "ms": 5668
+      }
+    ]
+  }
+]

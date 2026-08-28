@@ -21,6 +21,51 @@ below, the reason is recorded here:
 | Department "Who's carrying how much work" / "Most used" as two horizontal bar charts | a vertical column chart and a ring | They answer the same two questions the Cafeteria Manager's panels answer and had drifted into different shapes. Two panels with the same title across two dashboards now have the same form. |
 | The alerts rail's empty state as a green "all clear" card | the neutral `viz-empty` container every other panel uses | A green block on a page whose colours otherwise all mean "act on me" reads as a result, and it drew the eye hardest when it had the least to say. |
 
+### The CFO's three rows
+
+The top of the CFO dashboard is specified separately from the rest of the
+instrument below it:
+
+| Row | What it carries |
+|---|---|
+| 1 | The status strip — Inbox / Ongoing / Completed / **Cancelled** |
+| 2 | Total spend · Cost per pax · Total pax served |
+| 3 | Funding main items and Funding sub-items, side by side and cross-filtered |
+
+The fourth status tile is **Cancelled**, not the Late used elsewhere. A CFO is
+not chasing an overdue task; a cancelled event is money committed and then
+released, and it is the one bucket that changes what every spend figure above
+it means. Inbox is the CFO's own gate (`cfo_review`) and Ongoing is everything
+else still moving, so the two are disjoint and the strip adds up rather than
+double-counting the queue.
+
+`cfo_forward_spend_kpi` is gone. The mobile KPI trio is row 2, and that widget
+existed only to restate the hero as a tile when the old trio did not include
+it — the hero card renders on every screen size, so it was a duplicate.
+
+**Cross-filtering.** Selecting a bar on the main-items chart narrows the
+sub-items chart to that main item; selecting it again restores the overall
+view. It is declared on the panel, not coded into the page:
+
+```python
+cross_filter={
+    "target": "cfo_funding_sub_usage",
+    "pointKey": "optionId",       # the field a mark here carries its identity in
+    "targetKey": "mainOptionId",  # the field the target's points carry it in
+    "labelKey": "label",
+}
+```
+
+The client matches `point[pointKey]` against `point[targetKey]` and never needs
+to know which two panels are involved, so a second filtering pair is a
+server-side declaration and no client change. Every count is still computed
+server-side and arrives final; the selection chooses which already-computed
+bars to draw, which is why this does not violate the no-client-side-aggregation
+rule at the top of this file. Selections are cleared whenever the profile,
+period or outlet changes — a selection made against one period's catalogue
+would otherwise narrow a chart to an option the next period may not contain,
+and the reader would see an empty panel with no clue why.
+
 ### What "on time" means per department
 
 The schema records time three different ways, so one deadline column would be

@@ -1,0 +1,202 @@
+[
+  {
+    "id": "R7-61",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "multi-turn filter then date narrowing",
+    "expect": "turn2 keeps turn1's set, October only",
+    "exchanges": [
+      {
+        "q": "Show events with fewer than 10 people.",
+        "answer": "The events with fewer than 10 people registered are:\n\n- new test: 3\n- AI & Data Science Career Fair: 5\n- APU Cultural Night: 0\n- School of Computing Research Symposium: 1\n- Business Society Networking Lunch: 2\n- Annual Hackathon Kickoff: 0\n- Case Competition Finals: 1\n- Members-Only Photowalk Briefing: 0",
+        "sources": [
+          "School of Computing Research Symposium",
+          "Business Society Networking Lunch",
+          "Annual Hackathon Kickoff",
+          "Case Competition Finals",
+          "Members-Only Photowalk Briefing",
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 5387
+      },
+      {
+        "q": "which one is in october?",
+        "answer": "The AI & Data Science Career Fair is the event in October.",
+        "sources": [
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 7092
+      }
+    ]
+  },
+  {
+    "id": "R7-62",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "vague follow-up must continue CAPABILITIES not pivot to events",
+    "expect": "more capabilities, not a club/event pivot",
+    "exchanges": [
+      {
+        "q": "what can i do here?",
+        "answer": "Hi Daniel! You can use this system to browse and register for events, manage your event registrations and creations, and discover or join clubs. You are also able to submit and track your own event proposals. Let me know if you'd like help with any of those!",
+        "sources": [],
+        "clubs": [],
+        "navigation": [],
+        "ms": 6789
+      },
+      {
+        "q": "what else?",
+        "answer": "You can also ask me about how the app works, or get details on specific events and clubs. For example, I can help you find an event by topic, check the status of your own registrations, or look up information on club memberships and presidency. Is there anything specific you'd like to dive into?",
+        "sources": [],
+        "clubs": [],
+        "navigation": [],
+        "ms": 6746
+      }
+    ]
+  },
+  {
+    "id": "R7-63",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "pure garbage fragment",
+    "expect": "CLARIFY, must not invent two events",
+    "exchanges": [
+      {
+        "q": "which has more ppl this or that",
+        "answer": "The AI & Data Science Career Fair has 5 registered participants, while the event named new test has 3.",
+        "sources": [
+          "new test",
+          "AI & Data Science Career Fair"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 7163
+      }
+    ]
+  },
+  {
+    "id": "R7-64",
+    "as": "cafeteria.manager@demo.apu.edu.my",
+    "intent": "cross-domain question, cafeteria role",
+    "expect": "honest limit; no invented catering data",
+    "exchanges": [
+      {
+        "q": "what events need catering?",
+        "answer": "I don't have access to information about event catering requirements.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "My Events"
+        ],
+        "ms": 6271
+      }
+    ]
+  },
+  {
+    "id": "R7-65",
+    "as": "student.computing2@demo.apu.edu.my",
+    "intent": "two attributes one question",
+    "expect": "2026-10-11 + its venue",
+    "exchanges": [
+      {
+        "q": "when is the cultural night and where",
+        "answer": "The cultural night is on 2026-10-11 at the Grand Hall.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "Explore Events",
+          "My Events"
+        ],
+        "ms": 5188
+      }
+    ]
+  },
+  {
+    "id": "R7-66",
+    "as": "student.business@demo.apu.edu.my",
+    "intent": "self yes/no lookup",
+    "expect": "correct yes/no, no invention",
+    "exchanges": [
+      {
+        "q": "did i register for the hackathon?",
+        "answer": "I don't have any hackathon registrations to show for your account.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [
+          "My Events",
+          "Explore Events"
+        ],
+        "ms": 4750
+      }
+    ]
+  },
+  {
+    "id": "R7-67",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "past month - only 'new test' Aug 21 (past)",
+    "expect": "must not claim upcoming; honest about past",
+    "exchanges": [
+      {
+        "q": "show me events happening in august",
+        "answer": "The only event scheduled for August is new test, which is taking place on August 21, 2026, at location 11.",
+        "sources": [
+          "new test"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 10414
+      }
+    ]
+  },
+  {
+    "id": "R7-68",
+    "as": "hoshod@demo.apu.edu.my",
+    "intent": "HOS role, department aggregation",
+    "expect": "grounded count or honest limit",
+    "exchanges": [
+      {
+        "q": "how many events has the school of computing run?",
+        "answer": "I don't have access to information about the number of events run by specific schools. I can help you with information about published events or your own registrations if you'd like.",
+        "sources": [],
+        "clubs": [],
+        "navigation": [],
+        "ms": 6871
+      }
+    ]
+  },
+  {
+    "id": "R7-69",
+    "as": "student.computing@demo.apu.edu.my",
+    "intent": "max_pax is NULL; total_pax=300",
+    "expect": "must not present 300 as a hard capacity if unset",
+    "exchanges": [
+      {
+        "q": "whats the capacity of the cultural night",
+        "answer": "The APU Cultural Night does not have a set capacity.",
+        "sources": [
+          "APU Cultural Night"
+        ],
+        "clubs": [],
+        "navigation": [],
+        "ms": 10154
+      }
+    ]
+  },
+  {
+    "id": "R7-70",
+    "as": "student.computing2@demo.apu.edu.my",
+    "intent": "club recommendation ask-first",
+    "expect": "ASKS interests, does not dump list",
+    "exchanges": [
+      {
+        "q": "i want to join a club which do u recommend",
+        "answer": "I'd love to help you find a club you'll enjoy, Mei Ling. Could you tell me a bit about what you're interested in or what kind of activities you're looking for, so I can make a great recommendation for you?",
+        "sources": [],
+        "clubs": [],
+        "navigation": [],
+        "ms": 7699
+      }
+    ]
+  }
+]

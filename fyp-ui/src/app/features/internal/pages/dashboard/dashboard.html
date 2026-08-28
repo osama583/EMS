@@ -166,6 +166,7 @@
                   <app-chart-panel
                     [panel]="panel"
                     (drill)="navigate($event)"
+                    (filterSelect)="onFilterSelect($event)"
                     (retry)="retry()"
                   />
                 </div>
@@ -175,6 +176,7 @@
             <app-chart-panel
               [panel]="panel"
               (drill)="navigate($event)"
+              (filterSelect)="onFilterSelect($event)"
               (retry)="retry()"
             />
           }

@@ -54,9 +54,15 @@ CLASS_DESCRIPTIONS: dict[Class, str] = {
         "registered' is public and belongs to `events`; only asking who they ARE lands here."
     ),
     "event_organiser_decisions": "Registrations the caller has ALREADY approved/rejected as organiser - a resolved decision log, not a live roster.",
-    "clubs": "Browsing/discovering clubs, or a fact about clubs in general (categories, a specific club's details).",
+    "clubs": (
+        "Browsing/discovering clubs, or a fact about clubs in general (categories, a specific "
+        "club's details). ALSO covers HOW MANY members a club has, including which club has the "
+        "most or fewest and which are above/below a size - member counts are public, shown on "
+        "Discover Clubs to every signed-in user, so they belong here and NOT to clubs_admin, "
+        "which is about seeing WHO the members are."
+    ),
     "clubs_mine": "The caller's own club membership, presidency, or join requests.",
-    "clubs_admin": "Club-admin-only system-wide analytics (category counts, inactive clubs, president-replacement leaderboard) - NOT a plain 'what category is club X in' question.",
+    "clubs_admin": "Club-admin-only system-wide analytics (category counts, inactive/archived clubs, president-replacement leaderboard) - NOT a plain 'what category is club X in' question, and NOT a member-COUNT question ('which club has the most members', 'any club under 20'), which is public and belongs to `clubs`.",
     "president_change": "President-change requests specifically (handing over/stepping down as President).",
     "self_capability": "What the caller themselves can do/access in this app, given their own role(s).",
     "askable": "What the ASSISTANT can help with / what topics the caller may ask it about ('what can I ask about', 'what can you help me with') - not what they can DO in the app, which is self_capability.",
