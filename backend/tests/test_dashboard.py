@@ -139,8 +139,8 @@ def test_every_profile_names_registered_widgets():
     for key, variant, layout in _layouts():
         ids = [
             layout["hero"],
-            layout["signature"],
-            layout["alerts"],
+            *([layout["signature"]] if layout.get("signature") else []),
+            *([layout["alerts"]] if layout.get("alerts") else []),
             *layout["kpis"],
             *layout["panels"],
             *layout.get("mobileKpis", []),
@@ -166,12 +166,14 @@ def test_no_two_profiles_share_a_signature_panel():
     shape, not a bespoke instrument per lane. CFO, School, F&B and Cafeteria
     are untouched by that simplification and still keep their own.
     """
-    _SHARED_BY_DESIGN = {"dept_risk_list", "gen_backlog_age"}
+    _SHARED_BY_DESIGN = {"gen_backlog_age"}
     signatures = {}
     for key, variant, layout in _layouts():
         name = f"{key}:{variant}" if variant else key
-        signature = layout["signature"]
-        if signature in _SHARED_BY_DESIGN:
+        signature = layout.get("signature")
+        # A profile may carry no signature panel at all - the five department
+        # profiles dropped theirs rather than restating their own hero.
+        if signature is None or signature in _SHARED_BY_DESIGN:
             continue
         assert signature not in signatures, (
             f"{name} shares its signature panel {signature} with {signatures[signature]}"
@@ -229,8 +231,8 @@ def _profile_for_widget(widget_id: str) -> str:
     for key, variant, layout in _layouts():
         ids = {
             layout["hero"],
-            layout["signature"],
-            layout["alerts"],
+            *([layout["signature"]] if layout.get("signature") else []),
+            *([layout["alerts"]] if layout.get("alerts") else []),
             *layout["kpis"],
             *layout["panels"],
             *layout.get("mobileKpis", []),
@@ -498,9 +500,9 @@ def test_profile_builds_with_populated_data(profile_key, variant):
     widgets = [
         document["hero"],
         *document["kpis"],
-        document["signature"],
+        *([document["signature"]] if document["signature"] else []),
         *document["panels"],
-        document["alerts"],
+        *([document["alerts"]] if document["alerts"] else []),
     ]
     broken = [w["id"] for w in widgets if w.get("state") == "error"]
     assert not broken, f"{profile_key}/{variant}: {broken} errored on populated data"
@@ -525,7 +527,7 @@ def test_generic_profile_survives_a_unit_with_no_detail_table():
     table. It degrades to the flow/SLA/quality/people families rather than
     erroring - which is the whole reason hod_generic exists."""
     document = _preview().build_preview("hod_generic")
-    widgets = [document["hero"], *document["kpis"], document["signature"], *document["panels"]]
+    widgets = [document["hero"], *document["kpis"], *([document["signature"]] if document["signature"] else []), *document["panels"]]
     assert all(w.get("state") != "error" for w in widgets)
     # Its drills land on an unfiltered list rather than one filtered by a
     # requirement the unit does not have.

@@ -20,13 +20,11 @@
 .viz-alert--critical { background: var(--viz-critical-soft); border-left-color: var(--viz-critical); }
 .viz-alert--serious { background: var(--viz-serious-soft); border-left-color: var(--viz-serious); }
 .viz-alert--warning { background: var(--viz-warning-soft); border-left-color: var(--viz-warning); }
-.viz-alert--clear { background: var(--viz-good-soft); border-left-color: var(--viz-good); }
 
 .viz-alert__icon { font-size: 1.15rem; color: var(--viz-ink-secondary); }
 .viz-alert--critical .viz-alert__icon { color: var(--viz-critical); }
 .viz-alert--serious .viz-alert__icon { color: var(--viz-serious); }
 .viz-alert--warning .viz-alert__icon { color: #8a6100; }
-.viz-alert--clear .viz-alert__icon { color: var(--viz-good); }
 
 .viz-alert__body { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
 .viz-alert__title { font-size: 0.8125rem; font-weight: 600; color: var(--viz-ink); overflow-wrap: anywhere; }

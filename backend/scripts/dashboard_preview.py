@@ -215,7 +215,7 @@ def build_preview(profile_key: str, period: str = "30d", variant: str | None = N
         today=TODAY,
     )
     layout = layout_for(profile_key, variant)
-    ids = [layout["hero"], *layout["kpis"], layout["signature"], *layout["panels"], layout["alerts"], *layout.get("mobileKpis", [])]
+    ids = [layout["hero"], *layout["kpis"], *([layout["signature"]] if layout.get("signature") else []), *layout["panels"], *([layout["alerts"]] if layout.get("alerts") else []), *layout.get("mobileKpis", [])]
     results = {widget_id: build_widget(widget_id, cur, scope) for widget_id in dict.fromkeys(ids)}
     actions = _quick_actions(cur, scope, list(layout["quickActions"]), results)
     title = unit_label or ("Institutional finance" if profile_key == "cfo" else "Cafeteria operations")
@@ -240,9 +240,9 @@ def build_preview(profile_key: str, period: str = "30d", variant: str | None = N
         "period": scope.period.as_json(),
         "hero": results[layout["hero"]],
         "kpis": [results[widget_id] for widget_id in layout["kpis"]],
-        "signature": results[layout["signature"]],
+        "signature": results[layout["signature"]] if layout.get("signature") else None,
         "panels": [results[widget_id] for widget_id in layout["panels"]],
-        "alerts": results[layout["alerts"]],
+        "alerts": results[layout["alerts"]] if layout.get("alerts") else None,
         "quickActions": actions,
         "mobile": {"kpiOrder": list(layout.get("mobileKpis", []))},
         "extras": {wid: results[wid] for wid in layout.get("mobileKpis", []) if wid not in layout["kpis"]},
@@ -289,7 +289,7 @@ def check() -> int:
                 failures.append(f"{name}: build failed — {error!r}")
                 continue
 
-            widgets = [document["hero"], *document["kpis"], document["signature"], *document["panels"], document["alerts"]]
+            widgets = [document["hero"], *document["kpis"], *([document["signature"]] if document["signature"] else []), *document["panels"], *([document["alerts"]] if document["alerts"] else [])]
             for widget in widgets:
                 if widget.get("state") == "error":
                     failures.append(f"{name}: widget {widget['id']} returned state=error")

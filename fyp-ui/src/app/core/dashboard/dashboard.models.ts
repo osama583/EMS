@@ -230,9 +230,13 @@ export interface DashboardDocument {
   requestCounts: CountsWidget | null;
   hero: StatWidget;
   kpis: StatWidget[];
-  signature: PanelWidget;
+  /** Null for a profile that carries no signature panel. The template guards
+   *  on it, the same way it does for `alerts` and `requestCounts`. */
+  signature: PanelWidget | null;
   panels: PanelWidget[];
-  alerts: PanelWidget;
+  /** Null for a profile that carries no alerts rail — the same optionality
+   *  `requestCounts` already has. The template guards on it. */
+  alerts: PanelWidget | null;
   quickActions: QuickAction[];
   mobile: { kpiOrder: string[] };
   extras: Record<string, DashboardWidget>;

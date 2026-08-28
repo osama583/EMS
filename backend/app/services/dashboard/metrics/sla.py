@@ -12,7 +12,14 @@ from typing import Any
 
 from ....db import fetch_all, fetch_one
 from ..scope import Scope, num, ratio
-from .common import DepartmentSpec, iso_week_start
+from .common import NON_COMMITTED_STATUSES, DepartmentSpec, iso_week_start
+
+# A department whose detail rows carry a start but no end has no "until when"
+# in the schema, so punctuality is measured against the start instant plus this
+# grace. Five minutes is the tolerance a coach pulling away or a serving window
+# opening is actually judged on - anything tighter measures clock-rounding, and
+# anything looser stops being "on time".
+START_ONLY_GRACE_MINUTES = 5
 
 # The two department-level decisions a head can take on a task. There is no
 # 'send_back' action in this codebase - services/workflow/tasks.py writes
@@ -434,6 +441,89 @@ def order_claim_latency(cur, scope: Scope, *, outlet: str | None = None) -> dict
         scope.params(outlet=outlet),
     )
     return _pair(row)
+
+
+def task_deadline_sql(spec: DepartmentSpec, alias: str = "d") -> tuple[str, str]:
+    """A department's own "done by when", and the sentence that explains it.
+
+    The six departments record time three different ways, so one hardcoded
+    deadline column would be wrong for four of them:
+
+    - **A start and an end** (A/V, Logistics, Photography). The commitment runs
+      until the end of the booked window, so that is the deadline.
+    - **A start only** (Transport's `moving_time`, F&B's `serve_time`). There is
+      no "until when" in the schema at all, so the instant itself plus
+      `START_ONLY_GRACE_MINUTES` is the deadline - a coach that leaves five
+      minutes after its moving time left on time.
+    - **Neither** (Student Services; campus tours dropped their time columns).
+      The event date is all there is, so the deadline is the end of that day.
+      Midnight *at* the date would be the alternative and it would report every
+      tour on the books as late, which is a measurement artefact, not a fact
+      about the department.
+
+    Returns `(sql_expression, human_basis)`; the second is printed on the tile
+    so a head reads what their own number is measured against rather than
+    assuming it matches the department next door.
+    """
+    if spec.end_column:
+        return f'({alias}."date" + {alias}.{spec.end_column})', "the end of each booked window"
+    if spec.start_column:
+        return (
+            f'({alias}."date" + {alias}.{spec.start_column} '
+            f"+ interval '{START_ONLY_GRACE_MINUTES} minutes')",
+            f"{spec.start_column.replace('_', ' ')} plus {START_ONLY_GRACE_MINUTES} min",
+        )
+    return f'({alias}."date"::timestamp + interval \'1 day\')', "the end of the event day"
+
+
+def task_punctuality(cur, scope: Scope, spec: DepartmentSpec) -> dict[str, Any]:
+    """On-time completion - the department twin of M19.
+
+    A task counts once, against the **earliest** commitment among its own detail
+    rows: a job holding a 9am room and a 2pm room is late the moment the 9am one
+    is missed, and taking the latest would report it on time. This is the same
+    `min(deadline)` rule the Risk List ranks by, so the tile and that list
+    cannot disagree about which job was late.
+
+    Denominator is tasks *completed* in the period, not tasks created: an open
+    job has not failed yet, and counting it as a miss would make the rate fall
+    every time the department accepts work.
+    """
+    deadline_expr, basis = task_deadline_sql(spec)
+    row = fetch_one(
+        cur,
+        f"""
+        SELECT count(*) FILTER (WHERE resolved_at <= deadline) AS on_time,
+               count(*) AS completed,
+               percentile_cont(0.5) WITHIN GROUP (
+                   ORDER BY EXTRACT(epoch FROM resolved_at - deadline) / 60.0
+               ) AS median_minutes
+          FROM (
+            SELECT t.request_task_id,
+                   t.resolved_at AS resolved_at,
+                   min({deadline_expr}) AS deadline
+              FROM request_task t
+              JOIN request r ON r.request_id = t.request_id
+              JOIN {spec.table} d ON d.request_id = t.request_id
+             WHERE t.assigned_unit_code = %(unit)s
+               AND t.status = 'completed'
+               AND t.resolved_at IS NOT NULL
+               AND t.resolved_at >= %(from)s AND t.resolved_at < %(to)s
+               AND r.status <> ALL(%(non_committed)s)
+          GROUP BY 1, 2
+          ) s
+        """,
+        scope.params(non_committed=list(NON_COMMITTED_STATUSES)),
+    )
+    completed = int(row["completed"]) if row else 0
+    on_time = int(row["on_time"]) if row else 0
+    return {
+        "rate": ratio(on_time, completed) if row else None,
+        "completed": completed,
+        "late": completed - on_time,
+        "medianMinutes": num(row["median_minutes"]) if row else None,
+        "basis": basis,
+    }
 
 
 def delivery_punctuality(cur, scope: Scope, *, outlet: str | None = None) -> dict[str, Any]:

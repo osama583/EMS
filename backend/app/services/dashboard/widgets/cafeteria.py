@@ -68,7 +68,10 @@ def request_counts(cur, scope: Scope) -> dict[str, Any]:
             {"key": "inbox", "label": "Inbox", "value": int(row["inbox"] or 0), "status": "unknown", "drill": drill(_orders_route("inbox"), requestKind="fmb")},
             {"key": "ongoing", "label": "Ongoing", "value": int(row["ongoing"] or 0), "status": "unknown", "drill": drill(_orders_route("ongoing"), requestKind="fmb")},
             {"key": "completed", "label": "Completed", "value": int(row["completed"] or 0), "status": "good", "drill": drill(_orders_route("history"), requestKind="fmb")},
-            {"key": "late", "label": "Late", "value": late, "status": "critical" if late else "good", "drill": drill(_orders_route("ongoing"), requestKind="fmb", risk="true")},
+            # Late reads red whether or not anything is late. A green zero
+            # trains the eye to skim the tile that is the only one on the strip
+            # worth stopping for; the number itself already says "none".
+            {"key": "late", "label": "Late", "value": late, "status": "critical", "drill": drill(_orders_route("ongoing"), requestKind="fmb", risk="true")},
         ],
     }
 
@@ -237,25 +240,37 @@ def service_board(cur, scope: Scope) -> dict[str, Any]:
 @widget("caf_staff_workload")
 def staff_workload(cur, scope: Scope) -> dict[str, Any]:
     """Who's carrying how much work - cafeteria's own version of
-    dept_staff_balance (widgets/department.py), same plain wording and same
-    bar-chart shape, reading claims instead of task assignments since a
-    cafeteria manager's staff pick up orders, not row assignments.
+    dept_staff_balance (widgets/department.py), same plain wording, reading
+    claims instead of task assignments since a cafeteria manager's staff pick
+    up orders, not row assignments.
+
+    Vertical columns rather than horizontal bars: a cafeteria roster is a
+    handful of people with short given names, so nothing has to be rotated or
+    truncated to fit under a column, and one column per person compares
+    heights - which is the comparison this panel exists to make. The
+    horizontal form earns its keep where the categories are long service
+    names ("Photography / Videography"), which is not this panel.
     """
     staff = people.claim_distribution(cur, scope)
     balance = people.workload_balance(staff)
     return panel(
         title="Who's carrying how much work",
         subtitle="Orders claimed by each staff member this period",
-        chart="bar-chart",
+        chart="column-chart",
         series_list=[
             series(
                 "staff",
                 "Staff",
                 1,
-                [{"x": s["value"], "label": s["name"], "userId": s["userId"]} for s in staff],
+                # A column chart carries its category on x and its magnitude on
+                # y - the transpose of the bar form this panel used to take.
+                [{"x": s["name"], "y": s["value"], "userId": s["userId"]} for s in staff],
             )
         ],
-        axes={"x": {"type": "linear", "label": "Orders claimed", "format": FMT_COUNT}},
+        axes={
+            "x": {"type": "category", "label": "Staff"},
+            "y": {"type": "linear", "label": "Orders claimed", "format": FMT_COUNT},
+        },
         table_view=table(
             [
                 {"key": "name", "label": "Staff", "format": "text"},
@@ -307,28 +322,4 @@ def menu_performance(cur, scope: Scope) -> dict[str, Any]:
         empty="No menu items are configured at your outlets.",
         drill_to=drill("/app/menu"),
         mobile="ranked-list",
-    )
-
-
-@widget("caf_at_risk")
-def at_risk(cur, scope: Scope) -> dict[str, Any]:
-    result = risk.orders_at_risk(cur, scope)
-    unpriced = risk.unpriced_ordered_items(cur, scope)
-    claims = people.claim_distribution(cur, scope)
-    total_claimed = sum(c["value"] for c in claims)
-    hog = next((c for c in claims if c["share"] and c["share"] > 0.6), None) if total_claimed >= 5 else None
-    return panel(
-        title="Needs attention",
-        subtitle="Right now, at your outlets",
-        chart="alert-list",
-        data={"counts": result, "unpriced": unpriced, "claimConcentration": hog},
-        table_view=table(
-            [
-                {"key": "label", "label": "Unpriced item with live orders", "format": "text"},
-                {"key": "orders", "label": "Orders", "format": FMT_COUNT},
-            ],
-            unpriced,
-        ),
-        empty="Nothing needs attention right now.",
-        drill_to=drill("/app/inbox/requests", requestKind="fmb", risk="true"),
     )
