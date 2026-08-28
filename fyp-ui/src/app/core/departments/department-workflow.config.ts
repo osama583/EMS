@@ -38,7 +38,7 @@ export interface FlatDepartmentWorkflowConfig {
 export const UNIT_DEPARTMENT_WORKFLOWS: readonly UnitDepartmentWorkflowConfig[] = [
   { unitCode: 'logistics_and_facilities', requestKinds: ['logistics'], optionKinds: ['logistics'], assignmentRequired: true },
   { unitCode: 'student_services', requestKinds: ['campusTour'], optionKinds: ['campusTourStart', 'campusTourType'], assignmentRequired: true },
-  { unitCode: 'food_beverage_services', requestKinds: ['fmb', 'waterNormal'], optionKinds: ['fmb', 'dietaryInformation', 'servingUnit', 'waterNormal'], assignmentRequired: false },
+  { unitCode: 'food_beverage_services', requestKinds: ['fmb', 'waterNormal'], optionKinds: ['fmb', 'dietaryInformation', 'servingUnit'], assignmentRequired: false },
   { unitCode: 'a_v_services', requestKinds: ['soundLight'], optionKinds: ['soundLight'], assignmentRequired: true },
   { unitCode: 'photography_services', requestKinds: ['photoVideo'], optionKinds: ['photoVideo'], assignmentRequired: true },
   { unitCode: 'transport_services', requestKinds: ['transportation'], optionKinds: ['transportation'], assignmentRequired: true },

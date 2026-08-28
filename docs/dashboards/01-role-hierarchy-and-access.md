@@ -46,7 +46,7 @@ identical authority. Their *resource model*:
 | `logistics_and_facilities` | `logistics` | consumable stock | `logistics_options.available_quantity` |
 | `transport_services` | `transportation` | vehicles **and** drivers | `transportation_options.available_vehicle_count`, `.passenger_capacity` |
 | `student_services` | `campusTour` | guides, per-start-point group cap | `campus_tour_start_options.max_group_size` |
-| `food_beverage_services` | `fmb` + `waterNormal` | cafeteria kitchen throughput, water stock | `water_normal_options.available_stock`, `fmb_options.unit_price_rm` |
+| `food_beverage_services` | `fmb` + `waterNormal` | cafeteria food cost, gate outcomes, outlet fan-out, water requested | `fmb_options.unit_price_rm`, `request_mineral_water.quantity` |
 | `a_v_services` | `soundLight` | **technician-hours only** | *none — no capacity column exists* |
 | `photography_services` | `photoVideo` | **photographer-hours only** | *none — `media_options.max_personnel` was dropped* |
 

@@ -1,4 +1,4 @@
-# Head of Department — Food & Beverage Services
+# Head of Department — F&B
 
 `head-of-department` @ `food_beverage_services` · profile key `hod_fmb` ·
 requirements `fmb` + `waterNormal`
@@ -15,6 +15,41 @@ requirements `fmb` + `waterNormal`
 > Its dashboard therefore has to answer three different questions on one page, and
 > its signature panel is the one nothing else in the application shows: which outlet
 > is actually delivering.
+
+---
+
+## 0. What this page shows now (supersedes §§ 4-6 below)
+
+The layout was rebuilt to the structure F&B asked for. Everything below this
+section still describes the metrics correctly; only the arrangement changed, and
+two things were removed outright.
+
+| Row | Widget | Notes |
+|---|---|---|
+| 1 | `fmb_request_counts` | Inbox · Ongoing · Completed · **Cancelled**. The Cafeteria Manager's own counts strip (`caf_request_counts`), unfiltered by outlet. Cancelled replaces that strip's **Late** tile: late is a shift signal only the outlet can act on, whereas a cancelled order is F&B's own fan-out coming back undone. |
+| 2 | `fmb_total_cost` | Cafeteria orders **plus** purchase lines filed under the Food & Beverage budget category (`FIN-FNB`). |
+| 2 | `fmb_cafeteria_cost` | The cafeteria half on its own — the part an outlet is accountable for. Same number as the CFO's `cfo_cafeteria_cost`. |
+| 2 | `fmb_cost_per_pax` | F&B total over `total_pax`, same denominator as the CFO's institutional figure so the two compare. |
+| 2 | `fmb_change_rate` | M25, renamed from "Outlet push-back rate" to say what happened. |
+| 3 | `fmb_gate_outcomes` | Kept, now the signature panel. Approved / sent back / rejected at `fmb_review`. |
+| 3 | `fmb_order_distribution` | Donut of orders per outlet — the Cafeteria Manager's donut component with a different grouping. |
+| — | `fmb_water_usage` | Bottles **requested** this period: with logo, without logo, and cancelled. |
+
+**Removed.** `fmb_committed_cost` and `fmb_pushback_rate` were the same two
+metrics as the new Total cost and Change rate tiles under older labels, and
+keeping both would have been duplicate logic. `fmb_orders_at_risk` and
+`fmb_gate_queue` were displaced by the fixed four-card second row; the at-risk
+signal survives in the alerts rail (`fmb_at_risk`). `fmb_water_runway` and
+`fmb_water_meter` are gone with the table they read — see below.
+
+**Water is no longer a stock model.** Migration 028 dropped
+`water_normal_options` and with it `available_stock` / `number_of_bottles`. The
+applicant now types the number of bottles straight into the request, so there is
+no catalogue to hold stock against and no `/app/dropdown-options/waterNormal`
+page. `fmb_water_usage` reports what was *requested*, which is the question this
+role actually asked of it. Nothing in the schema records spillage or breakage, so
+the third bar is **cancelled** — requested volume on proposals that died — under
+its own honest name rather than a wastage figure the data cannot support.
 
 ---
 
@@ -63,7 +98,7 @@ apart, and only F&B sees both across every outlet.
   and it exists because the fan-out is its own action.
 - `fmb_options` for every cafeteria, including `unit_price_rm` — Menu Oversight
   already grants this.
-- `water_normal_options`, `dietary_information_options`, `serving_unit_options`.
+- `dietary_information_options`, `serving_unit_options`. (`water_normal_options` was dropped in migration 028.)
 - The `food_beverage_services` roster by name.
 
 **Restricted**

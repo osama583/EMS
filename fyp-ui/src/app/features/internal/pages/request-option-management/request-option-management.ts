@@ -39,7 +39,7 @@ interface ManagerField {
 const KIND_LABELS: Readonly<Record<RequestOptionKind, string>> = {
   logistics: 'Logistics', transportation: 'Transportation', photoVideo: 'Photographer / Videographer', soundLight: 'Sound & Light', fmb: 'My Menu',
   dietaryInformation: 'Dietary Information', servingUnit: 'Serving Unit',
-  campusTourStart: 'Campus Tour — Starting Points', campusTourType: 'Campus Tour — Types of Tour', waterNormal: 'Mineral Water',
+  campusTourStart: 'Campus Tour — Starting Points', campusTourType: 'Campus Tour — Types of Tour',
   fundingMain: 'Funding — Main Items', fundingSub: 'Funding — Sub-items',
 };
 
@@ -445,12 +445,6 @@ export class RequestOptionManagementComponent {
       servingUnit: [],
       campusTourStart: [{ key: 'maximumGroupSize', label: 'Maximum Group Size', type: 'number', min: 1 }, { key: 'meetingInstructions', label: 'Meeting Instructions', type: 'textarea' }],
       campusTourType: [],
-      waterNormal: [
-        { key: 'bottleCount', label: 'Number of Bottles', type: 'number', required: true, min: 0, half: true },
-        { key: 'availableStock', label: 'Available Stock', type: 'number', required: true, min: 0, half: true },
-        { key: 'orderingInstructions', label: 'Ordering / Delivery Instructions', type: 'textarea' },
-        { key: 'brandingRequirement', label: 'Logo / Branding Requirement (if requested with logo)', type: 'textarea' },
-      ],
       fundingMain: [{ key: 'financeCode', label: 'Budget Category / Finance Code', type: 'text' }, { key: 'purchasingGuidance', label: 'Purchasing Guidance', type: 'textarea' }],
       fundingSub: [{ key: 'parentId', label: 'Parent Main Item', type: 'select', required: true, options: this.allOptions().filter((option) => option.kind === 'fundingMain').map((option) => ({ value: option.id, label: option.label })) }, { key: 'financeCode', label: 'Finance / Procurement Code', type: 'text' }, { key: 'purchasingNote', label: 'Default Unit / Purchasing Note', type: 'textarea' }],
     };
@@ -466,7 +460,6 @@ export class RequestOptionManagementComponent {
       case 'dietaryInformation': case 'servingUnit': return option.description ?? '';
       case 'campusTourStart': return [option.maximumGroupSize ? `Maximum ${option.maximumGroupSize}` : '', option.meetingInstructions].filter(Boolean).join(' · ');
       case 'campusTourType': return option.description ?? '';
-      case 'waterNormal': return [`${option.bottleCount || 'Custom'} bottles`, `${option.availableStock} in stock`, option.brandingRequirement ? 'Logo option available' : ''].filter(Boolean).join(' · ');
       case 'fundingMain': return [option.financeCode, option.purchasingGuidance].filter(Boolean).join(' · ');
       case 'fundingSub': return [this.allOptions().find((item) => item.id === option.parentId)?.label, option.financeCode].filter(Boolean).join(' · ');
     }

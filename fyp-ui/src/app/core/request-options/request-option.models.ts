@@ -8,7 +8,6 @@ export type RequestOptionKind =
   | 'servingUnit'
   | 'campusTourStart'
   | 'campusTourType'
-  | 'waterNormal'
   | 'fundingMain'
   | 'fundingSub';
 
@@ -78,17 +77,9 @@ export interface CampusTourTypeOption extends RequestOptionBase {
   readonly kind: 'campusTourType';
 }
 
-// Merged catalog — one Mineral Water source consumed everywhere (manager admin page and the
-// applicant's single Mineral Water request, which toggles "with logo" rather than picking a
-// separate option kind). brandingRequirement is optional guidance a manager can fill in when an
-// option supports logo printing; leaving it blank just means no logo-specific note is shown.
-export interface WaterRequestOption extends RequestOptionBase {
-  readonly kind: 'waterNormal';
-  readonly bottleCount: number;
-  readonly availableStock: number;
-  readonly brandingRequirement?: string;
-  readonly orderingInstructions?: string;
-}
+// Mineral water has no catalogue: the applicant types the number of bottles they want
+// straight into the request (migration 028 dropped water_normal_options), so there is no
+// WaterRequestOption and no /app/dropdown-options/waterNormal page to maintain one on.
 
 export interface FundingMainOption extends RequestOptionBase {
   readonly kind: 'fundingMain';
@@ -113,7 +104,6 @@ export type RequestOption =
   | ServingUnitOption
   | CampusTourStartOption
   | CampusTourTypeOption
-  | WaterRequestOption
   | FundingMainOption
   | FundingSubOption;
 

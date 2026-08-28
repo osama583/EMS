@@ -1,4 +1,4 @@
-"""Food & Beverage Services — the order fan-out dashboard.
+"""F&B — the cost, gate and outlet dashboard.
 
 F&B wears three hats at once: a gatekeeper at `fmb_review` (the only department
 that can reject a proposal outright), a department lane like the other five, and
@@ -59,110 +59,6 @@ def on_time_delivery(cur, scope: Scope) -> dict[str, Any]:
         definition="M19 — delivered_at on or before request_fmb.date + serve_time",
         empty="No orders have been delivered in this period.",
         drill_to=drill("/app/history/requests", requestKind="fmb", delivery="late"),
-    )
-
-
-@widget("fmb_orders_at_risk")
-def orders_at_risk(cur, scope: Scope) -> dict[str, Any]:
-    result = risk.orders_at_risk(cur, scope, outlets=ALL_OUTLETS)
-    return kpi(
-        label="Orders at risk",
-        value=result["count"],
-        fmt=FMT_COUNT,
-        secondary=f"{result['pending']} pending · {result['approved']} unclaimed",
-        caption=f"serve time inside {result['windowHours'] / 24:.0f} days",
-        target={"max": 0, "label": "target 0 still pending"},
-        status="critical" if result["pending"] else ("warning" if result["count"] else "good"),
-        definition="An order still pending two days out is a different emergency from one preparing two hours out",
-        drill_to=drill("/app/inbox/requests", requestKind="fmb", risk="true"),
-    )
-
-
-@widget("fmb_gate_queue")
-def gate_queue(cur, scope: Scope) -> dict[str, Any]:
-    """F&B sits between HOS/HOD and the CFO; dwell here delays the CFO gate and
-    every department behind it."""
-    from ....db import fetch_one
-
-    waiting = fetch_one(
-        cur, "SELECT count(*) AS n FROM request WHERE status = 'fmb_review'", ()
-    )
-    dwell = sla.stage_dwell(cur, scope, status="fmb_review")
-    median = dwell[0]["median"] if dwell else None
-    return kpi(
-        label="Gate queue & latency",
-        value=int(waiting["n"]) if waiting else 0,
-        fmt=FMT_COUNT,
-        secondary=f"median dwell {median:.0f}h" if median is not None else None,
-        caption="proposals waiting at fmb_review",
-        target={"max": 48, "label": "target <= 48h dwell"},
-        status=status_for(median, warn=48, critical=96) if median is not None else ("warning" if waiting and waiting["n"] else "good"),
-        definition="M14 for the fmb_review stage",
-        drill_to=drill("/app/inbox/proposals", stage="fmb-review"),
-    )
-
-
-@widget("fmb_pushback_rate")
-def pushback_rate(cur, scope: Scope) -> dict[str, Any]:
-    """A manager's send-back comes back to F&B, not to the applicant. Every
-    push-back is F&B rework, usually caused by sending an order to an outlet
-    that could not take it."""
-    result = quality.order_pushback_rate(cur, scope, outlets_from_scope=False)
-    per_outlet = quality.pushback_by_outlet(cur, scope)
-    worst = max((o for o in per_outlet if o["rate"] is not None), key=lambda o: o["rate"], default=None)
-    return kpi(
-        label="Outlet push-back rate",
-        value=result["rate"],
-        fmt=FMT_PERCENT,
-        secondary=f"worst: {worst['label']} at {worst['rate']:.0%}" if worst and worst["rate"] else None,
-        caption=f"{result['count']} of {result['sample']} orders bounced",
-        target={"max": 0.10, "label": "target <= 10%"},
-        status=status_for(result["rate"], warn=0.10, critical=0.25),
-        definition="M25 read from the F&B side — my orders get bounced",
-        drill_to=drill("/app/inbox/requests", requestKind="fmb", orderStatus="resubmitted"),
-    )
-
-
-@widget("fmb_committed_cost")
-def committed_cost(cur, scope: Scope) -> dict[str, Any]:
-    """The total is the number people quote; the coverage is what makes it
-    honest. Showing one without the other is how a spend figure quietly
-    understates."""
-    current = finance.committed_food_cost(cur, scope)
-    previous = finance.committed_food_cost(cur, scope, previous=True)
-    coverage = current["coverage"]
-    return kpi(
-        label="Committed food cost",
-        value=current["total"],
-        fmt=FMT_CURRENCY,
-        caption=f"{current['totalItems']} ordered lines",
-        caveat=(
-            f"Based on {coverage:.0%} of items priced — unpriced menu items contribute nothing to this total."
-            if coverage is not None and coverage < 1
-            else None
-        ),
-        status="warning" if coverage is not None and coverage < 0.8 else "good",
-        delta=delta(current["total"], previous["total"], higher_is_better=False),
-        definition="M50 with M58 coverage",
-        drill_to=drill("#panel-fmb_cost_by_outlet"),
-    )
-
-
-@widget("fmb_water_runway")
-def water_runway(cur, scope: Scope) -> dict[str, Any]:
-    """The one genuine inventory constraint F&B owns; every other F&B resource
-    is a cafeteria's kitchen."""
-    result = capacity.water_runway_days(cur, scope)
-    return kpi(
-        label="Water stock runway",
-        value=result["days"],
-        fmt=FMT_DAYS,
-        secondary=f"{result['label']} on {result['date']}" if result["label"] else None,
-        caption="days until committed bottles exceed stock" if result["days"] is not None else "no breach in the horizon",
-        target={"min": 14, "label": "target >= 14 days"},
-        status=status_for(result["days"], minimum=14, critical=3, higher_is_better=True) if result["days"] is not None else "good",
-        definition="M30, water variant",
-        drill_to=drill("/app/dropdown-options/waterNormal"),
     )
 
 
@@ -352,42 +248,6 @@ def cost_by_outlet(cur, scope: Scope) -> dict[str, Any]:
     )
 
 
-@widget("fmb_water_meter")
-def water_meter(cur, scope: Scope) -> dict[str, Any]:
-    """A meter, not a pie — it is one ratio against one limit."""
-    rows = capacity.water_commitment(cur, scope)
-    warn = scope.config.capacity_warn(scope.unit_code)
-    return panel(
-        title="Water stock runway",
-        subtitle="Committed bottles against available stock",
-        chart="meter",
-        data={
-            "meters": [
-                {
-                    "label": r["label"],
-                    "optionId": r["optionId"],
-                    "value": r["ratio"],
-                    "committed": r["committed"],
-                    "available": r["available"],
-                    "status": status_for(r["ratio"], warn=warn, critical=1.0),
-                }
-                for r in rows
-            ]
-        },
-        table_view=table(
-            [
-                {"key": "label", "label": "Pack", "format": "text"},
-                {"key": "committed", "label": "Committed", "format": FMT_COUNT},
-                {"key": "available", "label": "Available", "format": FMT_COUNT},
-                {"key": "ratio", "label": "Ratio", "format": FMT_PERCENT},
-            ],
-            rows,
-        ),
-        empty="No mineral water packs are configured.",
-        drill_to=drill("/app/dropdown-options/waterNormal"),
-    )
-
-
 @widget("fmb_dietary_coverage")
 def dietary_coverage(cur, scope: Scope) -> dict[str, Any]:
     """An outlet with no halal or no vegetarian item cannot serve a large share
@@ -508,4 +368,252 @@ def at_risk(cur, scope: Scope) -> dict[str, Any]:
         ),
         empty="Nothing is inside the risk window.",
         drill_to=drill("/app/inbox/requests", requestKind="fmb", risk="true"),
+    )
+
+
+# --- The dashboard as specified ------------------------------------------
+# Row 1 counts, row 2 money, row 3 gate outcomes beside order distribution,
+# then water. Everything below reuses the Cafeteria Manager's own components:
+# the same counts strip, the same donut, the same stat tile.
+
+
+@widget("fmb_request_counts")
+def request_counts(cur, scope: Scope) -> dict[str, Any]:
+    """Row 1 - the same strip the Cafeteria Manager gets, over every outlet.
+
+    Identical component and identical query shape to caf_request_counts
+    (widgets/cafeteria.py). The difference is the scope, and it is the one this
+    module draws everywhere else: a manager's strip is filtered to their own
+    outlets, F&B's is not filtered at all (see ALL_OUTLETS).
+
+    CANCELLED replaces that strip's LATE tile. Late is a shift signal - it tells
+    someone who can still go and cook that it is not cooked yet. F&B cannot act
+    on that; by the time an order runs late the outlet has either delivered it
+    or has not. A cancelled order is F&B's own fan-out coming back undone, which
+    is what this page is about.
+    """
+    from ....db import fetch_all
+
+    rows = fetch_all(
+        cur,
+        """
+        SELECT count(*) FILTER (WHERE sel.status = 'pending') AS inbox,
+               count(*) FILTER (WHERE sel.status IN ('approved', 'preparing', 'resubmitted')) AS ongoing,
+               count(*) FILTER (WHERE sel.status = 'fulfilled') AS completed,
+               count(*) FILTER (WHERE sel.status = 'cancelled') AS cancelled
+          FROM request_fmb_selection sel
+          JOIN request_fmb f ON f.request_fmb_id = sel.request_fmb_id
+        """,
+        scope.params(),
+    )
+    row = rows[0] if rows else {"inbox": 0, "ongoing": 0, "completed": 0, "cancelled": 0}
+    return {
+        "kind": "counts",
+        "items": [
+            {"key": "inbox", "label": "Inbox", "value": int(row["inbox"] or 0), "status": "unknown",
+             "drill": drill("/app/inbox/requests", requestKind="fmb")},
+            {"key": "ongoing", "label": "Ongoing", "value": int(row["ongoing"] or 0), "status": "unknown",
+             "drill": drill("/app/ongoing/requests", requestKind="fmb")},
+            {"key": "completed", "label": "Completed", "value": int(row["completed"] or 0), "status": "good",
+             "drill": drill("/app/history/requests", requestKind="fmb")},
+            # Reads red whether or not anything is cancelled, for the reason the
+            # Late tile does on the cafeteria strip: a green zero trains the eye
+            # to skim the one tile on the row worth stopping for.
+            {"key": "cancelled", "label": "Cancelled", "value": int(row["cancelled"] or 0), "status": "critical",
+             "drill": drill("/app/history/requests", requestKind="fmb", orderStatus="cancelled")},
+        ],
+    }
+
+
+@widget("fmb_total_cost")
+def total_cost(cur, scope: Scope) -> dict[str, Any]:
+    """Row 2, tile 1 - every ringgit F&B is on the hook for this period.
+
+    Cafeteria orders plus purchase lines filed under the Food & Beverage budget
+    category. Both are F&B money; only the first is an outlet's doing, which is
+    what the tile beside this one separates out.
+
+    Deliberately not the CFO's Total Spend and always smaller than it: that
+    figure is every category's funding plus all food, and this is F&B's slice
+    of the same money, not a second count of it.
+    """
+    spend = finance.fnb_spend(cur, scope)
+    return kpi(
+        label="Total cost",
+        value=spend["total"],
+        fmt=FMT_CURRENCY,
+        secondary=f"RM {spend['funding']:,.0f} bought outside the cafeterias" if spend["funding"] else None,
+        caption="Cafeteria orders plus Food & Beverage funding lines",
+        status="unknown",
+        caveat=(
+            f"Based on {spend['coverage']:.0%} of ordered items carrying a price - "
+            "an unpriced item counts as zero."
+            if spend["coverage"] is not None and spend["coverage"] < 1
+            else None
+        ),
+        definition="M50 committed food cost plus FIN-FNB funding lines, over live proposals",
+        drill_to=drill("#panel-fmb_order_distribution"),
+    )
+
+
+@widget("fmb_cafeteria_cost")
+def cafeteria_cost(cur, scope: Scope) -> dict[str, Any]:
+    """Row 2, tile 2 - the part of Total Cost the outlets actually cooked.
+
+    Kept apart from the total because the two answer different questions. Total
+    cost is what F&B spent; this is what F&B spent THROUGH ITS OWN OUTLETS, and
+    only the second moves when a fan-out decision changes. The same number is
+    what the CFO's Cafeteria total cost tile shows.
+    """
+    spend = finance.fnb_spend(cur, scope)
+    share = ratio(spend["cafeteria"], spend["total"])
+    return kpi(
+        label="Total cafeteria cost",
+        value=spend["cafeteria"],
+        fmt=FMT_CURRENCY,
+        secondary=f"{share:.0%} of total cost" if share is not None else None,
+        caption=f"across {spend['totalItems']} ordered menu item(s)",
+        status="unknown",
+        caveat=(
+            f"{spend['totalItems'] - spend['pricedItems']} ordered item(s) carry no price."
+            if spend["totalItems"] > spend["pricedItems"]
+            else None
+        ),
+        definition="M50 - ordered quantity x fmb_options.unit_price_rm, cafeteria orders only",
+        drill_to=drill("#panel-fmb_cost_by_outlet"),
+    )
+
+
+@widget("fmb_cost_per_pax")
+def cost_per_pax(cur, scope: Scope) -> dict[str, Any]:
+    """Row 2, tile 3 - total cost over the heads it fed.
+
+    The same calculation and the same denominator as the CFO's cost-per-pax
+    tile, so the two can be read against each other. The numerator is F&B money
+    rather than all money, so this is always the smaller of the two.
+    """
+    result = finance.fnb_cost_per_pax(cur, scope)
+    return kpi(
+        label="Cost per pax",
+        value=result["value"],
+        fmt=FMT_CURRENCY,
+        caption=f"RM {result['cost']:,.0f} over {result['pax']:,.0f} pax in {result['proposals']} proposal(s)",
+        status="unknown",
+        caveat=(
+            "No attendance is recorded in this period, so this cannot be computed."
+            if not result["pax"]
+            else None
+        ),
+        definition="F&B total cost divided by total_pax over live proposals in the period",
+        drill_to=drill("#panel-fmb_order_distribution"),
+    )
+
+
+@widget("fmb_change_rate")
+def change_rate(cur, scope: Scope) -> dict[str, Any]:
+    """Row 2, tile 4 - how often an order goes back to the outlet for changes.
+
+    The same measurement as the old "Outlet push-back rate" (M25), renamed to
+    say what happened rather than to name a behaviour. A reader who has not read
+    the metric catalogue knows what "sent back for changes" means and can only
+    guess at "push-back".
+    """
+    result = quality.order_pushback_rate(cur, scope, outlets_from_scope=False)
+    per_outlet = quality.pushback_by_outlet(cur, scope)
+    worst = max((o for o in per_outlet if o["rate"] is not None), key=lambda o: o["rate"], default=None)
+    return kpi(
+        label="Cafeteria request change rate",
+        value=result["rate"],
+        fmt=FMT_PERCENT,
+        secondary=f"most affected: {worst['label']} at {worst['rate']:.0%}" if worst and worst["rate"] else None,
+        caption=f"{result['count']} of {result['sample']} order(s) sent back for changes",
+        target={"max": 0.10, "label": "target 10% or lower"},
+        status=status_for(result["rate"], warn=0.10, critical=0.25),
+        definition="M25 - orders returned to the cafeteria because something had to change",
+        drill_to=drill("/app/inbox/requests", requestKind="fmb", orderStatus="resubmitted"),
+    )
+
+
+@widget("fmb_order_distribution")
+def order_distribution(cur, scope: Scope) -> dict[str, Any]:
+    """Row 3, beside the gate - where the orders went.
+
+    The Cafeteria Manager's donut (caf_menu_performance) with a different
+    grouping: that one splits one outlet's orders by menu item, this one splits
+    every order by outlet. Same component, same shape of answer.
+    """
+    rows = finance.cafeteria_order_distribution(cur, scope)
+    total = sum(r["orders"] for r in rows)
+    lead = ratio(rows[0]["orders"], total) if rows and total else None
+    return panel(
+        title="Cafeteria order distribution",
+        subtitle="Orders placed with each outlet this period",
+        chart="donut-chart",
+        data={
+            "segments": [{"label": r["label"], "value": r["orders"], "code": r["code"]} for r in rows],
+            "total": total,
+            "totalLabel": "Orders this period",
+            "format": FMT_COUNT,
+        },
+        table_view=table(
+            [
+                {"key": "label", "label": "Outlet", "format": "text"},
+                {"key": "orders", "label": "Orders", "format": FMT_COUNT},
+                {"key": "portions", "label": "Portions", "format": FMT_COUNT},
+                {"key": "cost", "label": "Cost", "format": FMT_CURRENCY},
+            ],
+            rows,
+        ),
+        caption=(
+            f"{rows[0]['label']} is carrying {lead:.0%} of the orders."
+            if lead is not None
+            else None
+        ),
+        empty="No orders were placed with any outlet in this period.",
+        drill_to=drill("/app/history/requests", requestKind="fmb"),
+    )
+
+
+@widget("fmb_water_usage")
+def water_usage(cur, scope: Scope) -> dict[str, Any]:
+    """Mineral water requested this period, by branding.
+
+    A bar chart rather than a donut: with-logo and without-logo are two volumes
+    to compare, not two slices of something anyone thinks of as a whole, and the
+    third bar is not part of that whole at all.
+
+    Cancelled is the requested volume on proposals that died. Nothing in the
+    schema records spillage or breakage, so this is the closest true measure of
+    water that was asked for and then not needed - and it carries that name
+    rather than a wastage label the data cannot evidence.
+    """
+    result = finance.water_requested(cur, scope)
+    bars = [
+        {"label": "With logo", "value": result["withLogo"]},
+        {"label": "Without logo", "value": result["withoutLogo"]},
+        {"label": "Cancelled", "value": result["cancelled"]},
+    ]
+    return panel(
+        title="Water requested",
+        subtitle="Bottles asked for this period, by branding",
+        chart="bar-chart",
+        series_list=[series("bottles", "Bottles", 1, [{"x": b["label"], "y": b["value"]} for b in bars])],
+        axes={
+            "x": {"type": "category", "label": "Branding"},
+            "y": {"type": "linear", "label": "Bottles", "format": FMT_COUNT},
+        },
+        table_view=table(
+            [
+                {"key": "label", "label": "Branding", "format": "text"},
+                {"key": "value", "label": "Bottles", "format": FMT_COUNT},
+            ],
+            bars,
+        ),
+        caption=(
+            f"{result['total']:,} bottle(s) across {result['requests']} live request(s)."
+            if result["requests"]
+            else None
+        ),
+        empty="No mineral water was requested in this period.",
+        drill_to=drill("/app/inbox/requests", requestKind="waterNormal"),
     )

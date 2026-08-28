@@ -10,7 +10,6 @@ const dropdownSettingRoutes = [
   ['servingUnit', 'Serving Units'],
   ['campusTourStart', 'Campus Tour Starting Points'],
   ['campusTourType', 'Campus Tour Types'],
-  ['waterNormal', 'Mineral Water'],
   ['fundingMain', 'Funding Main Items'],
   ['fundingSub', 'Funding Sub-items'],
 ] as const;

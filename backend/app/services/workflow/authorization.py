@@ -154,7 +154,7 @@ def authorize_stage_action(cur, request: dict, principal: Principal) -> None:
         return
     if status == FMB_REVIEW:
         if not heads_unit(cur, principal.user_id, FMB_UNIT_CODE):
-            raise Forbidden("Only Food & Beverage Services can act at this stage.")
+            raise Forbidden("Only F&B can act at this stage.")
         return
     if status == CFO_REVIEW:
         if not has_role(cur, principal.user_id, "cfo"):
@@ -195,7 +195,7 @@ def authorize_department_task(cur, task: dict, user_id: int) -> None:
         if task["assigned_unit_code"]:
             raise Forbidden("You do not head the department this request is routed to.")
         if task["assigned_role"] == "fmb":
-            raise Forbidden("Only Food & Beverage Services can act on this request.")
+            raise Forbidden("Only F&B can act on this request.")
         raise Forbidden("Only the CFO can act on this request.")
 
 

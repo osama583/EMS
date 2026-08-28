@@ -69,7 +69,7 @@ const STANDALONE_PAGES_VALUE = '__standalone__';
 
 const GRANT_TYPE_OPTIONS: readonly { readonly value: NavGrantType; readonly label: string; readonly description: string }[] = [
   { value: 'role', label: 'Role only', description: 'Anyone holding this role, in any unit. Flat roles only (e.g. CFO, System Admin).' },
-  { value: 'unit_role', label: 'Unit + role', description: 'Anyone holding this role SPECIFICALLY in this unit — e.g. "Staff, but only in Food & Beverage Services".' },
+  { value: 'unit_role', label: 'Unit + role', description: 'Anyone holding this role SPECIFICALLY in this unit — e.g. "Staff, but only in F&B".' },
   { value: 'unit', label: 'Unit only', description: 'Anyone holding ANY role in this unit — e.g. "everyone in Finance".' },
   { value: 'cafeteria', label: 'All cafeterias', description: 'Anyone holding this role in ANY cafeteria — including outlets added later. No need to pick outlets one by one.' },
 ];

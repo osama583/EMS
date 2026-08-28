@@ -140,7 +140,7 @@ def create_selection(
 ) -> dict:
     """F&B places one cafeteria order under this proposal's food request."""
     if not heads_unit(cur, actor_user_id, FMB_UNIT_CODE):
-        raise Forbidden("Only Food & Beverage Services can place a cafeteria order.")
+        raise Forbidden("Only F&B can place a cafeteria order.")
     if quantity is None or int(quantity) <= 0:
         raise WorkflowError("An order needs a quantity of at least one.")
 
@@ -254,7 +254,7 @@ def edit_selection(cur, selection_id: int, actor_user_id: int, updates: dict) ->
     """
     selection = load_selection(cur, selection_id)
     if not heads_unit(cur, actor_user_id, FMB_UNIT_CODE):
-        raise Forbidden("Only Food & Beverage Services can edit a cafeteria order.")
+        raise Forbidden("Only F&B can edit a cafeteria order.")
     if selection["status"] not in (SEL_PENDING, SEL_RESUBMITTED):
         raise WorkflowError("This order has already been accepted and can no longer be edited.")
 

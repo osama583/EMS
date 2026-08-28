@@ -91,6 +91,36 @@ def total_spend(cur, scope: Scope) -> dict[str, Any]:
     )
 
 
+@widget("cfo_cafeteria_cost")
+def cafeteria_cost(cur, scope: Scope) -> dict[str, Any]:
+    """The cafeteria share of Total Spend, called out on its own.
+
+    Not additional money: this is already inside the Total Spend tile above,
+    through committed_food_cost. It is broken out because it is the only part of
+    institutional spend that another dashboard is accountable for - the same
+    figure F&B sees as its Total cafeteria cost - so the two pages reconcile
+    against each other rather than each quoting a private total.
+    """
+    spend = finance.fnb_spend(cur, scope)
+    total = finance.cost_per_pax(cur, scope)["cost"]
+    share = ratio(spend["cafeteria"], total)
+    return kpi(
+        label="Cafeteria total cost",
+        value=spend["cafeteria"],
+        fmt=FMT_CURRENCY,
+        secondary=f"{share:.0%} of total spend" if share is not None else None,
+        caption="Orders placed on cafeteria menus, already counted in total spend",
+        status="unknown",
+        caveat=(
+            f"{spend['totalItems'] - spend['pricedItems']} ordered item(s) carry no price (gap G4)."
+            if spend["totalItems"] > spend["pricedItems"]
+            else None
+        ),
+        definition="M50 committed food cost - the cafeteria component of M50+M52",
+        drill_to=drill("#panel-cfo_spend_by_category"),
+    )
+
+
 @widget("cfo_total_pax")
 def total_pax(cur, scope: Scope) -> dict[str, Any]:
     """Total attendance behind the spend - the denominator, shown in its own

@@ -222,7 +222,7 @@ SELECT l."date", o.label, sum(l.quantity) AS committed, o.available_quantity,
 |---|---|---|
 | Logistics | `sum(request_logistics.quantity)` | `logistics_options.available_quantity` |
 | Transport | `count(request_transportation)` rows | `transportation_options.available_vehicle_count` |
-| F&B (water) | `sum(request_mineral_water.quantity)` | `water_normal_options.available_stock` |
+| F&B (water) | `sum(request_mineral_water.quantity)` | — (stock model removed in migration 028) |
 | Student Services | `sum(request_campus_tour.pax)` | `campus_tour_start_options.max_group_size` |
 
 *Target:* ≤ 0.85 (headroom for late requests).

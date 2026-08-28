@@ -268,8 +268,6 @@ _OPTION_RULES: dict[str, tuple[str, str, tuple[tuple[str, str], ...]]] = {
                    (("request_photography_videography", "option_id"),)),
     "soundLight": ("sound_light_options", "sound_light_option_id",
                    (("request_sound_light", "option_id"),)),
-    "waterNormal": ("water_normal_options", "water_normal_option_id",
-                    (("request_mineral_water", "option_id"),)),
     "campusTourStart": ("campus_tour_start_options", "campus_tour_start_option_id",
                         (("request_campus_tour", "start_point_option_id"),)),
     "campusTourType": ("campus_tour_type_options", "campus_tour_type_option_id",

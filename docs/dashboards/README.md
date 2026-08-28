@@ -112,7 +112,7 @@ against overlapping event windows. Those are three different jobs, and a shared
 | # | Role | Unit | Doc |
 |---|---|---|---|
 | 1 | Head of Department | A/V Services | [10-hod-av-services.md](10-hod-av-services.md) |
-| 2 | Head of Department | Food & Beverage Services | [11-hod-food-beverage.md](11-hod-food-beverage.md) |
+| 2 | Head of Department | F&B | [11-hod-food-beverage.md](11-hod-food-beverage.md) |
 | 3 | Head of Department | Logistics and Facilities | [12-hod-logistics-facilities.md](12-hod-logistics-facilities.md) |
 | 4 | Head of Department | Photography Services | [13-hod-photography.md](13-hod-photography.md) |
 | 5 | Head of Department | Student Services | [14-hod-student-services.md](14-hod-student-services.md) |

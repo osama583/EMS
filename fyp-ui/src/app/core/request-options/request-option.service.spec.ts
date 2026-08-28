@@ -17,7 +17,7 @@ const DROPDOWN_PAGES_BY_UNIT: Readonly<Record<string, readonly string[]>> = {
   logistics_and_facilities: ['dropdown-options/logistics'],
   a_v_services: ['dropdown-options/soundLight'],
   student_services: ['dropdown-options/campusTourStart', 'dropdown-options/campusTourType'],
-  food_beverage_services: ['dropdown-options/dietaryInformation', 'dropdown-options/servingUnit', 'dropdown-options/waterNormal', 'cafeteria-menus'],
+  food_beverage_services: ['dropdown-options/dietaryInformation', 'dropdown-options/servingUnit', 'cafeteria-menus'],
 };
 
 // A Service department's manager is whoever holds head-of-department on that unit. Which option
@@ -34,7 +34,7 @@ function unitManager(unitCode: string, department: string): AuthUser {
 const logisticsManager = unitManager('logistics_and_facilities', 'Logistics and Facilities');
 const avManager = unitManager('a_v_services', 'A/V Services');
 const studentServicesManager = unitManager('student_services', 'Student Services');
-const fmbManager = unitManager('food_beverage_services', 'Food & Beverage Services');
+const fmbManager = unitManager('food_beverage_services', 'F&B');
 const studentUser: AuthUser = testUser([testRole('student', 'school_of_computing', 'School of Computing')], {
   email: 'student@demo.apu.edu.my', displayName: 'Student',
 });
@@ -85,7 +85,7 @@ describe('RequestOptionService', () => {
     // F&B owns the whole food-catalog set (menu, dietary information, serving units, mineral
     // water). A Cafeteria Manager owns only their own cafeteria's menu. waterLogo no longer
     // exists as its own kind — Mineral Water is one merged catalog.
-    expect(managerOptionKinds(fmbManager)).toEqual(['fmb', 'dietaryInformation', 'servingUnit', 'waterNormal']);
+    expect(managerOptionKinds(fmbManager)).toEqual(['fmb', 'dietaryInformation', 'servingUnit']);
     expect(managerOptionKinds(cafeteriaManagerUser)).toEqual(['fmb']);
     expect(managerOptionKinds(studentServicesManager)).toEqual(['campusTourStart', 'campusTourType']);
     expect(canManageRequestOptions(cafeteriaManagerUser, true)).toBe(true);
@@ -98,10 +98,11 @@ describe('RequestOptionService', () => {
     expect(roleCanAccess(logisticsManager, '/app/dropdown-options/logistics')).toBe(true);
     expect(roleCanAccess(logisticsManager, '/app/dropdown-options/soundLight')).toBe(false);
     expect(roleCanAccess(logisticsManager, '/app/dropdown-options/campusTourStart')).toBe(false);
-    expect(roleCanAccess(logisticsManager, '/app/dropdown-options/waterNormal')).toBe(false);
     expect(roleCanAccess(avManager, '/app/dropdown-options/soundLight')).toBe(true);
     expect(roleCanAccess(studentServicesManager, '/app/dropdown-options/campusTourStart')).toBe(true);
-    expect(roleCanAccess(fmbManager, '/app/dropdown-options/waterNormal')).toBe(true);
+    // Mineral water has no catalogue page any more (migration 028): the applicant types the
+    // bottle count straight into the request, so nobody administers options for it.
+    expect(roleCanAccess(fmbManager, '/app/dropdown-options/waterNormal')).toBe(false);
     expect(roleCanAccess(fmbManager, '/app/dropdown-options/servingUnit')).toBe(true);
     expect(roleCanAccess(cfoUser, '/app/dropdown-options/fundingMain')).toBe(true);
     // My Menu is the Cafeteria Manager's own cafeteria; F&B gets the read-only cross-cafeteria

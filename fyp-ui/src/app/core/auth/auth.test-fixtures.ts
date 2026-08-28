@@ -58,7 +58,7 @@ export const TEST_STUDENT = testUser([testRole('student', 'school_of_computing',
 export const TEST_HEAD_OF_SCHOOL = testUser([testRole('head-of-school', 'school_of_computing', 'School of Computing')], {
   email: 'hoshod@demo.apu.edu.my', displayName: 'HOS / HOD Demo',
 });
-export const TEST_FMB_HEAD = testUser([testRole('head-of-department', 'food_beverage_services', 'Food & Beverage Services')], {
+export const TEST_FMB_HEAD = testUser([testRole('head-of-department', 'food_beverage_services', 'F&B')], {
   email: 'fmb@demo.apu.edu.my', displayName: 'F&B Demo',
 });
 export const TEST_LOGISTICS_STAFF = testUser([testRole('staff', 'logistics_and_facilities', 'Logistics and Facilities')], {

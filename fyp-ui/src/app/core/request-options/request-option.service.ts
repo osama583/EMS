@@ -62,7 +62,6 @@ export class RequestOptionService {
       case 'dietaryInformation': case 'servingUnit': return option.description;
       case 'campusTourStart': return [option.maximumGroupSize ? `Maximum group: ${option.maximumGroupSize}` : '', option.meetingInstructions ?? option.description ?? ''].filter(Boolean).join(' · ') || undefined;
       case 'campusTourType': return option.description;
-      case 'waterNormal': return [`${option.bottleCount || 'Custom'} bottles`, `${option.availableStock} in stock`, option.brandingRequirement ?? option.orderingInstructions ?? ''].filter(Boolean).join(' · ');
       case 'fundingMain': return option.purchasingGuidance ?? option.description;
       case 'fundingSub': return option.purchasingNote ?? option.description;
     }
