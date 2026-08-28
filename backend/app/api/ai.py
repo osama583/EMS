@@ -359,12 +359,19 @@ def ask():
             # "What can I DO in the app" - role capabilities. A different question from what the
             # assistant can ANSWER (see "askable" below).
             kb_chunks.append(self_capability_document(principal.assignments if principal else ()))
-        if "greeting" in classes or "askable" in classes:
-            # Both answer "what can I ask about", built live from this caller's page grants (the
-            # same nav_page_grants check that gates every other answer), so it can never offer a
-            # topic the assistant would immediately refuse. Deliberately not gated itself - asking
-            # what you may ask is always allowed, and the answer is already limited to what the
-            # caller passes.
+        if "greeting" in classes:
+            # A bare "hey"/"hi" deserves a short, casual reply, not the full enumerated capability
+            # list below - greeting_hint_document() only tells the model whether it's safe to
+            # casually mention clubs and/or events (or, having neither, to offer help with the
+            # app/account instead), computed live from the same page grants so it can never offer
+            # a topic the asker would then be refused.
+            kb_chunks.append(topic_access.greeting_hint_document(principal))
+        if "askable" in classes:
+            # "What can I ask about" gets the complete, exhaustive list - built live from this
+            # caller's page grants (the same nav_page_grants check that gates every other answer),
+            # so it can never offer a topic the assistant would immediately refuse. Deliberately
+            # not gated itself - asking what you may ask is always allowed, and the answer is
+            # already limited to what the caller passes.
             kb_chunks.append(topic_access.askable_topics_document(principal))
         if "role_capability" in classes and role:
             kb_chunks.append(role_capability_document(role))

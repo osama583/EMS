@@ -1,7 +1,8 @@
 @if (error()) { <app-feedback-banner tone="error" [message]="error()" /> }
 
-<div class="staff-tasks-calendar-bar">
-  <div class="staff-tasks-calendar-toggle">
+<app-internal-data-page [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [sort]="sort()" (sortChange)="setSort($event)"
+  [loading]="loading()" [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()" (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()" (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)" (recordOpen)="openRecord($event)">
+  <div extraHeaderTrailing class="staff-tasks-calendar-toggle">
     <button
       type="button"
       class="staff-tasks-calendar-toggle__btn"
@@ -23,10 +24,7 @@
       </div>
     }
   </div>
-</div>
-
-<app-internal-data-page [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [sort]="sort()" (sortChange)="setSort($event)"
-  [loading]="loading()" [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()" (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()" (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)" (recordOpen)="openRecord($event)" />
+</app-internal-data-page>
 
 <app-form-modal [open]="modalOpen()" [title]="modalTitle()" [primaryLabel]="pendingStatus() ? 'Confirm' : 'Close'" [secondaryLabel]="'Cancel'" [showSecondary]="!!pendingStatus()" [loading]="saving()" [fixedSize]="true" (close)="closeModal()" (cancel)="closeModal()" (submit)="confirm()">
   @if (selected(); as task) {

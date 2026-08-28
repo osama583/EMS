@@ -161,6 +161,26 @@ def askable_topics_document(principal) -> str:
     )
 
 
+def greeting_hint_document(principal) -> str:
+    """The CONTEXT line for a BARE greeting ("hey", "hi") - a one-line steer, not the full
+    enumerated capability list askable_topics_document() above returns for "what can you help me
+    with". A greeting deserves a short, casual reply, not a menu; this only tells the model
+    whether it's safe to casually mention clubs and/or events, computed from the same live
+    Page Visibility grants so it can never offer a topic the asker would then be refused."""
+    has_clubs = topic_allowed(principal, "clubs") or topic_allowed(principal, "clubs_mine")
+    has_events = topic_allowed(principal, "events") or topic_allowed(principal, "my_registrations")
+    if has_clubs and has_events:
+        return "This asker can ask about both clubs and events - casually offer help with either."
+    if has_clubs:
+        return "This asker can ask about clubs but not events - casually offer help with clubs only."
+    if has_events:
+        return "This asker can ask about events but not clubs - casually offer help with events only."
+    return (
+        "This asker has no clubs or events access - casually offer help with the app/their account "
+        "instead, not clubs or events."
+    )
+
+
 def how_to_allowed(principal, guide_key: str) -> bool:
     """May this caller be given the STEPS for `guide_key`?
 

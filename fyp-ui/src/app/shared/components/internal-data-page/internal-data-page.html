@@ -15,6 +15,10 @@
 >
   @if (!hideHeader()) {
     <app-internal-page-header workspaceHeader [config]="config().header" (primaryAction)="primaryAction.emit()">
+      <!-- A page-specific control (e.g. staff-tasks.ts's date-filter calendar toggle) that needs
+           to sit in the title row next to the view toggle, rather than as its own bar above the
+           workspace with a visible gap under the title. -->
+      <ng-content select="[extraHeaderTrailing]" headerTrailing></ng-content>
       @if (showViewToggle()) {
         <app-view-toggle headerTrailing [mode]="viewMode()" [ariaLabel]="'Choose ' + config().ariaLabel + ' view'" (modeChange)="setViewMode($event)" />
       }
