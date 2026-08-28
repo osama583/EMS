@@ -603,6 +603,90 @@ def funding_catalogue_usage(cur, scope: Scope) -> list[dict[str, Any]]:
     ]
 
 
+def funding_sub_usage(cur, scope: Scope) -> list[dict[str, Any]]:
+    """Every active funding **sub**-option ranked by selections, each carrying
+    the main option it hangs off.
+
+    `mainOptionId` travels with every row on purpose. A sub-option belongs to
+    exactly one main, and its count is already final by the time it leaves this
+    function, so the CFO panel can narrow to one main option by *hiding* bars
+    rather than refetching. That is a filter, not client-side aggregation - no
+    number is recomputed in the browser, and no row reaches it that the caller
+    could not already see, since this is the catalogue the CFO owns.
+    """
+    rows = fetch_all(
+        cur,
+        f"""
+        SELECT s.funding_sub_option_id AS option_id,
+               s.label AS label,
+               s.main_option_id AS main_option_id,
+               m.label AS main_label,
+               s.finance_procurement_code AS code,
+               count(p.request_funding_purchase_id) AS selections,
+               coalesce(sum(p.quantity * p.unit_price_rm), 0) AS value
+          FROM funding_sub_options s
+          JOIN funding_main_options m ON m.funding_main_option_id = s.main_option_id
+          LEFT JOIN request_funding_purchase p ON p.sub_option_id = s.funding_sub_option_id
+          LEFT JOIN request r ON r.request_id = p.request_id
+                 AND r.submitted_at >= %(from)s AND r.submitted_at < %(to)s
+                 AND r.status NOT IN {_DEAD}
+         WHERE s.active AND s.archived_at IS NULL
+           AND m.active AND m.archived_at IS NULL
+      GROUP BY 1, 2, 3, 4, 5
+      ORDER BY 6 DESC, 2
+        """,
+        scope.base_params,
+    )
+    return [
+        {
+            "optionId": r["option_id"],
+            "label": r["label"],
+            "mainOptionId": r["main_option_id"],
+            "mainLabel": r["main_label"],
+            "code": r["code"],
+            "value": int(r["selections"]),
+            "amount": num(r["value"], 0.0),
+        }
+        for r in rows
+    ]
+
+
+def proposal_bucket_counts(cur, scope: Scope) -> dict[str, int]:
+    """Institution-wide proposal counts for the CFO's status strip.
+
+    The CFO holds no unit, so "inbox" cannot mean `assigned_unit_code = mine`
+    the way it does for a department head. It means the CFO's own gate, and
+    "ongoing" is everything else still moving - the two are disjoint, so the
+    strip adds up rather than double-counting the gate queue.
+
+    The fourth bucket is **cancelled**, not late. A CFO is not chasing an
+    overdue task; a cancelled event is money that was committed and released,
+    and it is the only one of the four that changes what the spend figures
+    above it mean.
+    """
+    row = fetch_one(
+        cur,
+        """
+        SELECT count(*) FILTER (WHERE r.status = 'cfo_review') AS inbox,
+               count(*) FILTER (
+                   WHERE r.status IN ('submitted', 'hos_hod_review', 'fmb_review',
+                                      'department_review', 'resubmission_required')
+               ) AS ongoing,
+               count(*) FILTER (WHERE r.status = 'completed_approved') AS completed,
+               count(*) FILTER (WHERE r.status = 'cancelled') AS cancelled
+          FROM request r
+         WHERE r.submitted_at IS NOT NULL
+        """,
+        (),
+    )
+    return {
+        "inbox": int(row["inbox"]) if row else 0,
+        "ongoing": int(row["ongoing"]) if row else 0,
+        "completed": int(row["completed"]) if row else 0,
+        "cancelled": int(row["cancelled"]) if row else 0,
+    }
+
+
 def funding_off_catalogue(cur, scope: Scope) -> dict[str, Any]:
     row = fetch_one(
         cur,

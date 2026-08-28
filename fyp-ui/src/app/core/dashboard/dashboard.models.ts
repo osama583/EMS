@@ -110,6 +110,38 @@ export interface Annotation {
   style?: 'solid' | 'long-dash';
 }
 
+/**
+ * A panel whose marks narrow a *sibling* panel instead of navigating away.
+ *
+ * The two key names are what keep this general: the client matches
+ * `point[pointKey]` on the source against `point[targetKey]` on the target and
+ * never needs to know which two panels are involved. Selecting the same mark
+ * twice clears the filter, so it toggles rather than trapping the reader in a
+ * narrowed view with no way back.
+ */
+export interface CrossFilter {
+  /** Widget id of the panel this one filters. */
+  target: string;
+  /** Field a mark on *this* panel carries its identity in. */
+  pointKey: string;
+  /** Field the target's own points carry that identity in. */
+  targetKey: string;
+  /** Field holding the human label, for the target's "showing X" subtitle. */
+  labelKey: string;
+}
+
+/** One cross-filter selection, as the dashboard page receives it. */
+export interface FilterSelect {
+  /** Widget id of the panel that was clicked. */
+  source: string;
+  /** Widget id of the panel to narrow. */
+  target: string;
+  targetKey: string;
+  value: string | number;
+  /** Human label of the selected mark, for the target's subtitle. */
+  label: string;
+}
+
 interface WidgetBase {
   id: string;
   kind: WidgetKind;
@@ -154,6 +186,8 @@ export interface PanelWidget extends WidgetBase {
   drill?: Drill | null;
   signature: boolean;
   mobile?: MobileForm | null;
+  /** Present when this panel's marks filter another panel rather than drilling. */
+  crossFilter?: CrossFilter | null;
   /** Buckets *this* panel withheld under the k>=5 floor. Per panel, not the page
    *  total: a footnote repeating one number under five charts says nothing about
    *  which chart is incomplete. */

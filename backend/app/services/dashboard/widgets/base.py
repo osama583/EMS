@@ -185,6 +185,7 @@ def panel(
     signature: bool = False,
     mobile: str | None = None,
     suppressed: int = 0,
+    cross_filter: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """A chart card.
 
@@ -195,6 +196,13 @@ def panel(
     `mobile` names the phone fallback form (see docs/dashboards/70 § 4.2). A
     thirty-column heatmap is unreadable at any cell size on a 390px screen, so
     it becomes a ranked list of breaches rather than a squeezed heatmap.
+
+    `cross_filter` makes a panel's marks narrow a *sibling* panel instead of
+    navigating away. It names the target panel, the field a mark carries its
+    identity in, and the field the target's own points carry that identity in -
+    so the client filters by matching two declared keys and never by knowing
+    which two panels these are. Every count involved is still computed here; the
+    client only chooses which already-final bars to show.
     """
     return {
         "kind": "panel",
@@ -213,6 +221,7 @@ def panel(
         "drill": drill_to,
         "signature": signature,
         "mobile": mobile,
+        "crossFilter": cross_filter,
         # Buckets *this* panel withheld under the k>=5 floor. Per panel, not the
         # page total: a footnote that repeats the same number under five charts
         # tells a reader nothing about which chart is incomplete.

@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
-import { Drill, PanelWidget } from '../../../core/dashboard/dashboard.models';
+import { Drill, FilterSelect, PanelWidget } from '../../../core/dashboard/dashboard.models';
 import { AlertListComponent } from './alert-list';
 import { BarChartComponent } from './bar-chart';
 import { ChartFrameComponent } from './chart-frame';
@@ -89,6 +89,8 @@ export class ChartPanelComponent {
   readonly panel = input.required<PanelWidget>();
   readonly drill = output<Drill>();
   readonly retry = output<string>();
+  /** Emitted instead of `drill` when the panel declares a `crossFilter`. */
+  readonly filterSelect = output<FilterSelect>();
 
   readonly form = computed(() => {
     const panel = this.panel();
@@ -141,6 +143,22 @@ export class ChartPanelComponent {
   onMark(event: MarkEvent): void {
     const panel = this.panel();
     const point = event.point as Record<string, unknown>;
+    // A filtering panel never navigates: clicking one of its marks narrows the
+    // panel it names. Checked before every other branch, so a mark that also
+    // carries a requestId cannot navigate out from under the filter.
+    const cross = panel.crossFilter;
+    if (cross) {
+      const value = point[cross.pointKey];
+      if (value === null || value === undefined) return;
+      this.filterSelect.emit({
+        source: panel.id,
+        target: cross.target,
+        targetKey: cross.targetKey,
+        value: value as string | number,
+        label: String(point[cross.labelKey] ?? value),
+      });
+      return;
+    }
     // A mark's own identity wins over the panel default, so clicking one bar
     // lands on that item rather than the panel's unfiltered list.
     if (typeof point['requestId'] === 'number') {
