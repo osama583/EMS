@@ -257,7 +257,12 @@ export class ExploreEventsComponent {
     this.draftPreviewRequests
       .pipe(
         debounceTime(300),
-        switchMap(() => this.publishedEventService.searchEvents(this.buildSearchParams(this.draftFilters(), this.draftCustomFrom(), this.draftCustomTo(), 1, 1))),
+        // Only `total` is ever read (see the subscribe below) — countOnly skips building/
+        // decorating a page of full event records server-side just to report how many exist.
+        switchMap(() => this.publishedEventService.searchEvents({
+          ...this.buildSearchParams(this.draftFilters(), this.draftCustomFrom(), this.draftCustomTo(), 1, 1),
+          countOnly: true,
+        })),
       )
       .subscribe({
         next: (response) => this.draftPreviewCount.set(response.total),

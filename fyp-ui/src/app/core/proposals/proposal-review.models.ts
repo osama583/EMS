@@ -39,6 +39,15 @@ export interface FmbSelection {
   readonly managerComment: string;
 }
 
+// Fields on this interface fall into two groups:
+//   - ALWAYS present: sent by both GET /proposals (list rows) and GET /proposals/{id} (full
+//     detail) — see proposals.py service's project_list_item() vs project().
+//   - OPTIONAL (`?`): sent ONLY by the single-item GET /proposals/{id} detail fetch. The four
+//     list pages (Inbox/Ongoing/History via hub-proposals.ts, Drafts via records-page.ts) only
+//     ever render the always-present fields, so list rows omit the rest — bank details, agenda,
+//     discussions, event image, co-owners, and so on — rather than shipping a full proposal's
+//     worth of data for every row of a paginated table. Do not read an optional field from a
+//     ProposalReviewRecord that came from a list endpoint; fetch GET /proposals/{id} first.
 export interface ProposalReviewRecord {
   readonly id: number;
   readonly proposalId: string;
@@ -46,9 +55,6 @@ export interface ProposalReviewRecord {
   readonly applicant: string;
   readonly applicantInitials: string;
   readonly schedule: string;
-  readonly shortIntroduction: string;
-  readonly goals: string;
-  readonly benefits: string;
   readonly totalPax: number;
   readonly status: string;
   // Server-computed, present only on GET /proposals list responses (not single-item reads):
@@ -58,8 +64,16 @@ export interface ProposalReviewRecord {
   // used to compute both from the full unbucketed list.
   readonly bucket?: 'inbox' | 'ongoing' | 'history' | 'drafts';
   readonly statusLabel?: string;
+  // List rows DO include these two: records-page.ts's Drafts table reads shortIntroduction (the
+  // 'introduction' cell) and category (its filter dropdown + search), same as full detail.
+  readonly shortIntroduction: string;
   readonly category: string;
-  readonly requests: readonly ProposalDepartmentRequest[];
+  readonly applicantEmail: string;
+  readonly workflow: ProposalWorkflowState;
+
+  readonly goals?: string;
+  readonly benefits?: string;
+  readonly requests?: readonly ProposalDepartmentRequest[];
   // Structured (non-flattened) per-requirement rows — mirrors what event-proposal.ts's own
   // requestRows form state holds (date/start/end/withLogo/etc. as individual fields, plus each
   // option-picker field encoded as `${kind}:${option_id}`). `requests` above is a display-only
@@ -68,34 +82,31 @@ export interface ProposalReviewRecord {
 
   // Full submission fields — everything the applicant filled out on the event-proposal form,
   // carried through so the Full Reviewer view (View 1) can render it read-only in its entirety.
-  readonly applicantEmail: string;
-  readonly applicantDepartment: string;
-  readonly coOwners: readonly EditableRow[];
-  readonly organizers: readonly EditableRow[];
-  readonly importantPeople: readonly EditableRow[];
-  readonly guests: readonly EditableRow[];
-  readonly agenda: readonly EditableRow[];
-  readonly discussions: readonly EditableRow[];
-  readonly scheduleRows: readonly EditableRow[];
-  readonly eventImage: EventImageAsset | null;
-  readonly eventVisibility: EventVisibility;
-  readonly eventCategories: readonly string[];
-  readonly eventFormat: string;
-  readonly registrationMode: RegistrationMode;
-  readonly publicity: string;
+  readonly applicantDepartment?: string;
+  readonly coOwners?: readonly EditableRow[];
+  readonly organizers?: readonly EditableRow[];
+  readonly importantPeople?: readonly EditableRow[];
+  readonly guests?: readonly EditableRow[];
+  readonly agenda?: readonly EditableRow[];
+  readonly discussions?: readonly EditableRow[];
+  readonly scheduleRows?: readonly EditableRow[];
+  readonly eventImage?: EventImageAsset | null;
+  readonly eventVisibility?: EventVisibility;
+  readonly eventCategories?: readonly string[];
+  readonly eventFormat?: string;
+  readonly registrationMode?: RegistrationMode;
+  readonly publicity?: string;
   readonly costAmount?: number | null;
   readonly bankAccountName?: string | null;
   readonly bankAccountNumber?: string | null;
-  readonly selectedRequirements: readonly DepartmentRequestKind[];
-  readonly externalPax: number;
+  readonly selectedRequirements?: readonly DepartmentRequestKind[];
+  readonly externalPax?: number;
   // Organizer-set registration capacity; null = uncapped.
   readonly maxPax?: number | null;
   // Server-computed: is this proposal still inside its CANCELLATION_DEADLINE_DAYS window? The
   // backend enforces the same rule on POST /cancel — this only decides whether the button shows.
   readonly cancellationOpen?: boolean;
   readonly fmbSelections?: readonly FmbSelection[];
-
-  readonly workflow: ProposalWorkflowState;
 }
 
 export function departmentsForRole(identity: WorkflowIdentity): readonly ProposalDepartmentKey[] {

@@ -259,6 +259,12 @@ def list_proposals():
 
     Still honours ?status= (raw comma-separated request.status values) and
     ?mine=true for callers that filter that way instead of by bucket.
+
+    ?requester=mine|other|co-owned|acted-on narrows by the caller's relationship to the
+    proposal - the list pages' Requester filter dropdown (hub-proposals.ts). 'mine'/'other'
+    split on applicant_user_id alone; 'co-owned' and 'acted-on' reuse _VISIBLE_SQL's own
+    co_owners/workflow_history predicates so this filter can never claim a relationship
+    that visibility itself would not have granted.
     """
     limit, offset = pagination()
     params = _scope_params()
@@ -285,8 +291,37 @@ def list_proposals():
         clauses.append("r.applicant_user_id = %(user_id)s")
     elif requester == "other":
         clauses.append("r.applicant_user_id <> %(user_id)s")
+    elif requester == "co-owned":
+        # Same co_owners predicate as _VISIBLE_SQL above, restricted to "I am a co-owner,
+        # not the applicant" - the Requester filter's "Co-Owned" option.
+        clauses.append("""
+            r.applicant_user_id <> %(user_id)s AND EXISTS (
+                SELECT 1 FROM co_owners c
+           LEFT JOIN staff s ON s.staff_id = c.staff_id
+               WHERE c.request_id = r.request_id
+                 AND (s.user_id = %(user_id)s OR lower(trim(c.staff_email)) = lower(%(email)s))
+            )
+        """)
+    elif requester == "acted-on":
+        # Same "durable acted-on" predicate as _VISIBLE_SQL's workflow_history clause - the
+        # Requester filter's "Acted On" option, offered only in History (see
+        # hub-proposals.ts's showActedOnOption): proposals a reviewer decided that are not
+        # their own and that they do not co-own.
+        clauses.append("""
+            r.applicant_user_id <> %(user_id)s
+            AND NOT EXISTS (
+                SELECT 1 FROM co_owners c
+           LEFT JOIN staff s ON s.staff_id = c.staff_id
+               WHERE c.request_id = r.request_id
+                 AND (s.user_id = %(user_id)s OR lower(trim(c.staff_email)) = lower(%(email)s))
+            )
+            AND EXISTS (
+                SELECT 1 FROM workflow_history wh
+                 WHERE wh.request_id = r.request_id AND wh.actor_user_id = %(user_id)s
+            )
+        """)
     elif requester is not None:
-        raise BadRequest("requester must be one of: mine, other.")
+        raise BadRequest("requester must be one of: mine, other, co-owned, acted-on.")
 
     query = request.args.get("q", "").strip()
     if query:
@@ -348,7 +383,7 @@ def list_proposals():
         )
         items = []
         for row in rows:
-            item = svc.project(cur, row, include_children=False)
+            item = svc.project_list_item(cur, row)
             item["bucket"] = row["bucket"]
             item["statusLabel"] = row["statusLabel"]
             items.append(item)

@@ -216,7 +216,4 @@ def nav_catalogue() -> list[dict]:
          "/app/admin/settings/categories", "system-config", 1, grants_for(["system-admin"]))
     page("admin-settings-formats", "Event Formats", "grid_view",
          "/app/admin/settings/formats", "system-config", 2, grants_for(["system-admin"]))
-    page("admin-matrix", "Routing Matrix", "account_tree", "/app/admin/matrix",
-         "system-config", 3, grants_for(["system-admin"]))
-
     return pages

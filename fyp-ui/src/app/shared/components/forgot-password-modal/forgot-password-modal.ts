@@ -20,10 +20,10 @@ import { FormModalComponent } from '../form-modal/form-modal';
     >
       @if (!sent()) {
         <div class="forgot-password-form">
-          <p>Enter the email address on your account. We'll send a link to reset your password.</p>
+          <p>We'll send a reset link to the email address on your account.</p>
           <app-form-field
             controlId="forgot-password-email" label="Email" type="email" autocomplete="email"
-            [required]="true" [value]="email()" (valueChange)="email.set($event)"
+            [required]="true" [readOnly]="emailLocked()" [value]="email()" (valueChange)="email.set($event)"
           />
         </div>
       } @else {
@@ -46,11 +46,15 @@ export class ForgotPasswordModalComponent {
   readonly loading = signal(false);
   readonly sent = signal(false);
   readonly resultMessage = signal('');
+  // Locked when opened for the signed-in user (their real, known email); editable
+  // from the login page, where the prefill is just an unverified guess the visitor typed.
+  readonly emailLocked = signal(false);
 
   readonly emailLooksValid = () => /^\S+@\S+\.\S+$/.test(this.email().trim());
 
-  show(prefillEmail = ''): void {
+  show(prefillEmail = '', options: { lockEmail?: boolean } = {}): void {
     this.email.set(prefillEmail);
+    this.emailLocked.set(options.lockEmail ?? false);
     this.loading.set(false);
     this.sent.set(false);
     this.resultMessage.set('');

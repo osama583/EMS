@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { finalize } from 'rxjs';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { catchError, debounceTime, distinctUntilChanged, finalize, of, switchMap } from 'rxjs';
 import { PendingEventRegistration } from '../../../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../../../core/events/published-event.service';
 import { ConfirmDialogComponent } from '../../../../../shared/components/confirm-dialog/confirm-dialog';
@@ -77,12 +77,20 @@ export class HubRegistrationsComponent {
   private readonly toast = inject(ToastService);
 
   readonly registrations = signal<readonly PendingEventRegistration[]>([]);
+  readonly eventOptions = signal<readonly string[]>([]);
+  readonly total = signal(0);
+  readonly totalPages = signal(1);
   readonly loading = signal(true);
   readonly errorMessage = signal('');
   readonly search = signal('');
+  private readonly debouncedSearch = signal('');
   readonly eventFilter = signal('All');
   readonly page = signal(1);
   readonly pageSize = signal(10);
+  // Bumped after an approve/reject so the query pipeline refetches the current page from the
+  // server — with server pagination, splicing the approved/rejected row out of the local array
+  // would desync `total`/`totalPages` from what the server actually holds.
+  private readonly reloadTick = signal(0);
 
   // Approve and reject are both confirmed first: approving admits someone to the event, and
   // rejecting cannot be undone by the applicant afterwards.
@@ -97,26 +105,50 @@ export class HubRegistrationsComponent {
   readonly imageLightboxOpen = signal(false);
   private readonly imageLightbox = viewChild<ElementRef<HTMLElement>>('imageLightbox');
 
-  constructor() { this.load(); }
+  constructor() {
+    toObservable(this.search).pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe((value) => { this.debouncedSearch.set(value); this.page.set(1); });
 
-  private load(): void {
-    this.loading.set(true);
-    this.events.getMyPendingRegistrations().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (rows) => { this.registrations.set(rows); this.loading.set(false); },
-      error: () => { this.errorMessage.set('Pending registrations could not be loaded.'); this.loading.set(false); },
-    });
+    this.events.getPendingApprovalEventOptions().pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((events) => this.eventOptions.set(events));
+
+    toObservable(computed(() => ({
+      q: this.debouncedSearch(),
+      event: this.eventFilter(),
+      page: this.page(),
+      pageSize: this.pageSize(),
+      reload: this.reloadTick(),
+    })))
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        switchMap((query) => {
+          this.loading.set(true);
+          return this.events.getMyPendingRegistrations({
+            q: query.q || undefined,
+            event: query.event === 'All' ? undefined : query.event,
+            page: query.page,
+            pageSize: query.pageSize,
+          }).pipe(
+            // Caught HERE, inside switchMap: an error reaching subscribe()'s error callback ends
+            // the outer subscription permanently, so every later filter/search/page change would
+            // silently stop doing anything.
+            catchError(() => {
+              this.errorMessage.set('Pending registrations could not be loaded.');
+              this.loading.set(false);
+              return of(null);
+            }),
+          );
+        }),
+      )
+      .subscribe((result) => {
+        if (!result) return;
+        this.registrations.set(result.items);
+        this.total.set(result.total);
+        this.totalPages.set(result.totalPages);
+        this.loading.set(false);
+        this.errorMessage.set('');
+      });
   }
-
-  readonly filtered = computed(() => {
-    const query = this.search().trim().toLowerCase();
-    const event = this.eventFilter();
-    return this.registrations().filter((row) =>
-      (event === 'All' || row.eventTitle === event)
-      && (!query || `${row.name} ${row.email} ${row.reason} ${row.eventTitle} ${row.eventCode}`.toLowerCase().includes(query)));
-  });
-  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filtered().length / this.pageSize())));
-  readonly currentPage = computed(() => Math.min(this.page(), this.totalPages()));
-  readonly visible = computed(() => this.filtered().slice((this.currentPage() - 1) * this.pageSize(), this.currentPage() * this.pageSize()));
 
   readonly config = computed<InternalDataPageConfig>(() => ({
     ariaLabel: 'Pending registrations',
@@ -126,7 +158,7 @@ export class HubRegistrationsComponent {
     header: {
       title: 'Events',
       description: 'People asking to attend your events. Approve or reject each request.',
-      countLabel: `${this.filtered().length} pending`,
+      countLabel: `${this.total()} pending`,
     },
     search: { ariaLabel: 'Search registrations', placeholder: 'Name, email, reason, or event' },
     columns: [
@@ -146,15 +178,12 @@ export class HubRegistrationsComponent {
     pageSizeOptions: [5, 10, 25],
   }));
 
-  readonly filters = computed(() => {
-    const events = [...new Set(this.registrations().map((row) => row.eventTitle))];
-    return [{
-      key: 'event', ariaLabel: 'Filter by event', value: this.eventFilter(),
-      options: [{ value: 'All', label: 'All events' }, ...events.map((value) => ({ value, label: value }))],
-    }];
-  });
+  readonly filters = computed(() => [{
+    key: 'event', ariaLabel: 'Filter by event', value: this.eventFilter(),
+    options: [{ value: 'All', label: 'All events' }, ...this.eventOptions().map((value) => ({ value, label: value }))],
+  }]);
 
-  readonly records = computed<readonly InternalDataRecord[]>(() => this.visible().map((row) => ({
+  readonly records = computed<readonly InternalDataRecord[]>(() => this.registrations().map((row) => ({
     id: row.id,
     cells: {
       event: { primary: row.eventTitle, secondary: row.eventCode },
@@ -192,10 +221,10 @@ export class HubRegistrationsComponent {
       : `Are you sure you want to reject ${who}'s registration for ${pending.registration.eventTitle}? This cannot be undone.`;
   });
 
-  setSearch(value: string): void { this.search.set(value); this.page.set(1); }
+  setSearch(value: string): void { this.search.set(value); }
   setFilter(change: InternalFilterChange): void { if (change.key === 'event') this.eventFilter.set(change.value); this.page.set(1); }
-  reset(): void { this.search.set(''); this.eventFilter.set('All'); this.page.set(1); }
-  setPage(value: number): void { this.page.set(value); }
+  reset(): void { this.search.set(''); this.debouncedSearch.set(''); this.eventFilter.set('All'); this.page.set(1); }
+  setPage(value: number): void { this.page.set(Math.max(1, Math.min(value, this.totalPages()))); }
   setPageSize(value: number): void { this.pageSize.set(value); this.page.set(1); }
 
   handleAction(event: InternalRowActionEvent): void {
@@ -237,7 +266,7 @@ export class HubRegistrationsComponent {
       : this.events.rejectRegistration(registration.eventId, registration.id);
     request$.pipe(finalize(() => this.processing.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
-        this.registrations.update((rows) => rows.filter((row) => row.id !== registration.id));
+        this.reloadTick.update((n) => n + 1);
         this.pendingAction.set(null);
         if (action === 'approve') this.toast.success('Registration approved', `${who} is confirmed for ${registration.eventTitle}.`);
         else this.toast.info('Registration rejected', `${who} was not admitted to ${registration.eventTitle}.`);

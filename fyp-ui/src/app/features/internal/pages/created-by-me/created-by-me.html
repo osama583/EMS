@@ -4,6 +4,20 @@
     <span>Events you proposed that have been approved and published. Open one to see who has registered.</span>
   </header>
 
+  <section class="internal-table-workspace__controls created-by-me__controls">
+    <div workspaceControls class="shared-page-controls">
+      <app-internal-search-field
+        workspaceControlWide
+        [config]="{ ariaLabel: 'Search events', placeholder: 'Search event title' }"
+        [value]="search()"
+        (valueChange)="setSearch($event)"
+      />
+      <div workspaceControlRight class="shared-page-controls__right">
+        <app-internal-filter-controls [filters]="filters()" (filterChange)="setFilter($event)" />
+      </div>
+    </div>
+  </section>
+
 @if (loading()) {
   <app-internal-page-state [loading]="true" [showClear]="false" />
 } @else if (error()) {
@@ -35,6 +49,13 @@
       </article>
     }
   </section>
+  @if (totalPages() > 1) {
+    <app-internal-pagination
+      paginationLabel="Event pages" rowsPerPageLabel="Events per page"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="9" [pageSizeOptions]="[9]"
+      (pageChange)="setPage($event)"
+    />
+  }
 }
 
 </section>

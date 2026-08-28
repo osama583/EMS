@@ -2,6 +2,7 @@
 
     GET  /events                       every published event, unfiltered (public)
     GET  /events/search                published events, filtered/paginated (public, see search_events)
+    GET  /events/schools               distinct schools/departments among published events (public)
     GET  /events/{id}                  one published event
     GET  /events/{id}/registrations    organiser-only attendee list
     POST /events/{id}/registrations    register
@@ -10,9 +11,11 @@
     DELETE /events/{id}/registrations/mine   cancel my registration
     POST /events/{id}/registrations/{rid}/decision   approve|reject (organiser)
     GET  /events/me/registrations      my registrations (?scope=active|history)
+    GET  /events/me/registration-history  resolved registrations, mine and decided-by-me (History > Events)
     GET  /events/me/pending-approvals  registrations awaiting my decision
-    GET  /events/me/organized          events I proposed that are now published
+    GET  /events/me/organized          events I proposed that are now published, searched/filtered/paginated (Created by Me)
     GET/PUT /events/me/saved/{id}      save / unsave
+    GET  /events/me/saved/search       my saved events, paginated (My Events > Saved)
     GET/PUT /events/me/reminders       notification preferences
 
 An event is "published" when its proposal reached completed_approved with public
@@ -36,7 +39,7 @@ from ..security import authenticate_optional, require_auth
 from ..security.passwords import hash_password
 from ..security.principal import current_principal
 from ..services import workflow as wf
-from ._helpers import body, required
+from ._helpers import body, paged, pagination, required
 
 bp = Blueprint("events", __name__, url_prefix="/events")
 
@@ -305,7 +308,13 @@ def search_events():
     Every Explore Events filter, the search box, and pagination are handled
     here - see _list_events_filters() for the filter-to-SQL mapping. Query
     params: q, visibility, category, school, format, time, registration, cost,
-    date (repeatable), dateFrom, dateTo, excludeRegistered, page, pageSize.
+    date (repeatable), dateFrom, dateTo, excludeRegistered, countOnly, page, pageSize.
+
+    ?countOnly=1 skips the row fetch and _decorate() entirely (each row needs three extra
+    sub-queries: schedule, categories, audience) and returns `items: []` with only `total`
+    populated - for the filter dialog's live "N events match" preview (explore-events.ts's
+    draftPreviewRequests), which only ever reads response.total and previously paid for a full
+    decorated event (bank details, event image, ...) just to report a count.
     """
     authenticate_optional()
     principal = getattr(g, "principal", None)
@@ -333,17 +342,47 @@ def search_events():
         page_size = 9
     offset = (page - 1) * page_size
 
+    count_only = str(request.args.get("countOnly", "")).lower() in ("1", "true", "yes")
+
     event_select = _event_select(include_internal)
     with transaction() as cur:
         total = fetch_one(cur, f"SELECT count(*) AS n FROM ({event_select}{where}) AS matched", params)["n"]
-        rows = fetch_all(
-            cur,
-            f'{event_select}{where} ORDER BY "firstDate" NULLS LAST, r.request_id DESC LIMIT %s OFFSET %s',
-            [*params, page_size, offset],
-        )
-        items = [_decorate(cur, row) for row in rows]
+        if count_only:
+            items = []
+        else:
+            rows = fetch_all(
+                cur,
+                f'{event_select}{where} ORDER BY "firstDate" NULLS LAST, r.request_id DESC LIMIT %s OFFSET %s',
+                [*params, page_size, offset],
+            )
+            items = [_decorate(cur, row) for row in rows]
 
     return jsonify({"items": items, "total": total, "page": page, "pageSize": page_size})
+
+
+@bp.get("/schools")
+@limiter.limit("120 per minute")
+def list_event_schools():
+    """Explore Events' school-filter facet: every distinct school/department among
+    published events the caller may see, computed here rather than the browser
+    downloading every published event's full payload just to dedupe one column.
+
+    Public, same visibility rule as search_events(): a valid bearer token from an
+    internal (non-guest) user also surfaces schools that only appear on
+    'Internal'-visibility events.
+    """
+    authenticate_optional()
+    principal = getattr(g, "principal", None)
+    include_internal = principal is not None and not principal.is_external
+    rows = query(
+        f"""SELECT DISTINCT r.applicant_department_or_school AS school
+              FROM request r
+             WHERE {_published_clause(include_internal)}
+               AND r.applicant_department_or_school IS NOT NULL
+               AND r.applicant_department_or_school <> ''
+          ORDER BY 1"""
+    )
+    return jsonify([row["school"] for row in rows])
 
 
 @bp.get("/<int:event_id>")
@@ -677,29 +716,83 @@ def my_registrations():
     return jsonify({"items": items, "total": len(items)})
 
 
+_PENDING_APPROVALS_SELECT = """
+    SELECT er.event_registration_id::text AS id, er.request_id::text AS "eventId",
+           r.event_title AS "eventTitle", r.request_code AS "eventCode",
+           er.registrant_name AS name, er.registrant_email AS email,
+           coalesce(er.reason_for_attending, '') AS reason,
+           'pending' AS status,
+           er.payment_proof_url AS "paymentProofUrl",
+           er.payment_proof_file_name AS "paymentProofFileName",
+           er.payment_status AS "paymentStatus",
+           (r.cost_amount IS NOT NULL AND r.cost_amount > 0) AS "paymentRequired",
+           er.registered_at AS "registeredAt"
+      FROM event_registration er
+      JOIN request r ON r.request_id = er.request_id
+"""
+
+
 @bp.get("/me/pending-approvals")
 @require_auth
 def pending_approvals():
-    """Registrations awaiting MY decision, across every event I organise."""
+    """Registrations awaiting MY decision, across every event I organise.
+
+    Searched/filtered/paginated in SQL, same convention as clubs.py's
+    join_requests_inbox() - ?q= searches name/email/reason/event, ?event=
+    narrows to one event title (the Inbox's event dropdown), ?page/?pageSize
+    cap what one response can hand back so an organiser with a very large
+    inbox can't pull it all in one request by mistake.
+    """
+    principal = current_principal()
+    where = ["er.status = 'pending_approval'", "r.applicant_user_id = %s"]
+    params: list = [principal.user_id]
+
+    event_filter = (request.args.get("event") or "").strip()
+    if event_filter:
+        where.append("r.event_title = %s")
+        params.append(event_filter)
+
+    search = (request.args.get("q") or "").strip()
+    if search:
+        where.append(
+            "(er.registrant_name ILIKE %s OR er.registrant_email ILIKE %s "
+            "OR er.reason_for_attending ILIKE %s OR r.event_title ILIKE %s OR r.request_code ILIKE %s)"
+        )
+        params.extend([f"%{search}%"] * 5)
+
+    where_sql = " AND ".join(where)
+    with transaction() as cur:
+        total = fetch_one(
+            cur,
+            f"SELECT count(*) AS c FROM event_registration er JOIN request r ON r.request_id = er.request_id WHERE {where_sql}",
+            params,
+        )["c"]
+        limit, offset = pagination()
+        rows = fetch_all(
+            cur,
+            f"{_PENDING_APPROVALS_SELECT} WHERE {where_sql} ORDER BY er.registered_at LIMIT %s OFFSET %s",
+            [*params, limit, offset],
+        )
+    return jsonify(paged(rows, total))
+
+
+@bp.get("/me/pending-approvals/events")
+@require_auth
+def pending_approval_event_options():
+    """Distinct event titles with at least one pending registration, for the
+    Inbox's event filter dropdown. Its own small, unpaginated query rather
+    than derived from a page of pending_approvals(): the dropdown must list
+    every matching event regardless of which page the caller is viewing."""
     principal = current_principal()
     rows = query(
-        """SELECT er.event_registration_id::text AS id, er.request_id::text AS "eventId",
-                  r.event_title AS "eventTitle", r.request_code AS "eventCode",
-                  er.registrant_name AS name, er.registrant_email AS email,
-                  coalesce(er.reason_for_attending, '') AS reason,
-                  'pending' AS status,
-                  er.payment_proof_url AS "paymentProofUrl",
-                  er.payment_proof_file_name AS "paymentProofFileName",
-                  er.payment_status AS "paymentStatus",
-                  (r.cost_amount IS NOT NULL AND r.cost_amount > 0) AS "paymentRequired",
-                  er.registered_at AS "registeredAt"
+        """SELECT DISTINCT r.event_title AS "eventTitle"
              FROM event_registration er
              JOIN request r ON r.request_id = er.request_id
             WHERE er.status = 'pending_approval' AND r.applicant_user_id = %s
-         ORDER BY er.registered_at""",
+         ORDER BY r.event_title""",
         (principal.user_id,),
     )
-    return jsonify(rows)
+    return jsonify([row["eventTitle"] for row in rows])
 
 
 @bp.get("/me/decided-registrations")
@@ -751,14 +844,148 @@ def decided_registrations():
     return jsonify(rows)
 
 
+# Requester bucket: 'me' when the viewer is the person who registered (their own request,
+# whether or not they also happened to decide it themself as organiser of their own event),
+# 'other' when the viewer decided someone ELSE's request as organiser/co-owner. Computed once
+# here in SQL rather than reconstructed client-side from two separate result sets, which is what
+# hub-history-events.ts used to do after fetching the whole unpaginated history AND the whole
+# unpaginated decided-registrations list.
+_HISTORY_UNION_SQL = """
+    WITH history AS (
+        -- The viewer's OWN registrations that reached a final outcome: confirmed-and-ended, or
+        -- rejected. Mirrors my_registrations()'s scope='history' branch (status <> 'pending',
+        -- and a confirmed one only counts once its event's last date has passed) but selects
+        -- only the columns this page actually renders instead of the full decorated event.
+        SELECT 'me:' || r.request_id::text AS key,
+               'me' AS requester,
+               r.event_title AS "eventTitle",
+               r.request_code AS "eventCode",
+               CASE er.status WHEN 'registered' THEN 'confirmed' ELSE 'rejected' END AS outcome,
+               coalesce(
+                   (SELECT min(s."date")::timestamp FROM event_schedule s WHERE s.request_id = r.request_id),
+                   er.registered_at
+               ) AS "registeredAt",
+               NULL::text AS "registrantName",
+               NULL::text AS "registrantEmail",
+               NULL::text AS reason,
+               NULL::text AS "decidedByName",
+               NULL::text AS "decidedByRole",
+               NULL::boolean AS "decidedByIsViewer"
+          FROM event_registration er
+          JOIN request r ON r.request_id = er.request_id
+         WHERE er.user_id = %(user_id)s
+           AND er.status IN ('registered', 'rejected')
+           AND (
+                 er.status = 'rejected'
+              OR (SELECT max(s."date") FROM event_schedule s WHERE s.request_id = r.request_id) < current_date
+               )
+
+        UNION ALL
+
+        -- Registrations to the viewer's OWN events (owner or co-owner) that the viewer or a
+        -- fellow co-owner has already decided. Skips a row that IS the viewer's own registration
+        -- to their own event - that is the exact same real-world request as its `history` branch
+        -- counterpart above, previously de-duplicated client-side by email+event-id match.
+        SELECT 'decided:' || er.event_registration_id::text AS key,
+               'other' AS requester,
+               r.event_title AS "eventTitle",
+               r.request_code AS "eventCode",
+               CASE er.status WHEN 'registered' THEN 'confirmed' ELSE 'rejected' END AS outcome,
+               er.registered_at AS "registeredAt",
+               er.registrant_name AS "registrantName",
+               er.registrant_email AS "registrantEmail",
+               coalesce(er.reason_for_attending, '') AS reason,
+               decider.full_name AS "decidedByName",
+               CASE WHEN er.decided_by_user_id = r.applicant_user_id THEN 'Owner' ELSE 'Co-owner' END
+                   AS "decidedByRole",
+               (er.decided_by_user_id = %(user_id)s) AS "decidedByIsViewer"
+          FROM event_registration er
+          JOIN request r ON r.request_id = er.request_id
+          LEFT JOIN users decider ON decider.user_id = er.decided_by_user_id
+         WHERE er.status IN ('registered', 'rejected')
+           AND r.registration_approval = 'Manual'
+           AND lower(trim(er.registrant_email)) <> (SELECT lower(trim(email)) FROM users WHERE user_id = %(user_id)s)
+           AND (
+                 r.applicant_user_id = %(user_id)s
+              OR EXISTS (
+                   SELECT 1 FROM co_owners c
+              LEFT JOIN staff s ON s.staff_id = c.staff_id
+                  WHERE c.request_id = r.request_id
+                    AND (
+                          s.user_id = %(user_id)s
+                       OR lower(trim(c.staff_email)) = (SELECT lower(trim(email)) FROM users WHERE user_id = %(user_id)s)
+                        )
+                 )
+               )
+    )
+    SELECT * FROM history
+"""
+
+
+@bp.get("/me/registration-history")
+@require_auth
+def registration_history():
+    """History > Events: every resolved registration decision, server-side
+    searched/filtered/paginated - the merged, re-bucketed replacement for
+    separately fetching me/registrations?scope=history (up to 200 rows) and
+    the entirely unpaginated me/decided-registrations and combining/filtering
+    them client-side (hub-history-events.ts). That endpoint had no limit at
+    all; this one is capped like every other list endpoint.
+
+    ?q filters by event title. ?requester=me|other matches the bucket
+    documented on _HISTORY_UNION_SQL above. ?decidedBy=me|co-owner further
+    narrows 'other' rows by who actually made the decision - meaningless for
+    'me' rows (nobody decided FOR the viewer via this axis), so it implicitly
+    excludes them, matching hub-history-events.ts's own filter predicate.
+    """
+    principal = current_principal()
+    params: dict = {"user_id": principal.user_id}
+    where = ["1 = 1"]
+
+    search = (request.args.get("q") or "").strip()
+    if search:
+        where.append('"eventTitle" ILIKE %(q)s')
+        params["q"] = f"%{search}%"
+
+    requester_filter = (request.args.get("requester") or "").strip()
+    if requester_filter in ("me", "other"):
+        where.append("requester = %(requester)s")
+        params["requester"] = requester_filter
+
+    decided_by_filter = (request.args.get("decidedBy") or "").strip()
+    if decided_by_filter in ("me", "co-owner"):
+        where.append('requester = \'other\' AND "decidedByIsViewer" = %(decided_by_is_viewer)s')
+        params["decided_by_is_viewer"] = decided_by_filter == "me"
+
+    where_sql = " AND ".join(where)
+    with transaction() as cur:
+        total = fetch_one(
+            cur, f"SELECT count(*) AS c FROM ({_HISTORY_UNION_SQL}) u WHERE {where_sql}", params
+        )["c"]
+        limit, offset = pagination()
+        rows = fetch_all(
+            cur,
+            f"""SELECT * FROM ({_HISTORY_UNION_SQL}) u WHERE {where_sql}
+                ORDER BY "registeredAt" DESC LIMIT %(limit)s OFFSET %(offset)s""",
+            {**params, "limit": limit, "offset": offset},
+        )
+    return jsonify(paged(rows, total))
+
+
 @bp.get("/me/organized")
 @require_auth
 def my_organized_events():
     """Events I proposed (or co-own) that reached completed_approved and are
-    published - my own organiser dashboard. Mirrors my_registrations()'s
-    {items, total} envelope, but each item is just the event: there is no
-    per-caller "status" here the way there is for a registration, since the
-    caller organised it rather than registered for it. Ownership matches
+    published - my own organiser dashboard (Created by Me), server-side
+    searched/filtered/paginated - the same predicate created-by-me.ts used to
+    apply in the browser over the ENTIRE unbounded result (this endpoint had
+    no limit at all) now runs in SQL instead, so it cannot hand back every
+    organised event in one response.
+
+    Mirrors my_registrations()'s {items, page, pageSize, total, totalPages}
+    envelope, but each item is just the event: there is no per-caller
+    "status" here the way there is for a registration, since the caller
+    organised it rather than registered for it. Ownership matches
     list_registrations()'s own gate (wf.is_proposal_owner: applicant or
     co-owner) so anyone who can see the attendee list also sees the event
     here.
@@ -769,7 +996,13 @@ def my_organized_events():
     creator/co-owner must still see it on their own organiser dashboard. AND'ing
     the ownership check onto the visibility filter would still require
     event_visibility IN (...) to hold too, which a Private event never
-    satisfies - that was the bug."""
+    satisfies - that was the bug.
+
+    ?q searches the event title. ?status=upcoming|ended splits on the event's
+    LAST scheduled date vs today, the same "ended" rule my_registrations()'s
+    scope=history branch already uses (an event with several sessions has not
+    ended until its final one has passed).
+    """
     principal = current_principal()
     owner_clause = """
         r.applicant_user_id = %(user_id)s
@@ -783,15 +1016,50 @@ def my_organized_events():
                )
         )
     """
+    event_select = _event_select(include_internal=not principal.is_external, owner_clause=owner_clause)
+    where = ["1 = 1"]
+    params: dict = {"user_id": principal.user_id}
+
+    search = (request.args.get("q") or "").strip()
+    if search:
+        where.append('"eventTitle" ILIKE %(q)s')
+        params["q"] = f"%{search}%"
+
+    status = (request.args.get("status") or "").strip().lower()
+    if status in ("upcoming", "ended"):
+        ended_clause = (
+            '(SELECT max(s."date") FROM event_schedule s WHERE s.request_id = id::bigint) < current_date'
+        )
+        where.append(ended_clause if status == "ended" else f"NOT ({ended_clause})")
+
+    where_sql = " AND ".join(where)
+
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except ValueError:
+        page = 1
+    try:
+        page_size = min(60, max(1, int(request.args.get("pageSize", 9))))
+    except ValueError:
+        page_size = 9
+    offset = (page - 1) * page_size
+
     with transaction() as cur:
+        total = fetch_one(
+            cur, f"SELECT count(*) AS n FROM ({event_select}) AS matched WHERE {where_sql}", params
+        )["n"]
         rows = fetch_all(
             cur,
-            f"""{_event_select(include_internal=not principal.is_external, owner_clause=owner_clause)}
-             ORDER BY "firstDate" NULLS LAST, r.request_id DESC""",
-            {"user_id": principal.user_id},
+            f"""SELECT * FROM ({event_select}) AS matched WHERE {where_sql}
+             ORDER BY "firstDate" NULLS LAST, id::bigint DESC LIMIT %(limit)s OFFSET %(offset)s""",
+            {**params, "limit": page_size, "offset": offset},
         )
         items = [_decorate(cur, row) for row in rows]
-    return jsonify({"items": items, "total": len(items)})
+
+    return jsonify({
+        "items": items, "page": page, "pageSize": page_size, "total": total,
+        "totalPages": max(1, -(-total // page_size)),
+    })
 
 
 # --- Saved events and reminders ------------------------------------------
@@ -815,6 +1083,51 @@ def list_saved():
         )
         items = [_decorate(cur, row) for row in rows]
     return jsonify({"items": items, "total": len(items)})
+
+
+@bp.get("/me/saved/search")
+@require_auth
+def search_saved():
+    """Paginated counterpart to list_saved() above, for the /my-events/saved list view -
+    page/pageSize LIMIT/OFFSET and the total count happen in SQL, matching
+    my_registrations()'s own {items, page, pageSize, total, totalPages} shape
+    (SavedEventsResponse) rather than list_saved()'s unpaginated {items, total}, which still
+    backs the app-wide "is this saved" heart-icon state and needs the complete id set.
+    """
+    principal = current_principal()
+    event_select = _event_select(include_internal=not principal.is_external)
+    where = """ AND EXISTS (
+                      SELECT 1 FROM saved_event se
+                       WHERE se.request_id = r.request_id AND se.user_id = %(user_id)s
+                    )"""
+    params = {"user_id": principal.user_id}
+
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except ValueError:
+        page = 1
+    try:
+        page_size = min(60, max(1, int(request.args.get("pageSize", 9))))
+    except ValueError:
+        page_size = 9
+    offset = (page - 1) * page_size
+
+    with transaction() as cur:
+        total = fetch_one(cur, f"SELECT count(*) AS n FROM ({event_select}{where}) AS matched", params)["n"]
+        rows = fetch_all(
+            cur,
+            f"""{event_select}{where}
+             ORDER BY (SELECT saved_at FROM saved_event
+                        WHERE request_id = r.request_id AND user_id = %(user_id)s) DESC
+                LIMIT %(limit)s OFFSET %(offset)s""",
+            {**params, "limit": page_size, "offset": offset},
+        )
+        items = [_decorate(cur, row) for row in rows]
+
+    return jsonify({
+        "items": items, "page": page, "pageSize": page_size, "total": total,
+        "totalPages": max(1, -(-total // page_size)),
+    })
 
 
 @bp.put("/me/saved/<int:event_id>")

@@ -15,7 +15,10 @@ code. See docs/security.md.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
+import secrets
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, jsonify, request
 
@@ -37,6 +40,7 @@ from ..security import (
 )
 from ..security.passwords import MAX_PASSWORD_BYTES
 from ..security.principal import current_principal
+from ..services.email import notifications
 from ..services.identity import project_auth_user
 
 log = logging.getLogger(__name__)
@@ -146,6 +150,133 @@ def me():
     if not user:
         raise Unauthorized("Your account no longer exists.")
     return jsonify(project_auth_user(user))
+
+
+_RESET_TOKEN_TTL_MINUTES = 10
+
+
+def _hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+@bp.post("/password-reset/request")
+@limiter.limit(config.ratelimit_auth)
+def request_password_reset():
+    """Forgot-password step 1. Always returns the same generic message,
+    whether or not the email is registered - a distinguishable response
+    would turn this into an account-enumeration oracle (see login())."""
+    body = _json_body()
+    email = str(body.get("email", "")).strip().lower()
+    generic_message = "If that email address is registered, a reset link has been sent."
+    if not email:
+        raise BadRequest("Email is required.")
+
+    user = query_one(
+        "SELECT user_id, full_name, email FROM users "
+        "WHERE lower(email) = %s AND is_active AND archived_at IS NULL",
+        (email,),
+    )
+    if user:
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=_RESET_TOKEN_TTL_MINUTES)
+        with transaction() as cur:
+            cur.execute("DELETE FROM password_reset_token WHERE user_id = %s", (user["user_id"],))
+            cur.execute(
+                "INSERT INTO password_reset_token (user_id, token_hash, expires_at) VALUES (%s, %s, %s)",
+                (user["user_id"], _hash_reset_token(token), expires_at),
+            )
+        notifications.password_reset_requested(
+            email=user["email"],
+            full_name=user["full_name"],
+            reset_link=f"{config.frontend_url}/reset-password?token={token}",
+            expiry_minutes=_RESET_TOKEN_TTL_MINUTES,
+        )
+        audit("auth.password_reset.requested", actor_user_id=user["user_id"])
+
+    return jsonify({"message": generic_message})
+
+
+@bp.post("/password-reset/confirm")
+@limiter.limit(config.ratelimit_auth)
+def confirm_password_reset():
+    """Forgot-password step 2: the token from the emailed link, plus a new password."""
+    body = _json_body()
+    token = str(body.get("token", "")).strip()
+    password = str(body.get("password", ""))
+    invalid_message = "This reset link could not be used. Please request a new one."
+
+    if not token or not password:
+        raise BadRequest("A token and new password are required.")
+    if len(password) < 8:
+        raise BadRequest("Choose a password of at least 8 characters.")
+    if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise BadRequest(f"Password must be at most {MAX_PASSWORD_BYTES} bytes.")
+
+    row = query_one(
+        "SELECT prt.password_reset_token_id, prt.user_id, prt.expires_at, u.full_name, u.email "
+        "FROM password_reset_token prt JOIN users u ON u.user_id = prt.user_id "
+        "WHERE prt.token_hash = %s",
+        (_hash_reset_token(token),),
+    )
+    if not row or row["expires_at"].replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+        return jsonify({"status": "invalid", "message": invalid_message})
+
+    with transaction() as cur:
+        cur.execute(
+            "UPDATE users SET password = %s WHERE user_id = %s",
+            (hash_password(password), row["user_id"]),
+        )
+        cur.execute(
+            "DELETE FROM password_reset_token WHERE password_reset_token_id = %s",
+            (row["password_reset_token_id"],),
+        )
+
+    notifications.password_reset_completed(
+        email=row["email"], full_name=row["full_name"], support_contact=config.email_from or "support",
+    )
+    audit("auth.password_reset.completed", actor_user_id=row["user_id"])
+    return jsonify({"status": "reset", "message": "Your password has been reset. You can now sign in."})
+
+
+@bp.post("/me/password")
+@require_auth
+@limiter.limit(config.ratelimit_auth)
+def change_own_password():
+    """Profile page's password-change form: current password + new password."""
+    body = _json_body()
+    old_password = str(body.get("oldPassword", ""))
+    new_password = str(body.get("newPassword", ""))
+
+    if not old_password or not new_password:
+        raise BadRequest("Current and new passwords are required.")
+    if len(new_password) < 8:
+        raise BadRequest("Choose a password of at least 8 characters.")
+    if len(new_password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise BadRequest(f"Password must be at most {MAX_PASSWORD_BYTES} bytes.")
+
+    principal = current_principal()
+    user = query_one(
+        "SELECT user_id, full_name, email, password FROM users WHERE user_id = %s",
+        (principal.user_id,),
+    )
+    if not user or not verify_password(old_password, user["password"]):
+        raise BadRequest("Your current password is incorrect.", code="invalid_current_password")
+    if verify_password(new_password, user["password"]):
+        raise BadRequest(
+            "New password must be different from your current password.", code="password_unchanged"
+        )
+
+    with transaction() as cur:
+        cur.execute(
+            "UPDATE users SET password = %s WHERE user_id = %s",
+            (hash_password(new_password), user["user_id"]),
+        )
+
+    notifications.password_reset_completed(
+        email=user["email"], full_name=user["full_name"], support_contact=config.email_from or "support",
+    )
+    audit("auth.password.changed", actor_user_id=user["user_id"])
+    return jsonify({"message": "Your password has been updated."})
 
 
 # This intentionally is not the administration directory.  Proposal authors

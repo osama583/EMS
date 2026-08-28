@@ -22,6 +22,12 @@
               <dd>{{ detail.value }}</dd>
             </div>
           }
+          @for (role of roleDetails(); track role.role + (role.unit ?? '')) {
+            <div class="profile-detail">
+              <dt>Role</dt>
+              <dd>{{ role.unit ? (role.role + ' — ' + role.unit) : role.role }}</dd>
+            </div>
+          }
         </dl>
 
         <section class="profile-password" aria-labelledby="profile-password-title">
@@ -30,10 +36,12 @@
           <form novalidate (submit)="$event.preventDefault(); submitPasswordChange()">
             <div class="profile-password__fields">
               <app-form-field
+                #oldPasswordField
                 controlId="profile-old-password" label="Current password" type="password" autocomplete="current-password"
                 [required]="true" [value]="oldPassword()" [error]="oldPasswordError()" (valueChange)="setOldPassword($event)"
               />
               <app-form-field
+                #newPasswordField
                 controlId="profile-new-password" label="New password" type="password" autocomplete="new-password"
                 [required]="true" [value]="newPassword()" [error]="newPasswordError()" hint="Use at least 8 characters."
                 (valueChange)="setNewPassword($event)"

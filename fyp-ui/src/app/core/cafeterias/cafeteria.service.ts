@@ -2,8 +2,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject, Observable, shareReplay, switchMap, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AssignableCafeteriaUser, Cafeteria, CafeteriaAssignment, CafeteriaAssignmentDraft, CafeteriaDraft, CafeteriaStaffAccountDraft } from './cafeteria.models';
-import { CafeteriaStaffAuditEntry, CafeteriaStaffAuditQuery, Page } from './cafeteria-audit-log.models';
+import { AssignableCafeteriaUser, Cafeteria, CafeteriaAssignment, CafeteriaAssignmentDraft, CafeteriaAssignmentQuery, CafeteriaDraft, CafeteriaName, CafeteriaQuery, CafeteriaStaffAccountDraft, Page } from './cafeteria.models';
+import { CafeteriaStaffAuditEntry, CafeteriaStaffAuditQuery } from './cafeteria-audit-log.models';
 import { Archived } from '../admin-directory/admin-directory.models';
 import { DeletionMetadata, DeletionPreview } from '../../shared/models/deletion.models';
 
@@ -12,6 +12,9 @@ export class CafeteriaService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiBaseUrl}/catalog/cafeterias`;
   private readonly refreshRequests = new BehaviorSubject<void>(undefined);
+  // Public so Manage Cafeterias can re-run its server-side search() after a create/update/
+  // delete/restore, the same way cafeterias$/assignments$ below refresh their own streams.
+  readonly refreshed$ = this.refreshRequests.asObservable();
 
   // Every non-admin cafeteria picker (F&B's read-only Cafeteria Menus viewer) still just calls
   // list() directly, unaffected by the cache below — only Manage Cafeterias/Staff Assignments
@@ -21,6 +24,22 @@ export class CafeteriaService {
   }
 
   readonly cafeterias$ = this.refreshRequests.pipe(switchMap(() => this.list()), shareReplay({ bufferSize: 1, refCount: true }));
+
+  // code/name only — for a "which cafeteria" filter dropdown (Staff Action History), which never
+  // needs `active`/`id` and so should never pay for them over the wire.
+  listNames(): Observable<readonly CafeteriaName[]> {
+    return this.http.get<readonly CafeteriaName[]>(this.baseUrl, { params: new HttpParams().set('namesOnly', 'true') });
+  }
+
+  // Server-side searched/filtered/paginated — GET /catalog/cafeterias with ?page/?pageSize, the
+  // same query params staffAuditLog() below sends. Only Manage Cafeterias uses this; every other
+  // caller of list()/cafeterias$ wants the full small picker list and is unaffected.
+  search(params: CafeteriaQuery): Observable<Page<Cafeteria>> {
+    let httpParams = new HttpParams().set('page', params.page).set('pageSize', params.pageSize);
+    if (params.q) httpParams = httpParams.set('q', params.q);
+    if (params.status) httpParams = httpParams.set('status', params.status);
+    return this.http.get<Page<Cafeteria>>(this.baseUrl, { params: httpParams });
+  }
 
   create(draft: CafeteriaDraft): Observable<Cafeteria> {
     return this.http.post<Cafeteria>(this.baseUrl, { name: draft.name, active: draft.active }).pipe(tap(() => this.refresh()));
@@ -62,6 +81,17 @@ export class CafeteriaService {
   readonly assignments$ = this.refreshRequests.pipe(switchMap(() => this.getAssignments()), shareReplay({ bufferSize: 1, refCount: true }));
   getAssignments(): Observable<readonly CafeteriaAssignment[]> {
     return this.http.get<readonly CafeteriaAssignment[]>(`${this.baseUrl}/assignments`);
+  }
+
+  // Server-side searched/filtered/paginated — GET /catalog/cafeterias/assignments with
+  // ?page/?pageSize, the same query params search()/staffAuditLog() above send. Only Staff
+  // Assignments uses this; every other caller of getAssignments()/assignments$ (the manager
+  // conflict check, other pickers) wants the full role-scoped list and is unaffected.
+  searchAssignments(params: CafeteriaAssignmentQuery): Observable<Page<CafeteriaAssignment>> {
+    let httpParams = new HttpParams().set('page', params.page).set('pageSize', params.pageSize);
+    if (params.q) httpParams = httpParams.set('q', params.q);
+    if (params.role) httpParams = httpParams.set('role', params.role);
+    return this.http.get<Page<CafeteriaAssignment>>(`${this.baseUrl}/assignments`, { params: httpParams });
   }
   getAssignableUsers(): Observable<readonly AssignableCafeteriaUser[]> {
     return this.http.get<readonly AssignableCafeteriaUser[]>(`${this.baseUrl}/assignable-users`);

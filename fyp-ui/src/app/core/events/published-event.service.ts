@@ -2,8 +2,8 @@ import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http'
 import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, map, of, shareReplay } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { EventRegistration, EventSearchParams, EventSearchResponse, PendingEventRegistration, PublishedEvent, RegistrationResult } from './published-event.models';
-import { EventRegistrationApi, RegisteredEventsResponse, SavedEventsResponse } from './event-engagement.models';
+import { EventRegistration, EventSearchParams, EventSearchResponse, PendingEventRegistration, PendingEventRegistrationPage, PublishedEvent, RegistrationResult } from './published-event.models';
+import { EventRegistrationApi, RegisteredEventsResponse, RegistrationHistoryPage, RegistrationHistoryQuery, SavedEventsResponse } from './event-engagement.models';
 
 @Injectable({ providedIn: 'root' })
 export class PublishedEventService implements EventRegistrationApi {
@@ -53,6 +53,7 @@ export class PublishedEventService implements EventRegistrationApi {
     if (params.dateFrom) httpParams = httpParams.set('dateFrom', params.dateFrom);
     if (params.dateTo) httpParams = httpParams.set('dateTo', params.dateTo);
     if (params.excludeRegistered) httpParams = httpParams.set('excludeRegistered', '1');
+    if (params.countOnly) httpParams = httpParams.set('countOnly', '1');
     httpParams = httpParams.set('page', String(params.page ?? 1));
     httpParams = httpParams.set('pageSize', String(params.pageSize ?? 9));
     return this.http.get<EventSearchResponse>(`${this.baseUrl}/search`, { params: httpParams });
@@ -84,9 +85,21 @@ export class PublishedEventService implements EventRegistrationApi {
     return this.http.get<PublishedEvent>(`${this.baseUrl}/${encodeURIComponent(id)}`).pipe(map((event) => event.confirmedRegistrationCount));
   }
   // Every registration awaiting this user's approval, across all of their own events. The actor
-  // is resolved server-side from the bearer token, so no email is sent.
-  getMyPendingRegistrations(): Observable<readonly PendingEventRegistration[]> {
-    return this.http.get<readonly PendingEventRegistration[]>(`${this.baseUrl}/me/pending-approvals`);
+  // is resolved server-side from the bearer token, so no email is sent. Searched/filtered/
+  // paginated server-side (events.py's pending_approvals()) — the Registrations inbox's search
+  // box and event dropdown are real query params, not a client-side filter over the whole set.
+  getMyPendingRegistrations(query: {
+    q?: string; event?: string; page: number; pageSize: number;
+  }): Observable<PendingEventRegistrationPage> {
+    let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
+    if (query.q) params = params.set('q', query.q);
+    if (query.event) params = params.set('event', query.event);
+    return this.http.get<PendingEventRegistrationPage>(`${this.baseUrl}/me/pending-approvals`, { params });
+  }
+  // Distinct event titles with a pending registration, for the Registrations inbox's event
+  // filter dropdown — its own small unpaginated query, independent of which page is shown.
+  getPendingApprovalEventOptions(): Observable<readonly string[]> {
+    return this.http.get<readonly string[]>(`${this.baseUrl}/me/pending-approvals/events`);
   }
   getPendingRegistrations(id: string): Observable<readonly EventRegistration[]> {
     return this.http
@@ -178,9 +191,15 @@ export class PublishedEventService implements EventRegistrationApi {
     return this.http.get<RegisteredEventsResponse>(`${this.baseUrl}/me/registrations`, { params: { scope: 'history', page: String(page), pageSize: String(pageSize) } });
   }
 
-  // Events I proposed (or co-own) that are now published — my own organiser dashboard.
-  getMyOrganizedEvents(): Observable<SavedEventsResponse> {
-    return this.http.get<SavedEventsResponse>(`${this.baseUrl}/me/organized`);
+  // Events I proposed (or co-own) that are now published — my own organiser dashboard (Created
+  // by Me). Server-side searched/filtered/paginated: search/status/page/pageSize are real query
+  // params to events.py's my_organized_events(), which filters, counts, and LIMIT/OFFSETs in
+  // SQL rather than the browser holding and filtering the whole organised-events list.
+  getMyOrganizedEvents(query: { q?: string; status?: 'upcoming' | 'ended'; page: number; pageSize: number }): Observable<SavedEventsResponse> {
+    let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
+    if (query.q) params = params.set('q', query.q);
+    if (query.status) params = params.set('status', query.status);
+    return this.http.get<SavedEventsResponse>(`${this.baseUrl}/me/organized`, { params });
   }
 
   // Full attendee list for one of my events, every status included (not just pending — see
@@ -193,5 +212,18 @@ export class PublishedEventService implements EventRegistrationApi {
   // getMyPendingRegistrations(). Feeds History's "decided by me" direction.
   getDecidedRegistrations(): Observable<readonly PendingEventRegistration[]> {
     return this.http.get<readonly PendingEventRegistration[]>(`${this.baseUrl}/me/decided-registrations`);
+  }
+
+  // History > Events (hub-history-events.ts): server-side searched/filtered/paginated merge of
+  // the two sources above (my own resolved registrations + registrations I decided as
+  // organiser), already re-bucketed into requester 'me'/'other' and de-duplicated - see
+  // events.py's registration_history()/_HISTORY_UNION_SQL for the query this replaces two
+  // unpaginated/lightly-paginated client-side-merged calls with.
+  getRegistrationHistoryPage(query: RegistrationHistoryQuery): Observable<RegistrationHistoryPage> {
+    let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
+    if (query.q) params = params.set('q', query.q);
+    if (query.requester) params = params.set('requester', query.requester);
+    if (query.decidedBy) params = params.set('decidedBy', query.decidedBy);
+    return this.http.get<RegistrationHistoryPage>(`${this.baseUrl}/me/registration-history`, { params });
   }
 }

@@ -58,7 +58,7 @@ _HISTORY_LIMIT = 8
 # (mildly annoying), a false negative costs the whole ask-first flow (the bug being fixed).
 _RECOMMENDATION = re.compile(
     r"\b(recommend|recommendation|suggest|suggestion)\b"
-    r"|\bwhat.{0,25}\b(fits?|suits?|good for|best for)\s+me\b"
+    r"|\b(fits?|suits?|good for|best for)\s+me\b"
     r"|\bwhich.{0,25}\bshould i\b"
     r"|\bwhat should i (join|attend|go to|do)\b"
     r"|\banything (good|interesting|fun|worth)\b"

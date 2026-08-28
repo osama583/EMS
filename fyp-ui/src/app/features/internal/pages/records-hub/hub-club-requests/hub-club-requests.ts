@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { finalize } from 'rxjs';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { catchError, debounceTime, distinctUntilChanged, finalize, of, switchMap } from 'rxjs';
 import { AuthService } from '../../../../../core/auth/auth.service';
 import { ClubService } from '../../../../../core/clubs/club.service';
 import { ClubJoinRequestRecord } from '../../../../../core/clubs/club.models';
@@ -33,28 +33,25 @@ export class HubClubRequestsComponent {
   readonly rejectionCommentMinLength = REJECTION_COMMENT_MIN_LENGTH;
 
   readonly requests = signal<readonly ClubJoinRequestRecord[]>([]);
+  readonly clubOptions = signal<readonly string[]>([]);
+  readonly total = signal(0);
+  readonly totalPages = signal(1);
   readonly loading = signal(true);
   readonly errorMessage = signal('');
   readonly search = signal('');
+  private readonly debouncedSearch = signal('');
   readonly clubFilter = signal('All');
   readonly page = signal(1);
   readonly pageSize = signal(10);
+  // Bumped after an approve/reject so the query pipeline refetches the current page from the
+  // server — with server pagination, splicing the decided request out of the local array would
+  // desync `total`/`totalPages` from what the server actually holds.
+  private readonly reloadTick = signal(0);
 
   readonly processingId = signal<string | null>(null);
   readonly approveTarget = signal<ClubJoinRequestRecord | null>(null);
   readonly rejectTarget = signal<ClubJoinRequestRecord | null>(null);
   readonly rejecting = signal(false);
-
-  readonly filtered = computed(() => {
-    const query = this.search().trim().toLowerCase();
-    const club = this.clubFilter();
-    return this.requests().filter((request) =>
-      (club === 'All' || request.clubName === club)
-      && (!query || `${request.requester.displayName} ${request.requester.email} ${request.clubName} ${request.reason}`.toLowerCase().includes(query)));
-  });
-  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filtered().length / this.pageSize())));
-  readonly currentPage = computed(() => Math.min(this.page(), this.totalPages()));
-  readonly visible = computed(() => this.filtered().slice((this.currentPage() - 1) * this.pageSize(), this.currentPage() * this.pageSize()));
 
   readonly config = computed<InternalDataPageConfig>(() => ({
     ariaLabel: 'Pending club join requests',
@@ -64,7 +61,7 @@ export class HubClubRequestsComponent {
     header: {
       title: 'Clubs',
       description: 'Requests to join your club, awaiting your decision as President.',
-      countLabel: `${this.filtered().length} pending`,
+      countLabel: `${this.total()} pending`,
     },
     search: { ariaLabel: 'Search club requests', placeholder: 'Name, email, club, or reason' },
     columns: [
@@ -83,15 +80,12 @@ export class HubClubRequestsComponent {
     pageSizeOptions: [5, 10, 25],
   }));
 
-  readonly filters = computed(() => {
-    const clubs = [...new Set(this.requests().map((request) => request.clubName))];
-    return [{
-      key: 'club', ariaLabel: 'Filter by club', value: this.clubFilter(),
-      options: [{ value: 'All', label: 'All clubs' }, ...clubs.map((value) => ({ value, label: value }))],
-    }];
-  });
+  readonly filters = computed(() => [{
+    key: 'club', ariaLabel: 'Filter by club', value: this.clubFilter(),
+    options: [{ value: 'All', label: 'All clubs' }, ...this.clubOptions().map((value) => ({ value, label: value }))],
+  }]);
 
-  readonly records = computed<readonly InternalDataRecord[]>(() => this.visible().map((request) => ({
+  readonly records = computed<readonly InternalDataRecord[]>(() => this.requests().map((request) => ({
     id: request.id,
     cells: {
       requester: { primary: request.requester.displayName, secondary: request.requester.email },
@@ -113,21 +107,54 @@ export class HubClubRequestsComponent {
   })));
 
   constructor() {
-    this.load();
+    toObservable(this.search).pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe((value) => { this.debouncedSearch.set(value); this.page.set(1); });
+
+    this.clubService.getInboxClubOptions().pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((clubs) => this.clubOptions.set(clubs));
+
+    toObservable(computed(() => ({
+      q: this.debouncedSearch(),
+      club: this.clubFilter(),
+      page: this.page(),
+      pageSize: this.pageSize(),
+      reload: this.reloadTick(),
+    })))
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        switchMap((query) => {
+          this.loading.set(true);
+          return this.clubService.getInbox({
+            q: query.q || undefined,
+            club: query.club === 'All' ? undefined : query.club,
+            page: query.page,
+            pageSize: query.pageSize,
+          }).pipe(
+            // Caught HERE, inside switchMap: an error reaching subscribe()'s error callback ends
+            // the outer subscription permanently, so every later filter/search/page change would
+            // silently stop doing anything.
+            catchError(() => {
+              this.errorMessage.set('Join requests could not be loaded. Please try again.');
+              this.loading.set(false);
+              return of(null);
+            }),
+          );
+        }),
+      )
+      .subscribe((result) => {
+        if (!result) return;
+        this.requests.set(result.items);
+        this.total.set(result.total);
+        this.totalPages.set(result.totalPages);
+        this.loading.set(false);
+        this.errorMessage.set('');
+      });
   }
 
-  private load(): void {
-    this.loading.set(true);
-    this.clubService.getInbox(this.currentUserId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (requests) => { this.requests.set(requests); this.loading.set(false); },
-      error: () => { this.errorMessage.set('Join requests could not be loaded. Please try again.'); this.loading.set(false); },
-    });
-  }
-
-  setSearch(value: string): void { this.search.set(value); this.page.set(1); }
+  setSearch(value: string): void { this.search.set(value); }
   setFilter(change: InternalFilterChange): void { if (change.key === 'club') this.clubFilter.set(change.value); this.page.set(1); }
-  reset(): void { this.search.set(''); this.clubFilter.set('All'); this.page.set(1); }
-  setPage(value: number): void { this.page.set(value); }
+  reset(): void { this.search.set(''); this.debouncedSearch.set(''); this.clubFilter.set('All'); this.page.set(1); }
+  setPage(value: number): void { this.page.set(Math.max(1, Math.min(value, this.totalPages()))); }
   setPageSize(value: number): void { this.pageSize.set(value); this.page.set(1); }
 
   handleAction(event: InternalRowActionEvent): void {
@@ -150,7 +177,7 @@ export class HubClubRequestsComponent {
     this.processingId.set(request.id);
     this.clubService.approveJoinRequest(request.id, this.currentUserId).pipe(finalize(() => this.processingId.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
-        this.requests.update((items) => items.filter((item) => item.id !== request.id));
+        this.reloadTick.update((n) => n + 1);
         this.approveTarget.set(null);
         this.toast.success('Request approved', `${request.requester.displayName} was approved to join ${request.clubName}.`);
       },
@@ -166,7 +193,7 @@ export class HubClubRequestsComponent {
     this.rejecting.set(true);
     this.clubService.rejectJoinRequest(request.id, this.currentUserId, comment).pipe(finalize(() => this.rejecting.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
-        this.requests.update((items) => items.filter((item) => item.id !== request.id));
+        this.reloadTick.update((n) => n + 1);
         this.rejectTarget.set(null);
         this.toast.info('Request rejected', `${request.requester.displayName}'s request to join ${request.clubName} was rejected.`);
       },

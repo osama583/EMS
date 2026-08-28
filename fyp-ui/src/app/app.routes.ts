@@ -436,11 +436,6 @@ export const routes: Routes = [
         title: 'Event Formats | APU Events',
       },
       {
-        path: 'admin/matrix',
-        loadComponent: () => import('./features/internal/pages/routing-matrix/routing-matrix').then((module) => module.RoutingMatrixComponent),
-        title: 'Routing Matrix | APU Events',
-      },
-      {
         path: 'users',
         loadComponent: () => import('./features/internal/pages/admin-directory/admin-directory').then((module) => module.AdminDirectoryComponent),
         title: 'Users | APU Events',

@@ -132,13 +132,69 @@ def _cafeteria_response(code: str) -> dict:
 @bp.get("")
 @require_auth
 def list_cafeterias():
-    sql = _CAFETERIA_SELECT + " AND archived_at IS NULL"
-    if flag("activeOnly") or flag("active"):
-        sql += " AND is_active"
-    rows = query(sql + " ORDER BY description")
+    """Server-side search/status-filter/pagination, mirroring what the Manage
+    Cafeterias screen used to do client-side over the full unpaginated list
+    (cafeteria-manage.ts's filteredCafeterias/pageSlice) - the query here is
+    that same predicate, just run in the database instead of fetched-then-
+    filtered in the browser, so the endpoint cannot hand back every outlet in
+    one response.
+
+    ?activeOnly/?active still work unpaginated for the plain pickers (F&B's
+    read-only Cafeteria Menus viewer, the proposal form) that just want every
+    live outlet and never called this with ?page - those stay a small, bounded
+    list and get no filtering to preserve their existing contract.
+
+    ?namesOnly=true projects just code/name - for a caller that only needs to
+    populate a "which cafeteria" dropdown (Staff Action History's filter) and
+    has no use for `active`/`id`, so there is no reason to send it.
+    """
+    where = ["archived_at IS NULL"]
+    params: list = []
+
+    active_only = flag("activeOnly") or flag("active")
+    if active_only:
+        where.append("is_active")
+
+    search = (request.args.get("q") or "").strip()
+    if search:
+        where.append("(description ILIKE %s OR code ILIKE %s)")
+        params.extend([f"%{search}%", f"%{search}%"])
+
+    status_filter = (request.args.get("status") or "").strip().lower()
+    if status_filter in ("active", "inactive"):
+        where.append("is_active = %s")
+        params.append(status_filter == "active")
+
+    where_sql = " AND ".join(where)
+
+    if flag("namesOnly"):
+        return jsonify(
+            query(
+                "SELECT code, description AS name FROM unit "
+                f"WHERE code LIKE 'cafeteria!_!_%%' ESCAPE '!' AND {where_sql} ORDER BY description",
+                params,
+            )
+        )
+
+    if "page" not in request.args and "pageSize" not in request.args:
+        rows = query(_CAFETERIA_SELECT + f" AND {where_sql} ORDER BY description", params)
+        for row in rows:
+            row.pop("archived_at", None)
+        return jsonify(rows)
+
+    with transaction() as cur:
+        total = fetch_one(
+            cur, f"SELECT count(*) AS c FROM unit WHERE code LIKE 'cafeteria!_!_%%' ESCAPE '!' AND {where_sql}", params
+        )["c"]
+        limit, offset = pagination()
+        rows = fetch_all(
+            cur,
+            _CAFETERIA_SELECT + f" AND {where_sql} ORDER BY description LIMIT %s OFFSET %s",
+            [*params, limit, offset],
+        )
     for row in rows:
         row.pop("archived_at", None)
-    return jsonify(rows)
+    return jsonify(paged(rows, total))
 
 
 @bp.get("/deleted")
@@ -313,18 +369,20 @@ def purge_cafeteria(code: str):
 
 
 # --- Assignments ----------------------------------------------------------
-_ASSIGNMENT_SELECT = """
-    SELECT uur.user_unit_role_id AS "assignmentId", u.user_id AS "userId",
-           u.full_name AS "displayName", u.email,
-           u.is_active AS "userActive",
-           uur.role_code AS "roleCode", uur.unit_code AS "cafeteriaCode",
-           uur.is_active AS active,
-           un.description AS "cafeteriaName"
-      FROM user_unit_roles uur
-      JOIN users u ON u.user_id = uur.user_id
-      JOIN unit un ON un.code = uur.unit_code
-     WHERE uur.role_code = ANY(%s) AND un.archived_at IS NULL
+_ASSIGNMENT_COLUMNS = """
+    uur.user_unit_role_id AS "assignmentId", u.user_id AS "userId",
+    u.full_name AS "displayName", u.email,
+    u.is_active AS "userActive",
+    uur.role_code AS "roleCode", uur.unit_code AS "cafeteriaCode",
+    uur.is_active AS active,
+    un.description AS "cafeteriaName"
 """
+_ASSIGNMENT_FROM = """
+    FROM user_unit_roles uur
+    JOIN users u ON u.user_id = uur.user_id
+    JOIN unit un ON un.code = uur.unit_code
+"""
+_ASSIGNMENT_SELECT = f"SELECT {_ASSIGNMENT_COLUMNS} {_ASSIGNMENT_FROM} WHERE uur.role_code = ANY(%s) AND un.archived_at IS NULL"
 
 
 def _shape_assignments(rows: list[dict]) -> list[dict]:
@@ -347,21 +405,64 @@ def _assignment_response(assignment_id: int) -> dict:
 @bp.get("/assignments")
 @require_internal
 def list_assignments():
-    """Every cafeteria staffing row.
+    """Cafeteria staffing rows, server-side searched/filtered/paginated -
+    mirroring what Staff Assignments used to do client-side over the full
+    unfiltered list (cafeteria-staff-assignments.ts's filteredAssignments/
+    pageSlice): search by name/email/cafeteria and filter by role, now run in
+    the database instead of fetched-then-filtered in the browser, so the
+    endpoint cannot hand back every staffing row in one response.
 
-    An Admin sees all outlets; a Manager sees only the outlets they run, so the
-    scope comes from their own roles rather than from a query parameter.
+    An Admin sees all outlets; a Manager sees only the outlets they run, so
+    that scope comes from their own roles rather than from a query parameter
+    and is applied before search/role/pagination narrow it further.
+
+    ?page/?pageSize are optional: omitted, the endpoint returns the full
+    (already role-scoped) array as before, for any caller that still wants
+    that - only Staff Assignments sends them.
     """
-    sql = _ASSIGNMENT_SELECT
+    where = ["uur.role_code = ANY(%s)", "un.archived_at IS NULL"]
     params: list = [list(STAFF_ROLES)]
     if not _is_cafeteria_admin():
         managed = _managed_codes()
         if not managed:
             raise Forbidden("You do not manage a cafeteria.")
-        sql += " AND uur.unit_code = ANY(%s)"
+        where.append("uur.unit_code = ANY(%s)")
         params.append(sorted(managed))
-    rows = query(sql + " ORDER BY un.description, u.full_name", params)
-    return jsonify(_shape_assignments(rows))
+
+    search = (request.args.get("q") or "").strip()
+    if search:
+        where.append("(u.full_name ILIKE %s OR u.email ILIKE %s OR un.description ILIKE %s)")
+        params.extend([f"%{search}%"] * 3)
+
+    role_filter = (request.args.get("role") or "").strip()
+    if role_filter:
+        if role_filter not in STAFF_ROLES:
+            raise BadRequest("role must be one of: " + ", ".join(STAFF_ROLES) + ".")
+        where.append("uur.role_code = %s")
+        params.append(role_filter)
+
+    where_sql = " AND ".join(where)
+
+    if "page" not in request.args and "pageSize" not in request.args:
+        rows = query(
+            f"SELECT {_ASSIGNMENT_COLUMNS} {_ASSIGNMENT_FROM} WHERE {where_sql} "
+            "ORDER BY un.description, u.full_name",
+            params,
+        )
+        return jsonify(_shape_assignments(rows))
+
+    with transaction() as cur:
+        total = fetch_one(
+            cur, f"SELECT count(*) AS c {_ASSIGNMENT_FROM} WHERE {where_sql}", params
+        )["c"]
+        limit, offset = pagination()
+        rows = fetch_all(
+            cur,
+            f"SELECT {_ASSIGNMENT_COLUMNS} {_ASSIGNMENT_FROM} WHERE {where_sql} "
+            "ORDER BY un.description, u.full_name LIMIT %s OFFSET %s",
+            [*params, limit, offset],
+        )
+    return jsonify(paged(_shape_assignments(rows), total))
 
 
 @bp.get("/assignable-users")

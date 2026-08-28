@@ -445,7 +445,7 @@
 }
 
 .shared-page-state__loading span {
-  width: min(100%, 64rem);
+  width: 100%;
   height: 3.25rem;
   border-radius: var(--radius-control);
   background: linear-gradient(90deg, #edf1f5 20%, #f8fafc 45%, #edf1f5 70%);
@@ -729,12 +729,15 @@
   }
   /* Count badge and the card/table toggle share the first row; the primary action ("Add
      cafeteria") sits on the row beneath it, still above the table/card content because the whole
-     header precedes the workspace body. It stays auto-width rather than a full-bleed bar. */
+     header precedes the workspace body. It stays auto-width, pushed to the right edge of its own
+     row via margin-left: auto rather than centered/left-aligned with the rest of the wrapped
+     actions. */
   .shared-page-header__actions > app-view-toggle { flex: 1 1 12rem; min-width: 0; }
   .shared-page-header__count { flex: 0 0 auto; padding: 0.42rem 0.7rem; font-size: 0.7rem; }
   .shared-page-header__actions > .table-control--primary {
     flex: 0 0 auto;
     min-height: 2.6rem;
+    margin-left: auto;
   }
   /*
    * Phone control layout.

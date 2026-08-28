@@ -734,6 +734,55 @@ def _department_confirmations(cur, request_id: int) -> list[dict[str, Any]]:
 
 
 # --- Projection -----------------------------------------------------------
+def project_list_item(cur, request: dict) -> dict[str, Any]:
+    """One proposal, shaped for the Inbox/Ongoing/History/Drafts TABLE rows only - every page
+    list_proposals() backs (see api/proposals.py).
+
+    hub-proposals.ts (Inbox/Ongoing/History) renders proposalId/eventTitle/applicant/schedule/
+    totalPax/status as table cells, plus applicantInitials/applicantEmail and workflow.stage/
+    departmentConfirmations for row logic (split-department rows, "is this my own proposal") - see
+    that component's toRecord()/sharedRecords() and proposal-visibility.ts's
+    userIsApplicantForProposal()/departmentsAwaitingApplicant(). records-page.ts (Drafts) renders
+    proposalId/eventTitle/applicant/applicantInitials/schedule/status plus shortIntroduction
+    (the 'introduction' cell) and category (its filter dropdown + search) - it never reads
+    totalPax (hardcoded '—' there) or workflow.
+
+    This is the union of both, still a fraction of the full project() shape: no bank details,
+    agenda, discussions, event image, visibility, registration mode, publicity, requirements,
+    co-owners, organizers, importantPeople, guests, etc. Full detail is only ever needed once the
+    caller opens ONE proposal, via GET /proposals/{id} -> project()."""
+    request_id = request["request_id"]
+    schedule = fetch_all(
+        cur,
+        'SELECT "date", start_time, end_time, location FROM event_schedule '
+        "WHERE request_id = %s ORDER BY event_schedule_id",
+        (request_id,),
+    )
+    categories = fetch_all(
+        cur, "SELECT category_name FROM request_categories WHERE request_id = %s", (request_id,)
+    )
+    initials = "".join(part[0] for part in (request["applicant_name"] or "").split()[:2]).upper()
+    return {
+        "id": request_id,
+        "proposalId": request["request_code"],
+        "eventTitle": request["event_title"],
+        "applicant": request["applicant_name"],
+        "applicantInitials": initials,
+        "applicantEmail": request["applicant_email"],
+        "shortIntroduction": request["short_introduction"],
+        "category": categories[0]["category_name"] if categories else "",
+        "totalPax": request["total_pax"],
+        "status": request["status"],
+        "schedule": "; ".join(
+            f"{r['date']} · {r['start_time']}-{r['end_time']} · {r['location']}" for r in schedule
+        ),
+        "workflow": {
+            "stage": stage_for_client(request["status"]),
+            "departmentConfirmations": _department_confirmations(cur, request_id),
+        },
+    }
+
+
 def project(cur, request: dict, *, include_children: bool = True) -> dict[str, Any]:
     """One proposal, shaped for the client."""
     request_id = request["request_id"]

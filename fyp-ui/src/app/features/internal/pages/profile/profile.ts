@@ -13,16 +13,23 @@ import { ForgotPasswordModalComponent } from '../../../../shared/components/forg
 })
 export class ProfileComponent {
   @ViewChild('forgotPasswordModal') private readonly forgotPasswordModal?: ForgotPasswordModalComponent;
+  @ViewChild('oldPasswordField') private readonly oldPasswordField?: FormFieldComponent;
+  @ViewChild('newPasswordField') private readonly newPasswordField?: FormFieldComponent;
   private readonly auth = inject(AuthService);
   readonly user = this.auth.user;
   readonly details = computed(() => {
     const user = this.user();
     if (!user) return [];
-    return [
-      { label: 'Email', value: user.email },
-      { label: 'Role', value: user.roleLabel },
-      { label: 'Department', value: user.department },
-    ];
+    return [{ label: 'Email', value: user.email }];
+  });
+  // Every (role, unit) pair this account holds, shown as its own tile — someone with more than
+  // one role (e.g. Student in one school AND Staff in another department) previously saw only
+  // roleLabel/department, which is a single-role convenience derived from just the FIRST role
+  // row (see identity.py's project_auth_user) and silently hid every other role they hold.
+  readonly roleDetails = computed(() => {
+    const user = this.user();
+    if (!user || user.roles.length === 0) return [{ role: 'Unassigned', unit: null as string | null }];
+    return user.roles.map((r) => ({ role: r.roleName, unit: r.unitDescription }));
   });
 
   readonly oldPassword = signal('');
@@ -33,11 +40,17 @@ export class ProfileComponent {
   private readonly wrongOldPassword = signal(false);
 
   readonly oldPasswordError = computed(() => this.wrongOldPassword() ? 'Your current password is incorrect.' : '');
-  readonly newPasswordError = computed(() =>
-    this.newPassword() && this.newPassword().length < 8 ? 'Password must contain at least 8 characters.' : '',
-  );
+  readonly newPasswordError = computed(() => {
+    const newPassword = this.newPassword();
+    if (!newPassword) return '';
+    if (newPassword.length < 8) return 'Password must contain at least 8 characters.';
+    if (newPassword === this.oldPassword()) return 'New password must be different from your current password.';
+    return '';
+  });
   readonly passwordFormValid = computed(() =>
-    !!this.oldPassword() && this.newPassword().length >= 8,
+    !!this.oldPassword() &&
+    this.newPassword().length >= 8 &&
+    this.newPassword() !== this.oldPassword(),
   );
 
   setOldPassword(value: string): void {
@@ -71,10 +84,15 @@ export class ProfileComponent {
       this.passwordChangeMessage.set('Your password has been updated. A confirmation has been sent to your email.');
       this.oldPassword.set('');
       this.newPassword.set('');
+      // Clearing the signals empties the fields; without this they'd re-validate
+      // against "required" using their own stale touched/submitted state and
+      // show an error immediately after a successful update.
+      this.oldPasswordField?.resetInteractionState();
+      this.newPasswordField?.resetInteractionState();
     });
   }
 
   openForgotPassword(): void {
-    this.forgotPasswordModal?.show(this.user()?.email ?? '');
+    this.forgotPasswordModal?.show(this.user()?.email ?? '', { lockEmail: true });
   }
 }

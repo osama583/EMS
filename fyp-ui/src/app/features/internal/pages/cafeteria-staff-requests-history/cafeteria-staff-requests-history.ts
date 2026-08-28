@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
-import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { CafeteriaService } from '../../../../core/cafeterias/cafeteria.service';
-import { Cafeteria } from '../../../../core/cafeterias/cafeteria.models';
+import { CafeteriaName } from '../../../../core/cafeterias/cafeteria.models';
 import {
   CafeteriaStaffAuditAction,
   CafeteriaStaffAuditActorRole,
@@ -50,7 +50,7 @@ export class CafeteriaStaffRequestsHistoryComponent {
   // server. cafeteriaCode is set only for a 'cafeteria-manager' role holder (auth.models.ts).
   readonly isCafeteriaAdmin = computed(() => this.auth.user()?.cafeteriaCode === undefined);
 
-  readonly cafeterias = signal<readonly Cafeteria[]>([]);
+  readonly cafeterias = signal<readonly CafeteriaName[]>([]);
   readonly entries = signal<readonly CafeteriaStaffAuditEntry[]>([]);
   readonly total = signal(0);
   readonly totalPages = signal(1);
@@ -144,7 +144,7 @@ export class CafeteriaStaffRequestsHistoryComponent {
     toObservable(this.search).pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe((value) => { this.debouncedSearch.set(value); this.page.set(1); });
 
-    this.service.cafeterias$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((cafeterias) => this.cafeterias.set(cafeterias));
+    this.service.listNames().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((cafeterias) => this.cafeterias.set(cafeterias));
 
     toObservable(computed(() => ({
       q: this.debouncedSearch(),
@@ -168,17 +168,23 @@ export class CafeteriaStaffRequestsHistoryComponent {
             actorRole: query.actorRole === 'all' ? undefined : (query.actorRole as CafeteriaStaffAuditActorRole),
             sort: query.sort.key as CafeteriaStaffAuditSortKey,
             order: query.sort.order,
-          });
+          }).pipe(
+            // Caught HERE, inside switchMap: an error reaching subscribe()'s error callback ends
+            // the outer subscription permanently, so every later filter/sort/page change would
+            // silently stop doing anything.
+            catchError(() => {
+              this.loading.set(false);
+              return of(null);
+            }),
+          );
         }),
       )
-      .subscribe({
-        next: (result) => {
-          this.entries.set(result.items);
-          this.total.set(result.total);
-          this.totalPages.set(result.totalPages);
-          this.loading.set(false);
-        },
-        error: () => this.loading.set(false),
+      .subscribe((result) => {
+        if (!result) return;
+        this.entries.set(result.items);
+        this.total.set(result.total);
+        this.totalPages.set(result.totalPages);
+        this.loading.set(false);
       });
   }
 

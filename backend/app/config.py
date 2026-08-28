@@ -48,6 +48,14 @@ class Config:
     bcrypt_rounds: int = _int("BCRYPT_ROUNDS", 12)
 
     cors_origins: list[str] = field(default_factory=lambda: _csv("CORS_ORIGINS", "http://localhost:4200"))
+    frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:4200").rstrip("/")
+
+    smtp_host: str = os.getenv("SMTP_HOST", "")
+    smtp_port: int = _int("SMTP_PORT", 587)
+    smtp_username: str = os.getenv("SMTP_USERNAME", "")
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
+    email_from: str = os.getenv("EMAIL_FROM", "")
+    email_cc: list[str] = field(default_factory=lambda: _csv("EMAIL_CC", ""))
 
     ratelimit_default: str = os.getenv("RATELIMIT_DEFAULT", "300 per minute")
     ratelimit_auth: str = os.getenv("RATELIMIT_AUTH", "10 per minute")

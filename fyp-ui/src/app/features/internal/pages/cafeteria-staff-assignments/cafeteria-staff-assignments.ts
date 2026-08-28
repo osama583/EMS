@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { combineLatest, finalize } from 'rxjs';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { combineLatest, debounceTime, finalize, switchMap } from 'rxjs';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { CafeteriaService } from '../../../../core/cafeterias/cafeteria.service';
 import { AssignableCafeteriaUser, Cafeteria, CafeteriaAssignment, CafeteriaStaffRoleCode } from '../../../../core/cafeterias/cafeteria.models';
@@ -44,7 +44,12 @@ export class CafeteriaStaffAssignmentsComponent {
   private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
 
+  // Full, unpaginated, role-scoped list — needed as-is for the manager-conflict check below,
+  // which must see every assignment, not just the page currently on screen.
   readonly assignments = signal<readonly CafeteriaAssignment[]>([]);
+  // The current page of the server-side search — what the table actually renders.
+  readonly pageAssignments = signal<readonly CafeteriaAssignment[]>([]);
+  readonly total = signal(0);
   readonly cafeterias = signal<readonly Cafeteria[]>([]);
   readonly assignableUsers = signal<readonly AssignableCafeteriaUser[]>([]);
   readonly loading = signal(true);
@@ -116,21 +121,14 @@ export class CafeteriaStaffAssignmentsComponent {
     ) ?? null;
   });
 
-  readonly filteredAssignments = computed(() => {
-    const search = this.search().trim().toLowerCase();
-    return this.assignments().filter((a) =>
-      (this.roleFilter() === 'all' || a.roleCode === this.roleFilter())
-      && (!search || `${a.displayName} ${a.email} ${a.cafeteriaName}`.toLowerCase().includes(search)),
-    );
-  });
-  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filteredAssignments().length / this.pageSize())));
+  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / this.pageSize())));
   readonly records = computed<readonly InternalDataRecord[]>(() => this.assignmentRecords());
   readonly config = computed<InternalDataPageConfig>(() => ({
     ariaLabel: 'Cafeteria staff assignments', paginationLabel: 'Assignment pages', rowsPerPageLabel: 'Assignments per page', mobileListLabel: 'Assignment cards',
     header: {
       title: 'Staff Assignments',
       description: 'Assign a Cafeteria Manager or Cafeteria Staff member to a specific cafeteria.',
-      countLabel: `${this.filteredAssignments().length} assignment${this.filteredAssignments().length === 1 ? '' : 's'}`,
+      countLabel: `${this.total()} assignment${this.total() === 1 ? '' : 's'}`,
       primaryActionLabel: 'Add assignment',
     },
     search: { ariaLabel: 'Search assignments', placeholder: 'Search name, email, or cafeteria' },
@@ -176,9 +174,32 @@ export class CafeteriaStaffAssignmentsComponent {
     mobile: { eyebrow: 'Deleted', status: `${a.daysRemaining}d left`, title: a.displayName, details: [{ icon: 'schedule', text: `Deleted ${this.formatDate(a.deletedAt)}` }] },
   })));
 
+  // Drives the table: search/role/page/pageSize, refetched from the server on every change or
+  // whenever the service signals a mutation (create/update/remove/restore) via refreshed$ - the
+  // same query params the page used to compute in the browser (filteredAssignments/pageSlice)
+  // are now sent to the server instead.
+  private readonly query$ = toObservable(computed(() => ({
+    page: this.page(), pageSize: this.pageSize(), q: this.search().trim(), role: this.roleFilter(),
+  })));
+
   constructor() {
     combineLatest([this.service.assignments$, this.service.cafeterias$]).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: ([assignments, cafeterias]) => { this.assignments.set(assignments); this.cafeterias.set(cafeterias); this.loading.set(false); },
+      next: ([assignments, cafeterias]) => { this.assignments.set(assignments); this.cafeterias.set(cafeterias); },
+      error: () => this.errorMessage.set('The staff assignments could not be loaded.'),
+    });
+
+    combineLatest([this.query$, this.service.refreshed$]).pipe(
+      debounceTime(200),
+      switchMap(([q]) => {
+        this.loading.set(true);
+        return this.service.searchAssignments({
+          page: q.page, pageSize: q.pageSize, q: q.q || undefined,
+          role: q.role === 'cafeteria-manager' || q.role === 'cafeteria-staff' ? q.role : undefined,
+        });
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (result) => { this.pageAssignments.set(result.items); this.total.set(result.total); this.loading.set(false); },
       error: () => { this.errorMessage.set('The staff assignments could not be loaded.'); this.loading.set(false); },
     });
   }
@@ -263,7 +284,7 @@ export class CafeteriaStaffAssignmentsComponent {
   }
 
   handleAction(event: InternalRowActionEvent): void {
-    const assignment = this.assignments().find((a) => a.assignmentId === event.record.id);
+    const assignment = this.pageAssignments().find((a) => a.assignmentId === event.record.id);
     if (!assignment) return;
     if (event.action.key === 'edit') { this.openEdit(assignment); return; }
     if (event.action.key === 'status') { this.toggleAssignmentActive(assignment); return; }
@@ -371,9 +392,8 @@ export class CafeteriaStaffAssignmentsComponent {
     });
   }
   private clearMessages(): void { this.errorMessage.set(''); }
-  private pageSlice<T>(records: readonly T[]): readonly T[] { return records.slice((this.page() - 1) * this.pageSize(), this.page() * this.pageSize()); }
   private assignmentRecords(): readonly InternalDataRecord[] {
-    return this.pageSlice(this.filteredAssignments()).map((a) => ({
+    return this.pageAssignments().map((a) => ({
       id: a.assignmentId,
       actionKeys: ['edit', 'status', 'remove'],
       cells: {

@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { forkJoin } from 'rxjs';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { debounceTime, switchMap } from 'rxjs';
 import { AuthService } from '../../../../../core/auth/auth.service';
 import { PublishedEventService } from '../../../../../core/events/published-event.service';
+import { RegistrationHistoryRow } from '../../../../../core/events/event-engagement.models';
 import { InternalPageHeaderComponent, InternalResetButtonComponent, InternalSearchFieldComponent, InternalFilterControlsComponent } from '../../../../../shared/components/internal-data-page/internal-data-page-parts';
 import { InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalPageHeaderConfig, InternalRowActionEvent } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
 import { InternalDataPageComponent } from '../../../../../shared/components/internal-data-page/internal-data-page';
@@ -11,8 +12,6 @@ import { FormModalComponent } from '../../../../../shared/components/form-modal/
 import { ViewToggleComponent } from '../../../../../shared/components/view-toggle/view-toggle';
 
 type ViewMode = 'table' | 'card';
-type Requester = 'me' | 'other';
-type Outcome = 'confirmed' | 'rejected';
 // Filter dimension for 'other' rows: who actually clicked approve/reject — the viewer themself
 // (as the event's Owner or a co-owner) or a DIFFERENT co-owner. Independent of `requester`: 'me'
 // rows (the viewer's own registration) never carry this, since nobody decided FOR them via this
@@ -21,36 +20,18 @@ type Outcome = 'confirmed' | 'rejected';
 // party to a decided-by-me/co-owner split.
 type DecidedByFilter = 'all' | 'me' | 'co-owner';
 
-interface RegistrationHistoryEntry {
-  readonly key: string;
-  // Who the registration was for, not who resolved it — 'me' when the viewer is the person who
-  // asked to attend (their own registration), 'other' when the viewer decided someone else's
-  // request as organiser. A viewer who registered for and approved their own event collapses to
-  // one 'me' row instead of two, since it is the same real-world request either way.
-  readonly requester: Requester;
-  readonly eventTitle: string;
-  readonly eventCode: string;
-  readonly outcome: Outcome;
-  readonly registeredAt: string;
-  readonly registrantName?: string;
-  readonly registrantEmail?: string;
-  readonly reason?: string;
-  // Who approved/rejected this decided-by-someone-else row — absent on 'me' rows (the viewer's
-  // own registration, not a decision they made) and on any row from before migration 019.
-  readonly decidedByName?: string;
-  readonly decidedByRole?: 'Owner' | 'Co-owner';
-  // True when the viewer themself made the decision (whether as Owner or as a co-owner) — the
-  // decidedByFilter axis reads this, not decidedByRole, since Owner-vs-Co-owner alone can't tell
-  // "me" apart from "a different co-owner" once decidedByRole says 'Co-owner'.
-  readonly decidedByIsViewer?: boolean;
-}
-
 // History → Events: every resolved event registration decision — events the viewer registered for
 // that reached a final outcome, and registrations to the viewer's own events that the viewer
 // approved/rejected as organiser. Rows are keyed by requester identity (me vs. someone else), not
 // by who took the action, so the same person's request never appears twice. Saved events and
 // confirmed-and-upcoming registrations are NOT here — see /app/events/my-events for those, this
 // tab is only for resolved manual-approval decisions.
+//
+// The merge/re-bucketing/de-duplication this page used to do client-side (fetching up to 200
+// history rows plus the ENTIRE unpaginated decided-registrations list, every request) now happens
+// in one query server-side — see events.py's registration_history()/_HISTORY_UNION_SQL. Search,
+// the requester filter, and the decided-by filter are real query params; only the current page's
+// rows ever reach the browser.
 @Component({
   selector: 'app-hub-history-events',
   imports: [ViewToggleComponent, FeedbackBannerComponent, InternalPageHeaderComponent, InternalDataPageComponent, FormModalComponent, InternalSearchFieldComponent, InternalFilterControlsComponent, InternalResetButtonComponent],
@@ -63,13 +44,16 @@ export class HubHistoryEventsComponent {
   private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly entries = signal<readonly RegistrationHistoryEntry[]>([]);
+  // The current page of results, exactly as the server returned them — no client-side
+  // filtering/slicing left to do.
+  readonly visibleEntries = signal<readonly RegistrationHistoryRow[]>([]);
+  readonly total = signal(0);
   readonly loading = signal(true);
   readonly errorMessage = signal('');
-  readonly detailsTarget = signal<RegistrationHistoryEntry | null>(null);
+  readonly detailsTarget = signal<RegistrationHistoryRow | null>(null);
   readonly viewMode = signal<ViewMode>('card');
   readonly search = signal('');
-  readonly requesterFilter = signal<'all' | Requester>('all');
+  readonly requesterFilter = signal<'all' | 'me' | 'other'>('all');
   readonly decidedByFilter = signal<DecidedByFilter>('all');
   readonly page = signal(1);
   readonly pageSize = signal(10);
@@ -81,23 +65,12 @@ export class HubHistoryEventsComponent {
   // registration, would see an option that always returns zero rows for them.
   readonly showDecidedByFilter = computed(() => this.auth.canAccess('/app/forms/event-proposal'));
 
-  readonly resolvedEntries = computed(() => {
-    const search = this.search().trim().toLowerCase();
-    const requester = this.requesterFilter();
-    const decidedBy = this.showDecidedByFilter() ? this.decidedByFilter() : 'all';
-    return this.entries()
-      .filter((entry) => requester === 'all' || entry.requester === requester)
-      .filter((entry) => decidedBy === 'all' || (entry.requester === 'other' && entry.decidedByIsViewer === (decidedBy === 'me')))
-      .filter((entry) => !search || entry.eventTitle.toLowerCase().includes(search))
-      .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime());
-  });
-  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.resolvedEntries().length / this.pageSize())));
-  readonly visibleEntries = computed(() => this.resolvedEntries().slice((this.page() - 1) * this.pageSize(), this.page() * this.pageSize()));
+  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / this.pageSize())));
 
   readonly headerConfig = computed<InternalPageHeaderConfig>(() => ({
     title: 'Events',
     description: 'Resolved event registrations — the ones you made, and the ones you decided as organiser.',
-    countLabel: `${this.resolvedEntries().length} registration${this.resolvedEntries().length === 1 ? '' : 's'}`,
+    countLabel: `${this.total()} registration${this.total() === 1 ? '' : 's'}`,
   }));
 
   readonly filters = computed<readonly { key: string; ariaLabel: string; value: string; options: readonly { value: string; label: string }[] }[]>(() => [
@@ -145,65 +118,35 @@ export class HubHistoryEventsComponent {
     },
   })));
 
-  requesterLabel(entry: RegistrationHistoryEntry): string {
+  requesterLabel(entry: RegistrationHistoryRow): string {
     const name = entry.requester === 'me'
       ? (this.auth.user()?.displayName || entry.registrantName || entry.registrantEmail || 'You')
       : (entry.registrantName || entry.registrantEmail || 'Someone else');
     return entry.requester === 'me' ? `${name} (You)` : name;
   }
 
-  constructor() {
-    this.load();
-  }
+  // Refetch whenever search/requester/decidedBy/page/pageSize change — the same predicate this
+  // page used to apply in the browser over the full merged set is now sent to the server instead.
+  private readonly query$ = toObservable(computed(() => ({
+    page: this.page(), pageSize: this.pageSize(), q: this.search().trim(),
+    requester: this.requesterFilter(),
+    decidedBy: this.showDecidedByFilter() ? this.decidedByFilter() : 'all',
+  })));
 
-  private load(): void {
-    this.loading.set(true);
-    const viewerEmail = this.auth.user()?.email?.trim().toLowerCase() ?? '';
-    forkJoin({
-      // This page merges history with getDecidedRegistrations() and re-buckets by requester
-      // identity client-side (see the comment on the class above), so it still needs the whole
-      // set in one shot rather than one page - MAX_PAGE_SIZE (_helpers.py) is the server's own
-      // ceiling for "as many as a single request may ask for."
-      history: this.events.getRegistrationHistory(1, 200),
-      decided: this.events.getDecidedRegistrations(),
-    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: ({ history, decided }) => {
-        const registered: RegistrationHistoryEntry[] = history.items
-          .filter((item) => item.status === 'confirmed' || item.status === 'rejected')
-          .map((item) => ({
-            key: `me:${item.event.id}`,
-            requester: 'me' as const,
-            eventTitle: item.event.eventTitle,
-            eventCode: '',
-            outcome: item.status as Outcome,
-            registeredAt: item.event.schedule[0]?.date ?? '',
-          }));
-        const registeredEventIds = new Set(registered.map((entry) => entry.key));
-        // A "decided" row where the registrant IS the viewer (they organised and registered for
-        // their own event) is the same real-world request as its "registered" counterpart above —
-        // skip it here so it doesn't produce a second row for the same person's request.
-        const decidedEntries: RegistrationHistoryEntry[] = decided
-          .filter((item) => (item.email ?? '').trim().toLowerCase() !== viewerEmail || !registeredEventIds.has(`me:${item.eventId}`))
-          .map((item) => {
-            const isViewer = (item.email ?? '').trim().toLowerCase() === viewerEmail;
-            return {
-              key: `decided:${item.id}`,
-              requester: (isViewer ? 'me' : 'other') as Requester,
-              eventTitle: item.eventTitle,
-              eventCode: item.eventCode,
-              outcome: item.status === 'confirmed' ? 'confirmed' as const : 'rejected' as const,
-              registeredAt: item.registeredAt,
-              registrantName: item.name,
-              registrantEmail: item.email,
-              reason: item.reason,
-              decidedByName: item.decidedByName ?? undefined,
-              decidedByRole: item.decidedByRole ?? undefined,
-              decidedByIsViewer: item.decidedByIsViewer ?? undefined,
-            };
-          });
-        this.entries.set([...registered, ...decidedEntries]);
-        this.loading.set(false);
-      },
+  constructor() {
+    this.query$.pipe(
+      debounceTime(200),
+      switchMap((q) => {
+        this.loading.set(true);
+        return this.events.getRegistrationHistoryPage({
+          page: q.page, pageSize: q.pageSize, q: q.q || undefined,
+          requester: q.requester === 'me' || q.requester === 'other' ? q.requester : undefined,
+          decidedBy: q.decidedBy === 'me' || q.decidedBy === 'co-owner' ? q.decidedBy : undefined,
+        });
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (result) => { this.visibleEntries.set(result.items); this.total.set(result.total); this.loading.set(false); },
       error: () => { this.errorMessage.set('Your registration history could not be loaded. Please try again.'); this.loading.set(false); },
     });
   }
@@ -211,7 +154,7 @@ export class HubHistoryEventsComponent {
   setViewMode(mode: ViewMode): void { this.viewMode.set(mode); }
   setSearch(value: string): void { this.search.set(value); this.page.set(1); }
   setFilter(change: InternalFilterChange): void {
-    if (change.key === 'requester') this.requesterFilter.set(change.value as 'all' | Requester);
+    if (change.key === 'requester') this.requesterFilter.set(change.value as 'all' | 'me' | 'other');
     if (change.key === 'decidedBy') this.decidedByFilter.set(change.value as DecidedByFilter);
     this.page.set(1);
   }
@@ -220,11 +163,11 @@ export class HubHistoryEventsComponent {
   setPageSize(size: number): void { this.pageSize.set(size); this.page.set(1); }
 
   handleAction(event: InternalRowActionEvent): void {
-    const entry = this.resolvedEntries().find((item) => item.key === event.record.id);
+    const entry = this.visibleEntries().find((item) => item.key === event.record.id);
     if (entry) this.openDetails(entry);
   }
 
-  openDetails(entry: RegistrationHistoryEntry): void { this.detailsTarget.set(entry); }
+  openDetails(entry: RegistrationHistoryRow): void { this.detailsTarget.set(entry); }
   closeDetails(): void { this.detailsTarget.set(null); }
 
   formatDate(iso: string): string {

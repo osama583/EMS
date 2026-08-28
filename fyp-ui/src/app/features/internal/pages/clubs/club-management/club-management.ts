@@ -4,7 +4,7 @@ import { debounceTime, distinctUntilChanged, finalize, switchMap } from 'rxjs';
 import { AuthService } from '../../../../../core/auth/auth.service';
 import { EVENT_IMAGE_UPLOAD_API } from '../../../../../core/events/event-image-upload.service';
 import { ClubService } from '../../../../../core/clubs/club.service';
-import { ClubCategoryRecord, ClubDraft, ClubMemberRecord, ClubRecord, ClubUserSummary } from '../../../../../core/clubs/club.models';
+import { ClubCategoryName, ClubCategoryRecord, ClubDraft, ClubMemberRecord, ClubRecord, ClubUserSummary } from '../../../../../core/clubs/club.models';
 import { FormFieldComponent } from '../../../../../shared/components/form-controls/form-field';
 import { SelectOption } from '../../../../../shared/components/form-controls/form-controls.models';
 import { FormModalComponent } from '../../../../../shared/components/form-modal/form-modal';
@@ -48,8 +48,18 @@ export class ClubManagementComponent {
   readonly clubs = signal<readonly ClubRecord[]>([]);
   readonly total = signal(0);
   readonly totalPages = signal(1);
+  // Loaded only when the Add/Edit modal actually opens (see openAdd/editClub) — not eagerly on
+  // page load, since most visits to this page never open the form at all, and re-fetched on
+  // every open rather than cached so a student's eligibility can never go stale while the page
+  // sits open in a background tab.
   readonly eligiblePresidents = signal<readonly ClubUserSummary[]>([]);
+  readonly presidentsLoading = signal(false);
   readonly categories = signal<readonly ClubCategoryRecord[]>([]);
+  readonly categoriesLoading = signal(false);
+  // Lean id/name projection for the filter dropdown only (?namesOnly=true) — loaded once eagerly,
+  // since the filter is visible on every page load and unlike the form's `categories` above never
+  // needs `active`/`createdAt`.
+  readonly categoryNames = signal<readonly ClubCategoryName[]>([]);
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly search = signal('');
@@ -131,7 +141,7 @@ export class ClubManagementComponent {
   }));
   readonly filters = computed(() => [
     { key: 'status', ariaLabel: 'Filter clubs by status', value: this.statusFilter(), options: [{ value: 'all', label: 'All statuses' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }] },
-    { key: 'category', ariaLabel: 'Filter clubs by category', value: this.categoryFilter(), options: [{ value: 'all', label: 'All categories' }, ...this.categories().map((category) => ({ value: category.id, label: category.name }))] },
+    { key: 'category', ariaLabel: 'Filter clubs by category', value: this.categoryFilter(), options: [{ value: 'all', label: 'All categories' }, ...this.categoryNames().map((category) => ({ value: category.id, label: category.name }))] },
   ]);
   readonly records = computed<readonly InternalDataRecord[]>(() => this.clubs().map((club) => ({
     id: club.id,
@@ -175,12 +185,11 @@ export class ClubManagementComponent {
   })));
 
   constructor() {
-    // Presidents/categories back the Add/Edit form and filter dropdown — loaded once, not on
-    // every search/filter/sort/page change the way the club list itself is below.
-    this.clubService.getEligiblePresidents().pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((presidents) => this.eligiblePresidents.set(presidents));
-    this.clubService.getCategories().pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((categories) => this.categories.set(categories));
+    // Only the lean filter-dropdown projection loads eagerly — it's visible on every page load.
+    // eligiblePresidents/categories (the full Add/Edit form data) load lazily, only when the
+    // modal actually opens; see openAdd()/editClub().
+    this.clubService.getCategoryNames().pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((categories) => this.categoryNames.set(categories));
 
     toObservable(this.search).pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe((value) => { this.debouncedSearch.set(value); this.page.set(1); });
@@ -245,7 +254,10 @@ export class ClubManagementComponent {
   setPageSize(size: number): void { this.pageSize.set(size); this.page.set(1); }
   setViewMode(mode: ViewMode): void { this.viewMode.set(mode); }
 
-  openAdd(): void { this.editingId.set(null); this.draft.set(this.emptyDraft()); this.imageError.set(''); this.modalOpen.set(true); this.errorMessage.set(''); }
+  openAdd(): void {
+    this.editingId.set(null); this.draft.set(this.emptyDraft()); this.imageError.set(''); this.modalOpen.set(true); this.errorMessage.set('');
+    this.loadFormOptions();
+  }
   editClub(id: string): void {
     const club = this.clubs().find((item) => item.id === id);
     if (!club) return;
@@ -254,6 +266,18 @@ export class ClubManagementComponent {
     this.imageError.set('');
     this.modalOpen.set(true);
     this.errorMessage.set('');
+    this.loadFormOptions();
+  }
+  // Eligible presidents and the full category list (with `active`) are only ever needed while
+  // this form is open, and re-fetched every time it opens rather than cached — a student's
+  // eligibility or a category's active status can change between one open and the next.
+  private loadFormOptions(): void {
+    this.presidentsLoading.set(true);
+    this.clubService.getEligiblePresidents().pipe(finalize(() => this.presidentsLoading.set(false)), takeUntilDestroyed(this.destroyRef))
+      .subscribe((presidents) => this.eligiblePresidents.set(presidents));
+    this.categoriesLoading.set(true);
+    this.clubService.getCategories().pipe(finalize(() => this.categoriesLoading.set(false)), takeUntilDestroyed(this.destroyRef))
+      .subscribe((categories) => this.categories.set(categories));
   }
   handleAction(event: InternalRowActionEvent): void {
     const club = this.clubs().find((item) => item.id === event.record.id);

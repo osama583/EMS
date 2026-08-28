@@ -237,6 +237,19 @@ def _category_response(category_id: int) -> dict:
 @categories_bp.get("")
 @require_auth
 def list_categories():
+    """?namesOnly=true projects just id/name - for a "filter by category"
+    dropdown (Manage Clubs), which never needs `active`/`createdAt` and so
+    should never pay for them over the wire."""
+    if flag("namesOnly"):
+        return jsonify(
+            [
+                {"id": str(row["id"]), "name": row["name"]}
+                for row in query(
+                    "SELECT club_category_id AS id, name FROM club_categories "
+                    "WHERE archived_at IS NULL ORDER BY name"
+                )
+            ]
+        )
     sql = _CATEGORY_SELECT + " WHERE archived_at IS NULL"
     if flag("activeOnly") or flag("active"):
         sql += " AND active"
@@ -767,14 +780,63 @@ def join_requests_inbox():
 
     Scoped by clubs.user_id rather than by a query parameter: the inbox is
     whose it is, so a caller naming someone else's id must not receive theirs.
+
+    Searched/filtered/paginated in SQL, same convention as
+    events.py's pending_approvals() - ?q= searches requester name/email/
+    reason, ?club= narrows to one club name (the Inbox's club dropdown),
+    ?page/?pageSize cap what one response can hand back so a President of
+    several large clubs can't pull the whole queue in one request by mistake.
     """
     principal = current_principal()
+    where = ["c.user_id = %s", "j.status = 'pending'"]
+    params: list = [principal.user_id]
+
+    club_filter = (request.args.get("club") or "").strip()
+    if club_filter:
+        where.append("c.club_name = %s")
+        params.append(club_filter)
+
+    search = (request.args.get("q") or "").strip()
+    if search:
+        where.append("(u.full_name ILIKE %s OR u.email ILIKE %s OR j.reason ILIKE %s)")
+        params.extend([f"%{search}%"] * 3)
+
+    where_sql = " AND ".join(where)
+    with transaction() as cur:
+        total = fetch_one(
+            cur,
+            f"""SELECT count(*) AS c
+                  FROM club_join_requests j
+                  JOIN clubs c ON c.club_id = j.club_id
+                  JOIN users u ON u.user_id = j.requester_user_id
+                 WHERE {where_sql}""",
+            params,
+        )["c"]
+        limit, offset = pagination()
+        rows = fetch_all(
+            cur,
+            f"{_JOIN_REQUEST_SELECT} WHERE {where_sql} ORDER BY j.created_at LIMIT %s OFFSET %s",
+            [*params, limit, offset],
+        )
+    return jsonify(paged(_shape_join_requests(rows), total))
+
+
+@bp.get("/join-requests/inbox/clubs")
+@require_internal
+def join_requests_inbox_club_options():
+    """Distinct club names with at least one pending join request, for the
+    Inbox's club filter dropdown - its own small, unpaginated query so the
+    dropdown lists every matching club regardless of which page is shown."""
+    principal = current_principal()
     rows = query(
-        _JOIN_REQUEST_SELECT + " WHERE c.user_id = %s AND j.status = 'pending' "
-        "ORDER BY j.created_at",
+        """SELECT DISTINCT c.club_name AS "clubName"
+             FROM club_join_requests j
+             JOIN clubs c ON c.club_id = j.club_id
+            WHERE c.user_id = %s AND j.status = 'pending'
+         ORDER BY c.club_name""",
         (principal.user_id,),
     )
-    return jsonify(_shape_join_requests(rows))
+    return jsonify([row["clubName"] for row in rows])
 
 
 @bp.get("/join-requests/decided")
@@ -894,7 +956,13 @@ def eligible_presidents():
 
     Two legitimate callers: a Club Admin picking/reassigning a President when
     creating or editing a club, and a sitting President naming a replacement
-    for a president-change-request. Anyone else is refused."""
+    for a president-change-request. Anyone else is refused.
+
+    Projects only id/displayName/email - every caller only ever builds a
+    dropdown option out of those three (see club-management.ts's
+    presidentOptions and president-change-request-modal.ts's own mapping);
+    there is no per-caller "role" here worth a column (it was always the same
+    hardcoded 'Member' string), so it is not sent."""
     principal = current_principal()
     if not principal.is_admin and not principal.has_role("club-admin"):
         is_a_president = query("SELECT 1 FROM clubs WHERE user_id = %s", (principal.user_id,))
@@ -909,7 +977,6 @@ def eligible_presidents():
     )
     for row in rows:
         row["id"] = str(row["id"])
-        row["role"] = "Member"
     return jsonify(rows)
 
 

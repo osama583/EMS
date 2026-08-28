@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { finalize } from 'rxjs';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { combineLatest, debounceTime, finalize, switchMap } from 'rxjs';
 import { CafeteriaService } from '../../../../core/cafeterias/cafeteria.service';
 import { Cafeteria } from '../../../../core/cafeterias/cafeteria.models';
 import { Archived } from '../../../../core/admin-directory/admin-directory.models';
@@ -43,6 +43,7 @@ export class CafeteriaManageComponent {
 
   readonly tab = signal<CafeteriaManageTab>('active');
   readonly cafeterias = signal<readonly Cafeteria[]>([]);
+  readonly total = signal(0);
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly search = signal('');
@@ -68,21 +69,14 @@ export class CafeteriaManageComponent {
   readonly checkingPurge = signal(false);
   readonly purging = signal(false);
 
-  readonly filteredCafeterias = computed(() => {
-    const search = this.search().trim().toLowerCase();
-    return this.cafeterias().filter((c) =>
-      (this.statusFilter() === 'all' || (this.statusFilter() === 'active') === c.active)
-      && (!search || `${c.name} ${c.code}`.toLowerCase().includes(search)),
-    );
-  });
-  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filteredCafeterias().length / this.pageSize())));
+  readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / this.pageSize())));
   readonly records = computed<readonly InternalDataRecord[]>(() => this.cafeteriaRecords());
   readonly config = computed<InternalDataPageConfig>(() => ({
     ariaLabel: 'Cafeterias', paginationLabel: 'Cafeteria pages', rowsPerPageLabel: 'Cafeterias per page', mobileListLabel: 'Cafeteria cards',
     header: {
       title: 'Manage Cafeterias',
       description: 'Create and manage the cafeterias available for staff assignment and menu oversight.',
-      countLabel: `${this.filteredCafeterias().length} cafeteria${this.filteredCafeterias().length === 1 ? '' : 's'}`,
+      countLabel: `${this.total()} cafeteria${this.total() === 1 ? '' : 's'}`,
       primaryActionLabel: 'Add cafeteria',
     },
     search: { ariaLabel: 'Search cafeterias', placeholder: 'Search cafeteria name' },
@@ -130,9 +124,26 @@ export class CafeteriaManageComponent {
     emptyTitle: 'No deleted cafeterias', emptyDescription: 'Cafeterias you delete will appear here for 7 days before being permanently removed.', pageSizeOptions: [5, 10, 25],
   }));
 
+  // Refetch whenever search/status/page/pageSize change, or the service signals a mutation
+  // (create/update/delete/restore) via refreshed$ — the same query params the Manage screen used
+  // to compute in the browser (search/statusFilter/pageSlice) are now sent to the server instead.
+  private readonly query$ = toObservable(computed(() => ({
+    page: this.page(), pageSize: this.pageSize(), q: this.search().trim(), status: this.statusFilter(),
+  })));
+
   constructor() {
-    this.service.cafeterias$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (cafeterias) => { this.cafeterias.set(cafeterias); this.loading.set(false); },
+    combineLatest([this.query$, this.service.refreshed$]).pipe(
+      debounceTime(200),
+      switchMap(([q]) => {
+        this.loading.set(true);
+        return this.service.search({
+          page: q.page, pageSize: q.pageSize, q: q.q || undefined,
+          status: q.status === 'active' || q.status === 'inactive' ? q.status : undefined,
+        });
+      }),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (result) => { this.cafeterias.set(result.items); this.total.set(result.total); this.loading.set(false); },
       error: () => { this.errorMessage.set('The cafeterias could not be loaded.'); this.loading.set(false); },
     });
   }
@@ -299,9 +310,8 @@ export class CafeteriaManageComponent {
       error: () => this.toast.error('The active status could not be changed'),
     });
   }
-  private pageSlice<T>(records: readonly T[]): readonly T[] { return records.slice((this.page() - 1) * this.pageSize(), this.page() * this.pageSize()); }
   private cafeteriaRecords(): readonly InternalDataRecord[] {
-    return this.pageSlice(this.filteredCafeterias()).map((c) => ({
+    return this.cafeterias().map((c) => ({
       id: c.code,
       cells: {
         identity: { primary: c.name, secondary: c.code },

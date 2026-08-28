@@ -10,6 +10,42 @@ export interface Cafeteria {
 
 export type CafeteriaDraft = { readonly name: string; readonly active: boolean };
 
+// The lean shape for a "which cafeteria" dropdown (Staff Action History's filter) — just what
+// labels an option, never `active`/`id`, which that caller has no use for.
+export interface CafeteriaName {
+  readonly code: string;
+  readonly name: string;
+}
+
+/** The server's paginated envelope — mirrors cafeteria-audit-log.models.ts's Page<T>. */
+export interface Page<T> {
+  readonly items: readonly T[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly totalPages: number;
+}
+
+// Every search/filter/page control on Manage Cafeterias is a real server query param — see
+// GET /catalog/cafeterias in api/cafeterias.py. Nothing here is filtered or paginated
+// client-side any more.
+export interface CafeteriaQuery {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly q?: string;
+  readonly status?: 'active' | 'inactive';
+}
+
+// Every search/filter/page control on Staff Assignments is a real server query param — see
+// GET /catalog/cafeterias/assignments in api/cafeterias.py. Nothing here is filtered or
+// paginated client-side any more.
+export interface CafeteriaAssignmentQuery {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly q?: string;
+  readonly role?: CafeteriaStaffRoleCode;
+}
+
 export type CafeteriaStaffRoleCode = 'cafeteria-manager' | 'cafeteria-staff';
 
 export interface CafeteriaAssignment {

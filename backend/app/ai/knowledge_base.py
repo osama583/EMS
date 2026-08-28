@@ -280,7 +280,6 @@ _ROLE_CAPABILITIES: dict[str, list[tuple[str, str]]] = {
          "cancellation deadline, and maximum event categories", "admin-settings-policies"),
         ("manage event categories", "admin-settings-categories"),
         ("manage event formats", "admin-settings-formats"),
-        ("configure the department routing matrix", "admin-matrix"),
         ("review questions the assistant refused for lack of access (AI Access Log)",
          "admin-ai-access-log"),
     ],
@@ -331,6 +330,14 @@ def self_capability_document(assignments: tuple[tuple[str, str | None], ...]) ->
     Returns a "no capabilities" message when nothing survives the check, rather than a header
     followed by an empty list - a role whose every page has been revoked genuinely has nothing to
     state, and printing the promise without the content reads as though the answer was truncated."""
+    if not assignments:
+        return (
+            "The asker is a GUEST - not signed in, holds no account in this system at all. This is "
+            "the ordinary, expected state for a visitor, not a broken or misconfigured account: say "
+            "plainly that they're not signed in, and never suggest contacting an administrator or "
+            "imply anything is wrong with an account - they don't have one to be wrong. If sign-up/"
+            "sign-in is something you can point them to, do that instead."
+        )
     role_codes = [role_code for role_code, _ in assignments]
     known = [r for r in dict.fromkeys(role_codes) if r in _ROLE_CAPABILITIES]
     granted: list[str] = []

@@ -91,6 +91,15 @@ export interface PendingEventRegistration extends EventRegistration {
   readonly decidedByIsViewer?: boolean;
 }
 
+/** The server's paginated envelope for GET /events/me/pending-approvals. */
+export interface PendingEventRegistrationPage {
+  readonly items: readonly PendingEventRegistration[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly totalPages: number;
+}
+
 // Public events are visible to everyone; Club Only is APU-community-only. In practice this only
 // ever receives 'Public' or 'Club Only' — the endpoints that feed it (GET /events) never return
 // 'Private' or 'Internal' events to begin with (see events.py's list_events()/_EVENT_SELECT).
@@ -116,6 +125,11 @@ export interface EventSearchParams {
   readonly excludeRegistered?: boolean;
   readonly page?: number;
   readonly pageSize?: number;
+  // Skips building/decorating `items` server-side entirely (schedule/categories/audience
+  // sub-queries, event image, bank details, ...) and returns only `total` — for callers that
+  // just want a result count (the filter dialog's live "N events match" preview), not a page of
+  // full event records. See events.py's search_events().
+  readonly countOnly?: boolean;
 }
 
 export interface EventSearchResponse {

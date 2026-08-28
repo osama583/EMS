@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
-import { debounceTime, distinctUntilChanged, finalize, switchMap } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, finalize, of, switchMap } from 'rxjs';
 import { AuthService } from '../../../../../core/auth/auth.service';
 import { hasRole } from '../../../../../core/auth/role-access';
 import { ClubService } from '../../../../../core/clubs/club.service';
@@ -167,22 +167,29 @@ export class HubPresidentChangeRequestsComponent {
             page: query.page,
             pageSize: query.pageSize,
           };
-          if (!query.admin) {
-            return this.bucket === 'ongoing'
-              ? this.clubService.getMyPendingPresidentChangeRequest(options)
-              : this.clubService.getMyDecidedPresidentChangeRequests(options);
-          }
-          return this.bucket === 'inbox' ? this.clubService.getPresidentChangeInbox(options) : this.clubService.getPresidentChangeHistory(options);
+          const request$ = !query.admin
+            ? (this.bucket === 'ongoing'
+                ? this.clubService.getMyPendingPresidentChangeRequest(options)
+                : this.clubService.getMyDecidedPresidentChangeRequests(options))
+            : (this.bucket === 'inbox' ? this.clubService.getPresidentChangeInbox(options) : this.clubService.getPresidentChangeHistory(options));
+          // Caught HERE, inside switchMap: an error reaching subscribe()'s error callback ends
+          // the outer subscription permanently, so every later filter/sort/page change would
+          // silently stop doing anything.
+          return request$.pipe(
+            catchError(() => {
+              this.errorMessage.set('Requests could not be loaded. Please try again.');
+              this.loading.set(false);
+              return of(null);
+            }),
+          );
         }),
       )
-      .subscribe({
-        next: (result) => {
-          this.requests.set(result.items);
-          this.total.set(result.total);
-          this.totalPages.set(result.totalPages);
-          this.loading.set(false);
-        },
-        error: () => { this.errorMessage.set('Requests could not be loaded. Please try again.'); this.loading.set(false); },
+      .subscribe((result) => {
+        if (!result) return;
+        this.requests.set(result.items);
+        this.total.set(result.total);
+        this.totalPages.set(result.totalPages);
+        this.loading.set(false);
       });
   }
 

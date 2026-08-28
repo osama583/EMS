@@ -1,8 +1,11 @@
+// A candidate for club President — GET /clubs/eligible-presidents. id/displayName/email only:
+// every caller (club-management.ts's presidentOptions, president-change-request-modal.ts) only
+// ever builds a dropdown option out of these three, so the server never sends a "role" (it was
+// always the same hardcoded 'Member' string with no per-caller use).
 export interface ClubUserSummary {
   readonly id: string;
   readonly displayName: string;
   readonly email: string;
-  readonly role: string;
 }
 
 export interface ClubCategoryRecord {
@@ -10,6 +13,13 @@ export interface ClubCategoryRecord {
   readonly name: string;
   readonly active: boolean;
   readonly createdAt: string;
+}
+
+// The lean shape for a "filter by category" dropdown (Manage Clubs) — just what labels an
+// option, never `active`/`createdAt`, which that caller has no use for.
+export interface ClubCategoryName {
+  readonly id: string;
+  readonly name: string;
 }
 
 /** The server's paginated envelope — mirrors row-assignment.models.ts's Page<T>. */
@@ -83,6 +93,15 @@ export interface ClubJoinRequestRecord {
   readonly comment: string;
   readonly createdAt: string;
   readonly resolvedAt: string | null;
+}
+
+/** Mirrors ClubPage — the envelope for the server-paginated /clubs/join-requests/inbox list. */
+export interface ClubJoinRequestPage {
+  readonly items: readonly ClubJoinRequestRecord[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly totalPages: number;
 }
 
 export interface ClubMyStatus {

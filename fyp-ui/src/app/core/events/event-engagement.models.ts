@@ -34,6 +34,42 @@ export interface RegisteredEventsResponse {
   readonly totalPages: number;
 }
 
+// GET /events/me/registration-history — the merged, server-side searched/filtered/paginated
+// replacement for fetching registration history (getRegistrationHistory) and every decided
+// registration (getDecidedRegistrations) separately and re-bucketing/filtering them in the
+// browser. `requester`/`decidedByIsViewer` are computed server-side; see events.py's
+// _HISTORY_UNION_SQL for the exact bucketing rule.
+export interface RegistrationHistoryRow {
+  readonly key: string;
+  readonly requester: 'me' | 'other';
+  readonly eventTitle: string;
+  readonly eventCode: string;
+  readonly outcome: 'confirmed' | 'rejected';
+  readonly registeredAt: string;
+  readonly registrantName: string | null;
+  readonly registrantEmail: string | null;
+  readonly reason: string | null;
+  readonly decidedByName: string | null;
+  readonly decidedByRole: 'Owner' | 'Co-owner' | null;
+  readonly decidedByIsViewer: boolean | null;
+}
+
+export interface RegistrationHistoryQuery {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly q?: string;
+  readonly requester?: 'me' | 'other';
+  readonly decidedBy?: 'me' | 'co-owner';
+}
+
+export interface RegistrationHistoryPage {
+  readonly items: readonly RegistrationHistoryRow[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly totalPages: number;
+}
+
 export interface NotificationPreference {
   readonly registrationClosingReminder: boolean;
   readonly eventStartingReminder: boolean;

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
-import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../../../core/auth/auth.service';
 import { hasRole, isHeadOfAnyUnit } from '../../../../../core/auth/role-access';
@@ -110,18 +110,27 @@ export class HubProposalsComponent {
             q: query.q,
             statusLabel: query.statusLabel,
             requester: query.requester === 'All' ? undefined : query.requester,
-          });
+          }).pipe(
+            // Caught HERE, inside switchMap, not in the terminal subscribe's error callback:
+            // an error reaching subscribe()'s error handler ends the whole outer subscription
+            // permanently, so every later filter/sort/page change would silently do nothing —
+            // exactly the "page gets broken, no other API works" symptom one bad filter combo
+            // used to cause.
+            catchError(() => {
+              this.error.set('Proposals could not be loaded.');
+              this.loading.set(false);
+              return of(null);
+            }),
+          );
         }),
       )
-      .subscribe({
-        next: (result) => {
-          this.items.set(result.items);
-          this.total.set(result.total);
-          this.totalPages.set(result.totalPages);
-          this.loading.set(false);
-          this.error.set('');
-        },
-        error: () => { this.error.set('Proposals could not be loaded.'); this.loading.set(false); },
+      .subscribe((result) => {
+        if (!result) return;
+        this.items.set(result.items);
+        this.total.set(result.total);
+        this.totalPages.set(result.totalPages);
+        this.loading.set(false);
+        this.error.set('');
       });
 
     this.service.listStatusLabels(this.bucket).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({

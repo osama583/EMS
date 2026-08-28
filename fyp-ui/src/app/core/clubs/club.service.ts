@@ -1,9 +1,9 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { DeletionMetadata, DeletionPreview } from '../../shared/models/deletion.models';
-import { ClubCategoryPage, ClubCategoryRecord, ClubDraft, ClubJoinRequestRecord, ClubMemberRecord, ClubMyStatus, ClubPage, ClubRecord, ClubSortKey, ClubUserSummary, PresidentChangeRequestPage, PresidentChangeRequestQuery } from './club.models';
+import { ClubCategoryName, ClubCategoryPage, ClubCategoryRecord, ClubDraft, ClubJoinRequestPage, ClubJoinRequestRecord, ClubMemberRecord, ClubMyStatus, ClubPage, ClubRecord, ClubSortKey, ClubUserSummary, PresidentChangeRequestPage, PresidentChangeRequestQuery } from './club.models';
 
 @Injectable({ providedIn: 'root' })
 export class ClubService {
@@ -71,6 +71,11 @@ export class ClubService {
     if (options?.activeOnly) params['activeOnly'] = 'true';
     return this.http.get<readonly ClubCategoryRecord[]>(`${this.baseUrl}/club-categories`, { params });
   }
+  // id/name only — for a "filter by category" dropdown (Manage Clubs), which never needs
+  // `active`/`createdAt` and so should never pay for them over the wire.
+  getCategoryNames(): Observable<readonly ClubCategoryName[]> {
+    return this.http.get<readonly ClubCategoryName[]>(`${this.baseUrl}/club-categories`, { params: { namesOnly: 'true' } });
+  }
   // Server-side search/pagination for the /app/club-category management page — filtering, the
   // active/inactive split, and the page slice all happen in SQL, not in the browser.
   searchCategories(options: { search?: string; includeInactive?: boolean; page: number; pageSize: number }): Observable<ClubCategoryPage> {
@@ -110,8 +115,21 @@ export class ClubService {
   sendJoinRequest(clubId: string, requesterUserId: string, reason: string): Observable<ClubJoinRequestRecord> {
     return this.http.post<ClubJoinRequestRecord>(`${this.baseUrl}/clubs/${encodeURIComponent(clubId)}/join-requests`, { requesterUserId, reason });
   }
-  getInbox(presidentUserId: string): Observable<readonly ClubJoinRequestRecord[]> {
-    return this.http.get<readonly ClubJoinRequestRecord[]>(`${this.baseUrl}/clubs/join-requests/inbox`, { params: { presidentUserId } });
+  // Pending requests for the clubs the caller presides over. Searched/filtered/paginated
+  // server-side (clubs.py's join_requests_inbox()) — the Club Requests inbox's search box and
+  // club dropdown are real query params, not a client-side filter over the whole set. Always
+  // scoped to the caller by the server (see that endpoint's docstring), so no presidentUserId
+  // is sent — one never was read server-side either.
+  getInbox(query: { q?: string; club?: string; page: number; pageSize: number }): Observable<ClubJoinRequestPage> {
+    let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
+    if (query.q) params = params.set('q', query.q);
+    if (query.club) params = params.set('club', query.club);
+    return this.http.get<ClubJoinRequestPage>(`${this.baseUrl}/clubs/join-requests/inbox`, { params });
+  }
+  // Distinct club names with a pending join request, for the inbox's club filter dropdown —
+  // its own small unpaginated query, independent of which page is shown.
+  getInboxClubOptions(): Observable<readonly string[]> {
+    return this.http.get<readonly string[]>(`${this.baseUrl}/clubs/join-requests/inbox/clubs`);
   }
   getMyRequests(requesterUserId: string): Observable<readonly ClubJoinRequestRecord[]> {
     return this.http.get<readonly ClubJoinRequestRecord[]>(`${this.baseUrl}/clubs/join-requests/mine`, { params: { requesterUserId } });

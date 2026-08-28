@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { finalize } from 'rxjs';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { debounceTime, finalize, switchMap } from 'rxjs';
 import { EventRegistration, PublishedEvent } from '../../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../../core/events/published-event.service';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
-import { InternalPageStateComponent } from '../../../../shared/components/internal-data-page/internal-data-page-parts';
+import { InternalFilterControlsComponent, InternalPageStateComponent, InternalPaginationComponent, InternalSearchFieldComponent } from '../../../../shared/components/internal-data-page/internal-data-page-parts';
+import { InternalFilterChange } from '../../../../shared/components/internal-data-page/internal-data-page.models';
 import { EVENT_IMAGE_PLACEHOLDER } from '../../../../shared/event-image-placeholder';
 
 // A registered attendee, or one still awaiting the organiser's decision (manual-approval events).
@@ -12,9 +13,15 @@ import { EVENT_IMAGE_PLACEHOLDER } from '../../../../shared/event-image-placehol
 // they never counted toward capacity and add nothing an organiser needs to act on or report on.
 const VISIBLE_STATUSES: readonly EventRegistration['status'][] = ['confirmed', 'pending', 'rejected'];
 
+const PAGE_SIZE = 9;
+
+// Created by Me: events this organiser proposed (or co-owns) that are published, server-side
+// searched/filtered/paginated — search/status/page/pageSize are real query params to
+// events.py's my_organized_events(), which used to have no filtering or pagination at all and
+// returned the caller's entire organised-events list in one response.
 @Component({
   selector: 'app-created-by-me',
-  imports: [FormModalComponent, InternalPageStateComponent],
+  imports: [FormModalComponent, InternalPageStateComponent, InternalSearchFieldComponent, InternalFilterControlsComponent, InternalPaginationComponent],
   templateUrl: './created-by-me.html',
   styleUrl: './created-by-me.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -27,6 +34,24 @@ export class CreatedByMeComponent {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly items = signal<readonly PublishedEvent[]>([]);
+  readonly total = signal(0);
+  readonly totalPages = signal(1);
+
+  readonly search = signal('');
+  private readonly debouncedSearch = signal('');
+  readonly statusFilter = signal('all');
+  readonly page = signal(1);
+
+  readonly filters = computed(() => [
+    {
+      key: 'status', ariaLabel: 'Filter by status', value: this.statusFilter(),
+      options: [
+        { value: 'all', label: 'All statuses' },
+        { value: 'upcoming', label: 'Upcoming' },
+        { value: 'ended', label: 'Ended' },
+      ],
+    },
+  ]);
 
   readonly infoTarget = signal<PublishedEvent | null>(null);
   readonly registrations = signal<readonly EventRegistration[]>([]);
@@ -41,17 +66,39 @@ export class CreatedByMeComponent {
   readonly rejectedCount = computed(() => this.visibleRegistrations().filter((row) => row.status === 'rejected').length);
 
   constructor() {
-    this.load();
+    toObservable(this.search).pipe(debounceTime(300), takeUntilDestroyed(this.destroyRef))
+      .subscribe((value) => { this.debouncedSearch.set(value); this.page.set(1); });
+
+    toObservable(computed(() => ({ q: this.debouncedSearch(), status: this.statusFilter(), page: this.page() })))
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        switchMap((query) => {
+          this.loading.set(true);
+          this.error.set('');
+          return this.events.getMyOrganizedEvents({
+            q: query.q || undefined,
+            status: query.status === 'upcoming' || query.status === 'ended' ? query.status : undefined,
+            page: query.page,
+            pageSize: PAGE_SIZE,
+          }).pipe(finalize(() => this.loading.set(false)));
+        }),
+      )
+      .subscribe({
+        next: (response) => {
+          this.items.set(response.items);
+          this.total.set(response.total);
+          this.totalPages.set(response.totalPages);
+        },
+        error: () => this.error.set('Your events could not be loaded.'),
+      });
   }
 
-  private load(): void {
-    this.loading.set(true);
-    this.error.set('');
-    this.events.getMyOrganizedEvents().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (response) => { this.items.set(response.items); this.loading.set(false); },
-      error: () => { this.error.set('Your events could not be loaded.'); this.loading.set(false); },
-    });
+  setSearch(value: string): void { this.search.set(value); }
+  setFilter(change: InternalFilterChange): void {
+    if (change.key === 'status') this.statusFilter.set(change.value);
+    this.page.set(1);
   }
+  setPage(page: number): void { this.page.set(Math.max(1, Math.min(page, this.totalPages()))); }
 
   openInfo(event: PublishedEvent): void {
     this.infoTarget.set(event);
