@@ -1,50 +1,50 @@
-# Graph Report - FYP - UI  (2026-08-27)
+# Graph Report - Osama  (2026-08-28)
 
 ## Corpus Check
-- 360 files · ~742,823 words
+- 429 files · ~815,523 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 5082 nodes · 12302 edges · 221 communities (171 shown, 50 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 190 edges (avg confidence: 0.77)
+- 6005 nodes · 14739 edges · 251 communities (200 shown, 51 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 224 edges (avg confidence: 0.71)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c55cfd47`
+- Built from commit: `8c59cbbd`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- admin.py
-- FormModalComponent
-- AuthService
-- events.py
-- ask
+- fetch_one
 - apiErrorMessage
-- clubs.py
-- BadRequest
-- WorkflowError
+- DepartmentSpec
+- require_auth
+- ai.py
+- InternalRowActionEvent
+- query
+- db.py
+- workflow/tasks.py
 - event-proposal.ts
 - ClubService
 - transaction
 - ProposalReviewRecord
-- require_internal
+- cafeterias.py
 - AdminDirectoryComponent
 - shared-library.ts
 - test_workflow_e2e.py
-- options.py
-- CafeteriaService
+- BadRequest
+- test_ai_scope.py
 - EventProposalComponent
 - services/proposals.py
-- query
+- dashboard/__init__.py
 - EventCatalogSectionComponent
 - ApiAdminDirectoryRepository
-- db.py
+- stages.py
 - fyp-ui
 - DepartmentRequestKind
 - dependencies
-- app/__init__.py
-- cafeteria_retrieval.py
+- create_app
+- widget
 - notifications.py
 - AdminDirectoryService
 - ProposalDepartmentViewComponent
@@ -56,39 +56,39 @@
 - EventCalendarComponent
 - ClubManagementComponent
 - PageVisibilityComponent
-- environment.ts
+- auth.test-fixtures.ts
 - CafeteriaManageComponent
 - CafeteriaStaffAssignmentsComponent
-- identity.py
-- fetch_all
+- num
+- api/proposals.py
 - HappeningSoonComponent
 - SiteHeaderComponent
 - seed/run.py
 - test_api_e2e.py
-- seed_events.py
-- sync.py
+- school.py
+- schema_catalog.py
 - HeroComponent
-- fetch_one
-- logging_setup.py
+- soft_delete.py
+- migrations/run.py
 - ExploreEventsComponent
 - ai-assistant.ts
 - LoginComponent
 - EditableTableColumn
 - HubRequestsComponent
-- TokenStore
+- fetch_all
 - CafeteriaMyStaffComponent
 - StaffTasksComponent
 - DeletionPreview
 - Implementation Prompt: Unit + Level RBAC Migration
 - InternalLayoutComponent
 - CafeteriaStaffTasksComponent
-- hub-proposals.ts
+- proposal-visibility.ts
 - AiAssistantComponent
 - HubMyClubsComponent
-- request-option.repository.ts
+- request-option.service.ts
 - staff-task.repository.ts
-- ForgotPasswordModalComponent
-- proposal_retrieval.py
+- components/explore-events/explore-events.ts
+- test_dashboard.py
 - 4. Analytics & visualisation
 - 4. Analytics & visualisation
 - 4. Analytics & visualisation
@@ -98,9 +98,9 @@
 - 4. Analytics & visualisation
 - 4. Analytics & visualisation
 - 4. Analytics & visualisation
-- event-image-upload.service.ts
+- sla.py
 - HowItWorksComponent
-- landing-page.ts
+- ProposalWorkflowService
 - Head of Department — A/V Services
 - Proposal list pages: server-side bucketing, pagination, sorting
 - 4. Angular Frontend Changes
@@ -108,7 +108,7 @@
 - DepartmentResubmitComponent
 - GuestRegistrationModalComponent
 - Dashboard architecture
-- api/__init__.py
+- uploads.py
 - 2. Query-parameter contract
 - HubPresidentChangeRequestsComponent
 - HubClubRequestsComponent
@@ -118,37 +118,37 @@
 - SearchableDropdownComponent
 - Wireframes, responsive behaviour, and mobile
 - RBAC Redesign: Users / Units / Roles / Page Visibility
-- auth.interceptor.ts
-- event-catalog.service.ts
+- AuthService
+- workflow/fmb.py
 - StepIndicatorComponent
-- query_router.py
+- _suppress_incidental_how_to_topics
 - MyEventsTabComponent
-- components/explore-events/explore-events.ts
+- PublishedEventService
 - 4. The rules
 - Implementation roadmap
-- InternalPaginationComponent
+- dashboard_preview.py
 - proposal-review.mock-data.ts
 - test_catalog_routes.py
 - test_role_capabilities.py
-- AdminRoleRecord
+- VizChartBase
 - HubHistoryClubsComponent
 - HubHistoryEventsComponent
 - EventDetailsModalComponent
-- config.py
+- test_dev_users.py
 - AiConversationStore
 - auth.service.ts
 - request-option.models.ts
 - EditableRow
-- purge-sweep.service.ts
-- EventCatalogRepositoryImpl
+- environment.ts
+- chart-panel.ts
 - .playGesture
-- event-calendar.ts
+- ExpandableSearchComponent
 - 1. Proposal / Event-Approval Workflow
 - 1. Proposal / Event-Approval Workflow
 - ToastService
 - CafeteriaMenuOversightComponent
 - .navigateToTableError
-- gemini.py
+- build
 - ClubDiscoverComponent
 - Database
 - The Proposal Workflow
@@ -158,17 +158,18 @@
 - Login Demo-User Picker Implementation Plan
 - payment-proof-upload.service.ts
 - AiAccessLogComponent
+- dashboard.models.ts
 - subject_scope.py
-- internal-placeholder.ts
+- viz.ts
 - APU EMS — Flask API
 - Role hierarchy, data access, and access-control rules
 - Family F — Cost & finance (M50–M58)
 - Family H — Risk & anomaly (M70–M78)
 - Email Notification Map
 - Global Constraints
-- EventCatalogEntry
-- system-config.service.ts
-- EventCatalogRepository
+- quality.py
+- policies-tab.ts
+- DashboardComponent
 - admin-directory.models.ts
 - TaskCalendarComponent
 - Security
@@ -187,13 +188,13 @@
 - Decisions worth explaining
 - `/app/dashboard` — Role-Based Analytics Design
 - .grantSummaryItems
-- errors.py
-- RequestOptionKind
+- _FakePrincipal
+- department-request-columns.ts
 - 3. Clubs
-- staff-tasks.ts
-- cafeteria.service.ts
-- hero.ts
-- AdminUserAssignment
+- cafeteria-staff-tasks.ts
+- CafeteriaService
+- demand.py
+- build_scope
 - NavEntryType
 - AiOrbAwarenessService
 - 4. Published Events
@@ -201,37 +202,64 @@
 - club-hub.ts
 - APU Event Management System
 - API Documentation
-- ImageUploadFieldComponent
+- recommendation.py
 - .clearMessages
 - .handleDeletedAction
 - ai-assistant-page.ts
-- PopoverComponent
+- authorization.py
 - Metric catalog — the semantic layer
 - CLAUDE.md
 - derivePageCode
 - environment.production.ts
-- happening-soon.spec.ts
-- topic_access.py
-- .onIconFile
-- DeadlineReminderService
+- sql_guard.py
+- topic_allowed
+- DashboardConfig
+- .closePanel
 - department-workflow.config.ts
-- OptionPickerItem
+- recipients.py
+- charts.spec.ts
+- TimelineChartComponent
+- ClubRosterModalComponent
+- HubProposalsComponent
+- logging_setup.py
+- 2. Per-question analysis
+- DashboardService
+- Principal
+- cards.py
+- HeatmapComponent
+- nav.py
+- _log_refusals
+- history.py
+- constants.py
+- funnel.ts
+- generate_openapi.py
+- harness.py
+- _preview
+- AdminUserRecord
+- meter.ts
+- BarChartComponent
+- Dependency
+- ProposalReviewPageComponent
+- ClubCategoryPickerComponent
+- PresidentChangeRequestModalComponent
+- Config
+- .onEscape
+- cleanup
+- AI assistant - defect registry
 
 ## God Nodes (most connected - your core abstractions)
-1. `transaction()` - 172 edges
-2. `fetch_one()` - 154 edges
-3. `current_principal()` - 152 edges
-4. `cur()` - 147 edges
+1. `fetch_one()` - 218 edges
+2. `transaction()` - 157 edges
+3. `fetch_all()` - 155 edges
+4. `current_principal()` - 147 edges
 5. `EventProposalComponent` - 144 edges
-6. `query()` - 140 edges
-7. `NotFound` - 108 edges
-8. `require_internal()` - 104 edges
-9. `ask()` - 91 edges
+6. `cur()` - 131 edges
+7. `NotFound` - 105 edges
+8. `query()` - 104 edges
+9. `require_internal()` - 101 edges
 10. `apiErrorMessage()` - 86 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `own_event_registrants()` --indirect_call--> `cur()`  [INFERRED]
-  backend/app/ai/retrieval.py → backend/tests/test_workflow_e2e.py
 - `create_user()` --indirect_call--> `cur()`  [INFERRED]
   backend/app/api/admin.py → backend/tests/test_workflow_e2e.py
 - `_apply_user_update()` --indirect_call--> `cur()`  [INFERRED]
@@ -240,126 +268,132 @@
   backend/app/api/admin.py → backend/tests/test_workflow_e2e.py
 - `delete_user()` --indirect_call--> `cur()`  [INFERRED]
   backend/app/api/admin.py → backend/tests/test_workflow_e2e.py
+- `purge_user()` --indirect_call--> `cur()`  [INFERRED]
+  backend/app/api/admin.py → backend/tests/test_workflow_e2e.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (221 total, 50 thin omitted)
+## Communities (251 total, 51 thin omitted)
 
-### Community 0 - "admin.py"
+### Community 0 - "fetch_one"
 Cohesion: 0.06
-Nodes (95): add_grant(), _apply_nav_page_update(), _apply_role_update(), _apply_unit_update(), _apply_user_update(), _assert_email_free(), _assert_grant_is_legal(), create_assignment() (+87 more)
+Nodes (110): add_grant(), _apply_nav_page_update(), _apply_role_update(), _apply_unit_update(), _apply_user_update(), _assert_email_free(), _assert_grant_is_legal(), create_nav_page() (+102 more)
 
-### Community 1 - "FormModalComponent"
-Cohesion: 0.23
-Nodes (3): FormModalComponent, Component, HostListener
-
-### Community 2 - "AuthService"
-Cohesion: 0.15
-Nodes (5): AuthService, Injectable, LogoutComponent, Component, Stage
-
-### Community 3 - "events.py"
-Cohesion: 0.08
-Nodes (55): calendar_events(), cancel_registration(), decided_registrations(), _decorate(), _event_select(), get_event(), get_reminders(), _guest_user_id() (+47 more)
-
-### Community 4 - "ask"
-Cohesion: 0.08
-Nodes (42): ai_denials_document(), person_lookup_document(), Every role that actually exists in the `role` table - the live data behind…, Every operational unit/department - the live data behind /app/units, a System-…, CONTEXT block for an admin_settings question naming ONE specific person by…, Has the AI ASSISTANT ITSELF refused to answer any question, and why - the live…, roles_document(), units_document() (+34 more)
-
-### Community 5 - "apiErrorMessage"
-Cohesion: 0.07
-Nodes (83): dropdownSettingRoutes, PresidentChangeRequestSortKey, AdminEntity, AdminTab, AssignmentRow, UserAssignmentGroup, CafeteriaManageTab, ROLE_CODE (+75 more)
-
-### Community 6 - "clubs.py"
+### Community 1 - "apiErrorMessage"
 Cohesion: 0.06
-Nodes (68): reindex_club_async(), remove_club_async(), _apply_club_update(), approve_join_request(), approve_president_change(), _assert_club_admin(), _category_blockers(), category_deletion_check() (+60 more)
+Nodes (52): dropdownSettingRoutes, placeholderPage(), Stage, AdminEntity, AdminTab, AssignmentRow, UserAssignmentGroup, CafeteriaManageTab (+44 more)
 
-### Community 7 - "BadRequest"
-Cohesion: 0.09
-Nodes (50): change_own_password(), confirm_password_reset(), _dev_user_rows(), dev_users(), _generate_otp(), internal_users(), _json_body(), login() (+42 more)
+### Community 2 - "DepartmentSpec"
+Cohesion: 0.03
+Nodes (94): committed_rows_sql(), DepartmentSpec, detail_params(), Any, Shared SQL vocabulary for the metric families. The six service departments run…, FROM clause for a department's detail rows joined to live proposals only., One service department's shape: which requirement it serves, which detail table…, True where a row occupies an interval rather than an instant. Transport rows… (+86 more)
 
-### Community 8 - "WorkflowError"
+### Community 3 - "require_auth"
 Cohesion: 0.07
-Nodes (67): Fire-and-forget re-index, off the request thread that just committed the…, reindex_event_async(), on_commit(), Registers a zero-arg callback to run after the enclosing transaction() commits…, A business-rule violation in the proposal state machine. Defaults to 409: the…, WorkflowError, authorize_department_task(), is_cafeteria_manager_of() (+59 more)
+Nodes (56): _cell(), export_widget(), get_dashboard(), get_profiles(), get_widget(), _no_access_payload(), _period(), get (+48 more)
+
+### Community 4 - "ai.py"
+Cohesion: 0.06
+Nodes (52): ai_denials_document(), Has the AI ASSISTANT ITSELF refused to answer any question, and why - the live…, classify(), Intent/topic classification, by the model rather than by regex. WHAT REPLACED…, Every class this question touches, resolved against the recent conversation.…, _system_instruction(), generate_answer(), _generate_content() (+44 more)
+
+### Community 5 - "InternalRowActionEvent"
+Cohesion: 0.06
+Nodes (61): ProposalSortKey, SortOrder, ViewMode, ViewMode, REJECTION_COMMENT_MIN_LENGTH, Requester, ViewMode, DecidedByFilter (+53 more)
+
+### Community 6 - "query"
+Cohesion: 0.05
+Nodes (80): Every operational unit/department - the live data behind /app/units, a System-…, Every active user and every role/unit they hold - the live data behind…, CONTEXT block for "who holds ROLE X" ("who has the Cafeteria Admin role",…, units_document(), user_directory_document(), users_by_role_document(), find_user_by_name(), find_user_by_name_fuzzy() (+72 more)
+
+### Community 7 - "db.py"
+Cohesion: 0.03
+Nodes (97): category_format_status_document(), config_document(), find_users_by_partial_name(), page_visibility_document(), person_lookup_document(), System-Admin-only live facts: config thresholds, user/role headcounts, and…, Every role that actually exists in the `role` table - the live data behind…, Every active user whose full name CONTAINS `name` (case-insensitive) - a first-… (+89 more)
+
+### Community 8 - "workflow/tasks.py"
+Cohesion: 0.10
+Nodes (38): authorize_department_task(), Only the head of the unit a task routed to may act on it. Reads the routing off…, primary_role_code(), Display-only role label for the history row. Never used for authorisation., record(), applicant_resubmit_task(), approve_task(), assign_staff() (+30 more)
 
 ### Community 9 - "event-proposal.ts"
-Cohesion: 0.04
-Nodes (61): AuthUserRole, buildDepartmentRequestDefinitions(), DepartmentRequestDefinition, fillDanglingHalves(), optionKindForDepartmentField(), resolveDepartmentRowLabels(), selectOptionOf(), selectOptionsOf() (+53 more)
+Cohesion: 0.06
+Nodes (52): EventVisibility, RegistrationMode, ConversationMessage, ConversationSenderSide, ProposalConversation, FmbSelectionStatus, allCommentEntries(), DEPARTMENT_LABELS (+44 more)
 
 ### Community 10 - "ClubService"
-Cohesion: 0.05
-Nodes (27): ClubCategoryPage, ClubCategoryRecord, ClubDraft, ClubJoinRequestRecord, ClubJoinRequestStatus, ClubMemberRecord, ClubMyStatus, ClubPage (+19 more)
+Cohesion: 0.07
+Nodes (19): ClubCategoryPage, ClubCategoryRecord, ClubDraft, ClubJoinRequestRecord, ClubJoinRequestStatus, ClubMyStatus, ClubPage, ClubRecord (+11 more)
 
 ### Community 11 - "transaction"
-Cohesion: 0.07
-Nodes (73): create_catalogue_entry(), post, `code` is derived from the name server-side and immutable thereafter, so it…, restore_catalogue_entry(), update_catalogue_entry(), Only the club's own President may submit this, naming an eligible (student)…, request_president_change(), request_to_join() (+65 more)
+Cohesion: 0.06
+Nodes (109): create_assignment(), Grant a role, validating the pairing against role_unit. Three rules the…, logout(), create_cafeteria(), The code is derived from the name and prefixed, so an outlet is always…, create_catalogue_entry(), patch, put (+101 more)
 
 ### Community 12 - "ProposalReviewRecord"
-Cohesion: 0.04
-Nodes (21): ProposalDepartmentRequest, ProposalReviewRecord, ApiProposalWorkflowRepository, DepartmentRequestBucket, DepartmentRequestListItem, DepartmentRequestListQuery, DepartmentRequestOrder, DepartmentRequestSortKey (+13 more)
+Cohesion: 0.07
+Nodes (5): ProposalReviewRecord, ApiProposalWorkflowRepository, fmbOptionRowId(), ProposalWorkflowRepository, Injectable
 
-### Community 13 - "require_internal"
-Cohesion: 0.06
-Nodes (79): _actor_role(), _apply_cafeteria_update(), _apply_user_detail_changes(), _assert_assignable(), _assert_cafeteria_admin(), _assert_may_staff(), assignable_users(), _assignment_blockers() (+71 more)
+### Community 13 - "cafeterias.py"
+Cohesion: 0.08
+Nodes (54): _actor_role(), _apply_cafeteria_update(), _apply_user_detail_changes(), _assert_assignable(), _assert_cafeteria_admin(), _assert_identity_free(), _assert_may_staff(), assignable_users() (+46 more)
 
 ### Community 15 - "shared-library.ts"
-Cohesion: 0.06
-Nodes (20): ArchivedRequestOption, ManagerField, PoliciesTabComponent, Component, LibraryCategory, LibraryEntry, SharedLibraryComponent, Component (+12 more)
+Cohesion: 0.07
+Nodes (15): LibraryCategory, LibraryEntry, SharedLibraryComponent, Component, CharacterCounterComponent, Component, EventImageUploadComponent, Component (+7 more)
 
 ### Community 16 - "test_workflow_e2e.py"
 Cohesion: 0.06
 Nodes (72): _issue(), issue_access_token(), issue_refresh_token(), JWT issue and verification. Two token types share one secret but are separated…, Wiring tests that need no database. They assert the security envelope:…, The `typ` claim is what stops a long-lived refresh token authenticating…, test_access_token_cannot_be_used_to_refresh(), test_refresh_token_cannot_be_used_as_an_access_token() (+64 more)
 
-### Community 17 - "options.py"
+### Community 17 - "BadRequest"
 Cohesion: 0.08
-Nodes (55): reindex_menu_item_async(), _apply_update(), _assert_may_write(), _assert_required_present(), Catalogue, Collection, _columns(), create_option() (+47 more)
+Nodes (55): _apply_update(), _assert_may_write(), _assert_required_present(), Catalogue, Collection, _columns(), create_option(), delete_option() (+47 more)
 
-### Community 18 - "CafeteriaService"
-Cohesion: 0.18
-Nodes (5): Cafeteria, CafeteriaAssignment, CafeteriaDraft, CafeteriaService, Injectable
+### Community 18 - "test_ai_scope.py"
+Cohesion: 0.04
+Nodes (94): _cafeteria_manager_scope(), _guest_scope(), _live_pages(), parametrize, The AI assistant's scope and its authorization layers. Scope is exactly what it…, Scope is Clubs + Events + how the app works. A class left half-deleted in one…, A class in neither set is answered by nothing; a class in both is ambiguous.…, Read-only is not negotiable, and is enforced here as well as by the read-only… (+86 more)
 
 ### Community 20 - "services/proposals.py"
-Cohesion: 0.08
-Nodes (50): _as_decimal(), _as_int(), clear_children(), create(), delete_draft(), _department_confirmations(), _event_image_asset(), _event_image_url() (+42 more)
+Cohesion: 0.06
+Nodes (87): _as_decimal(), _as_int(), clear_children(), create(), delete_draft(), _department_confirmations(), _event_image_asset(), _event_image_url() (+79 more)
 
-### Community 21 - "query"
-Cohesion: 0.08
-Nodes (39): active_category_names(), admin_president_replacements(), club_category_stats(), eligible_clubs_for(), find_user_by_name_fuzzy(), inactive_clubs(), inbound_join_requests_from(), own_join_requests() (+31 more)
+### Community 21 - "dashboard/__init__.py"
+Cohesion: 0.11
+Nodes (31): read_cursor(), build_document(), _build_scope(), build_widget_only(), _cache_key(), list_profiles(), _outlet_labels(), Any (+23 more)
+
+### Community 22 - "EventCatalogSectionComponent"
+Cohesion: 0.05
+Nodes (12): ArchivedEventCatalogEntry, EventCatalogDraft, EventCatalogEntry, EventCatalogRepository, EventCatalogRepositoryImpl, EventCatalogResource, Injectable, EventCatalogEntryService (+4 more)
 
 ### Community 23 - "ApiAdminDirectoryRepository"
-Cohesion: 0.10
-Nodes (6): AdminNavPageRecord, AdminUnitRecord, AdminUserRecord, Archived, ApiAdminDirectoryRepository, Injectable
+Cohesion: 0.08
+Nodes (7): AdminNavPageRecord, AdminRoleRecord, AdminUnitRecord, Archived, ApiAdminDirectoryRepository, Injectable, AssignmentDraftRow
 
-### Community 24 - "db.py"
-Cohesion: 0.06
-Nodes (59): Fire-and-forget removal — same freshness model as reindex_event_async()., remove_event_async(), PostgreSQL access: a threaded connection pool plus small query helpers. Every…, Principal, The authenticated actor, resolved from the database on every request. Roles…, assert_proposal_owner(), authorize_cancel(), authorize_stage_action() (+51 more)
+### Community 24 - "stages.py"
+Cohesion: 0.15
+Nodes (26): authorize_stage_action(), has_role(), heads_unit(), is_hos_hod_for_applicant(), load_request(), Assert `principal` may act at the request's current single-actor stage., True if `user_id` heads any SCHOOL unit the applicant belongs to. Used two…, applicant_resubmit() (+18 more)
 
 ### Community 25 - "fyp-ui"
 Cohesion: 0.05
 Nodes (44): build, serve, test, builder, configurations, defaultConfiguration, options, cli (+36 more)
 
 ### Community 26 - "DepartmentRequestKind"
-Cohesion: 0.09
-Nodes (19): DepartmentRequestKind, requiresSameDayStart(), AssignableStaff, MyRowAssignment, MyRowAssignmentQuery, MyRowAssignmentSortKey, Page, RowAssignment (+11 more)
+Cohesion: 0.08
+Nodes (20): DepartmentRequestDefinition, DepartmentRequestKind, AssignableStaff, MyRowAssignment, MyRowAssignmentQuery, MyRowAssignmentSortKey, Page, RowAssignment (+12 more)
 
 ### Community 27 - "dependencies"
 Cohesion: 0.05
 Nodes (43): @angular/build, @angular/cli, @angular/common, @angular/compiler, @angular/compiler-cli, @angular/core, @angular/forms, @angular/platform-browser (+35 more)
 
-### Community 28 - "app/__init__.py"
-Cohesion: 0.11
-Nodes (26): close_ai_pool(), get_ai_connection(), init_ai_pool(), connection, Connection pool for the AI/vector-index Postgres — a second, separate database…, close_pool(), health_check(), Flask (+18 more)
+### Community 28 - "create_app"
+Cohesion: 0.24
+Nodes (9): create_app(), _JSONProvider, Flask, Flask's DefaultJSONProvider does serialize datetime.date/datetime.datetime…, _register_blueprints(), _register_request_hooks(), client(), fixture (+1 more)
 
-### Community 29 - "cafeteria_retrieval.py"
+### Community 29 - "widget"
 Cohesion: 0.07
-Nodes (41): cafeteria_by_name(), cafeteria_names_fuzzy(), _cafeteria_scope_clause(), cafeterias_managed_by(), halal_menu_items(), is_cafeteria_admin(), is_food_authority(), managed_cafeterias() (+33 more)
+Nodes (85): spec_for(), delta(), Period-on-period movement, with whether the movement is good. Direction and…, Derive a KPI's status server-side so two clients cannot disagree about whether…, status_for(), drill(), hero(), panel() (+77 more)
 
 ### Community 30 - "notifications.py"
-Cohesion: 0.09
-Nodes (47): Low-level SMTP send (e.g. Gmail). Nothing else in this codebase should import…, Send one email over SMTP. Returns True if the server accepted it. Never raises:…, send(), account_created_with_password(), cafeteria_order_awaiting_review(), cafeteria_staff_account_created(), department_task_awaiting_review(), department_task_sent_back() (+39 more)
+Cohesion: 0.08
+Nodes (50): Low-level SMTP send (e.g. Gmail). Nothing else in this codebase should import…, Send one email over SMTP. Returns True if the server accepted it. Never raises:…, send(), Email notifications. One place for the whole system: `client.send()` is the…, account_created_with_password(), cafeteria_order_awaiting_review(), cafeteria_staff_account_created(), department_task_awaiting_review() (+42 more)
 
 ### Community 32 - "ProposalDepartmentViewComponent"
-Cohesion: 0.08
+Cohesion: 0.07
 Nodes (3): FmbSelection, ProposalDepartmentViewComponent, Component
 
 ### Community 35 - "RolesComponent"
@@ -368,87 +402,91 @@ Nodes (4): deriveRoleCode(), restoreLabelFor(), RolesComponent, Component
 
 ### Community 36 - "catalog.py"
 Cohesion: 0.11
-Nodes (28): _Catalogue, catalogue_deletion_check(), _config_payload(), _entry(), event_categories(), event_formats(), get_config(), list_catalogue() (+20 more)
+Nodes (30): _blockers(), _Catalogue, catalogue_deletion_check(), _config_payload(), delete_catalogue_entry(), _entry(), event_categories(), event_formats() (+22 more)
 
 ### Community 37 - "Phase 2: Angular Frontend Refactor"
 Cohesion: 0.05
 Nodes (38): EMS Schema Alignment + Mock Backend Implementation Plan, Global Constraints, Phase 1: Source-of-Truth Corrections, Phase 2: Angular Frontend Refactor, Phase 2b: Extend Auth, Events, Saved Events, System Config, and Image Upload to REST, Phase 3: Express Mock Backend, Phase 4: Wire the Dev-Server Proxy and Verify End-to-End, Task 1.1: Correct `ems_database_schema.sql` — roles, F&B rename, water/campus-tour restructuring, new status columns (+30 more)
 
-### Community 38 - "EventCalendarComponent"
-Cohesion: 0.08
-Nodes (3): EventCalendarComponent, Component, HostListener
-
-### Community 41 - "environment.ts"
-Cohesion: 0.05
-Nodes (49): SEED_UNITS, SEED_USERS, AiAccessDenial, AiAccessDenialPage, AiAccessLogService, Injectable, AiAssistantAnswer, AiAssistantHistoryTurn (+41 more)
+### Community 41 - "auth.test-fixtures.ts"
+Cohesion: 0.10
+Nodes (29): SEED_UNITS, SEED_USERS, AuthNavNode, TEST_CAFETERIA_MANAGER, TEST_CFO, TEST_EXTERNAL_USER, TEST_FMB_HEAD, TEST_HEAD_OF_SCHOOL (+21 more)
 
 ### Community 42 - "CafeteriaManageComponent"
 Cohesion: 0.09
 Nodes (3): CafeteriaManageComponent, restoreLabelFor(), Component
 
-### Community 44 - "identity.py"
-Cohesion: 0.09
-Nodes (33): category_format_status_document(), config_document(), find_users_by_partial_name(), page_visibility_document(), System-Admin-only live facts: config thresholds, user/role headcounts, and…, Every active user and every role/unit they hold - the live data behind…, Every active user whose full name CONTAINS `name` (case-insensitive) - a first-…, Every nav page and which roles/units currently grant access to it - the live… (+25 more)
+### Community 44 - "num"
+Cohesion: 0.07
+Nodes (67): budget_category_split(), committed_food_cost(), cost_by_outlet(), cost_per_pax(), cost_per_pax_by_school(), forward_commitment(), funding_catalogue_usage(), funding_commitment() (+59 more)
 
-### Community 45 - "fetch_all"
-Cohesion: 0.05
-Nodes (81): _cafeteria_manager_order_rows(), cancel(), cancellation_window(), create_proposal(), _department_task_rows(), _flatten_requests_for_task(), _fmb_orders(), get_history() (+73 more)
+### Community 45 - "api/proposals.py"
+Cohesion: 0.10
+Nodes (33): _cafeteria_manager_order_rows(), cancellation_window(), _department_task_rows(), _flatten_requests_for_task(), _fmb_orders(), get_conversations(), get_history(), get_proposal() (+25 more)
 
 ### Community 46 - "HappeningSoonComponent"
-Cohesion: 0.11
+Cohesion: 0.14
 Nodes (3): ProposalEventSchedule, HappeningSoonComponent, Component
 
 ### Community 47 - "SiteHeaderComponent"
-Cohesion: 0.17
-Nodes (4): SiteHeaderComponent, Component, HostListener, ViewChild
+Cohesion: 0.07
+Nodes (20): CampusLifeComponent, CampusLifePillar, Component, LandingPageComponent, Component, MyEventsComponent, Component, CtaLinkArrow (+12 more)
 
 ### Community 48 - "seed/run.py"
-Cohesion: 0.10
-Nodes (28): Seed data definitions - system data only, no proposals or submissions.…, cafeteria_manager_grant(), grants_for(), nav_catalogue(), The sidebar catalogue and its permission grants. nav_page rows describe WHAT…, Split a role list into the grant rows that express it exactly. Returns…, Scoped to real cafeteria units only - never every unit, which would put a…, _icon() (+20 more)
+Cohesion: 0.14
+Nodes (21): _icon(), main(), Populate the database with system data. python -m seed.run # seed an empty…, Which (role, unit) pairings are legal. A role with zero rows here is flat., Insert demo accounts. Returns (email, display name, role summary) for the…, lowercase_with_underscores - the same convention unit.code and role_code use., Look up the inline SVG for a nav icon name. Raises rather than falling back to…, Truncate seedable tables. Refuses if any proposal exists - those are real work,… (+13 more)
 
 ### Community 49 - "test_api_e2e.py"
-Cohesion: 0.12
-Nodes (29): auth(), cleanup(), client(), payload(), fixture, HTTP-level tests: the API as a client actually uses it. These commit real rows,…, Picker data must not be fetched through the admin-only user API., The mock returned every proposal to everyone. An unrelated student must not see… (+21 more)
+Cohesion: 0.14
+Nodes (25): auth(), payload(), HTTP-level tests: the API as a client actually uses it. These commit real rows,…, Picker data must not be fetched through the admin-only user API., The mock returned every proposal to everyone. An unrelated student must not see…, 404 rather than 403 - confirming a proposal exists is itself a disclosure., test_a_department_head_cannot_edit_another_departments_catalogue(), test_a_submitted_proposal_cannot_be_deleted() (+17 more)
 
-### Community 50 - "seed_events.py"
-Cohesion: 0.15
-Nodes (41): approve_all_department_tasks(), create_proposal(), days_out(), main(), make_payload(), placeholder_image(), principal_for(), Seed realistic event/proposal data by driving the real workflow state machine.… (+33 more)
+### Community 50 - "school.py"
+Cohesion: 0.11
+Nodes (55): kpi(), A stat tile. `secondary` carries the p90 beside a median, or the second half of…, series(), applicant_activity(), at_risk(), collection_rate(), commercial_intensity(), cost_by_category() (+47 more)
 
-### Community 51 - "sync.py"
-Cohesion: 0.15
-Nodes (22): ai_transaction(), cursor, One-off initial load: embeds every currently-published event into the AI…, run(), embed_text(), _club_to_document(), _menu_item_to_document(), Keeps event_embeddings (the AI database) up to date with `request` (the primary… (+14 more)
+### Community 51 - "schema_catalog.py"
+Cohesion: 0.05
+Nodes (48): allowed_columns(), _catalog(), _check_constraints(), document_for_topics(), _fingerprint(), _foreign_keys(), _introspect(), invalidate() (+40 more)
 
 ### Community 52 - "HeroComponent"
-Cohesion: 0.32
-Nodes (3): HeroComponent, Component, ViewChild
+Cohesion: 0.24
+Nodes (4): HeroComponent, MockIntersectionObserver, Component, ViewChild
 
-### Community 53 - "fetch_one"
-Cohesion: 0.06
-Nodes (68): clear_ai_access_denials(), delete_nav_page(), delete_role(), delete_unit(), purge_nav_page(), purge_role(), purge_unit(), purge_user() (+60 more)
+### Community 53 - "soft_delete.py"
+Cohesion: 0.16
+Nodes (23): check_dependencies(), DeletionRule, _expired(), hard_delete(), preview(), purge_expired(), Any, The deletion gate: one dependency rule, one retention window, one purge sweep.… (+15 more)
 
-### Community 54 - "logging_setup.py"
-Cohesion: 0.17
-Nodes (20): get_connection(), init_pool(), connection, configure_logging(), ConsoleFormatter, ContextFilter, _extras(), JsonFormatter (+12 more)
+### Community 54 - "migrations/run.py"
+Cohesion: 0.36
+Nodes (12): get_connection(), init_pool(), _applied(), _checksum(), _files(), main(), migrate(), Migration runner. Applies every ``NNN_*.sql`` in this directory in filename… (+4 more)
 
 ### Community 55 - "ExploreEventsComponent"
 Cohesion: 0.09
-Nodes (6): EventSearchParams, InternalExploreEventsComponent, Component, ExploreEventsComponent, Component, HostListener
+Nodes (5): InternalExploreEventsComponent, Component, ExploreEventsComponent, Component, HostListener
 
 ### Community 56 - "ai-assistant.ts"
-Cohesion: 0.11
-Nodes (18): AiAssistantClub, AiAssistantProposal, AiAssistantRegistrantsTable, AiAssistantService, AiAssistantSource, Injectable, AiChatMessage, AiConversation (+10 more)
+Cohesion: 0.12
+Nodes (21): AiAssistantAnswer, AiAssistantClub, AiAssistantHistoryTurn, AiAssistantNavigation, AiAssistantProposal, AiAssistantRegistrant, AiAssistantRegistrantsTable, AiAssistantService (+13 more)
 
 ### Community 57 - "LoginComponent"
-Cohesion: 0.18
-Nodes (3): LoginComponent, Component, ViewChild
+Cohesion: 0.08
+Nodes (10): LoginComponent, Component, ViewChild, ProfileComponent, Component, ViewChild, ForgotPasswordModalComponent, Component (+2 more)
 
 ### Community 58 - "EditableTableColumn"
 Cohesion: 0.10
-Nodes (5): RequestDefinition, DataTableComponent, Component, EditableTableColumn, FormControlType
+Nodes (4): RequestDefinition, DataTableComponent, Component, EditableTableColumn
+
+### Community 59 - "HubRequestsComponent"
+Cohesion: 0.15
+Nodes (4): ProposalDepartmentRequest, DepartmentRequestListItem, HubRequestsComponent, Component
+
+### Community 60 - "fetch_all"
+Cohesion: 0.11
+Nodes (47): fetch_all(), Same as query() but on a caller-supplied cursor, so it joins their transaction., active_staff_count(), catalogue_usage(), collision_rows(), concurrency_by_day(), consolidation_candidates(), dead_catalogue_entries() (+39 more)
 
 ### Community 62 - "StaffTasksComponent"
-Cohesion: 0.11
-Nodes (3): StaffTasksComponent, Component, HostListener
+Cohesion: 0.10
+Nodes (4): requiresSameDayStart(), StaffTasksComponent, Component, HostListener
 
 ### Community 64 - "Implementation Prompt: Unit + Level RBAC Migration"
 Cohesion: 0.08
@@ -462,33 +500,33 @@ Nodes (3): InternalLayoutComponent, Component, HostListener
 Cohesion: 0.07
 Nodes (13): CafeteriaOrder, CafeteriaOrderQuery, CafeteriaOrderSortKey, CafeteriaOrderStatus, Page, SortOrder, CafeteriaOrderService, RawCafeteriaOrder (+5 more)
 
-### Community 67 - "hub-proposals.ts"
-Cohesion: 0.06
-Nodes (54): authGuard(), defaultRoleRouteGuard(), externalUserGuard(), loginGuard(), publicLandingGuard(), recordsHubDefaultTabGuard(), roleGuard(), departmentFor() (+46 more)
+### Community 67 - "proposal-visibility.ts"
+Cohesion: 0.07
+Nodes (46): authGuard(), defaultRoleRouteGuard(), externalUserGuard(), loginGuard(), publicLandingGuard(), recordsHubDefaultTabGuard(), roleGuard(), departmentFor() (+38 more)
 
 ### Community 68 - "AiAssistantComponent"
-Cohesion: 0.08
-Nodes (5): AiAssistantComponent, isAssistantUrl(), newMessageId(), Component, HostListener
+Cohesion: 0.09
+Nodes (4): AiAssistantComponent, newMessageId(), segmentMessageText(), Component
 
 ### Community 69 - "HubMyClubsComponent"
 Cohesion: 0.11
 Nodes (3): HubMyClubsComponent, Component, HostListener
 
-### Community 70 - "request-option.repository.ts"
-Cohesion: 0.17
-Nodes (10): mapRequestOptionResponse(), mapRequestOptionWrite(), RequestOptionDto, RequestOptionWriteDto, RequestOptionDraft, RequestOptionQuery, RequestOptionRepository, ApiRequestOptionRepository (+2 more)
+### Community 70 - "request-option.service.ts"
+Cohesion: 0.15
+Nodes (11): mapRequestOptionResponse(), mapRequestOptionWrite(), RequestOptionDto, RequestOptionWriteDto, ArchivedRequestOption, RequestOptionDraft, RequestOptionQuery, RequestOptionRepository (+3 more)
 
 ### Community 71 - "staff-task.repository.ts"
 Cohesion: 0.19
 Nodes (10): StaffTask, StaffTaskAssignmentDraft, StaffTaskRepository, StaffTaskRoutingKey, StaffTaskStatus, ApiStaffTaskRepository, STAFF_TASK_REPOSITORY, Injectable (+2 more)
 
-### Community 72 - "ForgotPasswordModalComponent"
-Cohesion: 0.17
-Nodes (5): ProfileComponent, Component, ViewChild, ForgotPasswordModalComponent, Component
+### Community 72 - "components/explore-events/explore-events.ts"
+Cohesion: 0.08
+Nodes (23): ExternalRegistrationService, GuestRegistrationFlowService, StartRegistrationResponse, Injectable, EmailStatusResponse, ExternalRegistrationApi, ExternalUserRegistrationRequest, ExternalUserRegistrationResponse (+15 more)
 
-### Community 73 - "proposal_retrieval.py"
-Cohesion: 0.13
-Nodes (20): asker_profile_document(), bucket_for_status(), own_proposals(), proposal_by_title(), proposal_cards(), proposal_detail(), proposal_detail_to_document(), proposal_history() (+12 more)
+### Community 73 - "test_dashboard.py"
+Cohesion: 0.08
+Nodes (32): Drop every per-row identifier from an R7 aggregate result set. Used by widgets…, strip_identity(), FakeCursor, _layouts(), make_principal(), Dashboard tests that need no database. The existing suite runs against a live…, The declarative-layout guarantee. A profile is data; if it can name a widget…, The whole premise of ten dashboards rather than one with ten titles: band two… (+24 more)
 
 ### Community 74 - "4. Analytics & visualisation"
 Cohesion: 0.10
@@ -526,17 +564,17 @@ Nodes (21): 1. Dashboard objective, 2. Data access scope, 3. KPIs, 4. Analytics 
 Cohesion: 0.10
 Nodes (21): 1. Dashboard objective, 2. Data access scope, 3. KPIs, 4. Analytics & visualisation, 5. AI & decision-support insights, 6. Layout, 7. Navigation & drill-down, Cafeteria Manager — Operations Dashboard (+13 more)
 
-### Community 83 - "event-image-upload.service.ts"
-Cohesion: 0.16
-Nodes (11): ApiEventImageUploadService, EVENT_IMAGE_UPLOAD_API, EventImageUploadApi, EventImageUploadRequest, EventImageUploadResponse, MockEventImageUploadService, readAsDataUrl(), Injectable (+3 more)
+### Community 83 - "sla.py"
+Cohesion: 0.11
+Nodes (35): iso_week_start(), Postgres date_trunc to the Monday of the ISO week the column falls in. Weekly…, approximate_since(), assignment_lag(), decision_latency(), decision_latency_by_week(), delivery_punctuality(), execution_time() (+27 more)
 
 ### Community 84 - "HowItWorksComponent"
 Cohesion: 0.18
 Nodes (8): HowItWorksComponent, ProcessPathMarker, ProcessPathPoint, ProcessPathPosition, ProcessStep, Component, HostListener, ViewChild
 
-### Community 85 - "landing-page.ts"
-Cohesion: 0.14
-Nodes (13): CampusLifeComponent, CampusLifePillar, Component, LandingPageComponent, Component, MyEventsComponent, Component, FooterAward (+5 more)
+### Community 85 - "ProposalWorkflowService"
+Cohesion: 0.07
+Nodes (13): DepartmentRequestBucket, DepartmentRequestListQuery, DepartmentRequestOrder, DepartmentRequestSortKey, FmbSelectionDraft, FmbSelectionEdit, Page, PROPOSAL_WORKFLOW_REPOSITORY (+5 more)
 
 ### Community 86 - "Head of Department — A/V Services"
 Cohesion: 0.10
@@ -551,16 +589,16 @@ Cohesion: 0.10
 Nodes (19): 1. Purpose, 2. Source-of-Truth Corrections, 3. Corrected Workflow State Machine, 4. Angular Frontend Changes, 5. Mock Backend Server, 6. Out of Scope, Behavior, Component-level updates (+11 more)
 
 ### Community 89 - "RequestOption"
-Cohesion: 0.20
+Cohesion: 0.24
 Nodes (3): RequestOption, RequestOptionService, Injectable
 
 ### Community 92 - "Dashboard architecture"
 Cohesion: 0.11
 Nodes (19): 10. States, 11. Testing, 1. Shape of the thing, 2. API surface, 3. Role resolution, 4. Response contract, 5. Chart runtime, 6. Palette (+11 more)
 
-### Community 94 - "api/__init__.py"
-Cohesion: 0.16
-Nodes (12): Blueprint registry. One module per resource family, all mounted under /api/v1., _looks_like_image(), get, limit, post, Image uploads. POST /uploads accept a base64 data URL, return a stable URL GET…, Serve a stored image. The key is matched against a strict pattern before…, Accept a base64 data URL and return {storageKey, url}. (+4 more)
+### Community 94 - "uploads.py"
+Cohesion: 0.22
+Nodes (10): _looks_like_image(), get, limit, Image uploads. POST /uploads accept a base64 data URL, return a stable URL GET…, Serve a stored image. The key is matched against a strict pattern before…, Accept a base64 data URL and return {storageKey, url}., serve(), _store() (+2 more)
 
 ### Community 96 - "2. Query-parameter contract"
 Cohesion: 0.11
@@ -582,25 +620,21 @@ Nodes (17): 1. Component anatomy, 2. The grid, 3. Breakpoints, 4.1 Per-role mobi
 Cohesion: 0.12
 Nodes (16): Backend Services, Data Model, Deletion rules, Explicitly Out of Scope, Final Decisions (from conversation), Frontend, Known Uncertainty (flagged for user review), Migration of Seed Data (+8 more)
 
-### Community 105 - "auth.interceptor.ts"
-Cohesion: 0.18
-Nodes (11): App, appConfig, routes, Component, ANONYMOUS_PATHS, authInterceptor(), isAnonymous(), isApiRequest() (+3 more)
+### Community 105 - "AuthService"
+Cohesion: 0.06
+Nodes (17): App, appConfig, routes, Component, ANONYMOUS_PATHS, authInterceptor(), isAnonymous(), isApiRequest() (+9 more)
 
-### Community 106 - "event-catalog.service.ts"
-Cohesion: 0.17
-Nodes (10): ArchivedEventCatalogEntry, EventCatalogDraft, EventCatalogResource, EventCategoryService, EventFormatService, Injectable, CategoriesTabComponent, Component (+2 more)
+### Community 106 - "workflow/fmb.py"
+Cohesion: 0.12
+Nodes (29): is_cafeteria_manager_of(), is_cafeteria_staff_of(), approve_selection(), check_fmb_task_resolved(), claim_selection(), create_selection(), edit_selection(), fulfil_selection() (+21 more)
 
-### Community 107 - "StepIndicatorComponent"
-Cohesion: 0.18
-Nodes (4): StepIndicatorComponent, StepStatus, Component, WizardStep
+### Community 108 - "_suppress_incidental_how_to_topics"
+Cohesion: 0.15
+Nodes (15): A resolved how-to answers from its GUIDE, not from the database. "How do I join…, _suppress_incidental_how_to_topics(), Best-effort role_code for a role NAMED in a question ('what can Club Admin…, resolve_role_name(), how_to_topic(), named_role(), The topic vocabulary, and the two lookups that are genuinely lookups rather…, The role_code this question names, if any - resolved against knowledge_base's… (+7 more)
 
-### Community 108 - "query_router.py"
-Cohesion: 0.19
-Nodes (15): Best-effort role_code for a role NAMED in a question ('what can Club Admin…, resolve_role_name(), classify(), _fuzzy_classify(), how_to_topic(), _matched_weakly(), named_role(), needs_llm_verification() (+7 more)
-
-### Community 110 - "components/explore-events/explore-events.ts"
-Cohesion: 0.05
-Nodes (35): EventRegistrationApi, RegisteredEventEntry, RegisteredEventsResponse, SavedEventRecord, EventFavouriteService, Injectable, EVENT_FIELD_MAPPING, EventRegistration (+27 more)
+### Community 110 - "PublishedEventService"
+Cohesion: 0.04
+Nodes (38): EventCategoryService, EventRegistrationApi, RegisteredEventsResponse, ApiEventImageUploadService, EVENT_IMAGE_UPLOAD_API, EventImageUploadApi, EventImageUploadRequest, EventImageUploadResponse (+30 more)
 
 ### Community 111 - "4. The rules"
 Cohesion: 0.12
@@ -608,11 +642,11 @@ Nodes (16): 1. What "AI" means here, and what it does not, 2. Rule anatomy, 3. S
 
 ### Community 112 - "Implementation roadmap"
 Cohesion: 0.12
-Nodes (16): Definition of done, File structure, Global constraints, Implementation roadmap, Out of scope, Phase 0 · Prerequisites, Phase 1 · Backend skeleton, Phase 2 · Metric layer (+8 more)
+Nodes (17): Definition of done, File structure, Global constraints, Implementation roadmap, Out of scope, Phase 0 · Prerequisites, Phase 1 · Backend skeleton, Phase 2 · Metric layer (+9 more)
 
-### Community 113 - "InternalPaginationComponent"
-Cohesion: 0.25
-Nodes (3): InternalPaginationComponent, InternalTableWorkspaceComponent, Component
+### Community 113 - "dashboard_preview.py"
+Cohesion: 0.12
+Nodes (17): build_preview(), check(), _eyebrow(), _json_default(), main(), _output_columns(), PreviewHandler, Serve a dashboard document without a database. Every widget runs its **real**… (+9 more)
 
 ### Community 114 - "proposal-review.mock-data.ts"
 Cohesion: 0.17
@@ -623,32 +657,44 @@ Cohesion: 0.15
 Nodes (13): client(), fixture, parametrize, Routing and guard tests for the event category/format catalogues. No database:…, Every operation event-catalog.repository.ts calls has a route. The bug this…, Category/format names are reference vocabulary, not private data - the Explore…, A missing token must never reach the handler - an unauthenticated 404 here…, /catalog/config and friends must not be swallowed by /catalog/<resource>.… (+5 more)
 
 ### Community 116 - "test_role_capabilities.py"
-Cohesion: 0.15
-Nodes (17): Static, hand-curated reference content for the AI assistant: what the SYSTEM…, Assembles ONE caller's real capabilities from every role they actually hold -…, self_capability_document(), parametrize, _ROLE_CAPABILITIES must never claim a capability a role does not actually have.…, A unit this role can legally be paired with, or None for a flat role. A unit-…, A typo'd or deleted page_code silently drops the line (has_page_access fails…, The real check: does this role reach the page each of its capability lines is… (+9 more)
+Cohesion: 0.12
+Nodes (21): Static, hand-curated reference content for the AI assistant: what the SYSTEM…, Assembles ONE caller's real capabilities from every role they actually hold -…, The human-readable display name for a role_code (e.g. "cafeteria-admin" ->…, role_label(), self_capability_document(), has_page_access(), Would `page_code` be visible in the sidebar for a caller holding `assignments`?…, parametrize (+13 more)
 
-### Community 121 - "config.py"
-Cohesion: 0.07
-Nodes (17): Applies app/ai/migrations/*.sql against AI_DATABASE_URL. Deliberately separate…, _bool(), Config, Configuration, loaded from the environment (never hardcoded). Every secret…, Only the literal "true" enables a flag; unset or anything else is off., rate_limit_key(), Shared extension instances, created here so they can be imported without…, Rate-limit per authenticated user where possible, else per client IP. Keying… (+9 more)
+### Community 117 - "VizChartBase"
+Cohesion: 0.11
+Nodes (14): Directive, Annotation, Axes, Point, AlertListComponent, Component, DotPlotComponent, Component (+6 more)
+
+### Community 121 - "test_dev_users.py"
+Cohesion: 0.19
+Nodes (10): _bool(), Only the literal "true" enables a flag; unset or anything else is off., client(), fixture, parametrize, Tests for the TESTING ONLY demo-user picker endpoint (GET /auth/dev-users).…, The shipped default. Asserted against the parser rather than the imported…, test_demo_mode_accepts_true_case_insensitively() (+2 more)
 
 ### Community 122 - "AiConversationStore"
 Cohesion: 0.22
 Nodes (3): AiConversationStore, newId(), Injectable
 
 ### Community 123 - "auth.service.ts"
-Cohesion: 0.05
-Nodes (45): AuthNavigationItem, AuthNavigationSection, AuthNavNode, AuthUser, RoleNavigation, RoleNavigationEntry, UserAccountType, ChangePasswordResult (+37 more)
+Cohesion: 0.11
+Nodes (25): AuthNavigationItem, AuthNavigationSection, AuthUser, RoleNavigation, RoleNavigationEntry, UserAccountType, ChangePasswordResult, LoginResponse (+17 more)
 
 ### Community 124 - "request-option.models.ts"
 Cohesion: 0.27
 Nodes (13): CampusTourStartOption, CampusTourTypeOption, DietaryInformationOption, FoodRequestOption, FundingMainOption, FundingSubOption, LogisticsRequestOption, MediaRequestOption (+5 more)
 
-### Community 126 - "purge-sweep.service.ts"
-Cohesion: 0.33
-Nodes (4): PurgeSweepEntityResult, PurgeSweepResult, PurgeSweepService, Injectable
+### Community 125 - "EditableRow"
+Cohesion: 0.12
+Nodes (3): EditableRow, ProposalTableComponent, Component
 
-### Community 129 - "event-calendar.ts"
-Cohesion: 0.08
-Nodes (15): AgendaDay, CalendarDay, CalendarEvent, CalendarView, isoDate(), MOCK_EVENT_FIXTURES, MOCK_PUBLISHED_EVENTS, ExpandableSearchComponent (+7 more)
+### Community 126 - "environment.ts"
+Cohesion: 0.05
+Nodes (28): AiAccessDenial, AiAccessDenialPage, AiAccessLogService, Injectable, PurgeSweepEntityResult, PurgeSweepResult, PurgeSweepService, Injectable (+20 more)
+
+### Community 127 - "chart-panel.ts"
+Cohesion: 0.09
+Nodes (16): ChartFrameComponent, Component, ChartPanelComponent, Component, ColumnChartComponent, Component, DonutChartComponent, DonutSegment (+8 more)
+
+### Community 129 - "ExpandableSearchComponent"
+Cohesion: 0.12
+Nodes (7): ExpandableSearchComponent, Component, HostListener, ViewChild, OptionPickerItem, OptionPickerGridComponent, Component
 
 ### Community 130 - "1. Proposal / Event-Approval Workflow"
 Cohesion: 0.17
@@ -659,16 +705,16 @@ Cohesion: 0.17
 Nodes (12): 1.10 F&B places cafeteria order → cafeteria manager(s), 1.11 Applicant cancels proposal → everyone holding an open task, 1.1 Proposal submitted → first-stage reviewer, 1.2 Reviewer approves → next reviewer, 1.3 Reviewer rejects → applicant, 1.4 Reviewer sends back → applicant, 1.5 Department task created → department head, 1.6 Department task sent back → applicant (+4 more)
 
 ### Community 132 - "ToastService"
-Cohesion: 0.23
-Nodes (7): Toast, ToastAction, ToastRequest, ToastTone, ToastService, Injectable, TONE_ICON
+Cohesion: 0.18
+Nodes (9): Toast, ToastAction, ToastRequest, ToastTone, ToastService, Injectable, ToastHostComponent, TONE_ICON (+1 more)
 
-### Community 136 - "gemini.py"
-Cohesion: 0.29
-Nodes (9): classify_llm(), _classify_system_instruction(), generate_answer(), _get_client(), _get_groq_client(), Thin wrapper around the Gemini and Groq APIs for the three calls this feature…, Semantic classifier for query_router.classify() - called when the regex pass…, Client (+1 more)
+### Community 136 - "build"
+Cohesion: 0.09
+Nodes (26): date, Map a period key to its window. An unrecognised key falls back to the default…, resolve_period(), build(), Scope, Run one widget, converting a failure into an inline error state. A widget whose…, make_scope(), _profile_for_widget() (+18 more)
 
 ### Community 138 - "Database"
-Cohesion: 0.18
-Nodes (11): Cafeterias are units, Co-owners are snapshots too, Connection pooling, Constraints worth knowing, Database, Documented deviations, Migrations, `nav_page_grants.grant_id` (migration 003) (+3 more)
+Cohesion: 0.17
+Nodes (12): 018 — dashboard support (2026-08-27), Cafeterias are units, Co-owners are snapshots too, Connection pooling, Constraints worth knowing, Database, Documented deviations, Migrations (+4 more)
 
 ### Community 139 - "The Proposal Workflow"
 Cohesion: 0.18
@@ -694,13 +740,17 @@ Nodes (10): File Structure, Global Constraints, Login Demo-User Picker Implement
 Cohesion: 0.27
 Nodes (8): ApiPaymentProofUploadService, MockPaymentProofUploadService, PAYMENT_PROOF_UPLOAD_API, PaymentProofUploadApi, PaymentProofUploadRequest, PaymentProofUploadResponse, readAsDataUrl(), Injectable
 
+### Community 146 - "dashboard.models.ts"
+Cohesion: 0.11
+Nodes (19): AxisSpec, ChartKind, CountItem, CountsWidget, DashboardMeta, DashboardPeriod, DashboardProfile, DashboardWidget (+11 more)
+
 ### Community 147 - "subject_scope.py"
 Cohesion: 0.22
 Nodes (9): classes_to_drop(), denial_document(), other_person_in_question(), Whose data is this question about - the asker's own, or somebody else's?…, Who this question is about, if not the caller: a resolved person's name, or the…, Every class to remove for a privacy refusal - the self-scoped classes that…, CONTEXT line telling the model to refuse on PRIVACY grounds, not page access.…, The full name of a person OTHER than the caller that this question is about, or… (+1 more)
 
-### Community 148 - "internal-placeholder.ts"
-Cohesion: 0.50
-Nodes (3): placeholderPage(), InternalPlaceholderComponent, Component
+### Community 148 - "viz.ts"
+Cohesion: 0.16
+Nodes (19): areaPath(), categoriesOf(), columnPath(), CURRENCY, CURRENCY_PRECISE, DATE, DATE_TIME, DECIMAL (+11 more)
 
 ### Community 149 - "APU EMS — Flask API"
 Cohesion: 0.20
@@ -726,17 +776,25 @@ Nodes (10): 2.1 Guest self-registers → new user (⚠️ requires new OTP flow)
 Cohesion: 0.20
 Nodes (9): A/V Services HOD Dashboard Implementation Plan, Global Constraints, Task 1: Backend — dashboard blueprint skeleton with role resolution, Task 2: Backend — hero + KPI metrics for hod_av, Task 3: Backend — chart panels (collision timeline, decision-latency trend, catalogue health), Task 4: Frontend — dashboard service, models, and route wiring, Task 5: Frontend — chart primitives (stat-tile, donut-chart, column-chart, timeline-chart), Task 6: Frontend — DashboardComponent page, responsive layout, and route swap (+1 more)
 
-### Community 156 - "system-config.service.ts"
-Cohesion: 0.31
-Nodes (5): SystemConfig, SystemConfigDraft, DEFAULT_CONFIG, SystemConfigService, Injectable
+### Community 155 - "quality.py"
+Cohesion: 0.15
+Nodes (23): cancellation_rate(), first_pass_yield(), gate_outcome_mix(), gate_outcomes_by_period(), off_catalogue_rate(), order_pushback_rate(), pushback_by_outlet(), Any (+15 more)
+
+### Community 156 - "policies-tab.ts"
+Cohesion: 0.14
+Nodes (10): DASHBOARD_THRESHOLD_GROUPS, DashboardThreshold, SystemConfig, SystemConfigDraft, ThresholdGroup, DEFAULT_CONFIG, SystemConfigService, Injectable (+2 more)
+
+### Community 157 - "DashboardComponent"
+Cohesion: 0.13
+Nodes (8): PanelWidget, StatWidget, WidgetBase, DashboardComponent, inventedDocument(), panel(), stat(), Component
 
 ### Community 158 - "admin-directory.models.ts"
-Cohesion: 0.24
-Nodes (8): AdminDirectoryRepository, AdminNavPageDraft, AdminNavPageGrant, AdminNavPageGrantDraft, AdminRoleDraft, AdminUnitDraft, AdminUserDraft, ADMIN_DIRECTORY_REPOSITORY
+Cohesion: 0.19
+Nodes (9): AdminDirectoryRepository, AdminNavPageDraft, AdminNavPageGrant, AdminNavPageGrantDraft, AdminRoleDraft, AdminUnitDraft, AdminUserAssignment, AdminUserDraft (+1 more)
 
 ### Community 160 - "Security"
-Cohesion: 0.22
-Nodes (9): Auditing, Authentication, Authorisation, Data exposure, Injection, Known gaps, Rate limiting, Security (+1 more)
+Cohesion: 0.20
+Nodes (10): Auditing, Authentication, Authorisation, Dashboard aggregates (2026-08-27), Data exposure, Injection, Known gaps, Rate limiting (+2 more)
 
 ### Community 161 - "Family A — Flow & throughput (M01–M08)"
 Cohesion: 0.22
@@ -779,36 +837,40 @@ Cohesion: 0.29
 Nodes (7): API Design, Filtering and pagination, Principles, Removed deliberately, Resources, Versioning, What the client no longer has to do
 
 ### Community 176 - "Decisions worth explaining"
-Cohesion: 0.29
-Nodes (7): Decisions worth explaining, Eleven catalogues, one resource, `/me` for "about the caller", One `decision` endpoint, not three sibling verbs, Permissions replaced wholesale, `send-back`, not `resubmit`, Sub-resources for things that are things
+Cohesion: 0.25
+Nodes (8): Decisions worth explaining, Eleven catalogues, one resource, `/me` for "about the caller", One `decision` endpoint, not three sibling verbs, Permissions replaced wholesale, `send-back`, not `resubmit`, Sub-resources for things that are things, The dashboard is one document, not a metric API
 
 ### Community 177 - "`/app/dashboard` — Role-Based Analytics Design"
 Cohesion: 0.29
 Nodes (7): `/app/dashboard` — Role-Based Analytics Design, Four principles the whole design obeys, Reading order, Source of truth, The ten, What this design deliberately excludes, Why ten dashboards and not one
 
-### Community 179 - "errors.py"
-Cohesion: 0.28
-Nodes (7): ApiError, _payload(), Any, Centralised error handling. Every failure leaves the API as the same JSON…, Base for every deliberate, client-visible failure., ValidationError, Exception
+### Community 179 - "_FakePrincipal"
+Cohesion: 0.11
+Nodes (21): how_to_allowed(), May this caller be given the STEPS for `guide_key`? The how-to half of the same…, Take me there" cards for the pages a set of DATA topics lives on. The how-to…, topic_cards(), _FakePrincipal, The whole point: Page Visibility decides, live. Revoking Discover Clubs must…, A card must never point somewhere the caller cannot open, so it is built from…, A guest holds no assignments, so every grant check fails by construction.… (+13 more)
 
-### Community 181 - "RequestOptionKind"
-Cohesion: 0.32
-Nodes (3): FlatDepartmentWorkflowConfig, UnitDepartmentWorkflowConfig, RequestOptionKind
+### Community 181 - "department-request-columns.ts"
+Cohesion: 0.26
+Nodes (7): buildDepartmentRequestDefinitions(), fillDanglingHalves(), optionKindForDepartmentField(), resolveDepartmentRowLabels(), selectOptionOf(), selectOptionsOf(), RequestOptionKind
 
 ### Community 182 - "3. Clubs"
 Cohesion: 0.33
 Nodes (6): 3.1 Club created, president nominated → new president, 3.2 Club Admin reassigns president → old + new president, 3.3 Join request submitted → club president, 3.4 President-change request submitted → club admins, 3.5 President-change approved → outgoing + incoming president, 3. Clubs
 
-### Community 183 - "staff-tasks.ts"
+### Community 183 - "cafeteria-staff-tasks.ts"
 Cohesion: 0.10
-Nodes (13): COMMON_END, DEFAULT_PRESENTATION, PageMode, ROLE_PRESENTATION, RolePresentation, InternalRowAction, InternalTableColumn, InternalDataTableComponent (+5 more)
+Nodes (15): DeadlineReminderService, ReminderTask, Injectable, COLUMNS, PageMode, COMMON_END, DEFAULT_PRESENTATION, PageMode (+7 more)
 
-### Community 184 - "cafeteria.service.ts"
-Cohesion: 0.08
-Nodes (21): CafeteriaStaffAuditAction, CafeteriaStaffAuditActorRole, CafeteriaStaffAuditEntry, CafeteriaStaffAuditQuery, CafeteriaStaffAuditSortKey, Page, SortOrder, AssignableCafeteriaUser (+13 more)
+### Community 184 - "CafeteriaService"
+Cohesion: 0.06
+Nodes (26): CafeteriaStaffAuditAction, CafeteriaStaffAuditActorRole, CafeteriaStaffAuditEntry, CafeteriaStaffAuditQuery, CafeteriaStaffAuditSortKey, Page, SortOrder, AssignableCafeteriaUser (+18 more)
 
-### Community 185 - "hero.ts"
-Cohesion: 0.29
-Nodes (4): MockIntersectionObserver, CtaLinkArrow, CtaLinkComponent, Component
+### Community 185 - "demand.py"
+Cohesion: 0.16
+Nodes (21): requirement_label(), _daily_history(), demand_forecast(), event_calendar_density(), forward_demand(), lead_time_distribution(), mean_requirements_per_proposal(), pipeline_conversion() (+13 more)
+
+### Community 186 - "build_scope"
+Cohesion: 0.12
+Nodes (19): build_scope(), document(), _event_visibility_predicates(), _owner_clause(), The authorization half of Text-to-SQL: which ROWS may this caller's query…, Mirrors api/events.py _published_clause exactly. Both halves - published status…, The caller's row-level scope for THIS question's topics. Called AFTER…, The SCOPE section of the SQL-generation prompt: what this caller may see, and… (+11 more)
 
 ### Community 188 - "AiOrbAwarenessService"
 Cohesion: 0.40
@@ -826,49 +888,133 @@ Nodes (5): APU Event Management System, Architecture, Documentation, Running it,
 Cohesion: 0.50
 Nodes (4): API Documentation, Conventions, Quick start, Reading the spec
 
-### Community 196 - "ImageUploadFieldComponent"
-Cohesion: 0.40
-Nodes (3): ImageUploadFieldComponent, Component, ViewChild
+### Community 196 - "recommendation.py"
+Cohesion: 0.13
+Nodes (19): _asker_already_stated_interests(), history_document(), in_recommendation_thread(), is_recommendation(), named_domain(), Recommendation questions - "what fits me", "what do you suggest", "any good…, Which half of the two-part flow this question is in. "ask" first recommendation…, The asker's REAL history - events they registered for, clubs they asked to… (+11 more)
 
-### Community 202 - "PopoverComponent"
-Cohesion: 0.40
-Nodes (3): PopoverComponent, Component, HostListener
+### Community 202 - "authorization.py"
+Cohesion: 0.18
+Nodes (16): assert_proposal_owner(), authorize_cancel(), earliest_event_date(), is_applicant(), is_co_owner(), is_proposal_owner(), is_school_unit(), is_within_cancellation_window() (+8 more)
 
-### Community 211 - "happening-soon.spec.ts"
-Cohesion: 0.67
-Nodes (3): inDays(), MOCK_EVENT_FIXTURES, MOCK_PUBLISHED_EVENTS
+### Community 211 - "sql_guard.py"
+Cohesion: 0.17
+Nodes (14): _alias_map(), _blank_function_from(), _expand_aliases(), _normalise(), Exception, Validates model-generated SQL BEFORE it reaches the database. Nothing here…, Raised with a human/model-readable reason. Carries `repairable`: a malformed or…, Whitespace-collapsed, lowercased - the form predicate matching compares in, so… (+6 more)
 
-### Community 213 - "topic_access.py"
-Cohesion: 0.24
-Nodes (9): askable_topics_document(), denied_topics(), log_denials(), The ONE place that decides whether a caller may ask about a given topic. Every…, The CONTEXT block answering "what can I ask about?" - built live from the same…, May this caller ask about `topic`? True for an ungated topic (not in…, Every classified topic this caller may NOT ask about, in stable order so the…, Record each refused topic in ai_access_denial for the System Admin's audit… (+1 more)
+### Community 213 - "topic_allowed"
+Cohesion: 0.25
+Nodes (8): askable_topics_document(), denied_topics(), The CONTEXT block answering "what can I ask about?" - built live from the same…, May this caller ask about `topic`? True for an ungated topic (not in…, Every classified topic this caller may NOT ask about, in stable order so the…, Who is asking, in the form the SQL generator and the reviewer both need.…, topic_allowed(), user_context_document()
 
-### Community 215 - "DeadlineReminderService"
-Cohesion: 0.40
-Nodes (3): DeadlineReminderService, ReminderTask, Injectable
+### Community 214 - "DashboardConfig"
+Cohesion: 0.22
+Nodes (3): DashboardConfig, Every `config` row, read once per request, with per-unit override support.…, test_config_prefers_a_per_unit_override()
 
 ### Community 217 - "department-workflow.config.ts"
+Cohesion: 0.08
+Nodes (27): assignmentRequiredForManager(), FLAT_DEPARTMENT_WORKFLOWS, FlatDepartmentWorkflowConfig, isFlatRoleCode(), MAX_ASSIGNEES_PER_ROW, maxAssigneesPerRow(), optionKindsForManager(), SAME_DAY_START_ONLY (+19 more)
+
+### Community 218 - "recipients.py"
+Cohesion: 0.25
+Nodes (14): _applicant_schools(), cafeteria_managers_of(), department_head_for_task(), department_heads_for_request(), _heads_of_unit(), Resolves "who should be emailed" for a proposal stage or department task. Kept…, head-of-department — Logistics & Facilities" style label for account emails,…, Everyone who should be emailed "this proposal now needs your review" for the… (+6 more)
+
+### Community 221 - "charts.spec.ts"
+Cohesion: 0.15
+Nodes (7): Series, FrameHost, PanelHost, TileHost, Component, StatTileComponent, Component
+
+### Community 222 - "TimelineChartComponent"
 Cohesion: 0.14
-Nodes (15): assignmentRequiredForManager(), FLAT_DEPARTMENT_WORKFLOWS, isFlatRoleCode(), MAX_ASSIGNEES_PER_ROW, optionKindsForManager(), SAME_DAY_START_ONLY, staffUnitCodeForManager(), UNIT_DEPARTMENT_WORKFLOWS (+7 more)
+Nodes (6): TimelineBar, TimelineChartComponent, TimelineLane, Component, formatClock(), minutesOfDay()
+
+### Community 223 - "ClubRosterModalComponent"
+Cohesion: 0.24
+Nodes (3): ClubMemberRecord, ClubRosterModalComponent, Component
+
+### Community 224 - "HubProposalsComponent"
+Cohesion: 0.18
+Nodes (3): departmentsAwaitingApplicant(), HubProposalsComponent, Component
+
+### Community 225 - "logging_setup.py"
+Cohesion: 0.29
+Nodes (8): configure_logging(), ConsoleFormatter, ContextFilter, _extras(), JsonFormatter, Any, Structured logging. Every record carries the request id, so a client holding an…, LogRecord
+
+### Community 226 - "2. Per-question analysis"
+Cohesion: 0.17
+Nodes (11): 1. What the log actually showed, 2. Per-question analysis, 3. Genuinely missing capability, 4. Why the log could not answer this question before, A. How-To wrongly refused for lacking *data* access — **the real bug, now fixed**, AI Access Log Analysis — deriving the next phase from real unanswered questions, B. Correct refusals — no action needed, C. Guest asking for own data (+3 more)
+
+### Community 227 - "DashboardService"
+Cohesion: 0.32
+Nodes (3): DashboardDocument, DashboardService, Injectable
+
+### Community 229 - "cards.py"
+Cohesion: 0.29
+Nodes (9): build(), club_cards(), event_cards(), _names_in(), Rich cards for the events and clubs an answer actually names. WHY THIS HAD TO…, Card data for every active club the answer names. Club identity/description is…, (event_cards, club_cards) for this answer, restricted to the topics the…, The ids whose titles appear in `answer`, longest title first. Longest-first… (+1 more)
+
+### Community 231 - "HeatmapComponent"
+Cohesion: 0.24
+Nodes (4): HeatCell, HeatmapComponent, Component, rampColor()
+
+### Community 232 - "nav.py"
+Cohesion: 0.28
+Nodes (7): Seed data definitions - system data only, no proposals or submissions.…, cafeteria_manager_grant(), grants_for(), nav_catalogue(), The sidebar catalogue and its permission grants. nav_page rows describe WHAT…, Split a role list into the grant rows that express it exactly. Returns…, Scoped to real cafeteria units only - never every unit, which would put a…
+
+### Community 233 - "_log_refusals"
+Cohesion: 0.25
+Nodes (8): log_denials(), log_how_to_denial(), _log_refusals(), log_unanswerable(), Write refusal rows to ai_access_denial - the shared body behind log_denials(),…, A data topic was refused because Page Visibility does not grant its pages., The caller asked HOW to do something they cannot reach the page for., Nothing was refused - the assistant simply has no answer. Recorded so the admin…
+
+### Community 234 - "history.py"
+Cohesion: 0.36
+Nodes (7): can_view_department_task(), Non-raising sibling of authorize_department_task, for read-side filtering where…, conversations_for(), history_for(), Any, workflow_history writes - the audit trail for every state transition. Called…, Group workflow_history's resubmit/applicant-resubmit rows into per-partner…
+
+### Community 235 - "constants.py"
+Cohesion: 0.39
+Nodes (6): config_number(), high_pax_threshold(), max_event_categories(), Decimal, Workflow vocabulary: statuses, routing tables, and tunable config lookups.…, The proposal workflow state machine. The backend owns this entirely. Every…
+
+### Community 236 - "funnel.ts"
+Cohesion: 0.29
+Nodes (4): ValueFormat, FunnelComponent, FunnelStage, Component
+
+### Community 237 - "generate_openapi.py"
+Cohesion: 0.48
+Nodes (6): build(), main(), _parameters(), Generate docs/openapi.json from the live Flask app. Generated rather than hand-…, _responses(), _split_docstring()
+
+### Community 238 - "harness.py"
+Cohesion: 0.38
+Nodes (6): ask(), login(), Adversarial QA harness for the AI assistant. Logs in as real seeded accounts…, None means guest (signed-out) - a real, supported caller for this endpoint., A test may carry `turns` (multi-turn) or a single `q`. Conversation history…, run()
+
+### Community 239 - "_preview"
+Cohesion: 0.33
+Nodes (7): _preview(), parametrize, psycopg2 hands back Decimal, date and time; Flask's provider handles the last…, A service department a System Admin creates later has no known detail table. It…, test_document_is_json_serialisable(), test_generic_profile_survives_a_unit_with_no_detail_table(), test_profile_builds_with_populated_data()
+
+### Community 241 - "meter.ts"
+Cohesion: 0.33
+Nodes (5): VizStatus, MeterComponent, MeterSpec, Component, statusColor()
+
+### Community 243 - "Dependency"
+Cohesion: 0.33
+Nodes (5): _dep(), Dependency, One incoming reference that blocks deletion while it returns rows. ``sql`` must…, Has anything in ``table`` ever pointed at this row?" - the usual check.…, used_by()
+
+### Community 249 - "cleanup"
+Cohesion: 0.50
+Nodes (4): cleanup(), client(), fixture, Remove proposals these tests create, leaving the seed data intact.
 
 ## Knowledge Gaps
-- **808 isolated node(s):** `$schema`, `version`, `packageManager`, `newProjectRoot`, `projectType` (+803 more)
+- **844 isolated node(s):** `$schema`, `version`, `packageManager`, `newProjectRoot`, `projectType` (+839 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **50 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **51 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `EventProposalComponent` connect `EventProposalComponent` to `EditableTableColumn`, `.navigateToTableError`, `event-proposal.ts`, `environment.ts`, `.logisticsExceedsRemaining`, `.requestFieldError`, `shared-library.ts`, `.performSubmit`, `.row`, `OptionPickerItem`, `EditableRow`?**
-  _High betweenness centrality (0.026) - this node is a cross-community bridge._
-- **Why does `apiErrorMessage()` connect `apiErrorMessage` to `.clearMessages`, `event-proposal.ts`, `ClubService`, `AdminDirectoryComponent`, `shared-library.ts`, `AiAccessLogComponent`, `EventCatalogSectionComponent`, `ProposalDepartmentViewComponent`, `ClubCategoryManagementComponent`, `RequestOptionManagementComponent`, `RolesComponent`, `ClubManagementComponent`, `PageVisibilityComponent`, `CafeteriaManageComponent`, `CafeteriaStaffAssignmentsComponent`, `.performSubmit`, `staff-tasks.ts`, `CafeteriaMyStaffComponent`, `StaffTasksComponent`, `.restorePage`, `InternalLayoutComponent`, `CafeteriaStaffTasksComponent`, `.restore`, `DepartmentResubmitComponent`, `HubPresidentChangeRequestsComponent`, `HubRegistrationsComponent`, `RecordsPageComponent`, `ProposalReviewerViewComponent`, `auth.service.ts`?**
-  _High betweenness centrality (0.022) - this node is a cross-community bridge._
-- **Why does `RequestOptionManagementComponent` connect `RequestOptionManagementComponent` to `.toCardViewModel`, `apiErrorMessage`, `RequestOptionKind`?**
-  _High betweenness centrality (0.020) - this node is a cross-community bridge._
-- **Are the 143 inferred relationships involving `cur()` (e.g. with `own_event_registrants()` and `add_grant()`) actually correct?**
-  _`cur()` has 143 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `fetch_one()` connect `fetch_one` to `DepartmentSpec`, `require_auth`, `query`, `db.py`, `workflow/tasks.py`, `transaction`, `cafeterias.py`, `test_workflow_e2e.py`, `BadRequest`, `services/proposals.py`, `dashboard/__init__.py`, `stages.py`, `quality.py`, `widget`, `catalog.py`, `num`, `api/proposals.py`, `seed/run.py`, `school.py`, `soft_delete.py`, `demand.py`, `fetch_all`, `authorization.py`, `sla.py`, `recipients.py`, `workflow/fmb.py`, `constants.py`, `history.py`, `Dependency`?**
+  _High betweenness centrality (0.030) - this node is a cross-community bridge._
+- **Why does `apiErrorMessage()` connect `apiErrorMessage` to `InternalRowActionEvent`, `.clearMessages`, `event-proposal.ts`, `ClubService`, `AdminDirectoryComponent`, `AiAccessLogComponent`, `EventCatalogSectionComponent`, `policies-tab.ts`, `ProposalDepartmentViewComponent`, `ClubCategoryManagementComponent`, `RequestOptionManagementComponent`, `RolesComponent`, `ClubManagementComponent`, `PageVisibilityComponent`, `CafeteriaManageComponent`, `CafeteriaStaffAssignmentsComponent`, `.performSubmit`, `cafeteria-staff-tasks.ts`, `CafeteriaMyStaffComponent`, `StaffTasksComponent`, `.restorePage`, `InternalLayoutComponent`, `CafeteriaStaffTasksComponent`, `.restore`, `DepartmentResubmitComponent`, `ClubRosterModalComponent`, `HubPresidentChangeRequestsComponent`, `HubRegistrationsComponent`, `RecordsPageComponent`, `ProposalReviewerViewComponent`, `PresidentChangeRequestModalComponent`, `auth.service.ts`?**
+  _High betweenness centrality (0.018) - this node is a cross-community bridge._
+- **Why does `fetch_all()` connect `fetch_all` to `fetch_one`, `DepartmentSpec`, `require_auth`, `query`, `db.py`, `workflow/tasks.py`, `transaction`, `cafeterias.py`, `BadRequest`, `services/proposals.py`, `dashboard/__init__.py`, `stages.py`, `quality.py`, `widget`, `catalog.py`, `num`, `api/proposals.py`, `seed/run.py`, `school.py`, `demand.py`, `authorization.py`, `sla.py`, `recipients.py`, `workflow/fmb.py`?**
+  _High betweenness centrality (0.017) - this node is a cross-community bridge._
 - **What connects `$schema`, `version`, `packageManager` to the rest of the system?**
-  _808 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `admin.py` be split into smaller, more focused modules?**
-  _Cohesion score 0.060526315789473685 - nodes in this community are weakly interconnected._
-- **Should `events.py` be split into smaller, more focused modules?**
-  _Cohesion score 0.07727272727272727 - nodes in this community are weakly interconnected._
+  _844 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `fetch_one` be split into smaller, more focused modules?**
+  _Cohesion score 0.05847665847665848 - nodes in this community are weakly interconnected._
+- **Should `apiErrorMessage` be split into smaller, more focused modules?**
+  _Cohesion score 0.05672948791166952 - nodes in this community are weakly interconnected._
+- **Should `DepartmentSpec` be split into smaller, more focused modules?**
+  _Cohesion score 0.03271028037383177 - nodes in this community are weakly interconnected._

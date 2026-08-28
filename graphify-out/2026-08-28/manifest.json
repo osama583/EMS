@@ -1,0 +1,2516 @@
+{
+  "backend/app/__init__.py": {
+    "mtime": 1787774097.268366,
+    "seen": 1787814370.0053148,
+    "ast_hash": "4cf7a5beb3bd35676893171aa7eb8321",
+    "semantic_hash": ""
+  },
+  "backend/app/ai/__init__.py": {
+    "mtime": 1787657255.7366576,
+    "seen": 1787814370.0053241,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": ""
+  },
+  "backend/app/ai/admin_retrieval.py": {
+    "mtime": 1787811826.4884188,
+    "seen": 1787814370.0053277,
+    "ast_hash": "0d7aa41f8c9316f96812d490d94a9da8",
+    "semantic_hash": ""
+  },
+  "backend/app/ai/ai_db.py": {
+    "mtime": 1787657238.3942688,
+    "seen": 1787814370.00533,
+    "ast_hash": "9615b7727fe1949dc2b8068ba7a3705b",
+    "semantic_hash": ""
+  },
+  "backend/app/ai/backfill.py": {
+    "mtime": 1787673022.6264012,
+    "seen": 1787814370.0053322,
+    "ast_hash": "2ca20344477884e0b9e88c56651191bc",
+    "semantic_hash": ""
+  },
+  "backend/app/ai/cafeteria_retrieval.py": {
+    "mtime": 1787736085.5871542,
+    "seen": 1787814370.005334,
+    "ast_hash": "985d48b0cf8f53692f8c1dc1f54ebafb",
+    "semantic_hash": ""
+  },
+  "backend/app/ai/club_retrieval.py": {
+    "mtime": 1787688062.2544916,
+    "seen": 1787814370.0053356,
+    "ast_hash": "b45bc1462fefc0f1b47a8b3fb9c6a07a",
+    "semantic_hash": ""
+  },
+  "backend/app/ai/gemini.py": {
+    "mtime": 1787814209.0897574,
+    "seen": 1787814370.005337,
+    "ast_hash": "88cff58df79812931011ec0bcc0f8446",
+    "semantic_hash": ""
+  },
+  "backend/app/ai/knowledge_base.py": {
+    "mtime": 1787739345.7485628,
+    "seen": 1787814370.005339,
+    "ast_hash": "1d890705ff3e288bdef6a4ca31cc1fd8",
+    "semantic_hash": ""
+  },
+  "backend/app/ai/proposal_retrieval.py": {
+    "mtime": 1787687135.3192,
+    "seen": 1787814370.0053403,
+    "ast_hash": "865caf663bf1bbeb4a32d370001b7dd6",
+    "semantic_hash": ""
+  },
+  "backend/app/ai/query_router.py": {
+    "mtime": 1787811781.190174,
+    "seen": 1787814370.0053415,
+    "ast_hash": "4d98613c7be3a9b613cd0e36ef3e7a91",
+    "semantic_hash": ""
+  },
+  "backend/app/ai/retrieval.py": {
+    "mtime": 1787749826.2170036,
+    "seen": 1787814370.0053427,
+    "ast_hash": "be2dc769204d78dbdf65896072cdfb23",
+    "semantic_hash": ""
+  },
+  "backend/app/ai/run_migrations.py": {
+    "mtime": 1787657343.4755788,
+    "seen": 1787814370.0053446,
+    "ast_hash": "918bb251396ef09d7a9a4a533723cc4b",
+    "semantic_hash": ""
+  },
+  "backend/app/ai/subject_scope.py": {
+    "mtime": 1787750252.2088268,
+    "seen": 1787814370.0053458,
+    "ast_hash": "c0dcf0d0f65f3d6308b1d405e465b7bf",
+    "semantic_hash": ""
+  },
+  "backend/app/ai/sync.py": {
+    "mtime": 1787751901.3823256,
+    "seen": 1787814370.0053473,
+    "ast_hash": "573944fa2d27eab1244664d80ce6ddea",
+    "semantic_hash": ""
+  },
+  "backend/app/ai/topic_access.py": {
+    "mtime": 1787811803.7893243,
+    "seen": 1787814370.0053487,
+    "ast_hash": "aa9705ae7c46c54cf168aebdfe0c6f8e",
+    "semantic_hash": ""
+  },
+  "backend/app/api/__init__.py": {
+    "mtime": 1787774097.269365,
+    "seen": 1787814370.0053499,
+    "ast_hash": "5e69d9708ef387b9cdf80189ae2c8fab",
+    "semantic_hash": ""
+  },
+  "backend/app/api/_helpers.py": {
+    "mtime": 1787076477.7639635,
+    "seen": 1787814370.0053518,
+    "ast_hash": "a44e890e7f594ea3fa769190a9c7db02",
+    "semantic_hash": ""
+  },
+  "backend/app/api/admin.py": {
+    "mtime": 1787774097.270362,
+    "seen": 1787814370.0053532,
+    "ast_hash": "1dfe348254fee91c7e3480f6418d1f73",
+    "semantic_hash": ""
+  },
+  "backend/app/api/ai.py": {
+    "mtime": 1787811850.9875977,
+    "seen": 1787814370.0053544,
+    "ast_hash": "414ce99f72ce65a09b4ca7b6134d923f",
+    "semantic_hash": ""
+  },
+  "backend/app/api/auth.py": {
+    "mtime": 1787774097.2713623,
+    "seen": 1787814370.0053558,
+    "ast_hash": "3d23304b4d158bd54451dd5ac1262569",
+    "semantic_hash": ""
+  },
+  "backend/app/api/cafeterias.py": {
+    "mtime": 1787774097.2713623,
+    "seen": 1787814370.005357,
+    "ast_hash": "c1bb94c844ab35523768513f8b8c6d3c",
+    "semantic_hash": ""
+  },
+  "backend/app/api/catalog.py": {
+    "mtime": 1787774097.272871,
+    "seen": 1787814370.0053582,
+    "ast_hash": "ad274502a489a77cc73286d8daba5768",
+    "semantic_hash": ""
+  },
+  "backend/app/api/clubs.py": {
+    "mtime": 1787774097.27388,
+    "seen": 1787814370.0053594,
+    "ast_hash": "47f33b3998eb1ffe022392df5a39ca65",
+    "semantic_hash": ""
+  },
+  "backend/app/api/events.py": {
+    "mtime": 1787774097.2748766,
+    "seen": 1787814370.0053604,
+    "ast_hash": "95a719cb7ce2e4a2928b4ca3f1f7015b",
+    "semantic_hash": ""
+  },
+  "backend/app/api/options.py": {
+    "mtime": 1787774097.2758768,
+    "seen": 1787814370.005361,
+    "ast_hash": "5cd88f83a594a11049c90d9b00d38b3e",
+    "semantic_hash": ""
+  },
+  "backend/app/api/proposals.py": {
+    "mtime": 1787774097.2768767,
+    "seen": 1787814370.0053623,
+    "ast_hash": "d4ec117dd822d9f2af4c520adaa44143",
+    "semantic_hash": ""
+  },
+  "backend/app/api/tasks.py": {
+    "mtime": 1787774097.2778811,
+    "seen": 1787814370.0053635,
+    "ast_hash": "f7ccbd51b1717bd781ea949ff4d96267",
+    "semantic_hash": ""
+  },
+  "backend/app/api/uploads.py": {
+    "mtime": 1787076477.7639635,
+    "seen": 1787814370.0053644,
+    "ast_hash": "82bdd35e1fd3516910ee6357219c7ec9",
+    "semantic_hash": ""
+  },
+  "backend/app/config.py": {
+    "mtime": 1787814124.2791038,
+    "seen": 1787814370.0053656,
+    "ast_hash": "9de685e0ff9d1c42ae092be5f301bfc6",
+    "semantic_hash": ""
+  },
+  "backend/app/db.py": {
+    "mtime": 1787774097.27988,
+    "seen": 1787814370.0053668,
+    "ast_hash": "0b000704821851996b5115a7669b811b",
+    "semantic_hash": ""
+  },
+  "backend/app/errors.py": {
+    "mtime": 1787076477.7639635,
+    "seen": 1787814370.0053678,
+    "ast_hash": "b4b7f966f7b6a5f2915b1a6b8b24f2ed",
+    "semantic_hash": ""
+  },
+  "backend/app/extensions.py": {
+    "mtime": 1787076477.7639635,
+    "seen": 1787814370.0053692,
+    "ast_hash": "5b97d69f7aeaf774444b127c7a062484",
+    "semantic_hash": ""
+  },
+  "backend/app/logging_setup.py": {
+    "mtime": 1787076477.7639635,
+    "seen": 1787814370.0053704,
+    "ast_hash": "cefb7a762449d9c075dd0975b5c7f486",
+    "semantic_hash": ""
+  },
+  "backend/app/security/__init__.py": {
+    "mtime": 1787774097.27988,
+    "seen": 1787814370.0053716,
+    "ast_hash": "016dacc91705468c5c8fbb7ebc29f97a",
+    "semantic_hash": ""
+  },
+  "backend/app/security/decorators.py": {
+    "mtime": 1787774097.2808795,
+    "seen": 1787814370.005373,
+    "ast_hash": "a1ccffb5bd27edb9bccb0427ae90c9b9",
+    "semantic_hash": ""
+  },
+  "backend/app/security/passwords.py": {
+    "mtime": 1787076477.7639635,
+    "seen": 1787814370.005374,
+    "ast_hash": "170d04b3aa96283afe336f2d39749f5a",
+    "semantic_hash": ""
+  },
+  "backend/app/security/principal.py": {
+    "mtime": 1787774097.2818797,
+    "seen": 1787814370.005375,
+    "ast_hash": "6bec21cab464b153db7f5b42cecc9ec9",
+    "semantic_hash": ""
+  },
+  "backend/app/security/tokens.py": {
+    "mtime": 1787076477.7639635,
+    "seen": 1787814370.0053763,
+    "ast_hash": "5ef129c65f7f61cfed3ee665dde2e062",
+    "semantic_hash": ""
+  },
+  "backend/app/services/__init__.py": {
+    "mtime": 1787076477.7639635,
+    "seen": 1787814370.0053775,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": ""
+  },
+  "backend/app/services/email/__init__.py": {
+    "mtime": 1787568771.6074078,
+    "seen": 1787814370.0053787,
+    "ast_hash": "2df97afb8eaefa8141bf17bac620f22b",
+    "semantic_hash": ""
+  },
+  "backend/app/services/email/client.py": {
+    "mtime": 1787566798.744819,
+    "seen": 1787814370.0053802,
+    "ast_hash": "1ed0dec9ff2cccf2bdbcca77ba93e834",
+    "semantic_hash": ""
+  },
+  "backend/app/services/email/notifications.py": {
+    "mtime": 1787571088.1056018,
+    "seen": 1787814370.0053813,
+    "ast_hash": "e6cdaec633d2745f0cf16b2beb3814aa",
+    "semantic_hash": ""
+  },
+  "backend/app/services/email/recipients.py": {
+    "mtime": 1787568097.4751961,
+    "seen": 1787814370.0053825,
+    "ast_hash": "1ae10fb9b9bff45b85ce0c5848a34632",
+    "semantic_hash": ""
+  },
+  "backend/app/services/email/render.py": {
+    "mtime": 1787570288.2687843,
+    "seen": 1787814370.0053835,
+    "ast_hash": "9b985c78bc5dfc9af77890aa53b8f62a",
+    "semantic_hash": ""
+  },
+  "backend/app/services/identity.py": {
+    "mtime": 1787774097.2818797,
+    "seen": 1787814370.0053847,
+    "ast_hash": "f6e3dc4985fa3d9741ac000b467612b8",
+    "semantic_hash": ""
+  },
+  "backend/app/services/proposals.py": {
+    "mtime": 1787774097.2828808,
+    "seen": 1787814370.0053859,
+    "ast_hash": "51c1fa1f54ae740b448726d7fafb42e5",
+    "semantic_hash": ""
+  },
+  "backend/app/services/soft_delete.py": {
+    "mtime": 1787644274.203626,
+    "seen": 1787814370.0053873,
+    "ast_hash": "f4eec0356a8119f3fd9d51996ca7aa37",
+    "semantic_hash": ""
+  },
+  "backend/app/services/workflow/__init__.py": {
+    "mtime": 1787415496.7803276,
+    "seen": 1787814370.0053887,
+    "ast_hash": "8b0ef037c2c9ca47f6d9e30af77f4bc8",
+    "semantic_hash": ""
+  },
+  "backend/app/services/workflow/authorization.py": {
+    "mtime": 1787415496.7803276,
+    "seen": 1787814370.00539,
+    "ast_hash": "a91200382d76412539396e7ac7533f17",
+    "semantic_hash": ""
+  },
+  "backend/app/services/workflow/constants.py": {
+    "mtime": 1787415496.7803276,
+    "seen": 1787814370.0053911,
+    "ast_hash": "f7da25b93740819dcf9500c62fac39f4",
+    "semantic_hash": ""
+  },
+  "backend/app/services/workflow/fmb.py": {
+    "mtime": 1787415496.7803276,
+    "seen": 1787814370.0053923,
+    "ast_hash": "a7e434edbf3e2dbaac753e97f4935563",
+    "semantic_hash": ""
+  },
+  "backend/app/services/workflow/history.py": {
+    "mtime": 1787415496.7803276,
+    "seen": 1787814370.0053935,
+    "ast_hash": "75b36ec2939471733238d61724ae8992",
+    "semantic_hash": ""
+  },
+  "backend/app/services/workflow/stages.py": {
+    "mtime": 1787774097.283883,
+    "seen": 1787814370.0053947,
+    "ast_hash": "b33b432ffebc00860de9ef93910ec0ff",
+    "semantic_hash": ""
+  },
+  "backend/app/services/workflow/tasks.py": {
+    "mtime": 1787774097.2848833,
+    "seen": 1787814370.0053961,
+    "ast_hash": "849c58086094e10a36af81b267c4a7c1",
+    "semantic_hash": ""
+  },
+  "backend/docs/__init__.py": {
+    "mtime": 1787076477.775856,
+    "seen": 1787814370.0053976,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": ""
+  },
+  "backend/docs/generate_openapi.py": {
+    "mtime": 1787076477.775856,
+    "seen": 1787814370.0053985,
+    "ast_hash": "6843d654705f80d530a5c2fed3101d1c",
+    "semantic_hash": ""
+  },
+  "backend/migrations/__init__.py": {
+    "mtime": 1787076477.775856,
+    "seen": 1787814370.0053997,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": ""
+  },
+  "backend/migrations/run.py": {
+    "mtime": 1787076477.775856,
+    "seen": 1787814370.0054011,
+    "ast_hash": "0819a52a4f146326e9be7b965fd7e147",
+    "semantic_hash": ""
+  },
+  "backend/scripts/__init__.py": {
+    "mtime": 1787076477.775856,
+    "seen": 1787814370.005402,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": ""
+  },
+  "backend/scripts/check_db.py": {
+    "mtime": 1787076477.775856,
+    "seen": 1787814370.0054033,
+    "ast_hash": "cba1f51d4885e2a069cffffffb278aac",
+    "semantic_hash": ""
+  },
+  "backend/scripts/purge_deleted.py": {
+    "mtime": 1787649737.7743833,
+    "seen": 1787814370.0054042,
+    "ast_hash": "c5a88ff24bc18bb7001b8602164bfd03",
+    "semantic_hash": ""
+  },
+  "backend/seed/__init__.py": {
+    "mtime": 1787076477.7840178,
+    "seen": 1787814370.0054054,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": ""
+  },
+  "backend/seed/data.py": {
+    "mtime": 1787076477.7840178,
+    "seen": 1787814370.0054066,
+    "ast_hash": "876c3ce50b43132e82c9164f5158c2db",
+    "semantic_hash": ""
+  },
+  "backend/seed/nav.py": {
+    "mtime": 1787774097.28588,
+    "seen": 1787814370.0054078,
+    "ast_hash": "13166e0546d3b9240ab3044471d18c0c",
+    "semantic_hash": ""
+  },
+  "backend/seed/run.py": {
+    "mtime": 1787427455.8480866,
+    "seen": 1787814370.0054088,
+    "ast_hash": "b0949d7f1583ccaa52027211d943cc20",
+    "semantic_hash": ""
+  },
+  "backend/seed/seed_events.py": {
+    "mtime": 1787774097.28588,
+    "seen": 1787814370.00541,
+    "ast_hash": "fb28c6e9137449dddc6e48efc163708e",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_admin_routes.py": {
+    "mtime": 1787085514.4107091,
+    "seen": 1787814370.0054114,
+    "ast_hash": "8b11cd0f9f144e6afe528af621c41395",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_api_e2e.py": {
+    "mtime": 1787415496.7803276,
+    "seen": 1787814370.0054126,
+    "ast_hash": "d43b96e0564adea9e48c5f06bff59ade",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_auth_wiring.py": {
+    "mtime": 1787076477.7856367,
+    "seen": 1787814370.0054135,
+    "ast_hash": "183fb702e8c422232b64d9a36fa94f80",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_catalog_routes.py": {
+    "mtime": 1787415496.7803276,
+    "seen": 1787814370.0054147,
+    "ast_hash": "f2fbb6158cdd6e6adb4c486e6cde0dbb",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_dev_users.py": {
+    "mtime": 1787083031.0515018,
+    "seen": 1787814370.0054157,
+    "ast_hash": "3a94824ba146c29df5b2de8db2a3d658",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_role_capabilities.py": {
+    "mtime": 1787739374.7725017,
+    "seen": 1787814370.0054166,
+    "ast_hash": "2280425c58e6a55f519070a93dcbf812",
+    "semantic_hash": ""
+  },
+  "backend/tests/test_workflow_e2e.py": {
+    "mtime": 1787415496.7803276,
+    "seen": 1787814370.005418,
+    "ast_hash": "dc66cc691bd7c97bc7f3f44c80e724ca",
+    "semantic_hash": ""
+  },
+  "backend/wsgi.py": {
+    "mtime": 1787082318.5081453,
+    "seen": 1787814370.0054193,
+    "ast_hash": "88913a1a429332c62e1b068372ebcd95",
+    "semantic_hash": ""
+  },
+  "fyp-ui/angular.json": {
+    "mtime": 1786526425.8050694,
+    "seen": 1787814370.0054204,
+    "ast_hash": "b15afd5c5fad3a537bb597607a2c1804",
+    "semantic_hash": ""
+  },
+  "fyp-ui/package.json": {
+    "mtime": 1787076477.8249388,
+    "seen": 1787814370.0054216,
+    "ast_hash": "1588edc09cfd78c18e9b229579cbda53",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/app.config.ts": {
+    "mtime": 1787076477.8249388,
+    "seen": 1787814370.0054226,
+    "ast_hash": "6364445691fa927476c805a2b71971b7",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/app.routes.ts": {
+    "mtime": 1787774097.32074,
+    "seen": 1787814370.0054235,
+    "ast_hash": "6fd983d1d3ae2b331d8c1d64d5914cf1",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/app.spec.ts": {
+    "mtime": 1787415683.35458,
+    "seen": 1787814370.005425,
+    "ast_hash": "38529fb54b69511df14d861d83d839f3",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/app.ts": {
+    "mtime": 1786565628.7848773,
+    "seen": 1787814370.0054264,
+    "ast_hash": "c65567a6929588a021db336ba25625cb",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/admin-directory/admin-directory.models.ts": {
+    "mtime": 1787415683.35458,
+    "seen": 1787814370.0054274,
+    "ast_hash": "001441988fd3de3bda6b09cb7ef9f18c",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/admin-directory/admin-directory.repository.ts": {
+    "mtime": 1787076477.827645,
+    "seen": 1787814370.0054288,
+    "ast_hash": "2706800727582fbb8d98a8990831f5a9",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/admin-directory/admin-directory.service.spec.ts": {
+    "mtime": 1787415692.5607214,
+    "seen": 1787814370.00543,
+    "ast_hash": "6fe5195f1f4c7729fcf35c3f041b8e26",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/admin-directory/admin-directory.service.ts": {
+    "mtime": 1786800003.544856,
+    "seen": 1787814370.005431,
+    "ast_hash": "a306364e9a7354e5314f42f618bd5a64",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/admin-directory/ai-access-log.service.ts": {
+    "mtime": 1787726559.2936888,
+    "seen": 1787814370.005432,
+    "ast_hash": "c0e1e1fc3d87a30686104d11a4ca2d03",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/admin-directory/purge-sweep.service.ts": {
+    "mtime": 1787650938.0551686,
+    "seen": 1787814370.005433,
+    "ast_hash": "2512dd26ee6d5e219a26b503a888b28f",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/ai-assistant/ai-assistant.service.ts": {
+    "mtime": 1787687219.2506692,
+    "seen": 1787814370.0054338,
+    "ast_hash": "6739b36447796a1f9d367cc4cd39365b",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/ai-assistant/ai-conversation-store.service.ts": {
+    "mtime": 1787719044.3180149,
+    "seen": 1787814370.005435,
+    "ast_hash": "82dcf9910978f3cf99d7259fae4badce",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/auth/auth.guards.ts": {
+    "mtime": 1787431184.9750886,
+    "seen": 1787814370.005436,
+    "ast_hash": "28dc5ca284df641bea04caa58e6c2a10",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/auth/auth.interceptor.ts": {
+    "mtime": 1787076477.827645,
+    "seen": 1787814370.005437,
+    "ast_hash": "55a2cf1d2d82d4c983ac162ea6b186af",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/auth/auth.models.ts": {
+    "mtime": 1787415683.35458,
+    "seen": 1787814370.0054379,
+    "ast_hash": "69bc59a49c8a19a36aa6bfef739f59e0",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/auth/auth.service.ts": {
+    "mtime": 1787774097.32074,
+    "seen": 1787814370.005439,
+    "ast_hash": "75ce51674d377cf56bfc0dfda71a478d",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/auth/auth.test-fixtures.ts": {
+    "mtime": 1787415692.5607214,
+    "seen": 1787814370.00544,
+    "ast_hash": "d81a2d5f1eb21ed9474495264a4e8c91",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/auth/dev-users.service.spec.ts": {
+    "mtime": 1787080820.5777423,
+    "seen": 1787814370.005441,
+    "ast_hash": "819c88ecc833177e9b209ce306faed14",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/auth/dev-users.service.ts": {
+    "mtime": 1787080820.5777423,
+    "seen": 1787814370.0054424,
+    "ast_hash": "0c84db3c4e900b0fee7dcbfcd3f2608c",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/auth/external-registration.service.ts": {
+    "mtime": 1787774097.3217523,
+    "seen": 1787814370.005443,
+    "ast_hash": "1116bb15d9b80624fa4c1e993ef6f4eb",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/auth/role-access.ts": {
+    "mtime": 1787774097.3217523,
+    "seen": 1787814370.005444,
+    "ast_hash": "c255468725b65a322ae7eea31b0225cb",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/auth/role-navigation.spec.ts": {
+    "mtime": 1787054907.3858376,
+    "seen": 1787814370.005445,
+    "ast_hash": "400293f18a04f5caf79c34ef4618285e",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/auth/role-navigation.ts": {
+    "mtime": 1787415683.370533,
+    "seen": 1787814370.0054462,
+    "ast_hash": "8743729d083fb022aaabf79feea5e940",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/auth/token-store.ts": {
+    "mtime": 1787076477.827645,
+    "seen": 1787814370.005447,
+    "ast_hash": "e3103e8af6bdbd2cb62761bbdb3748ba",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/cafeterias/cafeteria-audit-log.models.ts": {
+    "mtime": 1787418982.0520506,
+    "seen": 1787814370.0054479,
+    "ast_hash": "91057ab3c7eba8828829ab6db46fd9a8",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/cafeterias/cafeteria-order.models.ts": {
+    "mtime": 1787251056.2123778,
+    "seen": 1787814370.0054488,
+    "ast_hash": "be310dc849cf93c691c57e44f286a7c7",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/cafeterias/cafeteria-order.service.ts": {
+    "mtime": 1787416605.4210608,
+    "seen": 1787814370.0054498,
+    "ast_hash": "b702b4156bad7c6117cb9dc15228bedb",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/cafeterias/cafeteria.models.ts": {
+    "mtime": 1787415683.371377,
+    "seen": 1787814370.005451,
+    "ast_hash": "2fc06078d4b1a7cd77a54fd98a937600",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/cafeterias/cafeteria.service.ts": {
+    "mtime": 1787774097.322761,
+    "seen": 1787814370.0054517,
+    "ast_hash": "405fdfd01ba7f71aae991248cddb8fc3",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/clubs/club.models.ts": {
+    "mtime": 1787430750.7355235,
+    "seen": 1787814370.005453,
+    "ast_hash": "2ce834b6ed46f7001c2c0b36158082fd",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/clubs/club.service.ts": {
+    "mtime": 1787774097.323762,
+    "seen": 1787814370.005454,
+    "ast_hash": "619d0680c7727aa8b6368290a39e40cd",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/config/system-config.models.ts": {
+    "mtime": 1787054907.3878465,
+    "seen": 1787814370.005455,
+    "ast_hash": "2c2355f658767568e75271a25196f23c",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/config/system-config.service.ts": {
+    "mtime": 1787076477.827645,
+    "seen": 1787814370.0054562,
+    "ast_hash": "53b1ff8bf999c8dfc82173ee0b5fcf41",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/departments/department-request-columns.ts": {
+    "mtime": 1787300638.830929,
+    "seen": 1787814370.0054572,
+    "ast_hash": "73a37ee9984d105cece9ce9b7a585ac0",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/departments/department-workflow.config.ts": {
+    "mtime": 1787415683.371377,
+    "seen": 1787814370.005458,
+    "ast_hash": "147936f01b5eb133bd1667e950a80f4d",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/event-catalog/event-catalog.models.ts": {
+    "mtime": 1786866797.0455723,
+    "seen": 1787814370.0054593,
+    "ast_hash": "9513c07ef17574b135e9fe39b227fb53",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/event-catalog/event-catalog.repository.ts": {
+    "mtime": 1787076477.827645,
+    "seen": 1787814370.00546,
+    "ast_hash": "65c5930c98c5ddc8659f7526b031c753",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/event-catalog/event-catalog.service.ts": {
+    "mtime": 1787025205.3920076,
+    "seen": 1787814370.0054612,
+    "ast_hash": "bb031de982cd88042291224d00ea4a9b",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/events/event-engagement.models.ts": {
+    "mtime": 1787774097.323762,
+    "seen": 1787814370.0054622,
+    "ast_hash": "98842b63784adccef1d71a78a856b30c",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/events/event-favourite.service.ts": {
+    "mtime": 1787415683.371377,
+    "seen": 1787814370.0054634,
+    "ast_hash": "8579e0ea6005b448deac8104db09e5f5",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/events/event-image-upload.service.ts": {
+    "mtime": 1787076477.827645,
+    "seen": 1787814370.0054643,
+    "ast_hash": "c7b510fcfaaacb9a885341b8d1da5463",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/events/payment-proof-upload.service.ts": {
+    "mtime": 1787076477.827645,
+    "seen": 1787814370.0054653,
+    "ast_hash": "b16fcb5a14b5486404dfbdf42786697e",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/events/published-event.models.ts": {
+    "mtime": 1787774097.3247595,
+    "seen": 1787814370.0054665,
+    "ast_hash": "6f7ab5586e71002d3cf082ff5dfb0c0d",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/events/published-event.service.ts": {
+    "mtime": 1787774097.3257608,
+    "seen": 1787814370.0054674,
+    "ast_hash": "983c4b00516a79dc5325f208bef98565",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/events/saved-events.service.spec.ts": {
+    "mtime": 1787774097.3257608,
+    "seen": 1787814370.0054684,
+    "ast_hash": "28a5b11620ed96f6233e3cfaed502313",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/events/saved-events.service.ts": {
+    "mtime": 1787774097.3267624,
+    "seen": 1787814370.0054698,
+    "ast_hash": "f84b7c67c6874e3153ea4d366fa5a649",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/proposals/proposal-conversation.models.ts": {
+    "mtime": 1787287656.9124842,
+    "seen": 1787814370.0054708,
+    "ast_hash": "c682e06597941dd2f08f450bfb08b426",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/proposals/proposal-review.mock-data.ts": {
+    "mtime": 1787076477.827645,
+    "seen": 1787814370.0054717,
+    "ast_hash": "b491c4f9dc4afec5e8047b9aa3d21093",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/proposals/proposal-review.models.ts": {
+    "mtime": 1787415683.371377,
+    "seen": 1787814370.0054727,
+    "ast_hash": "0ebd9b4a9709fd4422dd55190b625916",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/proposals/proposal-status.models.spec.ts": {
+    "mtime": 1786526425.8638167,
+    "seen": 1787814370.0054739,
+    "ast_hash": "4fad5f389c2eca89a97c8346bf1f652c",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/proposals/proposal-status.models.ts": {
+    "mtime": 1787415683.371377,
+    "seen": 1787814370.0054748,
+    "ast_hash": "7cf0831bf33593c7bfb96ae23c452eb8",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/proposals/proposal-visibility.ts": {
+    "mtime": 1787415683.371377,
+    "seen": 1787814370.0054758,
+    "ast_hash": "32b4c041cbec4765b08c92e679fc8a19",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/proposals/proposal-workflow.repository.ts": {
+    "mtime": 1787774097.3267624,
+    "seen": 1787814370.005477,
+    "ast_hash": "3a89366d1308a1efeedaea0556d11935",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/proposals/proposal-workflow.service.ts": {
+    "mtime": 1787415683.371377,
+    "seen": 1787814370.0054781,
+    "ast_hash": "5aafa78290aa81ef1f047b46afbd5ae5",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/reminders/deadline-reminder.service.ts": {
+    "mtime": 1787249160.156314,
+    "seen": 1787814370.0054789,
+    "ast_hash": "d1ca6917c13a5c0a30c5737d45678b00",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/request-options/logistics-availability.models.ts": {
+    "mtime": 1787415683.371377,
+    "seen": 1787814370.00548,
+    "ast_hash": "eaedfe97a966edfb3b18d5f532062ca6",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/request-options/logistics-availability.service.ts": {
+    "mtime": 1787076477.8389754,
+    "seen": 1787814370.005481,
+    "ast_hash": "594416cdd7135d7695a1abf62dca5245",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/request-options/request-option.mapper.ts": {
+    "mtime": 1785681816.9075596,
+    "seen": 1787814370.005482,
+    "ast_hash": "bd80cf9667eecc83e1e2a2f6028b49d2",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/request-options/request-option.models.ts": {
+    "mtime": 1787141817.6966372,
+    "seen": 1787814370.005483,
+    "ast_hash": "0df13c8b16f3aadf01ea3aa7abb489a8",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/request-options/request-option.permissions.ts": {
+    "mtime": 1786565628.8010328,
+    "seen": 1787814370.0054839,
+    "ast_hash": "f8389b2e60f61cec58ef1aacd92fb94c",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/request-options/request-option.repository.ts": {
+    "mtime": 1787076477.8394773,
+    "seen": 1787814370.005485,
+    "ast_hash": "ce138b4540c72cdb6a11b21b79893fa9",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/request-options/request-option.service.spec.ts": {
+    "mtime": 1787774097.3282318,
+    "seen": 1787814370.005486,
+    "ast_hash": "00bb6e5e8f646df0bae8b7dce216ba70",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/request-options/request-option.service.ts": {
+    "mtime": 1787774097.3296351,
+    "seen": 1787814370.005487,
+    "ast_hash": "94608aae3a9f0a7987548c051ba05c56",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/row-assignments/row-assignment.models.ts": {
+    "mtime": 1787303442.3064394,
+    "seen": 1787814370.005488,
+    "ast_hash": "e72c3927909a38672f3453ec0505f0cc",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/row-assignments/row-assignment.repository.ts": {
+    "mtime": 1787303429.695168,
+    "seen": 1787814370.0054889,
+    "ast_hash": "6416895e41386530222d5f5c6a4185fb",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/row-assignments/row-assignment.service.ts": {
+    "mtime": 1787250879.6855605,
+    "seen": 1787814370.0054896,
+    "ast_hash": "283c1e5c9cd13a6de9b0cce68d73f49e",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/staff-tasks/staff-task-routing.ts": {
+    "mtime": 1786634871.9966662,
+    "seen": 1787814370.0054905,
+    "ast_hash": "b4b0e756efefb8564efd9421e4327947",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/staff-tasks/staff-task.models.ts": {
+    "mtime": 1787054907.4086196,
+    "seen": 1787814370.0054915,
+    "ast_hash": "27618655e18e454d7d8a3c4cad02385c",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/staff-tasks/staff-task.repository.ts": {
+    "mtime": 1787076477.8410087,
+    "seen": 1787814370.0054924,
+    "ast_hash": "40ebd9e65206841e8a8388571842d2e3",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/staff-tasks/staff-task.service.ts": {
+    "mtime": 1786565628.805033,
+    "seen": 1787814370.0054932,
+    "ast_hash": "46f9d7249c682007cb991bec4e62229e",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/core/users/internal-user-directory.service.ts": {
+    "mtime": 1787234404.6724846,
+    "seen": 1787814370.0054944,
+    "ast_hash": "47350970993aaead4f7f963efe3adf98",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/auth/login/login.spec.ts": {
+    "mtime": 1787080820.5894172,
+    "seen": 1787814370.0054953,
+    "ast_hash": "bc48f8e37a45cb70a2bfd90b10c72a54",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/auth/login/login.ts": {
+    "mtime": 1787774097.3316414,
+    "seen": 1787814370.0054963,
+    "ast_hash": "c253b94965508e9e9184d0c2f455d9aa",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/auth/logout/logout.ts": {
+    "mtime": 1785597016.2972114,
+    "seen": 1787814370.005497,
+    "ast_hash": "b11269acf03296b75509e533b7040a59",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/auth/reset-password/reset-password.ts": {
+    "mtime": 1787571387.5737224,
+    "seen": 1787814370.0054982,
+    "ast_hash": "21cd47880d750dc11af382bfc2ef55c2",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/layout/internal-layout.spec.ts": {
+    "mtime": 1787415692.555588,
+    "seen": 1787814370.0054994,
+    "ast_hash": "3d8aec2a82399a9bb816252f7f60f283",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/layout/internal-layout.ts": {
+    "mtime": 1787774097.3326416,
+    "seen": 1787814370.0055,
+    "ast_hash": "2b969dc8b98b9429d4afbc61b978f3a8",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/admin-directory/admin-directory.ts": {
+    "mtime": 1787774097.3337984,
+    "seen": 1787814370.0055017,
+    "ast_hash": "0e31e49610bc4d858f18593144b7e238",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/ai-access-log/ai-access-log.ts": {
+    "mtime": 1787726637.0067284,
+    "seen": 1787814370.0055027,
+    "ast_hash": "d36e739a3c45e9201ec8a0fcef7396f6",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/cafeteria-manage/cafeteria-manage.ts": {
+    "mtime": 1787774097.334802,
+    "seen": 1787814370.0055037,
+    "ast_hash": "a3914453b96b027896a2f808f84adaf9",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/cafeteria-menu-oversight/cafeteria-menu-oversight.ts": {
+    "mtime": 1787129058.3296053,
+    "seen": 1787814370.005505,
+    "ast_hash": "6a94f6deb1a15120cb77fb58c1433092",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/cafeteria-my-staff/cafeteria-my-staff.ts": {
+    "mtime": 1787774097.3369217,
+    "seen": 1787814370.0055058,
+    "ast_hash": "748617a040add531bf6cd93cde4197a2",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/cafeteria-staff-assignments/cafeteria-staff-assignments.ts": {
+    "mtime": 1787774097.337925,
+    "seen": 1787814370.0055068,
+    "ast_hash": "ba1b3335566b6a1f73ad32f1b5a69331",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/cafeteria-staff-requests-history/cafeteria-staff-requests-history.ts": {
+    "mtime": 1787419140.8074753,
+    "seen": 1787814370.0055082,
+    "ast_hash": "ecc917642b32e2ea0933f0eec913c46c",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/cafeteria-staff-tasks/cafeteria-staff-tasks.ts": {
+    "mtime": 1787344554.2166336,
+    "seen": 1787814370.0055091,
+    "ast_hash": "1a86a1b0a29b923001220bd427ae6acd",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/club-category-management/club-category-management.ts": {
+    "mtime": 1787375821.8015063,
+    "seen": 1787814370.00551,
+    "ast_hash": "fe8c350d7759c3b60a1b4ea66a8e697c",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/clubs/club-discover/club-discover.ts": {
+    "mtime": 1787054907.433161,
+    "seen": 1787814370.0055108,
+    "ast_hash": "0ab284786a802e7284b8c032bbb51c0e",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/clubs/club-hub/club-hub.ts": {
+    "mtime": 1787415683.388041,
+    "seen": 1787814370.0055122,
+    "ast_hash": "38d8d15021df86a5d22553ed2172c3d4",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/clubs/club-hub/hub-my-clubs/hub-my-clubs.ts": {
+    "mtime": 1787431938.5925734,
+    "seen": 1787814370.0055132,
+    "ast_hash": "9bd16918187a47324ce314f04f65edcf",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/clubs/club-management/club-management.ts": {
+    "mtime": 1787774097.3389246,
+    "seen": 1787814370.0055141,
+    "ast_hash": "331a65b80fb9d4c5aadff831afb271ee",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/created-by-me/created-by-me.ts": {
+    "mtime": 1787378219.90021,
+    "seen": 1787814370.0055153,
+    "ast_hash": "287bc2087c3bde97f7e7a065f0533769",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/department-resubmit/department-resubmit.ts": {
+    "mtime": 1787300657.2508826,
+    "seen": 1787814370.0055165,
+    "ast_hash": "0e2b7079e4ba12c112dfaade6637a76a",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/event-proposal/event-proposal.spec.ts": {
+    "mtime": 1787415683.388041,
+    "seen": 1787814370.0055177,
+    "ast_hash": "e44ac3ca167df8a82eedfdd3d9110ca9",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/event-proposal/event-proposal.ts": {
+    "mtime": 1787415683.388041,
+    "seen": 1787814370.005519,
+    "ast_hash": "9fdaed09be3b574d11715723e02ee698",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/explore-events/explore-events.ts": {
+    "mtime": 1785776282.816451,
+    "seen": 1787814370.0055196,
+    "ast_hash": "d92d6d85aea239394f6e06a73fe7c607",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/how-it-works/how-it-works.spec.ts": {
+    "mtime": 1787054907.4731123,
+    "seen": 1787814370.0055206,
+    "ast_hash": "d11db981f4e55102800e3907b76f8a84",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/how-it-works/how-it-works.ts": {
+    "mtime": 1787054907.4767795,
+    "seen": 1787814370.0055213,
+    "ast_hash": "81b58cbb1c1c12570226964ec490d561",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/internal-placeholder.ts": {
+    "mtime": 1785487715.3196225,
+    "seen": 1787814370.0055227,
+    "ast_hash": "a4679c54f5592038a019e649bbf87d0f",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/page-visibility/page-visibility.ts": {
+    "mtime": 1787774097.341362,
+    "seen": 1787814370.0055237,
+    "ast_hash": "26d026b0cb9f7815aea06ae7fb273764",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/profile/profile.ts": {
+    "mtime": 1787774097.3423686,
+    "seen": 1787814370.0055246,
+    "ast_hash": "2462e52a56bed184c0cf90fd368bb618",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/proposal-review-page/proposal-review-page.spec.ts": {
+    "mtime": 1787415692.5607214,
+    "seen": 1787814370.0055258,
+    "ast_hash": "fec7bf12159c1d382be1fab4053af0a9",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/proposal-review-page/proposal-review-page.ts": {
+    "mtime": 1787415683.4046087,
+    "seen": 1787814370.005527,
+    "ast_hash": "c561fc846d15d711191b4b204bcacfec",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-club-requests/hub-club-requests.ts": {
+    "mtime": 1787415683.4046087,
+    "seen": 1787814370.0055277,
+    "ast_hash": "cf52a173ecbae903211ee78fa1b76c3f",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-history-clubs/hub-history-clubs.ts": {
+    "mtime": 1787345658.4095972,
+    "seen": 1787814370.005529,
+    "ast_hash": "ab3a2001bf63002f3c73d1f71fd7a4bc",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-history-events/hub-history-events.ts": {
+    "mtime": 1787774097.3455544,
+    "seen": 1787814370.0055299,
+    "ast_hash": "4ec774b9a086272c87bd707999af2522",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-ongoing-clubs/hub-ongoing-clubs.ts": {
+    "mtime": 1787342618.5157754,
+    "seen": 1787814370.005531,
+    "ast_hash": "2570515a18dcb72d5c1b44ffe369e4e7",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-president-change-requests/hub-president-change-requests.ts": {
+    "mtime": 1787774097.3470259,
+    "seen": 1787814370.0055323,
+    "ast_hash": "8cc39c4a9764fbfa9d2dbf8f9202bfcc",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-proposals/hub-proposals.ts": {
+    "mtime": 1787774097.3482099,
+    "seen": 1787814370.0055332,
+    "ast_hash": "b1565ba767768dde417070a15f97e076",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-registrations/hub-registrations.ts": {
+    "mtime": 1787774097.3503911,
+    "seen": 1787814370.0055342,
+    "ast_hash": "e87ee49effabab084d6febc683332a1e",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-requests/hub-requests.ts": {
+    "mtime": 1787415683.4046087,
+    "seen": 1787814370.0055351,
+    "ast_hash": "1ba57f0cb69de33b64998aa49b3be8d5",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/records-hub.ts": {
+    "mtime": 1787774097.3508954,
+    "seen": 1787814370.0055363,
+    "ast_hash": "c43c799d0cf63f4a1f1f133b5118adb7",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-page/records-page.spec.ts": {
+    "mtime": 1787415692.5607214,
+    "seen": 1787814370.0055373,
+    "ast_hash": "4ab2be53d4e49228a63d4dd4545f1178",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-page/records-page.ts": {
+    "mtime": 1787415683.4046087,
+    "seen": 1787814370.005538,
+    "ast_hash": "51d8f5ee3567290dfd508e4f41728a45",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/request-option-management/request-option-management.ts": {
+    "mtime": 1787774097.3520668,
+    "seen": 1787814370.0055392,
+    "ast_hash": "1af96dab63f7bb70b3d82705348c70cd",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/roles/roles.ts": {
+    "mtime": 1787774097.3530707,
+    "seen": 1787814370.0055401,
+    "ast_hash": "e895c4ceec2d5892749fea217a94cc09",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/routing-matrix/routing-matrix.ts": {
+    "mtime": 1786612772.9760213,
+    "seen": 1787814370.0055413,
+    "ast_hash": "339d66bbf3f1c2517bc39a0f8da32f20",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/staff-tasks/staff-tasks.ts": {
+    "mtime": 1787415683.4046087,
+    "seen": 1787814370.005542,
+    "ast_hash": "ba83bad3b232cefd8399d204e2dd20bc",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/system-config/categories-tab/categories-tab.ts": {
+    "mtime": 1787025381.659843,
+    "seen": 1787814370.0055432,
+    "ast_hash": "de0f8a154f0a6ea791f3583f97d91843",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/system-config/event-catalog-section/event-catalog-section.ts": {
+    "mtime": 1787774097.355071,
+    "seen": 1787814370.0055442,
+    "ast_hash": "1bb9541a2a3fb3808e6143791ac5afc0",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/system-config/formats-tab/formats-tab.ts": {
+    "mtime": 1787025391.5323296,
+    "seen": 1787814370.0055451,
+    "ast_hash": "9155b380137debc998da4afa361b980f",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/system-config/policies-tab/policies-tab.ts": {
+    "mtime": 1787054907.5162013,
+    "seen": 1787814370.0055463,
+    "ast_hash": "8d37a932d018a0203d3b5dfb5a473c0b",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/components/campus-life/campus-life.ts": {
+    "mtime": 1785406418.970657,
+    "seen": 1787814370.0055473,
+    "ast_hash": "c0511dc768afe6f03f9ebd77b422c22e",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/components/event-calendar/event-calendar.spec.ts": {
+    "mtime": 1787076477.852787,
+    "seen": 1787814370.0055482,
+    "ast_hash": "db7a8d416668a9a29856714132ea36c4",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/components/event-calendar/event-calendar.ts": {
+    "mtime": 1787774097.3570714,
+    "seen": 1787814370.0055494,
+    "ast_hash": "4a4baed43353782725a7bf6c81b2cfec",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/components/explore-events/explore-events-internal.spec.ts": {
+    "mtime": 1787774097.3570714,
+    "seen": 1787814370.0055504,
+    "ast_hash": "462ce827dc8b8f8c0b380a8141f6317f",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/components/explore-events/explore-events.spec.ts": {
+    "mtime": 1787415683.4046087,
+    "seen": 1787814370.0055516,
+    "ast_hash": "a578e92fe1c251834a86bca603b170ac",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/components/explore-events/explore-events.ts": {
+    "mtime": 1787774097.3580747,
+    "seen": 1787814370.0055523,
+    "ast_hash": "ff7403b79d5bb304c6816b3046e9752b",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/components/happening-soon/happening-soon.spec.ts": {
+    "mtime": 1787076477.8562915,
+    "seen": 1787814370.0055537,
+    "ast_hash": "181e362ea1fb7d9592f3fe1da2b1cced",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/components/happening-soon/happening-soon.ts": {
+    "mtime": 1787774097.360072,
+    "seen": 1787814370.0055547,
+    "ast_hash": "6db160686d1944112209b5834f55e2ef",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/components/hero/hero.spec.ts": {
+    "mtime": 1786128087.155409,
+    "seen": 1787814370.0055556,
+    "ast_hash": "42cc9d81adb6a2913e3282996a6ec538",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/components/hero/hero.ts": {
+    "mtime": 1786121144.6056268,
+    "seen": 1787814370.0055566,
+    "ast_hash": "dbbb4a71ff19fe64bb90e1406794f601",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/landing-page.ts": {
+    "mtime": 1785771326.6260655,
+    "seen": 1787814370.0055575,
+    "ast_hash": "e12ba7173f92e4538259759c5332e3fb",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/my-events/my-events-tab/my-events-tab.ts": {
+    "mtime": 1787774097.3610747,
+    "seen": 1787814370.0055585,
+    "ast_hash": "60b53daa9b002484e231e21cd7d4205a",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/my-events/my-events.ts": {
+    "mtime": 1787415683.4046087,
+    "seen": 1787814370.0055592,
+    "ast_hash": "bf79f8fcf72b1c3721dd2f809e84d13b",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/shared-library/shared-library.spec.ts": {
+    "mtime": 1785568968.5901382,
+    "seen": 1787814370.0055604,
+    "ast_hash": "0cb9d50e69f1fb2aebb281f4d27af599",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/shared-library/shared-library.ts": {
+    "mtime": 1786121428.3647363,
+    "seen": 1787814370.0055614,
+    "ast_hash": "9b3923ba1c2fef4167c792459a6d51d2",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/ai-assistant/ai-assistant-page/ai-assistant-page.ts": {
+    "mtime": 1787666954.228162,
+    "seen": 1787814370.0055625,
+    "ast_hash": "dce59a9bdf77453d538a56da3f8b500e",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/ai-assistant/ai-assistant.ts": {
+    "mtime": 1787810453.9990685,
+    "seen": 1787814370.0055637,
+    "ast_hash": "3aac0874e3fbeb2a6c012f008e322a3a",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/ai-assistant/ai-orb-awareness.service.ts": {
+    "mtime": 1786100705.8405478,
+    "seen": 1787814370.0055645,
+    "ast_hash": "326c4843d2182f8e2056cfe2cb6b1028",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/camera-capture/camera-capture.ts": {
+    "mtime": 1787309646.0511093,
+    "seen": 1787814370.0055654,
+    "ast_hash": "05241e819f6daf25017543837077ae2a",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/character-counter/character-counter.ts": {
+    "mtime": 1785586182.983235,
+    "seen": 1787814370.0055664,
+    "ast_hash": "926be588ae41f1ae8ee9e41ac64fa38f",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/club-category-picker/club-category-picker.ts": {
+    "mtime": 1787415683.4196033,
+    "seen": 1787814370.0055676,
+    "ast_hash": "a90e3eb81560c111f8df269d1e5d573c",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/club-roster-modal/club-roster-modal.ts": {
+    "mtime": 1787430811.1132593,
+    "seen": 1787814370.0055685,
+    "ast_hash": "fda987202be5fd82d607ec86177fac50",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/confirm-dialog/confirm-dialog.ts": {
+    "mtime": 1786012842.1480803,
+    "seen": 1787814370.0055695,
+    "ast_hash": "fc250364b632478e69e8a0249953280b",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/conversation-thread/conversation-thread.ts": {
+    "mtime": 1787296088.0590696,
+    "seen": 1787814370.0055704,
+    "ast_hash": "a39d688613fc9724e81ad62b537d3011",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/cta-link/cta-link.ts": {
+    "mtime": 1786121118.8738844,
+    "seen": 1787814370.0055716,
+    "ast_hash": "8a03a50ef5ef0c8598fd04f70c5f6303",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/data-table/data-table.ts": {
+    "mtime": 1785572123.5172274,
+    "seen": 1787814370.0055726,
+    "ast_hash": "aa268969b8f84bed36dba912ad52bb8a",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/delete-confirm-dialog/delete-confirm-dialog.ts": {
+    "mtime": 1787774097.365052,
+    "seen": 1787814370.0055733,
+    "ast_hash": "86855bab9d6dec9d58ee7f310d6c25d2",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/event-card/event-card.ts": {
+    "mtime": 1787415683.4196033,
+    "seen": 1787814370.0055745,
+    "ast_hash": "53ea6be43ec440721ed7b8b2fe825dc3",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/event-details-modal/event-details-modal.ts": {
+    "mtime": 1787415683.4215183,
+    "seen": 1787814370.0055754,
+    "ast_hash": "c91f77484436dffc9171b44d4a0d2e93",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/event-image-upload/event-image-upload.ts": {
+    "mtime": 1787415683.4225192,
+    "seen": 1787814370.0055766,
+    "ast_hash": "14927a05eb1d068acac46da104daefe0",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/expandable-search/expandable-search.ts": {
+    "mtime": 1785945981.994689,
+    "seen": 1787814370.0055778,
+    "ast_hash": "8d645c9705f34b8d528cdcfcc17aa0ba",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/feedback-banner/feedback-banner.ts": {
+    "mtime": 1785730644.8408313,
+    "seen": 1787814370.0055785,
+    "ast_hash": "ecad119e4cbb5da12f1091c8a4a23428",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/filter-button/filter-button.ts": {
+    "mtime": 1786004890.2666583,
+    "seen": 1787814370.0055797,
+    "ast_hash": "17ed9dd250dff1930ff13980215f0ce1",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/forgot-password-modal/forgot-password-modal.ts": {
+    "mtime": 1787571280.8563502,
+    "seen": 1787814370.005581,
+    "ast_hash": "575ceafbe8bf6895f3e3b8bcc8c20e1b",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/form-controls/editable-table.ts": {
+    "mtime": 1785581496.0736887,
+    "seen": 1787814370.005582,
+    "ast_hash": "6ee60f06ede23004878d3af8e989c28b",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/form-controls/form-controls.models.ts": {
+    "mtime": 1786565628.834033,
+    "seen": 1787814370.005583,
+    "ast_hash": "4b8d54118aa55f6fc89f7d7835c0ed65",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/form-controls/form-field.ts": {
+    "mtime": 1787774097.3662753,
+    "seen": 1787814370.0055845,
+    "ast_hash": "5bbb1c307cd13bbc278f9619b21daaa5",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/form-modal/form-modal.ts": {
+    "mtime": 1786129091.2911925,
+    "seen": 1787814370.0055854,
+    "ast_hash": "951addfb89ef9f75380bb9b6e72a01e8",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/guest-registration-modal/guest-registration-modal.ts": {
+    "mtime": 1787774097.3682804,
+    "seen": 1787814370.0055866,
+    "ast_hash": "f4acf8309c300262480f9566cdd490bb",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/image-upload-field/image-upload-field.ts": {
+    "mtime": 1786627815.4588149,
+    "seen": 1787814370.0055878,
+    "ast_hash": "31d38c64951d0d8c29dd21dbf978aa9b",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/internal-data-page/internal-data-page-parts.ts": {
+    "mtime": 1787774097.3682804,
+    "seen": 1787814370.005589,
+    "ast_hash": "841bd77d28d9518de2a04f8a5bd96722",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/internal-data-page/internal-data-page.models.ts": {
+    "mtime": 1787415683.424762,
+    "seen": 1787814370.00559,
+    "ast_hash": "34122697358ad731baca9d259342e707",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/internal-data-page/internal-data-page.ts": {
+    "mtime": 1787415683.424762,
+    "seen": 1787814370.0055912,
+    "ast_hash": "1a5c99ddbba6020ebfa721a8797bde4e",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/internal-table-workspace/internal-table-workspace.spec.ts": {
+    "mtime": 1785527951.9982884,
+    "seen": 1787814370.0055923,
+    "ast_hash": "69f1964e0b06226229528f85737039cb",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/internal-table-workspace/internal-table-workspace.ts": {
+    "mtime": 1787054907.5353682,
+    "seen": 1787814370.005593,
+    "ast_hash": "9326b989b3b3d438b631037d5df6a8ec",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/loading-state/loading-state.ts": {
+    "mtime": 1786526425.9099076,
+    "seen": 1787814370.0055943,
+    "ast_hash": "a66e90310011831a3f53937533d1d79f",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/nav-icon/nav-icon.ts": {
+    "mtime": 1786617234.8645532,
+    "seen": 1787814370.0055952,
+    "ast_hash": "a15894ab69f467864f4e2bb27a1231ec",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/option-card-grid/option-card-grid.models.ts": {
+    "mtime": 1786184656.4921036,
+    "seen": 1787814370.0055962,
+    "ast_hash": "e3bb8c309ff312796ff63dea402c5cde",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/option-card-grid/option-card-grid.ts": {
+    "mtime": 1786565628.836033,
+    "seen": 1787814370.0055974,
+    "ast_hash": "5b631a922c9833c91af8419b1ebc81cc",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/option-item-details-modal/option-item-details-modal.ts": {
+    "mtime": 1786183505.3131073,
+    "seen": 1787814370.0055985,
+    "ast_hash": "bbe8f115f0a1bc7d70340e046a744d41",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/option-picker-grid/option-picker-grid.models.ts": {
+    "mtime": 1786541258.4489818,
+    "seen": 1787814370.0055995,
+    "ast_hash": "5f6bcfca600bcdef8d4fe3e2fb6160f6",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/option-picker-grid/option-picker-grid.ts": {
+    "mtime": 1786541269.2664409,
+    "seen": 1787814370.0056007,
+    "ast_hash": "b6b7d9f94fe44b1d6f512a29762de6b6",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/popover/popover.ts": {
+    "mtime": 1786641662.3945408,
+    "seen": 1787814370.005602,
+    "ast_hash": "31da42915b6d341575dd87d436800144",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/president-change-request-modal/president-change-request-modal.ts": {
+    "mtime": 1787430879.3031206,
+    "seen": 1787814370.0056028,
+    "ast_hash": "13f9a434f100c4a9971545c9d1b1134d",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/proposal-comment-dialog/proposal-comment-dialog.ts": {
+    "mtime": 1786999068.839665,
+    "seen": 1787814370.005604,
+    "ast_hash": "41eb7274e4633ba4eac8ef6339e19415",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/proposal-department-view/proposal-department-view.ts": {
+    "mtime": 1787415683.424762,
+    "seen": 1787814370.0056052,
+    "ast_hash": "51f393d88613374bd7bae09eac636c37",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/proposal-field/proposal-field.ts": {
+    "mtime": 1786178795.6504345,
+    "seen": 1787814370.005606,
+    "ast_hash": "22b0538c4a2c138cac3bcb56e69a37ba",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/proposal-kpi-bar/proposal-kpi-bar.ts": {
+    "mtime": 1786178772.316612,
+    "seen": 1787814370.0056071,
+    "ast_hash": "09bfe19ba9732ba35883af7fd4203d10",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/proposal-reviewer-view/proposal-reviewer-view.ts": {
+    "mtime": 1787415683.424762,
+    "seen": 1787814370.005608,
+    "ast_hash": "d67b41cd5577b4cdf3c056958549d068",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/proposal-section/proposal-section.ts": {
+    "mtime": 1786178785.4134178,
+    "seen": 1787814370.005609,
+    "ast_hash": "44e490e895c44a9f958b7f14c16bdc29",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/proposal-table/proposal-table.ts": {
+    "mtime": 1786565628.839033,
+    "seen": 1787814370.00561,
+    "ast_hash": "4603799638cca51d36db03950443435f",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/reviewer-comments-drawer/reviewer-comments-drawer.ts": {
+    "mtime": 1787299905.377028,
+    "seen": 1787814370.0056112,
+    "ast_hash": "5e0a9e7a711dd64c5d2cf020778bcc4b",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/row-counter/row-counter.ts": {
+    "mtime": 1786177505.7628527,
+    "seen": 1787814370.0056124,
+    "ast_hash": "7f21ad3169cbf57aaf57a7cde68f8e86",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/searchable-dropdown/searchable-dropdown.ts": {
+    "mtime": 1787774097.370283,
+    "seen": 1787814370.0056133,
+    "ast_hash": "d2ce5d5195312f471291280c6a9dd249",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/site-footer/site-footer.spec.ts": {
+    "mtime": 1785418615.4934916,
+    "seen": 1787814370.0056143,
+    "ast_hash": "09adc83d5f612ab2ac38935e5801e584",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/site-footer/site-footer.ts": {
+    "mtime": 1785417925.825976,
+    "seen": 1787814370.005615,
+    "ast_hash": "1960ca0debe7a8a10fdf596828a6524b",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/site-header/site-header.spec.ts": {
+    "mtime": 1786121752.9674046,
+    "seen": 1787814370.0056162,
+    "ast_hash": "0b19bae8f24119370a9d7c2ccd90ab71",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/site-header/site-header.ts": {
+    "mtime": 1787774097.3712826,
+    "seen": 1787814370.0056174,
+    "ast_hash": "f207b6666fafd283a1a56e6de8acb68a",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/status-toggle/status-toggle.ts": {
+    "mtime": 1785730128.0477054,
+    "seen": 1787814370.005618,
+    "ast_hash": "3a577b87a824d9b2a0d3740607a61f26",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/step-indicator/step-indicator.spec.ts": {
+    "mtime": 1785573335.392791,
+    "seen": 1787814370.0056193,
+    "ast_hash": "cc5d2167b29c4069f0a113c33ce547d6",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/step-indicator/step-indicator.ts": {
+    "mtime": 1785732696.2942204,
+    "seen": 1787814370.0056202,
+    "ast_hash": "196ef3a5ebeb4124f45b7d95efcd4572",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/task-calendar/task-calendar.ts": {
+    "mtime": 1787248950.7844093,
+    "seen": 1787814370.0056212,
+    "ast_hash": "5052aa7a5d2e262b69ada8642582c89a",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/toast/toast.models.ts": {
+    "mtime": 1786559137.5371046,
+    "seen": 1787814370.0056224,
+    "ast_hash": "c5f25ff8d754d637b1d83d306760cdde",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/toast/toast.service.ts": {
+    "mtime": 1787054907.5353682,
+    "seen": 1787814370.0056233,
+    "ast_hash": "794b9bdffccb2eb29f03bf290543fb57",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/toast/toast.ts": {
+    "mtime": 1786559167.4858694,
+    "seen": 1787814370.0056243,
+    "ast_hash": "08760b7845df9fb4ef8c849c15abec61",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/user-avatar/user-avatar.ts": {
+    "mtime": 1785599253.2936306,
+    "seen": 1787814370.0056252,
+    "ast_hash": "abd9d5ede17f04d605ea77aaea8da281",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/validation-message/validation-message.ts": {
+    "mtime": 1785576321.6230683,
+    "seen": 1787814370.0056267,
+    "ast_hash": "2f35c7dbd1c80f7a9e3715790df27620",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/view-toggle/view-toggle.ts": {
+    "mtime": 1787054907.5434277,
+    "seen": 1787814370.0056276,
+    "ast_hash": "a372573f635270e7d72d0846dcb149b4",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/event-image-placeholder.ts": {
+    "mtime": 1787378204.830186,
+    "seen": 1787814370.0056286,
+    "ast_hash": "e58620159d8eeb19e635e416a876d318",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/models/deletion.models.ts": {
+    "mtime": 1786644797.0625672,
+    "seen": 1787814370.0056298,
+    "ast_hash": "09a8a4b8b46ca0fd7d553595963c83c9",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/environments/environment.production.ts": {
+    "mtime": 1787076477.8562915,
+    "seen": 1787814370.0056307,
+    "ast_hash": "25fc07c3bb6845b7f24ddcaf74eb6880",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/environments/environment.ts": {
+    "mtime": 1787083235.0323348,
+    "seen": 1787814370.0056317,
+    "ast_hash": "2c1f57de5d2e438e5982dceb351d4b5b",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/main.ts": {
+    "mtime": 1785319421.195698,
+    "seen": 1787814370.0056334,
+    "ast_hash": "1289536d6d8f94242a4ffc598d094633",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1787076477.7639635,
+    "seen": 1787814370.0056343,
+    "ast_hash": "b62fbe8a02c4a40f2b89088acae30932",
+    "semantic_hash": ""
+  },
+  "backend/README.md": {
+    "mtime": 1787076735.6882937,
+    "seen": 1787814370.0056355,
+    "ast_hash": "511f82fa70a0cace13b254219864857c",
+    "semantic_hash": ""
+  },
+  "backend/app/services/email/templates/_button.html": {
+    "mtime": 1787570249.6606865,
+    "seen": 1787814370.0056365,
+    "ast_hash": "aeb1347b8d647c95db60a61493e08fa1",
+    "semantic_hash": ""
+  },
+  "backend/app/services/email/templates/_detail_block.html": {
+    "mtime": 1787554577.5695686,
+    "seen": 1787814370.0056374,
+    "ast_hash": "71c807474ca7d705f5ac833d5a9c67ab",
+    "semantic_hash": ""
+  },
+  "backend/app/services/email/templates/_shell.html": {
+    "mtime": 1787570239.2117612,
+    "seen": 1787814370.0056384,
+    "ast_hash": "0c540d209f6732003d0cdc042a61751c",
+    "semantic_hash": ""
+  },
+  "backend/docs/README.md": {
+    "mtime": 1787076477.775856,
+    "seen": 1787814370.0056398,
+    "ast_hash": "915ab67cb7e14c47fd553466b3d7af21",
+    "semantic_hash": ""
+  },
+  "backend/docs/api-design.md": {
+    "mtime": 1787076477.775856,
+    "seen": 1787814370.0056407,
+    "ast_hash": "5d1fd3a95a9cf6b263591133b3f8cc3d",
+    "semantic_hash": ""
+  },
+  "backend/docs/database.md": {
+    "mtime": 1787076477.775856,
+    "seen": 1787814370.0056417,
+    "ast_hash": "080ac014f44ab21817e6b20990263673",
+    "semantic_hash": ""
+  },
+  "backend/docs/index.html": {
+    "mtime": 1787076477.775856,
+    "seen": 1787814370.0056424,
+    "ast_hash": "03d89b94f5ae3093b0ab4ff8fa8ca4da",
+    "semantic_hash": ""
+  },
+  "backend/docs/security.md": {
+    "mtime": 1787076477.775856,
+    "seen": 1787814370.0056436,
+    "ast_hash": "b0a4013a746b7583aef2b331d8f30bf5",
+    "semantic_hash": ""
+  },
+  "backend/docs/workflow.md": {
+    "mtime": 1787076477.775856,
+    "seen": 1787814370.0056446,
+    "ast_hash": "a5427e89e99a5ff8dcba1adcecea43a1",
+    "semantic_hash": ""
+  },
+  "backend/requirements.txt": {
+    "mtime": 1787814227.6510153,
+    "seen": 1787814370.0056458,
+    "ast_hash": "d18fdb2ebe0d3992e226c9183ab3d770",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/01-role-hierarchy-and-access.md": {
+    "mtime": 1787773371.9380732,
+    "seen": 1787814370.0056467,
+    "ast_hash": "97408abe4b91e5a4641b155a93e492c4",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/02-metric-catalog.md": {
+    "mtime": 1787773371.9397154,
+    "seen": 1787814370.0056477,
+    "ast_hash": "e828c21130548643795e0f1fa645098e",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/03-dashboard-architecture.md": {
+    "mtime": 1787773371.9422717,
+    "seen": 1787814370.0056486,
+    "ast_hash": "e7f112fef50923e472a5bdda227ae88b",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/10-hod-av-services.md": {
+    "mtime": 1787773371.9448159,
+    "seen": 1787814370.0056496,
+    "ast_hash": "538087a6ed11db3fcc2c163cb3db5040",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/11-hod-food-beverage.md": {
+    "mtime": 1787773371.9448159,
+    "seen": 1787814370.0056505,
+    "ast_hash": "ba2668b126e506269a0afb3d8e3e201d",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/12-hod-logistics-facilities.md": {
+    "mtime": 1787773371.9448159,
+    "seen": 1787814370.005652,
+    "ast_hash": "3bd5155859223f517da02e30f65fbfa5",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/13-hod-photography.md": {
+    "mtime": 1787773371.9494944,
+    "seen": 1787814370.005653,
+    "ast_hash": "1eadf081c48c5128cb8fb7dd46bc2569",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/14-hod-student-services.md": {
+    "mtime": 1787773371.9516346,
+    "seen": 1787814370.005654,
+    "ast_hash": "f80b3be68a9730b785501ce681bec690",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/15-hod-transport.md": {
+    "mtime": 1787773371.9516346,
+    "seen": 1787814370.0056548,
+    "ast_hash": "ab56653709e3046eaee35519e39cd1fa",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/20-hos-school-of-computing.md": {
+    "mtime": 1787773371.9538343,
+    "seen": 1787814370.005656,
+    "ast_hash": "d3216c611288a74147ddf4abe310b0d5",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/21-hos-school-of-business.md": {
+    "mtime": 1787773371.9538343,
+    "seen": 1787814370.0056572,
+    "ast_hash": "63812ac80e15d860701e574763fd9f2d",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/30-cfo.md": {
+    "mtime": 1787773371.9579573,
+    "seen": 1787814370.0056581,
+    "ast_hash": "a3a67bf35691b81bf2dd2ea3cb0bf648",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/40-cafeteria-manager.md": {
+    "mtime": 1787773371.9579573,
+    "seen": 1787814370.0056589,
+    "ast_hash": "6e2673589203d88c399a12d69e724ee5",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/50-ai-insight-engine.md": {
+    "mtime": 1787773371.960558,
+    "seen": 1787814370.00566,
+    "ast_hash": "d7e1af992eb8f98b77619b4aedc38c31",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/60-navigation-and-drilldown.md": {
+    "mtime": 1787773371.9618618,
+    "seen": 1787814370.005661,
+    "ast_hash": "4afeb1b15f62053e9c3a8dea3c103fcf",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/70-wireframes-and-mobile.md": {
+    "mtime": 1787773371.9618618,
+    "seen": 1787814370.0056622,
+    "ast_hash": "e137e2e6b39e2e1a94206e0b2ea4f207",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/90-implementation-roadmap.md": {
+    "mtime": 1787773371.9636116,
+    "seen": 1787814370.0056634,
+    "ast_hash": "aac204ea3d6911e8bfdff2008de6e839",
+    "semantic_hash": ""
+  },
+  "docs/dashboards/README.md": {
+    "mtime": 1787773371.9636116,
+    "seen": 1787814370.0056646,
+    "ast_hash": "67a30148b1db73294c18f23547509b02",
+    "semantic_hash": ""
+  },
+  "docs/email-notifications-plan.md": {
+    "mtime": 1787552603.397835,
+    "seen": 1787814370.0056658,
+    "ast_hash": "52dcbee0dd59008d3b5cf21d9d307858",
+    "semantic_hash": ""
+  },
+  "docs/email-templates.md": {
+    "mtime": 1787553378.9077294,
+    "seen": 1787814370.0056667,
+    "ast_hash": "909ac9cda2345de58f279a71f014c40c",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-08-19-login-demo-user-picker.md": {
+    "mtime": 1787078262.4035537,
+    "seen": 1787814370.0056677,
+    "ast_hash": "787287b0a213f36eb67b9bf1c16af2c1",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/plans/2026-08-27-av-services-dashboard.md": {
+    "mtime": 1787802563.1969292,
+    "seen": 1787814370.0056689,
+    "ast_hash": "0d17e7a4b74bb9a72eceb032908f001f",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-08-19-login-demo-user-picker-design.md": {
+    "mtime": 1787077990.2459586,
+    "seen": 1787814370.0056698,
+    "ast_hash": "f11679cb7cf930fe315941394e592da2",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-08-20-proposal-api-bug-patterns.md": {
+    "mtime": 1787227703.2417042,
+    "seen": 1787814370.0056713,
+    "ast_hash": "85812243bbff4f77ef3fbc60a6483c24",
+    "semantic_hash": ""
+  },
+  "docs/superpowers/specs/2026-08-20-proposal-list-server-side-bucketing.md": {
+    "mtime": 1787214238.7600687,
+    "seen": 1787814370.0056722,
+    "ast_hash": "7fdc2af5a79d3c306eed51ad3b176c88",
+    "semantic_hash": ""
+  },
+  "fyp-ui/CLAUDE.md": {
+    "mtime": 1786688323.695338,
+    "seen": 1787814370.0056732,
+    "ast_hash": "8a6643a420fdad6bfb583523bc6cef16",
+    "semantic_hash": ""
+  },
+  "fyp-ui/README.md": {
+    "mtime": 1785319421.1708262,
+    "seen": 1787814370.0056746,
+    "ast_hash": "d15f0118c6392e7693dd73c820d402be",
+    "semantic_hash": ""
+  },
+  "fyp-ui/docs/superpowers/plans/2026-08-10-ems-schema-alignment-and-mock-backend.md": {
+    "mtime": 1786364678.7805636,
+    "seen": 1787814370.0056756,
+    "ast_hash": "cccbcb806cb1229de2b296a97a150466",
+    "semantic_hash": ""
+  },
+  "fyp-ui/docs/superpowers/specs/2026-08-10-ems-schema-alignment-and-mock-backend-design.md": {
+    "mtime": 1786362142.5710704,
+    "seen": 1787814370.0056763,
+    "ast_hash": "e24c41c1c68f0845bcf653e5fadc3048",
+    "semantic_hash": ""
+  },
+  "fyp-ui/docs/superpowers/specs/2026-08-13-rbac-role-unit-redesign-design.md": {
+    "mtime": 1786611337.2254605,
+    "seen": 1787814370.005678,
+    "ast_hash": "b0cfa74a30390c88b69bc93653f258e7",
+    "semantic_hash": ""
+  },
+  "fyp-ui/docs/system-logic/rbac-unit-level-migration-prompt.md": {
+    "mtime": 1787076477.7856367,
+    "seen": 1787814370.0056787,
+    "ast_hash": "10a2ae927cc082b03bd0bf2961d7c9c3",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/app.html": {
+    "mtime": 1786565628.7831404,
+    "seen": 1787814370.0056796,
+    "ast_hash": "77218dd34a836820a4e1ca933aaaa794",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/auth/login/login.html": {
+    "mtime": 1787774097.3306415,
+    "seen": 1787814370.0056806,
+    "ast_hash": "6c02d3529b4463590fbe49ac9be52303",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/layout/internal-layout.html": {
+    "mtime": 1787774097.3316414,
+    "seen": 1787814370.0056818,
+    "ast_hash": "495d9321c04fc48cd232ee266f394f99",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/admin-directory/admin-directory.html": {
+    "mtime": 1787774097.3326416,
+    "seen": 1787814370.0056827,
+    "ast_hash": "3977d61711bd53b3fa68fb17b244e123",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/ai-access-log/ai-access-log.html": {
+    "mtime": 1787726628.2828047,
+    "seen": 1787814370.0056837,
+    "ast_hash": "99982ffad915ab70b3c72bfe9bca864a",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/cafeteria-manage/cafeteria-manage.html": {
+    "mtime": 1787774097.334802,
+    "seen": 1787814370.0056844,
+    "ast_hash": "7a848abb84ec66d96c00b9f74a079a8a",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/cafeteria-menu-oversight/cafeteria-menu-oversight.html": {
+    "mtime": 1786946720.9286814,
+    "seen": 1787814370.0056856,
+    "ast_hash": "fa2b6a0121f1b1493f12d4531daf01ac",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/cafeteria-my-staff/cafeteria-my-staff.html": {
+    "mtime": 1787774097.3359156,
+    "seen": 1787814370.0056865,
+    "ast_hash": "844261b77d910b4596b9b6381f2d053e",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/cafeteria-staff-assignments/cafeteria-staff-assignments.html": {
+    "mtime": 1787774097.3369217,
+    "seen": 1787814370.0056877,
+    "ast_hash": "4f260c139d1e522e050fd80594f1d8f8",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/cafeteria-staff-requests-history/cafeteria-staff-requests-history.html": {
+    "mtime": 1787417849.154959,
+    "seen": 1787814370.005689,
+    "ast_hash": "786ec772d9fb307aae2212c03b07c1b6",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/cafeteria-staff-tasks/cafeteria-staff-tasks.html": {
+    "mtime": 1787311315.623796,
+    "seen": 1787814370.00569,
+    "ast_hash": "f39b0c182ba1677df27a6b39a357d36e",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/club-category-management/club-category-management.html": {
+    "mtime": 1787375834.6048281,
+    "seen": 1787814370.0056908,
+    "ast_hash": "08a803b9c2cdda5bfe30040e142685fe",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/clubs/club-discover/club-discover.html": {
+    "mtime": 1787076477.8440244,
+    "seen": 1787814370.005692,
+    "ast_hash": "ac50f30ec8a99dfae94fb0c508e87664",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/clubs/club-hub/club-hub.html": {
+    "mtime": 1787415683.388041,
+    "seen": 1787814370.005693,
+    "ast_hash": "ca8227d75de4e8e15bf204e2cd477251",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/clubs/club-hub/hub-my-clubs/hub-my-clubs.html": {
+    "mtime": 1787432264.3609478,
+    "seen": 1787814370.0056942,
+    "ast_hash": "31d9e509dc8e54c9aa82563b8105d80b",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/clubs/club-management/club-management.html": {
+    "mtime": 1787774097.3389246,
+    "seen": 1787814370.0056953,
+    "ast_hash": "ea153837d2ec7a7013f21b18ba83caf3",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/created-by-me/created-by-me.html": {
+    "mtime": 1787378224.0073307,
+    "seen": 1787814370.0056963,
+    "ast_hash": "78953f8b854ac4e49ffb45343723fc0b",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/department-resubmit/department-resubmit.html": {
+    "mtime": 1787300645.482869,
+    "seen": 1787814370.005697,
+    "ast_hash": "fb37eddd34fed9219d2552260126c9da",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/event-proposal/event-proposal.html": {
+    "mtime": 1787812059.4300883,
+    "seen": 1787814370.005698,
+    "ast_hash": "84eb870451d9440739ec006edeb90856",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/explore-events/explore-events.html": {
+    "mtime": 1785777645.272809,
+    "seen": 1787814370.0056992,
+    "ast_hash": "d5ef549609d0fb68796cd6f8cda5173e",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/how-it-works/how-it-works.html": {
+    "mtime": 1787022946.054431,
+    "seen": 1787814370.0057,
+    "ast_hash": "c8fcfcac91953092828f01511c28f753",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/internal-placeholder.html": {
+    "mtime": 1785487716.0580926,
+    "seen": 1787814370.005701,
+    "ast_hash": "d9ea0b1a454544db1f1a084ba60f7ac1",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/page-visibility/page-visibility.html": {
+    "mtime": 1787774097.3399253,
+    "seen": 1787814370.0057023,
+    "ast_hash": "217d1d5560203bfceaaa3ce577fba770",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/profile/profile.html": {
+    "mtime": 1787774097.341362,
+    "seen": 1787814370.005703,
+    "ast_hash": "2624f12feda4ebd03adf298a2182caa2",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/proposal-review-page/proposal-review-page.html": {
+    "mtime": 1787415683.388041,
+    "seen": 1787814370.005704,
+    "ast_hash": "e5cf383bfffb5dcffc432dff02f47dad",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-club-requests/hub-club-requests.html": {
+    "mtime": 1787415683.4046087,
+    "seen": 1787814370.0057049,
+    "ast_hash": "e0f9861bbed2739276dbca1897b178af",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-history-clubs/hub-history-clubs.html": {
+    "mtime": 1787379643.6086063,
+    "seen": 1787814370.0057065,
+    "ast_hash": "af7abde8d901b8c9f089515a9ae687d9",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-history-events/hub-history-events.html": {
+    "mtime": 1787774097.3433678,
+    "seen": 1787814370.0057075,
+    "ast_hash": "d32a73e90a1afe39099c38eb24afba9a",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-ongoing-clubs/hub-ongoing-clubs.html": {
+    "mtime": 1787429838.9544027,
+    "seen": 1787814370.0057087,
+    "ast_hash": "ac73df3b18117c85bb21031b2a6f4519",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-president-change-requests/hub-president-change-requests.html": {
+    "mtime": 1787431068.6007493,
+    "seen": 1787814370.00571,
+    "ast_hash": "9b9c367e475e57c411de6cd560b066fe",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-proposals/hub-proposals.html": {
+    "mtime": 1787415683.4046087,
+    "seen": 1787814370.005711,
+    "ast_hash": "ae11567c8f496412bce6f7e214d1b894",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-registrations/hub-registrations.html": {
+    "mtime": 1787774097.349388,
+    "seen": 1787814370.0057118,
+    "ast_hash": "42867527d72b3235d4ba69c73e301c02",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/hub-requests/hub-requests.html": {
+    "mtime": 1787415683.4046087,
+    "seen": 1787814370.0057132,
+    "ast_hash": "d9e3efc29b49cbfb004ffe3907fa53e4",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/records-hub/records-hub.html": {
+    "mtime": 1787431204.6597214,
+    "seen": 1787814370.0057142,
+    "ast_hash": "280d23eec1a481ed9eb1103bebc769d2",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/request-option-management/request-option-management.html": {
+    "mtime": 1787141817.7067006,
+    "seen": 1787814370.0057151,
+    "ast_hash": "527e6473617d3b0775e4f2be8f837937",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/roles/roles.html": {
+    "mtime": 1787774097.3530707,
+    "seen": 1787814370.0057163,
+    "ast_hash": "145ef30de88e91b5549fa0a1218de9bd",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/staff-tasks/staff-tasks.html": {
+    "mtime": 1787415683.4046087,
+    "seen": 1787814370.0057175,
+    "ast_hash": "ce846813e15fbd01ab6aa1a011e02135",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/system-config/event-catalog-section/event-catalog-section.html": {
+    "mtime": 1787774097.3540714,
+    "seen": 1787814370.0057185,
+    "ast_hash": "a6bd7870354526e5e9ed4677315b89d9",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/internal/pages/system-config/policies-tab/policies-tab.html": {
+    "mtime": 1787054907.5162013,
+    "seen": 1787814370.00572,
+    "ast_hash": "fdbe891f6a9e2816cebfa7d681696e6f",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/components/campus-life/campus-life.html": {
+    "mtime": 1785416595.5952535,
+    "seen": 1787814370.0057209,
+    "ast_hash": "5dccef8f8bdac0f8d5cd5375582bf84c",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/components/event-calendar/event-calendar.html": {
+    "mtime": 1787774182.3096726,
+    "seen": 1787814370.005722,
+    "ast_hash": "5664b1fb8f2e3e87e63b58be986ad3f0",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/components/explore-events/explore-events.html": {
+    "mtime": 1787415683.4046087,
+    "seen": 1787814370.0057228,
+    "ast_hash": "8f72f27cb2f88ae14c2aa4dded14659d",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/components/happening-soon/happening-soon.html": {
+    "mtime": 1786565628.8290327,
+    "seen": 1787814370.005724,
+    "ast_hash": "385f875632f1b95799ba776b3cb1690a",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/components/hero/hero.html": {
+    "mtime": 1786128064.0658689,
+    "seen": 1787814370.0057247,
+    "ast_hash": "f2e011c20083e6a2e7a3f7790d564303",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/landing/landing-page.html": {
+    "mtime": 1787488581.2563224,
+    "seen": 1787814370.0057259,
+    "ast_hash": "e89ed902087dec8271a2f41fbbd45f66",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/my-events/my-events-tab/my-events-tab.html": {
+    "mtime": 1787774097.360072,
+    "seen": 1787814370.0057268,
+    "ast_hash": "373bbe795d211b439fa8ec61dd093e87",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/my-events/my-events.html": {
+    "mtime": 1787774097.3610747,
+    "seen": 1787814370.005728,
+    "ast_hash": "41f6028cbc7567ca2bb4a82ea1e54296",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/features/shared-library/shared-library.html": {
+    "mtime": 1785753753.946733,
+    "seen": 1787814370.005729,
+    "ast_hash": "43e2280465538f528df734643911bb5c",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/ai-assistant/ai-assistant.html": {
+    "mtime": 1787774097.363075,
+    "seen": 1787814370.0057297,
+    "ast_hash": "209d2f210948f1db9593efb1b58f825a",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/club-category-picker/club-category-picker.html": {
+    "mtime": 1786997402.766516,
+    "seen": 1787814370.0057309,
+    "ast_hash": "844364cf793c580369be66604605422f",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/club-roster-modal/club-roster-modal.html": {
+    "mtime": 1787430820.7507882,
+    "seen": 1787814370.0057318,
+    "ast_hash": "67efe85dfb118240f438ad92bf539ccc",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/internal-data-page/internal-data-page.html": {
+    "mtime": 1787415683.4225192,
+    "seen": 1787814370.005733,
+    "ast_hash": "a6dc2af8f552c19f9067fa966d287123",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/internal-table-workspace/internal-table-workspace.html": {
+    "mtime": 1787054907.5353682,
+    "seen": 1787814370.0057344,
+    "ast_hash": "ec21b4848b0f1a00ce832738ad140313",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/option-card-grid/option-card-grid.html": {
+    "mtime": 1786565628.835033,
+    "seen": 1787814370.0057354,
+    "ast_hash": "98c991e1891b3ce9d070b2a962285812",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/option-picker-grid/option-picker-grid.html": {
+    "mtime": 1786541278.3315058,
+    "seen": 1787814370.0057366,
+    "ast_hash": "bd74d38e3705b71c267a23a2d35a0e5f",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/president-change-request-modal/president-change-request-modal.html": {
+    "mtime": 1787430884.8698552,
+    "seen": 1787814370.0057378,
+    "ast_hash": "9cc3e835ae0009b518e99caaad2e6484",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/proposal-reviewer-view/proposal-reviewer-view.html": {
+    "mtime": 1787811996.0432577,
+    "seen": 1787814370.005739,
+    "ast_hash": "2bbc72aa164f12e6054e25f9136cd16b",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/site-footer/site-footer.html": {
+    "mtime": 1785418611.6721609,
+    "seen": 1787814370.0057404,
+    "ast_hash": "4f8a5bb4bce0c5dc847d35b5a1dd0c8d",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/site-header/site-header.html": {
+    "mtime": 1787774097.370283,
+    "seen": 1787814370.0057414,
+    "ast_hash": "f650b4b3fac372e08100d44cca3c8569",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/app/shared/components/task-calendar/task-calendar.html": {
+    "mtime": 1787248958.263854,
+    "seen": 1787814370.0057423,
+    "ast_hash": "0af8a1d2e1cf4cb10967edc92944587c",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/index.html": {
+    "mtime": 1786128055.0163186,
+    "seen": 1787814370.0057433,
+    "ast_hash": "cc01332a277fca7795965e06540ec2bf",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/events/campus-after-dark.jpg": {
+    "mtime": 1785350164.8625114,
+    "seen": 1787814370.0057445,
+    "ast_hash": "a32fdc00282814b83a7e8b437426e4ef",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/events/career-connect-fair.jpg": {
+    "mtime": 1785411002.7799933,
+    "seen": 1787814370.0057456,
+    "ast_hash": "920be5e3b2e19bdcc7588bd064f69d59",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/events/community-green-day.jpg": {
+    "mtime": 1785411002.5461426,
+    "seen": 1787814370.0057466,
+    "ast_hash": "5a8a21bab8bc58b3337739469cfff240",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/events/cultural-night.jpg": {
+    "mtime": 1785350164.915538,
+    "seen": 1787814370.0057478,
+    "ast_hash": "f8682e9a15026397cca0ff52db8b4e4e",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/events/esports-showdown.jpg": {
+    "mtime": 1785350164.9666016,
+    "seen": 1787814370.0057485,
+    "ast_hash": "42a64d628d67aa15e6a5e08c1b77f9af",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/events/startup-pitch-night.jpg": {
+    "mtime": 1785411002.3482165,
+    "seen": 1787814370.0057495,
+    "ast_hash": "b0b44c44bfe61770ba748ebc8311830d",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/events/tech-expo.jpg": {
+    "mtime": 1785350165.017028,
+    "seen": 1787814370.0057504,
+    "ast_hash": "fa01affbf827706700587d8a9a2a1103",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/events/wellness-run.jpg": {
+    "mtime": 1785350165.0705054,
+    "seen": 1787814370.0057518,
+    "ast_hash": "e0bc9a9ef331b3026e1df853ed147799",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/a.png": {
+    "mtime": 1785321704.5673606,
+    "seen": 1787814370.0057528,
+    "ast_hash": "7dc7dcbc699091e91131cc99dacaabb3",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/apu-logo-only.png": {
+    "mtime": 1787774097.3193626,
+    "seen": 1787814370.0057538,
+    "ast_hash": "d251c9b022773c107155270b03b49933",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/apu-logo-text-dark.png": {
+    "mtime": 1787774097.3193626,
+    "seen": 1787814370.005755,
+    "ast_hash": "6bd66e5605163a71887a3cb3c1649d17",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/apu-logo-text-dark.webp": {
+    "mtime": 1786127657.9714825,
+    "seen": 1787814370.005756,
+    "ast_hash": "5bdf319646f65ffb2c4815aedef06e76",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/footer/apu-footer-logo.png": {
+    "mtime": 1785417661.9135537,
+    "seen": 1787814370.0057569,
+    "ast_hash": "88b4f7473efc3b2ab4679a969e088a74",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/footer/award-life-at-work.png": {
+    "mtime": 1785417662.6323485,
+    "seen": 1787814370.005758,
+    "ast_hash": "86d6be18ff91f66ae4be2afd0fd55171",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/footer/award-premier-digital-tech.png": {
+    "mtime": 1785417662.2449243,
+    "seen": 1787814370.005759,
+    "ast_hash": "02e4b1c3d364466342fc41477dfa16da",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/footer/award-qs-five-stars.png": {
+    "mtime": 1785417662.3545992,
+    "seen": 1787814370.0057597,
+    "ast_hash": "9211775202bf93916f1f9a106adee296",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/footer/award-qs-world-ranking.png": {
+    "mtime": 1785417662.5098433,
+    "seen": 1787814370.0057607,
+    "ast_hash": "d6c7a54f71b5ac0d1ef4d91254193dc5",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/footer/award-talentbank-employability.jpg": {
+    "mtime": 1785417663.1611876,
+    "seen": 1787814370.005762,
+    "ast_hash": "e9d3776f3817a3ba3d0a64587f4ede8a",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/footer/social-facebook.png": {
+    "mtime": 1785417663.2148972,
+    "seen": 1787814370.0057633,
+    "ast_hash": "bd3ab67d21510889382d1dff8e0ae544",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/footer/social-instagram.png": {
+    "mtime": 1785417663.3015192,
+    "seen": 1787814370.0057642,
+    "ast_hash": "10176ee0a2e24643f76b1c814bdf9dd1",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/footer/social-linkedin.png": {
+    "mtime": 1785417663.3477774,
+    "seen": 1787814370.0057654,
+    "ast_hash": "bf89c4cc96a30d9d34387b73a339d9bf",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/footer/social-tiktok.png": {
+    "mtime": 1785417663.5614152,
+    "seen": 1787814370.0057666,
+    "ast_hash": "af71873c5ef116621d5c939e6096bd2d",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/footer/social-x.png": {
+    "mtime": 1785417663.4062822,
+    "seen": 1787814370.0057676,
+    "ast_hash": "8242b1ed3500e9350b17d7767a7da4f8",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/footer/social-youtube.png": {
+    "mtime": 1785417663.4674993,
+    "seen": 1787814370.0057688,
+    "ast_hash": "4c8653e5876dbdba251861bd37f42b85",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/logo-text-black.webp": {
+    "mtime": 1786127596.742071,
+    "seen": 1787814370.0057697,
+    "ast_hash": "d37010aabc5f197f87da59d0ef074a4d",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/old/apu-logo-text-old.png": {
+    "mtime": 1785337317.088858,
+    "seen": 1787814370.005771,
+    "ast_hash": "c5c56e99b62b1fe04bf3d4fbe600a540",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/old/logo-text-black-old.png": {
+    "mtime": 1785496829.906638,
+    "seen": 1787814370.005772,
+    "ast_hash": "cb3882d2bfbc20362ebf741e2c605d6a",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/old/video-start-iamge.png": {
+    "mtime": 1785350642.024519,
+    "seen": 1787814370.005773,
+    "ast_hash": "7a9d318cbd6685dd8eff2f56275ab8e7",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/video-start-iamge.jpg": {
+    "mtime": 1786127403.5499802,
+    "seen": 1787814370.0057738,
+    "ast_hash": "5369c6af9443d24841a009cc425a81eb",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/assit/ChatGPT Image Jul 31, 2026, 07_20_29 PM.png": {
+    "mtime": 1785496829.906638,
+    "seen": 1787814370.0057752,
+    "ast_hash": "cb3882d2bfbc20362ebf741e2c605d6a",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/assit/apu-text-only-white.png": {
+    "mtime": 1787736315.2460878,
+    "seen": 1787814370.0057762,
+    "ast_hash": "6bd66e5605163a71887a3cb3c1649d17",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/assit/logo.jpg": {
+    "mtime": 1787774097.3732703,
+    "seen": 1787814370.0057771,
+    "ast_hash": "d251c9b022773c107155270b03b49933",
+    "semantic_hash": ""
+  },
+  "fyp-ui/public/assets/media/video-hero-section.mp4": {
+    "mtime": 1786126634.6921458,
+    "seen": 1787814370.005778,
+    "ast_hash": "4aac93319461ebaacf5d0796318ab395",
+    "semantic_hash": ""
+  },
+  "fyp-ui/src/assit/video-hero-section.mp4": {
+    "mtime": 1785318255.9347668,
+    "seen": 1787814370.0057793,
+    "ast_hash": "a5cb8a3e1556a0b52a8549265d1245b2",
+    "semantic_hash": ""
+  }
+}
