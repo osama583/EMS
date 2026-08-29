@@ -44,6 +44,7 @@ SEEDABLE_TABLES = [
     "club_join_requests",
     "clubs",
     "club_categories",
+    "venue_options",
     "funding_sub_options",
     "funding_main_options",
     "fmb_options",
@@ -243,6 +244,18 @@ def seed_options(cur) -> None:
     insert_simple("serving_unit_options", None, D.SERVING_UNIT_OPTIONS)
     insert_simple("campus_tour_start_options", "campusTour", D.CAMPUS_TOUR_START_OPTIONS)
     insert_simple("campus_tour_type_options", "campusTour", D.CAMPUS_TOUR_TYPE_OPTIONS)
+
+    # Venues carry an explicit sort_order: the CFO's chosen order is what every
+    # venue dropdown in the system reads, so a fresh seed has to start from a
+    # definite one rather than whatever the insert order happened to be.
+    for position, (label, description, extra) in enumerate(D.VENUE_OPTIONS):
+        columns = ["label", "description", "active", "sort_order", *extra]
+        values = [label, description, True, position, *extra.values()]
+        cur.execute(
+            f"INSERT INTO venue_options ({', '.join(columns)}) "
+            f"VALUES ({', '.join(['%s'] * len(values))})",
+            values,
+        )
 
     main_ids: dict[str, int] = {}
     for label, description, finance_code in D.FUNDING_MAIN_OPTIONS:

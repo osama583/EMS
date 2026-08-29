@@ -272,14 +272,18 @@ class Catalogue:
         "campusTourType": ("campus_tour_type_options", "campus_tour_type_option_id"),
         "fundingMain": ("funding_main_options", "funding_main_option_id"),
         "fundingSub": ("funding_sub_options", "funding_sub_option_id"),
+        "venue": ("venue_options", "venue_option_id"),
     }
 
     def __init__(self, cur):
         self.by_label: dict[str, dict[str, int]] = {}
         self.order: dict[str, list[int]] = {}
         for kind, (table, pk) in self.TABLES.items():
+            order_by = "sort_order, " + pk if kind == "venue" else pk
             rows = fetch_all(
-                cur, f"SELECT {pk} AS id, label FROM {table} WHERE active AND archived_at IS NULL ORDER BY {pk}"
+                cur,
+                f"SELECT {pk} AS id, label FROM {table} "
+                f"WHERE active AND archived_at IS NULL ORDER BY {order_by}",
             )
             self.by_label[kind] = {r["label"]: r["id"] for r in rows}
             self.order[kind] = [r["id"] for r in rows]
@@ -293,6 +297,19 @@ class Catalogue:
         ):
             self.menu.setdefault(row["unit_code"], []).append(row)
 
+    def venue(self, rng: random.Random) -> tuple[str, str]:
+        """A random live venue as ("venue:{n}", label).
+
+        Read from venue_options rather than a literal list: after migration 032
+        the venue catalogue IS the source, and a seed that carried its own copy
+        would be exactly the hardcoded list this feature removed.
+        """
+        table = self.by_label.get("venue") or {}
+        if not table:
+            raise SystemExit("no active venues - run `python -m seed.run` first")
+        label = rng.choice(sorted(table))
+        return f"venue:{table[label]}", label
+
     def pick(self, kind: str, *preferred: str) -> str:
         """`"{kind}:{id}"` for the first preferred label that exists, else the first active row."""
         table = self.by_label[kind]
@@ -305,36 +322,44 @@ class Catalogue:
 
 
 # --- Requirement row builders ----------------------------------------------
-def build_requirement_rows(cat: Catalogue, kinds: list[str], day: str, venue: str, pax: int,
-                           rng: random.Random) -> dict[str, list[dict]]:
+def build_requirement_rows(cat: Catalogue, kinds: list[str], day: str, venue: tuple[str, str],
+                           pax: int, rng: random.Random) -> dict[str, list[dict]]:
+    """`venue` is the ("venue:{n}", label) pair from the venue catalogue.
+
+    Logistics, Sound & Light, Food and Mineral Water send `venueId` and no
+    location text at all: those four are delivered by the university, so the
+    only place they can be delivered to is a university venue (migration 032).
+    The proposal service freezes the label onto each row from the id.
+    """
+    venue_ref, venue_label = venue
     rows: dict[str, list[dict]] = {}
 
     if "logistics" in kinds:
         items = [{
             "item": cat.pick("logistics", "Banquet Chair"),
             "quantity": max(10, min(400, int(pax * rng.uniform(0.7, 1.0)))),
-            "date": day, "start": "07:30", "end": "19:00", "location": venue,
+            "date": day, "start": "07:30", "end": "19:00", "venueId": venue_ref,
             "notes": "Chairs in theatre rows, aisle down the centre.",
         }]
         if pax >= 60:
             items.append({
                 "item": cat.pick("logistics", "Round Table (8 pax)"),
                 "quantity": max(2, min(40, pax // 10)),
-                "date": day, "start": "07:30", "end": "19:00", "location": venue,
+                "date": day, "start": "07:30", "end": "19:00", "venueId": venue_ref,
                 "notes": "Round tables at the back for registration and refreshments.",
             })
         if pax >= 150:
             items.append({
                 "item": cat.pick("logistics", "Portable Stage Deck"),
                 "quantity": rng.randint(4, 10),
-                "date": day, "start": "06:30", "end": "20:00", "location": venue,
+                "date": day, "start": "06:30", "end": "20:00", "venueId": venue_ref,
                 "notes": "Stage built the evening before if the hall is free.",
             })
         if rng.random() < 0.45:
             items.append({
                 "item": cat.pick("logistics", "Pull-up Banner Stand"),
                 "quantity": rng.randint(2, 6),
-                "date": day, "start": "08:00", "end": "18:00", "location": venue,
+                "date": day, "start": "08:00", "end": "18:00", "venueId": venue_ref,
                 "notes": "Banners at the entrance and either side of the stage.",
             })
         rows["logistics"] = items
@@ -342,18 +367,18 @@ def build_requirement_rows(cat: Catalogue, kinds: list[str], day: str, venue: st
     if "soundLight" in kinds:
         items = [{
             "item": cat.pick("soundLight", "Full Stage Sound" if pax >= 200 else "Basic PA System"),
-            "date": day, "start": "07:00", "end": "20:00", "location": venue,
+            "date": day, "start": "07:00", "end": "20:00", "venueId": venue_ref,
             "notes": "Sound check ninety minutes before doors.",
         }]
         items.append({
             "item": cat.pick("soundLight", "Wireless Microphone"),
-            "date": day, "start": "08:00", "end": "19:00", "location": venue,
+            "date": day, "start": "08:00", "end": "19:00", "venueId": venue_ref,
             "notes": f"{rng.randint(2, 6)} handhelds plus one lapel for the host.",
         })
         if pax >= 250:
             items.append({
                 "item": cat.pick("soundLight", "Stage Lighting Rig"),
-                "date": day, "start": "06:00", "end": "22:00", "location": venue,
+                "date": day, "start": "06:00", "end": "22:00", "venueId": venue_ref,
                 "notes": "Front wash plus movers for the performance segment.",
             })
         rows["soundLight"] = items
@@ -361,13 +386,13 @@ def build_requirement_rows(cat: Catalogue, kinds: list[str], day: str, venue: st
     if "photoVideo" in kinds:
         items = [{
             "service": cat.pick("photoVideo", "Event Photography"),
-            "date": day, "start": "08:30", "end": "18:00", "location": venue,
+            "date": day, "start": "08:30", "end": "18:00", "venueId": venue_ref,
             "notes": "Coverage of the opening, the main session and the group photo.",
         }]
         if pax >= 200:
             items.append({
                 "service": cat.pick("photoVideo", "Event Videography"),
-                "date": day, "start": "09:00", "end": "18:00", "location": venue,
+                "date": day, "start": "09:00", "end": "18:00", "venueId": venue_ref,
                 "notes": "Highlight reel for the marketing team, delivered within two weeks.",
             })
         rows["photoVideo"] = items
@@ -378,7 +403,7 @@ def build_requirement_rows(cat: Catalogue, kinds: list[str], day: str, venue: st
         rows["transportation"] = [{
             "type": cat.pick("transportation", label),
             "requestedPax": min(pax, seats),
-            "pickup": "APU Main Entrance", "dropoff": venue,
+            "pickup": "APU Main Entrance", "dropoff": venue_label,
             "date": day, "start": "07:00",
             "notes": "Return leg departs the site at 16:30.",
         }]
@@ -386,7 +411,7 @@ def build_requirement_rows(cat: Catalogue, kinds: list[str], day: str, venue: st
             rows["transportation"].append({
                 "type": cat.pick("transportation", "18-Seater Van"),
                 "requestedPax": min(18, pax - seats),
-                "pickup": "APU Main Entrance", "dropoff": venue,
+                "pickup": "APU Main Entrance", "dropoff": venue_label,
                 "date": day, "start": "07:15",
                 "notes": "Overflow vehicle for the remaining participants.",
             })
@@ -407,7 +432,7 @@ def build_requirement_rows(cat: Catalogue, kinds: list[str], day: str, venue: st
             "foodType": f"fmb:{item['id']}",
             "quantity": max(10, int(pax * rng.uniform(0.6, 1.0))),
             "date": day, "start": rng.choice(["10:30", "12:30", "15:30", "18:30"]),
-            "location": venue,
+            "venueId": venue_ref,
             "notes": "Halal only. Please label anything containing nuts.",
         }]
 
@@ -415,7 +440,7 @@ def build_requirement_rows(cat: Catalogue, kinds: list[str], day: str, venue: st
         rows["waterNormal"] = [{
             "quantity": max(24, int(pax * rng.uniform(0.8, 1.4)) // 24 * 24 or 24),
             "withLogo": "yes" if rng.random() < 0.4 else "no",
-            "date": day, "start": "08:00", "end": "18:00", "location": venue,
+            "date": day, "start": "08:00", "end": "18:00", "venueId": venue_ref,
             "notes": "Chilled, delivered to the registration desk.",
         }]
 
@@ -817,7 +842,15 @@ class Spec:
     title: str
     applicant_id: int
     applicant_unit: str | None
-    venue: str
+    # ("venue:{n}", "Grand Hall"). The ref is what request rows and the schedule
+    # carry - the label is only used for the agenda, which is still free text.
+    venue: tuple[str, str]
+    event_format: str
+    # Set only for an Off Campus event: the street address that goes in the
+    # schedule's Outside University branch. None means the event is held at
+    # `venue` and the schedule is Inside University. Decided here rather than in
+    # make_payload so the format and the location can never disagree.
+    external_location: str | None
     day: date
     days: int
     visibility: str
@@ -921,7 +954,8 @@ def fetch_unit_of(ctx: Ctx, user_id: int) -> str | None:
     return None
 
 
-def build_specs(ctx: Ctx, rng: random.Random, high_pax: int, cancel_days: int) -> list[Spec]:
+def build_specs(cat: Catalogue, ctx: Ctx, rng: random.Random, high_pax: int,
+                cancel_days: int) -> list[Spec]:
     today, now = ctx.today, ctx.txn_now
     templates = list(P.EVENTS)
     rng.shuffle(templates)
@@ -999,10 +1033,20 @@ def build_specs(ctx: Ctx, rng: random.Random, high_pax: int, cancel_days: int) -
                 fmb_mode = derive_fmb_cycle[fmb_turn % len(derive_fmb_cycle)]
                 fmb_turn += 1
 
+            # Format first, because it decides whether this event is held at a
+            # university venue at all. An "offsite" template is always Off
+            # Campus; everything else follows the usual mix.
+            event_format = ("Off Campus" if template[6] == "offsite" else
+                            rng.choices(["On Campus", "Hybrid", "Off Campus", "Online"],
+                                        [78, 12, 7, 3])[0])
+            external_location = (
+                rng.choice(P.EXTERNAL_LOCATIONS) if event_format == "Off Campus" else None
+            )
             specs.append(Spec(
                 index=index, template=template, title=title,
                 applicant_id=applicant_id, applicant_unit=applicant_unit,
-                venue=rng.choice(P.VENUES), day=day, days=days,
+                venue=cat.venue(rng), event_format=event_format,
+                external_location=external_location, day=day, days=days,
                 visibility=visibility, registration_mode=registration_mode, cost=cost,
                 outcome=outcome, requirements=requirements,
                 dept_modes=_plan_departments(routed, outcome, rng, fmb_mode),
@@ -1076,11 +1120,25 @@ def _pick_visibility(rng: random.Random, kind: str, categories: list[int], club:
 def make_payload(cat: Catalogue, rng: random.Random, ctx: Ctx, spec: Spec) -> dict:
     title, intro, goals, benefits, categories, pax, kind = spec.template
     first = spec.day.isoformat()
+    venue_ref, venue_label = spec.venue
+    # What the agenda's free-text location column says. The agenda is a
+    # running-order note ("Registration desk, 09:00"), not a bookable slot, so
+    # it stays text - it is the one location field in the form that is not a
+    # venue dropdown.
+    where = spec.external_location or venue_label
     schedule = []
     for offset in range(spec.days):
         day = (spec.day + timedelta(days=offset)).isoformat()
         start, end = ("18:00", "22:30") if kind in ("concert", "dinner", "screening", "gaming") else ("09:00", "17:30")
-        schedule.append({"date": day, "start": start, "end": end, "location": spec.venue})
+        if spec.external_location:
+            # Outside University: the address is free text and there is no venue
+            # to reference, which is exactly the shape migration 032 converts
+            # pre-existing external locations into.
+            schedule.append({"date": day, "start": start, "end": end,
+                             "locationKind": "outside", "location": spec.external_location})
+        else:
+            schedule.append({"date": day, "start": start, "end": end,
+                             "locationKind": "inside", "venueId": venue_ref})
 
     payload: dict = {
         "eventTitle": spec.title,
@@ -1099,8 +1157,7 @@ def make_payload(cat: Catalogue, rng: random.Random, ctx: Ctx, spec: Spec) -> di
             else []
         ),
         "registrationMode": spec.registration_mode,
-        "eventFormat": rng.choices(["On Campus", "Hybrid", "Off Campus", "Online"], [78, 12, 7, 3])[0]
-                       if kind != "offsite" else "Off Campus",
+        "eventFormat": spec.event_format,
         "eventImage": "/assets/events/" + IMAGE_FOR_KIND.get(kind, "campus-after-dark.jpg"),
         "totalPax": pax,
         # Mirrors the proposal form: Max Registered Pax exists for every visibility except Internal.
@@ -1123,11 +1180,11 @@ def make_payload(cat: Catalogue, rng: random.Random, ctx: Ctx, spec: Spec) -> di
 
     if rng.random() < 0.5:
         payload["agenda"] = [
-            {"time": "09:00", "activity": "Registration and refreshments", "location": spec.venue,
+            {"time": "09:00", "activity": "Registration and refreshments", "location": where,
              "pic": "Organising committee", "notes": "Two desks, split by surname."},
-            {"time": "09:30", "activity": "Opening address", "location": spec.venue, "pic": "Head of School"},
-            {"time": "10:00", "activity": "Main programme", "location": spec.venue, "pic": "Programme lead"},
-            {"time": "16:30", "activity": "Closing and group photo", "location": spec.venue, "pic": "Photography team"},
+            {"time": "09:30", "activity": "Opening address", "location": where, "pic": "Head of School"},
+            {"time": "10:00", "activity": "Main programme", "location": where, "pic": "Programme lead"},
+            {"time": "16:30", "activity": "Closing and group photo", "location": where, "pic": "Photography team"},
         ]
     if rng.random() < 0.35:
         payload["importantPeople"] = [
@@ -1912,7 +1969,7 @@ def run(*, dry_run: bool, seed: int, password: str) -> None:
         print(f"organisation ready: {len(ctx.users_by_email)} accounts, "
               f"{len(ctx.club_presidents)} club presidents, {club_requests} club requests")
 
-        specs = build_specs(ctx, rng, high_pax, cancel_days)
+        specs = build_specs(cat, ctx, rng, high_pax, cancel_days)
         published: list[dict] = []
         by_status: dict[str, int] = {}
         for number, spec in enumerate(specs, start=1):

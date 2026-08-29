@@ -158,6 +158,11 @@ def nav_catalogue() -> list[dict]:
         # Funding is the CFO's flat-role workflow - no owning unit.
         ("fundingMain", "Funding Main Items", "account_balance_wallet", None),
         ("fundingSub", "Funding Sub-items", "account_tree", None),
+        # University venues, also the CFO's. Registered here rather than as a
+        # page of its own precisely so it is not a special case: it gets the
+        # same route, the same management page, the same Page Visibility row and
+        # the same role-grant plumbing as the twelve catalogues above it.
+        ("venue", "Venue Management", "location_city", None),
     ]
     for index, (kind, label, icon, unit_code) in enumerate(dropdown_kinds):
         grant = (

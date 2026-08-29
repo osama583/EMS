@@ -3,7 +3,7 @@ import { Injectable, InjectionToken, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { DeletionPreview } from '../../shared/models/deletion.models';
-import { ArchivedRequestOption, RequestOption, RequestOptionDraft, RequestOptionQuery, RequestOptionRepository } from './request-option.models';
+import { ArchivedRequestOption, RequestOption, RequestOptionDraft, RequestOptionKind, RequestOptionQuery, RequestOptionRepository } from './request-option.models';
 import { RequestOptionDto, mapRequestOptionResponse, mapRequestOptionWrite } from './request-option.mapper';
 
 @Injectable({ providedIn: 'root' })
@@ -27,6 +27,9 @@ export class ApiRequestOptionRepository implements RequestOptionRepository {
   deleteOption(id: string): Observable<RequestOption> { return this.http.delete<RequestOptionDto>(`${this.baseUrl}/${encodeURIComponent(id)}`).pipe(map(mapRequestOptionResponse)); }
   restoreOption(id: string): Observable<RequestOption> { return this.http.post<RequestOptionDto>(`${this.baseUrl}/${encodeURIComponent(id)}/restore`, {}).pipe(map(mapRequestOptionResponse)); }
   purgeOption(id: string): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/${encodeURIComponent(id)}/purge`); }
+  reorderOptions(kind: RequestOptionKind, ids: readonly string[]): Observable<readonly RequestOption[]> {
+    return this.http.put<readonly RequestOptionDto[]>(`${this.baseUrl}/reorder`, { kind, ids }).pipe(map((options) => options.map(mapRequestOptionResponse)));
+  }
   getDeletedOptions(): Observable<readonly ArchivedRequestOption[]> {
     return this.http.get<readonly (RequestOptionDto & { deletedAt: string; permanentDeletionAt: string; daysRemaining: number })[]>(`${this.baseUrl}/deleted/all`).pipe(
       map((rows) => rows.map((row) => ({ ...mapRequestOptionResponse(row), deletedAt: row.deletedAt, permanentDeletionAt: row.permanentDeletionAt, daysRemaining: row.daysRemaining }))),

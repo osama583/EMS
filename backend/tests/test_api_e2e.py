@@ -11,7 +11,7 @@ from datetime import date, timedelta
 import pytest
 
 from app import create_app
-from app.db import transaction
+from app.db import fetch_one, transaction
 
 PASSWORD = "Demo@1234"
 
@@ -76,6 +76,21 @@ def auth(client, email: str) -> dict:
     return {"Authorization": f"Bearer {token_for(client, email)}"}
 
 
+
+def a_venue() -> str:
+    """The "venue:{n}" id of any live venue, read from the catalogue rather than
+    named here — there is one source for the venue list and a test fixture is
+    not allowed to be a second copy of it."""
+    with transaction() as cur:
+        row = fetch_one(
+            cur,
+            "SELECT venue_option_id FROM venue_options WHERE active AND archived_at IS NULL "
+            "ORDER BY sort_order, venue_option_id LIMIT 1",
+        )
+    assert row is not None, "no live venues - run `python -m migrations.run` and reseed"
+    return f"venue:{row['venue_option_id']}"
+
+
 def payload(**overrides) -> dict:
     day = (date.today() + timedelta(days=45)).isoformat()
     base = {
@@ -86,7 +101,10 @@ def payload(**overrides) -> dict:
         "eventVisibility": "Private",
         "registrationMode": "Automatic",
         "totalPax": 25,
-        "scheduleRows": [{"date": day, "start": "10:00", "end": "12:00", "location": "Hall B"}],
+        # Inside University + a real venue id: schedule rows reference the venue
+        # catalogue rather than typing a location (migration 032).
+        "scheduleRows": [{"date": day, "start": "10:00", "end": "12:00",
+                          "locationKind": "inside", "venueId": a_venue()}],
         "selectedRequirements": ["logistics"],
     }
     base.update(overrides)

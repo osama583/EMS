@@ -12,6 +12,7 @@ const dropdownSettingRoutes = [
   ['campusTourType', 'Campus Tour Types'],
   ['fundingMain', 'Funding Main Items'],
   ['fundingSub', 'Funding Sub-items'],
+  ['venue', 'Venue Management'],
 ] as const;
 
 const placeholderPage = () =>

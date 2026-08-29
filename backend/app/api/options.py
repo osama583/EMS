@@ -92,6 +92,12 @@ class Catalogue:
     # table rather than a column: {dtoField: Collection}. Declared here so the
     # generic read/write paths handle them without special-casing a kind.
     collections: dict[str, "Collection"] = field(default_factory=dict)
+    # The owner decides the order these appear in, rather than the alphabetical
+    # default. Requires a sort_order column; enables PUT /options/reorder for
+    # this kind. Only venues need it today - a Logistics item list reads better
+    # alphabetically, a list of halls reads better in the order the CFO thinks
+    # of them.
+    ordered: bool = False
 
     @property
     def extra_columns(self) -> tuple[str, ...]:
@@ -145,6 +151,16 @@ CATALOGUES: dict[str, Catalogue] = {
         collections={"dietaryInformationIds": Collection(
             "fmb_option_dietary_information", "fmb_option_id",
             "dietary_information_option_id", "dietaryInformation")}),
+    # University venues - the single source for every Inside University location
+    # dropdown in the system (event schedule, logistics, sound & light, food,
+    # mineral water, photography). CFO-owned like funding, and scoped to no
+    # requirement: a venue is not part of one department's request, it is where
+    # any of them happen. `ordered` because the CFO sets the order venues appear
+    # in, everywhere at once. See migration 032.
+    "venue": Catalogue(
+        "venue_options", "venue_option_id", None, "cfo",
+        {"building": "building", "capacity": "capacity", "sortOrder": "sort_order"},
+        has_requirement=False, ordered=True),
 }
 
 # Requirement each catalogue's rows belong to, for the requirement_id column.
@@ -472,8 +488,13 @@ def list_options():
             clauses.append("unit_code = %s")
             params.append(cafeteria_code)
 
+        # An ordered catalogue is read in the owner's order and nothing else -
+        # this single ORDER BY is what makes the CFO's venue order show up in
+        # every dropdown in the system, because every dropdown reads from here.
+        order_by = "sort_order, venue_option_id" if catalogue.ordered else "label"
         rows = query(
-            f"SELECT * FROM {catalogue.table} WHERE " + " AND ".join(clauses) + " ORDER BY label",
+            f"SELECT * FROM {catalogue.table} WHERE " + " AND ".join(clauses)
+            + f" ORDER BY {order_by}",
             params,
         )
         out += _to_dtos(kind, rows)
@@ -556,6 +577,14 @@ def create_option():
         allowed = _columns(cur, catalogue)
         values = _writable_values(payload, catalogue, allowed)
         values.setdefault("active", True)
+
+        # Appended, not inserted at the default 0: a newly created venue joining
+        # the top of every dropdown in the system is not what "create" means.
+        if catalogue.ordered and "sort_order" not in values:
+            cur.execute(
+                f"SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM {catalogue.table}"
+            )
+            values["sort_order"] = cur.fetchone()["next"]
 
         if catalogue.has_requirement and "requirement_id" in allowed:
             requirement_id = _requirement_id(cur, str(kind))
@@ -688,6 +717,71 @@ def delete_option(option_ref: str):
         audit("options.deleted", kind=kind, option_id=number,
               actor_user_id=current_principal().user_id)
     return jsonify(dto)
+
+
+@bp.put("/reorder")
+@require_internal
+def reorder_options():
+    """Set the display order of an ordered catalogue.
+
+        PUT /options/reorder  {"kind": "venue", "ids": ["venue:3", "venue:1", ...]}
+
+    The body is the full order the owner wants, so position IS the index in
+    that list - the client never computes sort_order values and two clients
+    reordering concurrently cannot interleave into a half-applied order.
+
+    Ids not named in the body keep their relative order after the ones that
+    were, rather than being dropped to 0: reordering the six venues on screen
+    must not silently reshuffle the ten that were filtered out of the view.
+    """
+    payload = body()
+    kind = str(payload.get("kind") or "")
+    catalogue = _catalogue(kind)
+    if not catalogue.ordered:
+        raise BadRequest("The " + kind + " catalogue is not orderable.")
+
+    raw_ids = payload.get("ids")
+    if not isinstance(raw_ids, list):
+        raise BadRequest("An 'ids' array is required.")
+
+    numbers: list[int] = []
+    for value in raw_ids:
+        ref_kind, number = parse_option_id(str(value))
+        if ref_kind != kind:
+            raise BadRequest("Every id must belong to the " + kind + " catalogue.")
+        if number not in numbers:
+            numbers.append(number)
+
+    with transaction() as cur:
+        _assert_may_write(cur, kind, catalogue)
+        live = [
+            r[catalogue.pk]
+            for r in fetch_all(
+                cur,
+                f"SELECT {catalogue.pk} FROM {catalogue.table} WHERE archived_at IS NULL "
+                f"ORDER BY sort_order, {catalogue.pk}",
+            )
+        ]
+        known = set(live)
+        missing = [n for n in numbers if n not in known]
+        if missing:
+            raise NotFound("No live option with id " + option_id(kind, missing[0]) + ".")
+
+        final = numbers + [n for n in live if n not in numbers]
+        for position, number in enumerate(final):
+            cur.execute(
+                f"UPDATE {catalogue.table} SET sort_order = %s WHERE {catalogue.pk} = %s",
+                (position, number),
+            )
+        rows = fetch_all(
+            cur,
+            f"SELECT * FROM {catalogue.table} WHERE archived_at IS NULL "
+            f"ORDER BY sort_order, {catalogue.pk}",
+        )
+        dtos = _to_dtos(kind, [dict(r) for r in rows], cur)
+        audit("options.reordered", kind=kind, count=len(final),
+              actor_user_id=current_principal().user_id)
+    return jsonify(dtos)
 
 
 @bp.post("/<option_ref>/restore")

@@ -51,7 +51,11 @@ export const UNIT_DEPARTMENT_WORKFLOWS: readonly UnitDepartmentWorkflowConfig[] 
 // requestKinds is empty and the CFO renders the reviewer view. The optionKinds entry stays,
 // because the CFO still curates the Funding/Purchase dropdown catalogs.
 export const FLAT_DEPARTMENT_WORKFLOWS: readonly FlatDepartmentWorkflowConfig[] = [
-  { roleCode: 'cfo', requestKinds: [], optionKinds: ['fundingMain', 'fundingSub'], assignmentRequired: false },
+  // 'venue' joins funding as CFO-curated master data: the university's venue
+  // list is finance-governed, and putting it here is what gives the Venue
+  // Management page the same ownership check, nav grant and Page Visibility row
+  // as every other dropdown catalogue rather than a special case.
+  { roleCode: 'cfo', requestKinds: [], optionKinds: ['fundingMain', 'fundingSub', 'venue'], assignmentRequired: false },
 ];
 
 // Accepts either a bare role_code string ('cfo') or a full AuthUser — every caller below

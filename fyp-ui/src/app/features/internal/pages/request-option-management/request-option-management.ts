@@ -41,7 +41,14 @@ const KIND_LABELS: Readonly<Record<RequestOptionKind, string>> = {
   dietaryInformation: 'Dietary Information', servingUnit: 'Serving Unit',
   campusTourStart: 'Campus Tour — Starting Points', campusTourType: 'Campus Tour — Types of Tour',
   fundingMain: 'Funding — Main Items', fundingSub: 'Funding — Sub-items',
+  venue: 'Venue Management',
 };
+
+// Catalogues the owner puts in a deliberate order rather than reading
+// alphabetically. The order set here is the order the venue appears in every
+// dropdown in the system, so the page offers move-up/move-down instead of
+// asking anyone to type a sort number.
+const ORDERED_KINDS: readonly RequestOptionKind[] = ['venue'];
 
 import { ImageUploadFieldComponent } from '../../../../shared/components/image-upload-field/image-upload-field';
 import { ListViewMode, ViewToggleComponent, defaultListViewMode } from '../../../../shared/components/view-toggle/view-toggle';
@@ -133,6 +140,19 @@ export class RequestOptionManagementComponent {
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filteredOptions().length / this.pageSize())));
   readonly visibleOptions = computed(() => this.filteredOptions().slice((this.page() - 1) * this.pageSize(), this.page() * this.pageSize()));
   readonly showCardToggle = computed(() => ['fmb', 'logistics', 'transportation'].includes(this.selectedKind()));
+  // Move up / move down are offered only when the rows on screen ARE the
+  // catalogue, in the catalogue's order: with a search or a status filter
+  // applied, "up" would mean past rows the CFO cannot currently see, and the
+  // result would look like the list reordered itself.
+  readonly reorderable = computed(() =>
+    ORDERED_KINDS.includes(this.selectedKind())
+    && !this.search().trim()
+    && this.statusFilter() === 'all');
+  readonly reorderingId = signal<string | null>(null);
+  readonly reorderHint = computed(() =>
+    ORDERED_KINDS.includes(this.selectedKind()) && !this.reorderable()
+      ? 'Clear the search and status filter to reorder venues.'
+      : '');
   readonly records = computed<readonly InternalDataRecord[]>(() => this.visibleOptions().map((option) => ({
     id: option.id,
     cells: {
@@ -148,7 +168,7 @@ export class RequestOptionManagementComponent {
     // Every option kind is dependency-gated on the server (app/services/soft_delete.py's
     // DELETION_RULES covers all twelve catalogues), so delete belongs on every row here, not
     // just the three kinds this used to allow-list.
-    actionKeys: ['edit', 'status', 'delete'],
+    actionKeys: this.reorderable() ? ['moveUp', 'moveDown', 'edit', 'status', 'delete'] : ['edit', 'status', 'delete'],
   })));
   readonly menuCardData = computed<readonly OptionCardViewModel[]>(() =>
     this.visibleOptions().map((option) => this.toCardViewModel(option)),
@@ -167,13 +187,23 @@ export class RequestOptionManagementComponent {
         ? 'Manage menu items and the serving units available when adding a menu item.'
         : this.selectedKind() === 'dietaryInformation'
           ? 'Manage the dietary information applicants and cafeteria teams can select for menu items.'
-          : 'Manage the options and operational information available in applicant request popups.',
+          : this.selectedKind() === 'venue'
+            ? 'The university venue list. Every Inside University location dropdown in the system reads from here — the event schedule and the logistics, sound & light, food and mineral water requests. Archived venues stop being offered for new selections but keep displaying on records that already used them.'
+            : 'Manage the options and operational information available in applicant request popups.',
       countLabel: `${this.filteredOptions().length} option${this.filteredOptions().length === 1 ? '' : 's'}`,
-      primaryActionLabel: this.selectedKind() === 'fmb' ? 'Add menu item' : this.selectedKind() === 'servingUnit' ? 'Add serving unit' : this.selectedKind() === 'dietaryInformation' ? 'Add dietary information' : 'Add option',
+      primaryActionLabel: this.selectedKind() === 'fmb' ? 'Add menu item' : this.selectedKind() === 'servingUnit' ? 'Add serving unit' : this.selectedKind() === 'dietaryInformation' ? 'Add dietary information' : this.selectedKind() === 'venue' ? 'Add venue' : 'Add option',
     },
     search: { ariaLabel: 'Search options', placeholder: 'Search option name or details' },
     columns: [{ key: 'name', label: 'Option' }, { key: 'details', label: 'Configuration' }, { key: 'status', label: 'Status' }, { key: 'actions', label: 'Actions', actions: true }],
-    actions: [{ key: 'edit', label: 'Edit option', icon: 'edit' }, { key: 'status', label: 'Change active status', icon: 'power_settings_new' }, { key: 'delete', label: 'Delete option', icon: 'delete' }],
+    actions: [
+      // Reorder first: on an ordered catalogue it is the action the owner
+      // reaches for most, and it is meaningless on every other kind, so it is
+      // added only where it applies rather than shown disabled everywhere.
+      ...(this.reorderable() ? [
+        { key: 'moveUp', label: 'Move up', icon: 'arrow_upward' },
+        { key: 'moveDown', label: 'Move down', icon: 'arrow_downward' },
+      ] : []),
+      { key: 'edit', label: 'Edit option', icon: 'edit' }, { key: 'status', label: 'Change active status', icon: 'power_settings_new' }, { key: 'delete', label: 'Delete option', icon: 'delete' }],
     emptyTitle: 'No options found', emptyDescription: 'Add an option or change the search and status filters.',
   }));
   readonly cardHeaderConfig = computed<InternalPageHeaderConfig>(() => ({
@@ -225,7 +255,29 @@ export class RequestOptionManagementComponent {
     if (!option) return;
     if (event.action.key === 'edit') { this.editingId.set(option.id); this.draft.set({ ...option }); this.imageError.set(''); this.modalOpen.set(true); this.clearNotices(); return; }
     if (event.action.key === 'delete') { this.requestDelete(option); return; }
+    if (event.action.key === 'moveUp') { this.move(option.id, -1); return; }
+    if (event.action.key === 'moveDown') { this.move(option.id, 1); return; }
     this.changeStatus(option);
+  }
+
+  // Sends the WHOLE resulting order, not "this row moved": the server assigns
+  // positions from the array it is given, so a stale client cannot leave the
+  // catalogue half-ordered. The list re-renders from the server's response.
+  private move(id: string, delta: number): void {
+    const ids = this.currentOptions().map((option) => option.id);
+    const from = ids.indexOf(id);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= ids.length) return;
+    const next = [...ids];
+    next.splice(to, 0, ...next.splice(from, 1));
+    this.clearNotices();
+    this.reorderingId.set(id);
+    this.optionService.reorder(this.selectedKind(), next)
+      .pipe(finalize(() => this.reorderingId.set(null)), takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => this.toast.success('Order updated'),
+        error: (err) => this.toast.error('The order could not be saved', apiErrorMessage(err, 'Please try again.')),
+      });
   }
   setViewMode(mode: 'table' | 'card'): void { this.viewMode.set(mode); }
   editMenuItem(id: string): void {
@@ -445,6 +497,10 @@ export class RequestOptionManagementComponent {
       servingUnit: [],
       campusTourStart: [{ key: 'maximumGroupSize', label: 'Maximum Group Size', type: 'number', min: 1 }, { key: 'meetingInstructions', label: 'Meeting Instructions', type: 'textarea' }],
       campusTourType: [],
+      // A venue is a place, so what distinguishes two of them is where it is and
+      // how many people fit — both optional, because a venue with neither is
+      // still a venue. Display order is not a field: it is set by reordering.
+      venue: [{ key: 'building', label: 'Building / Block', type: 'text', half: true }, { key: 'capacity', label: 'Capacity (pax)', type: 'number', min: 0, half: true }],
       fundingMain: [{ key: 'financeCode', label: 'Budget Category / Finance Code', type: 'text' }, { key: 'purchasingGuidance', label: 'Purchasing Guidance', type: 'textarea' }],
       fundingSub: [{ key: 'parentId', label: 'Parent Main Item', type: 'select', required: true, options: this.allOptions().filter((option) => option.kind === 'fundingMain').map((option) => ({ value: option.id, label: option.label })) }, { key: 'financeCode', label: 'Finance / Procurement Code', type: 'text' }, { key: 'purchasingNote', label: 'Default Unit / Purchasing Note', type: 'textarea' }],
     };
@@ -462,6 +518,7 @@ export class RequestOptionManagementComponent {
       case 'campusTourType': return option.description ?? '';
       case 'fundingMain': return [option.financeCode, option.purchasingGuidance].filter(Boolean).join(' · ');
       case 'fundingSub': return [this.allOptions().find((item) => item.id === option.parentId)?.label, option.financeCode].filter(Boolean).join(' · ');
+      case 'venue': return [option.building, option.capacity ? `${option.capacity} pax` : '', option.description].filter(Boolean).join(' · ');
     }
   }
 

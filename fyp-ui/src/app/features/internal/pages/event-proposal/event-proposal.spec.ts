@@ -67,7 +67,14 @@ describe('EventProposalComponent', () => {
   });
 
   afterEach(() => {
-    TestBed.inject(HttpTestingController).verify();
+    const httpMock = TestBed.inject(HttpTestingController);
+    // The venue catalogue is fetched in the constructor, not on reaching step 3
+    // like the per-requirement catalogues: the Event Schedule step needs venues
+    // on step 2. Every test therefore has this one pending request whether or
+    // not it touches the schedule, so it is answered here rather than in each.
+    httpMock.match((request) => request.url === `${environment.apiBaseUrl}/options`)
+      .forEach((request) => request.flush(CATALOG_SEED));
+    httpMock.verify();
   });
 
   it('starts with the complete six-step proposal flow', () => {

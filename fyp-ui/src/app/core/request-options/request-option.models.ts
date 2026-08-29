@@ -9,7 +9,8 @@ export type RequestOptionKind =
   | 'campusTourStart'
   | 'campusTourType'
   | 'fundingMain'
-  | 'fundingSub';
+  | 'fundingSub'
+  | 'venue';
 
 export interface RequestOptionBase {
   readonly id: string;
@@ -94,6 +95,20 @@ export interface FundingSubOption extends RequestOptionBase {
   readonly purchasingNote?: string;
 }
 
+// A university venue. The single source for every Inside University location
+// dropdown in the system — the event schedule and the four university-delivered
+// requests all read this one catalogue, so a venue the CFO archives disappears
+// from all of them at once and a venue they reorder moves in all of them at
+// once. See backend migration 032.
+export interface VenueOption extends RequestOptionBase {
+  readonly kind: 'venue';
+  readonly building?: string;
+  readonly capacity?: number | null;
+  // The CFO's display order. Server-assigned (appended on create, rewritten by
+  // reorder) — the management page never asks anyone to type a number.
+  readonly sortOrder?: number;
+}
+
 export type RequestOption =
   | LogisticsRequestOption
   | TransportationRequestOption
@@ -105,7 +120,8 @@ export type RequestOption =
   | CampusTourStartOption
   | CampusTourTypeOption
   | FundingMainOption
-  | FundingSubOption;
+  | FundingSubOption
+  | VenueOption;
 
 export type RequestOptionDraft = Omit<RequestOption, 'id'>;
 
@@ -129,4 +145,8 @@ export interface RequestOptionRepository {
   restoreOption(id: string): import('rxjs').Observable<RequestOption>;
   purgeOption(id: string): import('rxjs').Observable<void>;
   getDeletedOptions(): import('rxjs').Observable<readonly ArchivedRequestOption[]>;
+  // Whole-list write: the caller sends the order it wants and the server assigns
+  // the positions, so two managers reordering at once cannot interleave into a
+  // half-applied order. Only orderable catalogues (venues) accept it.
+  reorderOptions(kind: RequestOptionKind, ids: readonly string[]): import('rxjs').Observable<readonly RequestOption[]>;
 }

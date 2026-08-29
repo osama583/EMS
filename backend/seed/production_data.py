@@ -125,12 +125,25 @@ NEW_CLUBS = [
      ["Special Interest"], 11, "none"),
 ]
 
-# --- Venues ----------------------------------------------------------------
-VENUES = [
-    "Auditorium", "Grand Hall", "Main Hall", "Level 6 Multipurpose Hall",
-    "Seminar Room 1", "Seminar Room 2", "Lecture Theatre 3", "Lecture Theatre 5",
-    "Innovation Lab", "Campus Green", "Basketball Court", "Library Discussion Zone",
-    "Atrium Concourse", "Block D Studio", "Sports Complex", "Boardroom A",
+# --- Locations -------------------------------------------------------------
+# University venues are NOT listed here any more. They live in venue_options,
+# seeded from seed/data.py's VENUE_OPTIONS and managed by the CFO at
+# /app/dropdown-options/venue - see migration 032. seed_production reads them
+# back out of the table (Catalogue.venue), so this file cannot drift from what
+# the app actually offers, and there is no second copy to update.
+#
+# What does still belong here is the opposite case: addresses that are NOT
+# university venues, used by Off Campus events to exercise the schedule's
+# Outside University branch. These are free text by definition - there is
+# nothing to look them up in.
+EXTERNAL_LOCATIONS = [
+    "Kuala Lumpur Convention Centre, Hall 5",
+    "Sunway Pyramid Convention Centre",
+    "Bukit Jalil National Stadium, East Wing",
+    "Menara APU, Level 12 Function Room",
+    "Taman Tugu Forest Park (guided trail)",
+    "Setia City Convention Centre, Shah Alam",
+    "Chin Woo Stadium, Jalan Hang Jebat",
 ]
 
 # --- Event catalogue -------------------------------------------------------

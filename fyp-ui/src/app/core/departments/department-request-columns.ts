@@ -50,7 +50,9 @@ export function buildDepartmentRequestDefinitions(
   const date = { key: 'date', label: 'Date', type: 'date', required: true, span: 'half' } as const;
   const start = { key: 'start', label: 'Start Time', type: 'time', required: true, span: 'half' } as const;
   const end = { key: 'end', label: 'End Time', type: 'time', required: true, span: 'half' } as const;
-  const location = { key: 'location', label: 'Location', type: 'text', required: true, span: 'full' } as const;
+  // A university venue, never free text — the same rule the applicant form
+  // enforces and the server re-checks (proposals.py's VENUE_ONLY_REQUIREMENTS).
+  const location = { key: 'venueId', label: 'Venue', type: 'select', required: true, options: activeSelectOptions('venue'), span: 'full' } as const;
   const notes = { key: 'notes', label: 'Notes', type: 'text', span: 'full' } as const;
 
   const definitions: readonly DepartmentRequestDefinition[] = [
@@ -100,6 +102,9 @@ export function optionKindForDepartmentField(key: DepartmentRequestKind, columnK
   if (key === 'campusTour' && columnKey === 'tourType') return 'campusTourType';
   if (key === 'fundingPurchase' && columnKey === 'mainItem') return 'fundingMain';
   if (key === 'fundingPurchase' && columnKey === 'subItem') return 'fundingSub';
+  // Every request that records where it is delivered reads the one venue
+  // catalogue, so its Location column resolves like any other select.
+  if (columnKey === 'venueId') return 'venue';
   return null;
 }
 
@@ -127,7 +132,13 @@ export function resolveDepartmentRowLabels(
     for (const column of selectColumns) {
       const raw = String(row[column.key] ?? '');
       const option = catalog.find((item) => item.id === raw);
-      if (option) resolved[column.key] = option.label;
+      if (option) { resolved[column.key] = option.label; continue; }
+      // Unresolvable means the catalogue row is gone from the ACTIVE list — an
+      // archived venue, most often. The row still carries the label frozen onto
+      // it when it was saved, so display that rather than the raw "venue:3",
+      // which is what keeps an archived venue reading correctly on an old
+      // record. Falls through to the raw value only if there is no snapshot.
+      if (column.key === 'venueId' && row['location']) resolved[column.key] = row['location'];
     }
     return resolved;
   });

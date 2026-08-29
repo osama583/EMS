@@ -49,17 +49,26 @@ const options = (...labels: string[]): readonly SelectOption[] => labels.map(opt
 // Which option kinds each "Required for Event" checkbox needs, so the catalog only ever fetches
 // what the applicant actually selected rather than every dropdown in the system up front.
 // dietaryInformation/servingUnit ride along with fmb since they only ever render inside its rows.
+// Which catalogues each request popup has to load before it can render. The
+// five venue-backed requirements pull 'venue' as well as their own list — that
+// is what makes the Venue Management page the source for their Location field.
 const REQUIREMENT_OPTION_KINDS: Record<RequirementKey, readonly RequestOptionKind[]> = {
-  logistics: ['logistics'],
+  logistics: ['logistics', 'venue'],
   transportation: ['transportation'],
-  photoVideo: ['photoVideo'],
-  soundLight: ['soundLight'],
-  fmb: ['fmb', 'dietaryInformation', 'servingUnit'],
+  photoVideo: ['photoVideo', 'venue'],
+  soundLight: ['soundLight', 'venue'],
+  fmb: ['fmb', 'dietaryInformation', 'servingUnit', 'venue'],
   campusTour: ['campusTourStart', 'campusTourType'],
-  // Mineral water needs no catalogue lookup: the quantity is typed in (migration 028).
-  waterNormal: [],
+  // Mineral water needs no catalogue of its own: the quantity is typed in
+  // (migration 028). It still needs venues for its delivery location.
+  waterNormal: ['venue'],
   fundingPurchase: ['fundingMain', 'fundingSub'],
 };
+
+// Matches app/services/proposals.py's INSIDE/OUTSIDE — the value travels to the
+// server as-is on every schedule row.
+const INSIDE_UNIVERSITY = 'inside';
+const OUTSIDE_UNIVERSITY = 'outside';
 
 @Component({
   selector: 'app-event-proposal',
@@ -196,6 +205,10 @@ export class EventProposalComponent implements OnDestroy {
   readonly tableEditorCollection = signal<TableEditorCollection | null>(null);
   readonly tableEditingIndex = signal<number | null>(null);
   readonly tableDraft = signal<EditableRow>({});
+  // Live venues in the CFO's order (active only) and the wider catalogue used to
+  // re-admit an archived venue that an existing row still points at.
+  readonly venues = signal<readonly RequestOption[]>([]);
+  readonly venueCatalog = signal<readonly RequestOption[]>([]);
 
   private readonly toastService = inject(ToastService);
   private readonly systemConfig = inject(SystemConfigService);
@@ -261,6 +274,10 @@ export class EventProposalComponent implements OnDestroy {
   private readonly pendingFormatName = signal<string | null>(null);
 
   constructor() {
+    // Venues load with the form, not with a request popup: the Event Schedule
+    // step needs them on step 2, long before Request Details is reached.
+    this.loadVenueCatalog();
+
     // The "Club Only" audience options. Only fetched for a president - for anyone
     // else the tier is not offered at all, so the request would be wasted.
     if (this.isClubPresident) {
@@ -356,6 +373,24 @@ export class EventProposalComponent implements OnDestroy {
   // directly for a resubmission/draft, since submit() validates every step immediately and the
   // fundingPurchase check below needs the catalog loaded to recognize prefilled mainItem/subItem
   // values as valid even if the applicant never revisits Request Details.
+  private loadVenueCatalog(): void {
+    this.requestOptionSubscription.add(
+      this.optionService.watchVenues().subscribe({
+        next: (venues) => {
+          this.venues.set(venues);
+          // The wider catalogue keeps every venue this form has seen, including
+          // one that has since been archived, so a row that already points at it
+          // still renders its name instead of falling back to a blank select.
+          this.venueCatalog.update((current) => {
+            const seen = new Set(current.map((venue) => venue.id));
+            return [...current, ...venues.filter((venue) => !seen.has(venue.id))];
+          });
+        },
+        error: () => undefined,
+      }),
+    );
+  }
+
   private loadRequestOptionCatalog(): void {
     const kinds = new Set(this.selectedRequirements().flatMap((key) => REQUIREMENT_OPTION_KINDS[key as RequirementKey] ?? []));
     const missing = [...kinds].filter((kind) => !this.loadedRequestOptionKinds.has(kind));
@@ -443,9 +478,47 @@ export class EventProposalComponent implements OnDestroy {
   readonly coOwnerDisplayColumns: readonly ProposalTableColumn[] = [
     { key: 'name', label: 'Staff Name', width: '14rem' }, { key: 'email', label: 'Email', width: '14rem' }, { key: 'role', label: 'Role', width: '12rem' },
   ];
+  // The saved-row table. `location` is the resolved text either branch produces
+  // (the venue's name, or the typed address), so the table and the review
+  // summary read the same whichever was used — and a row saved against a venue
+  // that has since been archived still shows the name it was saved with.
   readonly scheduleColumns: readonly EditableTableColumn[] = [
     { key: 'date', label: 'Date', type: 'date', required: true }, { key: 'start', label: 'Start Time', type: 'time', required: true }, { key: 'end', label: 'End Time', type: 'time', required: true }, { key: 'location', label: 'Location', type: 'text', required: true },
   ];
+
+  // The row EDITOR's columns, which differ from the table's: Inside University
+  // picks a venue from the CFO's catalogue, Outside University types an
+  // address. Only one of the two is shown, chosen by the row being edited —
+  // showing both would let a row be saved claiming to be in two places.
+  scheduleEditorColumns(): readonly EditableTableColumn[] {
+    const outside = String(this.tableDraft()['locationKind'] ?? INSIDE_UNIVERSITY) === OUTSIDE_UNIVERSITY;
+    return [
+      { key: 'date', label: 'Date', type: 'date', required: true, span: 'half' },
+      { key: 'start', label: 'Start Time', type: 'time', required: true, span: 'half' },
+      { key: 'end', label: 'End Time', type: 'time', required: true, span: 'half' },
+      { key: 'locationKind', label: 'Location', type: 'select', required: true, span: 'half',
+        options: [{ value: INSIDE_UNIVERSITY, label: 'Inside University' }, { value: OUTSIDE_UNIVERSITY, label: 'Outside University' }] },
+      outside
+        ? { key: 'location', label: 'External Location', type: 'text', required: true, span: 'full', placeholder: 'e.g. Kuala Lumpur Convention Centre, Hall 5' }
+        : { key: 'venueId', label: 'Venue', type: 'select', required: true, span: 'full', options: this.venueSelectOptions(this.tableDraft()['venueId']) },
+    ];
+  }
+
+  // Every Inside University dropdown in the app is built from this one list, in
+  // the order the CFO set. `selected` re-admits an archived venue when it is the
+  // value the row already holds: an old proposal must keep showing the venue it
+  // was submitted with, even though that venue is no longer offered to new rows.
+  venueSelectOptions(selected?: string | number): readonly SelectOption[] {
+    const venues = this.venues();
+    const current = String(selected ?? '');
+    const known = venues.some((venue) => venue.id === current);
+    const shown = !current || known ? venues : [...venues, ...this.archivedVenueFallback(current)];
+    return this.optionService.toSelectOptions(shown);
+  }
+  private archivedVenueFallback(id: string): readonly RequestOption[] {
+    const found = this.venueCatalog().find((venue) => venue.id === id);
+    return found ? [found] : [];
+  }
   readonly organizerColumns: readonly EditableTableColumn[] = [
     { key: 'name', label: 'Name', type: 'staff', required: true }, { key: 'email', label: 'Email', type: 'readonly' }, { key: 'role', label: 'Role', type: 'readonly', span: 'full' }, { key: 'notes', label: 'Responsibility / Notes', type: 'text', span: 'full' },
   ];
@@ -665,7 +738,7 @@ export class EventProposalComponent implements OnDestroy {
   }
   addRow(collection: RowCollection): void {
     const target = this[collection] as unknown as { update(fn: (rows: readonly EditableRow[]) => readonly EditableRow[]): void };
-    const defaults: Record<RowCollection, EditableRow> = { coOwners: { name: '', email: '', role: '' }, schedule: { date: '', start: '', end: '', location: '' }, organizers: { name: '', email: '', role: '', notes: '' }, importantPeople: { name: '', type: '', organization: '', designation: '' }, guests: { guestType: '', count: 0, notes: '' }, agenda: { date: '', time: '', activity: '', location: '', pic: '', notes: '' }, discussions: { topic: '' } };
+    const defaults: Record<RowCollection, EditableRow> = { coOwners: { name: '', email: '', role: '' }, schedule: { date: '', start: '', end: '', location: '', venueId: '', locationKind: INSIDE_UNIVERSITY }, organizers: { name: '', email: '', role: '', notes: '' }, importantPeople: { name: '', type: '', organization: '', designation: '' }, guests: { guestType: '', count: 0, notes: '' }, agenda: { date: '', time: '', activity: '', location: '', pic: '', notes: '' }, discussions: { topic: '' } };
     target.update((rows) => [...rows, this.row(defaults[collection])]);
   }
   removeRow(collection: RowCollection, index: number): void {
@@ -696,15 +769,39 @@ export class EventProposalComponent implements OnDestroy {
     return (this[collection] as unknown as () => readonly EditableRow[])();
   }
   tableColumns(collection: TableEditorCollection): readonly EditableTableColumn[] {
-    return ({ schedule: this.scheduleColumns, organizers: this.organizerColumns, importantPeople: this.importantColumns, guests: this.guestColumns, agenda: this.agendaColumns(), discussions: this.discussionColumns })[collection];
+    // Schedule is the one collection whose editor columns are not its table
+    // columns — see scheduleEditorColumns().
+    return ({ schedule: this.scheduleEditorColumns(), organizers: this.organizerColumns, importantPeople: this.importantColumns, guests: this.guestColumns, agenda: this.agendaColumns(), discussions: this.discussionColumns })[collection];
   }
   tableEditorColumns(): readonly EditableTableColumn[] { const collection = this.tableEditorCollection(); return collection ? this.tableColumns(collection) : []; }
   tableTitle(collection: TableEditorCollection): string {
     return ({ schedule: 'Event Schedule', organizers: 'Organizer / PIC', importantPeople: 'Important People', guests: 'General Guest / Pax', agenda: 'Brief Agenda', discussions: 'Discussion Topics' })[collection];
   }
   isTableAtLimit(collection: TableEditorCollection): boolean { return this.tableRows(collection).length >= 20; }
-  openTableEditor(collection: TableEditorCollection): void { this.tableEditorCollection.set(collection); this.tableEditingIndex.set(null); this.tableDraft.set({}); this.tableModalOpen.set(true); this.resetDateConflict(); }
-  editTableRow(collection: TableEditorCollection, index: number): void { this.tableEditorCollection.set(collection); this.tableEditingIndex.set(index); this.tableDraft.set({ ...this.tableRows(collection)[index] }); this.tableModalOpen.set(true); this.resetDateConflict(); if (collection === 'schedule') this.scheduleDateConflictCheck(); }
+  openTableEditor(collection: TableEditorCollection): void {
+    this.tableEditorCollection.set(collection);
+    this.tableEditingIndex.set(null);
+    // A new schedule row starts Inside University — that is what nearly every
+    // event is, and leaving the required Location field blank would make the
+    // applicant confirm the default before the venue picker below it counts as
+    // filled in.
+    this.tableDraft.set(collection === 'schedule' ? { locationKind: INSIDE_UNIVERSITY } : {});
+    this.tableModalOpen.set(true);
+    this.resetDateConflict();
+  }
+  editTableRow(collection: TableEditorCollection, index: number): void {
+    this.tableEditorCollection.set(collection);
+    this.tableEditingIndex.set(index);
+    const row = { ...this.tableRows(collection)[index] };
+    // A row written before venues existed carries no locationKind. It is Inside
+    // University unless it says otherwise — which is the same reading migration
+    // 032 applied to the rows already in the database.
+    if (collection === 'schedule' && !row['locationKind']) row['locationKind'] = INSIDE_UNIVERSITY;
+    this.tableDraft.set(row);
+    this.tableModalOpen.set(true);
+    this.resetDateConflict();
+    if (collection === 'schedule') this.scheduleDateConflictCheck();
+  }
   closeTableModal(): void { this.tableModalOpen.set(false); this.tableEditorCollection.set(null); this.tableEditingIndex.set(null); this.tableDraft.set({}); this.resetDateConflict(); }
   tableModalTitle(): string { const collection = this.tableEditorCollection(); return collection ? `Add ${this.tableTitle(collection)} row` : 'Add table row'; }
   tableDraftValue(key: string): string | number { return this.tableDraft()[key] ?? ''; }
@@ -717,6 +814,18 @@ export class EventProposalComponent implements OnDestroy {
     if (column?.type === 'staff') {
       const person = this.tableStaffOptions(column).find((item) => item.value === value);
       if (person) { draft['name'] = person.label; draft['email'] = person.email; draft['role'] = person.role; }
+    }
+    if (collection === 'schedule' && (key === 'venueId' || key === 'locationKind')) {
+      const outside = String(draft['locationKind'] ?? INSIDE_UNIVERSITY) === OUTSIDE_UNIVERSITY;
+      if (outside) {
+        // Switching to Outside drops the venue link but keeps nothing stale
+        // behind it: the address is typed next, and an empty location is what
+        // validation should see until it is.
+        draft['venueId'] = '';
+        if (key === 'locationKind') draft['location'] = '';
+      } else {
+        draft['location'] = this.venueCatalog().find((venue) => venue.id === String(draft['venueId'] ?? ''))?.label ?? '';
+      }
     }
     this.tableDraft.set(draft);
     // Re-check congestion whenever the schedule row's date changes, so the warning appears
@@ -1033,6 +1142,7 @@ export class EventProposalComponent implements OnDestroy {
       case 'dietaryInformation': case 'servingUnit': return option.description ?? '';
       case 'campusTourStart': return [option.maximumGroupSize ? `Maximum group size: ${option.maximumGroupSize}` : '', option.meetingInstructions].filter(Boolean).join(' · ');
       case 'campusTourType': return option.description ?? '';
+      case 'venue': return [option.building, option.capacity ? `Capacity: ${option.capacity}` : '', option.description].filter(Boolean).join(' · ');
     }
   }
   requestFormValid(): boolean {
@@ -1458,7 +1568,12 @@ export class EventProposalComponent implements OnDestroy {
     const date = { key: 'date', label: 'Date', type: 'date', required: true, span: 'half' } as const;
     const start = { key: 'start', label: 'Start Time', type: 'time', required: true, span: 'half' } as const;
     const end = { key: 'end', label: 'End Time', type: 'time', required: true, span: 'half' } as const;
-    const location = { key: 'location', label: 'Location', type: 'text', required: true, span: 'full' } as const;
+    // Venue, not free text. Logistics, Sound & Light, Food, Mineral Water and
+    // Photography are all delivered BY the university, so the only place they
+    // can be delivered to is a university venue — and a request naming a place
+    // Logistics cannot find is exactly what free text produced. Enforced
+    // server-side too (proposals.py's VENUE_ONLY_REQUIREMENTS).
+    const location = { key: 'venueId', label: 'Venue', type: 'select', required: true, options: this.activeSelectOptions('venue'), span: 'full' } as const;
     const notes = { key: 'notes', label: 'Notes', type: 'text', span: 'full' } as const;
     const definitions: readonly RequestDefinition[] = [
       // Required scheduling/quantity fields first (paired 2-up), then the Item / Need picker
@@ -1512,6 +1627,10 @@ export class EventProposalComponent implements OnDestroy {
     if (key === 'campusTour' && columnKey === 'tourType') return 'campusTourType';
     if (key === 'fundingPurchase' && columnKey === 'mainItem') return 'fundingMain';
     if (key === 'fundingPurchase' && columnKey === 'subItem') return 'fundingSub';
+    // Every venue-backed request field reads the one venue catalogue, so the
+    // existing option-loading path (including its archived-but-selected
+    // fallback) covers venues with no special casing.
+    if (columnKey === 'venueId') return 'venue';
     return null;
   }
 }

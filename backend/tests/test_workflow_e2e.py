@@ -45,7 +45,25 @@ def principal_for(cur, email: str) -> Principal:
     )
 
 
-def make_payload(**overrides) -> dict:
+def a_venue(cur) -> str:
+    """The "venue:{n}" id of any live venue.
+
+    Schedule rows and the university-delivered requests reference the venue
+    catalogue rather than typing a location (migration 032), so a payload that
+    reaches submission has to name a real one. Read from the table rather than
+    hardcoded here for the same reason the feature exists: there is one source
+    for the venue list and this is not a second copy of it.
+    """
+    row = fetch_one(
+        cur,
+        "SELECT venue_option_id FROM venue_options WHERE active AND archived_at IS NULL "
+        "ORDER BY sort_order, venue_option_id LIMIT 1",
+    )
+    assert row is not None, "no live venues - run `python -m migrations.run` and reseed"
+    return f"venue:{row['venue_option_id']}"
+
+
+def make_payload(venue: str, **overrides) -> dict:
     """A valid submission. Scheduled far enough out that cancellation stays open."""
     day = (date.today() + timedelta(days=30)).isoformat()
     payload = {
@@ -56,7 +74,8 @@ def make_payload(**overrides) -> dict:
         "eventVisibility": "Private",
         "registrationMode": "Automatic",
         "totalPax": 20,
-        "scheduleRows": [{"date": day, "start": "09:00", "end": "17:00", "location": "Hall A"}],
+        "scheduleRows": [{"date": day, "start": "09:00", "end": "17:00",
+                          "locationKind": "inside", "venueId": venue}],
         # Defaults to one routed requirement so a proposal REACHES department
         # review and stops there. With no requirements it would auto-complete
         # immediately - correct behaviour, covered by its own test below.
@@ -69,7 +88,7 @@ def make_payload(**overrides) -> dict:
 def create_proposal(cur, applicant_email: str, **overrides) -> int:
     principal = principal_for(cur, applicant_email)
     applicant = proposals.load_applicant(cur, principal.user_id)
-    return proposals.create(cur, applicant, make_payload(**overrides), draft=False)
+    return proposals.create(cur, applicant, make_payload(a_venue(cur), **overrides), draft=False)
 
 
 def status_of(cur, request_id: int) -> str:
@@ -453,7 +472,8 @@ def test_cancellation_closes_near_the_event_date(cur):
     request_id = create_proposal(
         cur,
         "student.computing@demo.apu.edu.my",
-        scheduleRows=[{"date": tomorrow, "start": "09:00", "end": "17:00", "location": "Hall A"}],
+        scheduleRows=[{"date": tomorrow, "start": "09:00", "end": "17:00",
+                       "locationKind": "inside", "venueId": a_venue(cur)}],
     )
     wf.submit(cur, request_id)
     with pytest.raises(WorkflowError):
@@ -503,7 +523,7 @@ def _place_and_approve_order(cur, **create_overrides) -> tuple[int, int]:
         cur, "student.computing@demo.apu.edu.my", selectedRequirements=["fmb"],
         requestRows={"fmb": [{
             "foodType": "fmb:1", "quantity": 20, "date": day,
-            "start": "12:00", "location": "Hall A",
+            "start": "12:00", "venueId": a_venue(cur),
         }]},
     )
     wf.submit(cur, request_id)
@@ -602,7 +622,7 @@ def test_flatten_requests_carries_a_raw_deadline_for_row_assignable_kinds(cur):
         cur, "hoshod@demo.apu.edu.my", selectedRequirements=["logistics"],
         requestRows={"logistics": [{
             "item": "logistics:1", "quantity": 5, "date": day,
-            "start": "09:00", "end": "10:00", "location": "Hall A",
+            "start": "09:00", "end": "10:00", "venueId": a_venue(cur),
         }]},
     )
     rows = proposals.flatten_requests(cur, request_id)

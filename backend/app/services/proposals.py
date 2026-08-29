@@ -66,7 +66,55 @@ _OPTION_CATALOGUES: dict[str, tuple[str, str]] = {
     "campusTourType": ("campus_tour_type_options", "campus_tour_type_option_id"),
     "fundingMain": ("funding_main_options", "funding_main_option_id"),
     "fundingSub": ("funding_sub_options", "funding_sub_option_id"),
+    "venue": ("venue_options", "venue_option_id"),
 }
+
+# The two location shapes a row can carry. 'outside' is only ever legal on the
+# event schedule - the four delivery requests are venue-only by requirement.
+INSIDE, OUTSIDE = "inside", "outside"
+
+# Requirements whose location must be a catalogue venue, never free text, with
+# the label the applicant sees for each. Photography is included: it carries the
+# same location field and reads from the same dropdown, so leaving it free-text
+# would have kept one corner of the form on the old approach.
+VENUE_ONLY_REQUIREMENTS = {
+    "logistics": "Logistics",
+    "soundLight": "Sound & Light",
+    "fmb": "Food",
+    "waterNormal": "Mineral Water",
+    "photoVideo": "Photography / Videography",
+}
+
+
+def _venue_ref(venue_option_id: int | None) -> str:
+    """The "venue:{n}" composite id the client selects by (app.api.options.option_id).
+    Empty string for a row whose venue was never resolved, which is what an
+    unselected dropdown sends back."""
+    return f"venue:{venue_option_id}" if venue_option_id else ""
+
+
+def _resolve_location(cur, row: dict, *, allow_outside: bool = False) -> tuple[int | None, str, str]:
+    """Resolve a row's location to (venue_option_id, frozen label, kind).
+
+    The label is frozen onto the row exactly like every other catalogue pick in
+    this file: venue_option_id is the live link a dropdown re-selects from, and
+    `location` is what the record displays for the rest of its life. That is
+    what lets the CFO archive or rename a venue without rewriting the history
+    of every proposal that used it.
+
+    An unresolvable venueId degrades to the typed text rather than failing, the
+    same way _resolve_option treats a deleted option - a venue archived between
+    opening the form and saving must not cost the applicant their draft.
+    """
+    if allow_outside and str(row.get("locationKind") or "").strip().lower() == OUTSIDE:
+        return None, str(row.get("location") or "").strip(), OUTSIDE
+    venue_id, label, _ = _resolve_option(cur, row.get("venueId"), "venue")
+    if venue_id is None:
+        # No usable venue reference: keep whatever text the row already carried
+        # so nothing is silently blanked, and report it as the kind it is.
+        text = str(row.get("location") or "").strip()
+        return None, text, (INSIDE if not allow_outside else (INSIDE if text else OUTSIDE))
+    return venue_id, label, INSIDE
 
 
 def _resolve_option(cur, value: Any, kind: str) -> tuple[int | None, str, dict[str, Any]]:
@@ -166,10 +214,29 @@ def validate(cur, payload: dict, *, draft: bool, applicant: dict | None = None) 
         if not schedule:
             errors.append("Add at least one scheduled date, time and location.")
         for index, row in enumerate(schedule, start=1):
-            if not (row.get("date") and row.get("start") and row.get("end") and row.get("location")):
-                errors.append(f"Schedule row {index} needs a date, start time, end time and location.")
+            outside = str(row.get("locationKind") or "").strip().lower() == OUTSIDE
+            # Inside University means a venue from the catalogue; Outside means
+            # a typed address. Exactly one of the two has to be present, and
+            # which one is decided by the row, not by whichever field happens to
+            # be filled - a half-switched row is a real error, not a guess.
+            located = bool(str(row.get("location") or "").strip()) if outside else bool(row.get("venueId"))
+            if not (row.get("date") and row.get("start") and row.get("end") and located):
+                what = "an external location" if outside else "a venue"
+                errors.append(f"Schedule row {index} needs a date, start time, end time and {what}.")
             elif str(row["end"]) <= str(row["start"]):
                 errors.append(f"Schedule row {index} ends before it starts.")
+
+        # The four university-delivered requests are venue-only by requirement
+        # (migration 032): there is nowhere to deliver a stage or a tray of food
+        # but a university venue, and free text there is what used to send
+        # Logistics to a place they could not find. Enforced here as well as in
+        # the form, because the form is not the only thing that can POST.
+        request_rows = payload.get("requestRows")
+        request_rows = request_rows if isinstance(request_rows, dict) else {}
+        for requirement, label in VENUE_ONLY_REQUIREMENTS.items():
+            for index, row in enumerate(_rows(request_rows, requirement), start=1):
+                if not row.get("venueId"):
+                    errors.append(f"{label} row {index} needs a university venue.")
 
         total_pax = payload.get("totalPax")
         if total_pax is None or _as_int(total_pax, default=-1) <= 0:
@@ -468,10 +535,12 @@ def write_children(cur, request_id: int, payload: dict) -> None:
     for row in _rows(payload, "scheduleRows"):
         if not (row.get("date") and row.get("start") and row.get("end")):
             continue
+        venue_id, location, kind = _resolve_location(cur, row, allow_outside=True)
         cur.execute(
-            'INSERT INTO event_schedule (request_id, "date", start_time, end_time, location) '
-            "VALUES (%s, %s, %s, %s, %s)",
-            (request_id, row["date"], row["start"], row["end"], row.get("location") or ""),
+            'INSERT INTO event_schedule '
+            '(request_id, "date", start_time, end_time, location, venue_option_id, location_kind) '
+            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (request_id, row["date"], row["start"], row["end"], location, venue_id, kind),
         )
 
     for row in _rows(payload, "coOwners"):
@@ -587,12 +656,14 @@ def _write_logistics_rows(cur, request_id: int, rows: list[dict]) -> None:
         if not row.get("item"):
             continue
         option_id, label, _ = _resolve_option(cur, row.get("item"), "logistics")
+        venue_id, location, _ = _resolve_location(cur, row)
         cur.execute(
             """INSERT INTO request_logistics
-                   (request_id, option_id, item, quantity, "date", start_time, end_time, location, notes)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                   (request_id, option_id, item, quantity, "date", start_time, end_time, location,
+                    venue_option_id, notes)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (request_id, option_id, label, _as_int(row.get("quantity")),
-             row.get("date"), row.get("start"), row.get("end"), row.get("location") or "", row.get("notes")),
+             row.get("date"), row.get("start"), row.get("end"), location, venue_id, row.get("notes")),
         )
 
 
@@ -616,12 +687,14 @@ def _write_photo_video_rows(cur, request_id: int, rows: list[dict]) -> None:
         if not row.get("service"):
             continue
         option_id, label, _ = _resolve_option(cur, row.get("service"), "photoVideo")
+        venue_id, location, _ = _resolve_location(cur, row)
         cur.execute(
             """INSERT INTO request_photography_videography
-                   (request_id, option_id, service, "date", start_time, end_time, location, notes)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                   (request_id, option_id, service, "date", start_time, end_time, location,
+                    venue_option_id, notes)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (request_id, option_id, label, row.get("date"),
-             row.get("start"), row.get("end"), row.get("location") or "", row.get("notes")),
+             row.get("start"), row.get("end"), location, venue_id, row.get("notes")),
         )
 
 
@@ -630,12 +703,14 @@ def _write_sound_light_rows(cur, request_id: int, rows: list[dict]) -> None:
         if not row.get("item"):
             continue
         option_id, label, _ = _resolve_option(cur, row.get("item"), "soundLight")
+        venue_id, location, _ = _resolve_location(cur, row)
         cur.execute(
             """INSERT INTO request_sound_light
-                   (request_id, option_id, item, "date", start_time, end_time, location, notes)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                   (request_id, option_id, item, "date", start_time, end_time, location,
+                    venue_option_id, notes)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (request_id, option_id, label, row.get("date"),
-             row.get("start"), row.get("end"), row.get("location") or "", row.get("notes")),
+             row.get("start"), row.get("end"), location, venue_id, row.get("notes")),
         )
 
 
@@ -644,12 +719,14 @@ def _write_fmb_rows(cur, request_id: int, rows: list[dict]) -> None:
         if not row.get("foodType"):
             continue
         option_id, label, _ = _resolve_option(cur, row.get("foodType"), "fmb")
+        venue_id, location, _ = _resolve_location(cur, row)
         cur.execute(
             """INSERT INTO request_fmb
-                   (request_id, option_id, food_type, pax, "date", serve_time, location, notes)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                   (request_id, option_id, food_type, pax, "date", serve_time, location,
+                    venue_option_id, notes)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (request_id, option_id, label, _as_int(row.get("quantity")),
-             row.get("date"), row.get("start"), row.get("location") or "", row.get("notes")),
+             row.get("date"), row.get("start"), location, venue_id, row.get("notes")),
         )
 
 
@@ -688,14 +765,15 @@ def _write_water_normal_rows(cur, request_id: int, rows: list[dict]) -> None:
         quantity = _as_int(row.get("quantity"), default=0)
         if quantity <= 0:
             continue
+        venue_id, location, _ = _resolve_location(cur, row)
         cur.execute(
             """INSERT INTO request_mineral_water
                    (request_id, quantity, with_logo, "date",
-                    start_time, end_time, location, notes)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                    start_time, end_time, location, venue_option_id, notes)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
             (request_id, quantity,
              str(row.get("withLogo") or "").strip().lower() == "yes", row.get("date"),
-             row.get("start"), row.get("end"), row.get("location") or "", row.get("notes")),
+             row.get("start"), row.get("end"), location, venue_id, row.get("notes")),
         )
 
 
@@ -900,8 +978,8 @@ def project(cur, request: dict, *, include_children: bool = True) -> dict[str, A
     ]
     schedule = fetch_all(
         cur,
-        'SELECT "date", start_time, end_time, location FROM event_schedule '
-        "WHERE request_id = %s ORDER BY event_schedule_id",
+        'SELECT "date", start_time, end_time, location, venue_option_id, location_kind '
+        "FROM event_schedule WHERE request_id = %s ORDER BY event_schedule_id",
         (request_id,),
     )
     # The Club Only audience. Two shapes because two consumers: the proposal form
@@ -949,7 +1027,12 @@ def project(cur, request: dict, *, include_children: bool = True) -> dict[str, A
                 "date": str(r["date"]),
                 "start": str(r["start_time"]),
                 "end": str(r["end_time"]),
+                # `location` stays the frozen display text every existing reader
+                # already uses; venueId/locationKind are what the form re-selects
+                # from when a draft is reopened.
                 "location": r["location"],
+                "venueId": _venue_ref(r["venue_option_id"]),
+                "locationKind": r["location_kind"] or INSIDE,
             }
             for r in schedule
         ],
@@ -1157,7 +1240,8 @@ def _read_requirement_rows(cur, request_id: int) -> dict[str, list[dict[str, Any
         {
             "id": r["request_logistics_id"], "item": _option_ref(r["option_id"], "logistics"),
             "quantity": r["quantity"], "date": str(r["date"]), "start": str(r["start_time"]),
-            "end": str(r["end_time"]), "location": r["location"], "notes": r["notes"] or "",
+            "end": str(r["end_time"]), "location": r["location"],
+            "venueId": _venue_ref(r["venue_option_id"]), "notes": r["notes"] or "",
         }
         for r in fetch_all(
             cur,
@@ -1181,7 +1265,8 @@ def _read_requirement_rows(cur, request_id: int) -> dict[str, list[dict[str, Any
         {
             "id": r["request_photography_videography_id"], "service": _option_ref(r["option_id"], "photoVideo"),
             "date": str(r["date"]), "start": str(r["start_time"]), "end": str(r["end_time"]),
-            "location": r["location"], "notes": r["notes"] or "",
+            "location": r["location"], "venueId": _venue_ref(r["venue_option_id"]),
+            "notes": r["notes"] or "",
         }
         for r in fetch_all(
             cur,
@@ -1194,7 +1279,8 @@ def _read_requirement_rows(cur, request_id: int) -> dict[str, list[dict[str, Any
         {
             "id": r["request_sound_light_id"], "item": _option_ref(r["option_id"], "soundLight"),
             "date": str(r["date"]), "start": str(r["start_time"]), "end": str(r["end_time"]),
-            "location": r["location"], "notes": r["notes"] or "",
+            "location": r["location"], "venueId": _venue_ref(r["venue_option_id"]),
+            "notes": r["notes"] or "",
         }
         for r in fetch_all(
             cur,
@@ -1206,7 +1292,8 @@ def _read_requirement_rows(cur, request_id: int) -> dict[str, list[dict[str, Any
         {
             "id": r["request_fmb_id"], "foodType": _option_ref(r["option_id"], "fmb"),
             "quantity": r["pax"], "date": str(r["date"]), "start": str(r["serve_time"]),
-            "location": r["location"], "notes": r["notes"] or "",
+            "location": r["location"], "venueId": _venue_ref(r["venue_option_id"]),
+            "notes": r["notes"] or "",
         }
         for r in fetch_all(
             cur, "SELECT * FROM request_fmb WHERE request_id = %s ORDER BY request_fmb_id", (request_id,)
@@ -1229,7 +1316,8 @@ def _read_requirement_rows(cur, request_id: int) -> dict[str, list[dict[str, Any
             "id": r["request_mineral_water_id"], "quantity": r["quantity"],
             "withLogo": "Yes" if r["with_logo"] else "No", "date": str(r["date"]),
             "start": str(r["start_time"]), "end": str(r["end_time"]),
-            "location": r["location"], "notes": r["notes"] or "",
+            "location": r["location"], "venueId": _venue_ref(r["venue_option_id"]),
+            "notes": r["notes"] or "",
         }
         for r in fetch_all(
             cur, "SELECT * FROM request_mineral_water WHERE request_id = %s ORDER BY request_mineral_water_id",

@@ -188,6 +188,28 @@ CAMPUS_TOUR_TYPE_OPTIONS = [
     ("Facilities Tour", "Labs, studios, and workshops.", {}),
     ("Accommodation Tour", "Student residence walkthrough.", {}),
 ]
+# University venues - the single source for every Inside University dropdown in
+# the system. Managed by the CFO at /app/dropdown-options/venue after seeding;
+# this is only the starting list. (label, description, {extra columns})
+VENUE_OPTIONS = [
+    ("Auditorium", "Main auditorium, tiered seating.", {"capacity": 500}),
+    ("Grand Hall", "Largest flat-floor hall, full staging supported.", {"capacity": 800}),
+    ("Main Hall", "Flat-floor hall for fairs and exhibitions.", {"capacity": 600}),
+    ("Level 6 Multipurpose Hall", "Divisible hall on level 6.", {"capacity": 250}),
+    ("Seminar Room 1", "Seminar room, boardroom or theatre layout.", {"capacity": 60}),
+    ("Seminar Room 2", "Seminar room, boardroom or theatre layout.", {"capacity": 60}),
+    ("Lecture Theatre 3", "Tiered lecture theatre.", {"capacity": 180}),
+    ("Lecture Theatre 5", "Tiered lecture theatre.", {"capacity": 180}),
+    ("Innovation Lab", "Project space with workbenches and power.", {"capacity": 40}),
+    ("Campus Green", "Outdoor lawn, weather dependent.", {"capacity": 1000}),
+    ("Basketball Court", "Outdoor court, also used for large gatherings.", {"capacity": 400}),
+    ("Library Discussion Zone", "Group study area on the library floor.", {"capacity": 30}),
+    ("Atrium Concourse", "Central concourse, high footfall.", {"capacity": 350}),
+    ("Block D Studio", "Studio space with lighting rig.", {"capacity": 80}),
+    ("Sports Complex", "Indoor sports hall.", {"capacity": 900}),
+    ("Boardroom A", "Executive boardroom, seats 20.", {"capacity": 20}),
+]
+
 FUNDING_MAIN_OPTIONS = [
     ("Venue & Facilities", "Room hire, setup, and cleaning.", "FIN-VEN"),
     ("Food & Beverage", "Catering and refreshments.", "FIN-FNB"),

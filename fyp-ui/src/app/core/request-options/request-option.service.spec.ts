@@ -81,7 +81,9 @@ describe('RequestOptionService', () => {
 
   it('keeps manager permissions centralized by role and page', () => {
     expect(managerOptionKinds(logisticsManager)).toEqual(['logistics']);
-    expect(managerOptionKinds(cfoUser)).toEqual(['fundingMain', 'fundingSub']);
+    // The CFO curates the funding catalogues and, since migration 032, the
+    // university venue list that every Inside University dropdown reads from.
+    expect(managerOptionKinds(cfoUser)).toEqual(['fundingMain', 'fundingSub', 'venue']);
     // F&B owns the whole food-catalog set (menu, dietary information, serving units, mineral
     // water). A Cafeteria Manager owns only their own cafeteria's menu. waterLogo no longer
     // exists as its own kind — Mineral Water is one merged catalog.
