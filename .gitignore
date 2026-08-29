@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+backend/.venv/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Build output
+fyp-ui/dist/
+fyp-ui/.angular/
+*.tsbuildinfo
+
+# Secrets and local configuration. Only .env.example is committed.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+sa_token.txt
+*_token.txt
+
+# Logs and runtime output
+*.log
+backend/var/
+
+# Test and tooling output
+coverage/
+.nyc_output/
+.pytest_cache/
+qa/*-results.json
+backend/qa/*-results.json
+
+# Generated knowledge graph. Rebuilt on demand with `graphify update .` — the
+# committed copies were tens of megabytes of derived data plus dated snapshot
+# backups, which is not source.
+graphify-out/cache/
+graphify-out/20*/
+fyp-ui/graphify-out/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

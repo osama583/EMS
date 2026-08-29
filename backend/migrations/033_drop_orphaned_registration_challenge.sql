@@ -1,0 +1,22 @@
+-- ============================================================================
+-- Migration 033 - drop the orphaned registration_challenge table.
+--
+-- Migration 020 added this table for an OTP-verified external registration
+-- flow: a guest asked for an account, received a one-time code by email, and
+-- the hashed code lived here until they proved it. That flow no longer exists.
+-- POST /auth/register (app/api/auth.py) creates the external account directly
+-- from email + password and never touches this table.
+--
+-- Traced before dropping, per layer:
+--   Database  - no inbound foreign keys reference it.
+--   Backend   - the string "challenge" does not appear anywhere under app/.
+--   Seed      - not seeded, not truncated, not referenced.
+--   API       - no endpoint reads or writes it.
+--   Frontend  - nothing calls an OTP-verification endpoint; the registration
+--               form posts straight to /auth/register.
+--
+-- The rows it holds are expired one-time codes for a flow that cannot be
+-- completed, so there is nothing to preserve. Its indexes go with it.
+-- ============================================================================
+
+DROP TABLE IF EXISTS registration_challenge;
