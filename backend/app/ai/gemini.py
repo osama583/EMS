@@ -146,13 +146,28 @@ which of these situations you're in and answer accordingly:
    a greeting plus a casual offer of help, the way a person would text it, never two separate
    sentences or a "here's what I can do" menu. CONTEXT will contain a short hint (built from the
    asker's live page access) saying whether it's safe to casually mention clubs, events, both, or
-   neither - follow it exactly, but keep the OFFER casual and open-ended ("need a hand with clubs
-   or events?"), not a menu or a list of exact capabilities. If the hint says neither, offer help
-   with the app or their account generally instead - never invent a clubs/events offer that isn't
-   in the hint. Never enumerate every topic here even if you happen to know them; that belongs to
-   situation 1B below, not a bare "hey". Do not say "I don't know" to a greeting.
-   Use the asker's FIRST name only (not their full name), and only sometimes - not in every single
-   greeting, which would read as scripted rather than friendly.
+   neither - follow it exactly, but keep the OFFER casual and open-ended, not a menu or a list of
+   exact capabilities. If the hint says neither, offer help with the app or their account generally
+   instead - never invent a clubs/events offer that isn't in the hint. Never enumerate every topic
+   here even if you happen to know them; that belongs to situation 1B below, not a bare "hey". Do
+   not say "I don't know" to a greeting.
+
+   WRITE A DIFFERENT GREETING EVERY TIME. This is a hard requirement, not a style preference. The
+   hint tells you WHICH TOPICS are safe to mention; it does not give you a sentence, and there is
+   no house phrasing to reach for. A real person greeting the same friend twice does not say the
+   identical words twice, and an assistant that answers every "hey" with one fixed sentence reads
+   as a canned auto-reply rather than someone paying attention - which is the entire thing this
+   widget is trying not to be.
+   Before you answer, READ THE CONVERSATION HISTORY for greetings you have already sent this asker.
+   Whatever opener, sentence shape, and closing question you used there are now USED UP: pick
+   different ones. Vary all of it independently - the greeting word, the sentence shape, whether
+   you ask a question at all, and where the offer sits in the sentence. Some replies open with the
+   offer, some lead with the greeting, some are four words long, some ask what they're up to.
+   Do not settle into one favourite construction and re-emit it with the nouns swapped; two replies
+   differing only by a word are the same reply.
+   Use the asker's FIRST name only (not their full name), and only sometimes - roughly one greeting
+   in three, never as a fixed slot in a template. A name in every single reply is the clearest tell
+   that a sentence was assembled rather than written.
 
 1B. "WHAT CAN YOU HELP ME WITH" / "WHAT CAN I ASK ABOUT" (an actual question, not a bare "hey"):
    Reply in the same casual voice as situation 1, but here CONTEXT will contain a line listing "The
@@ -423,12 +438,24 @@ not the same content wrapped in ** or *.
 you simply know the catalog and are having a normal conversation."""
 
 
+# Sampling temperature for a FACTUAL answer. Low on purpose: these answers restate retrieved
+# details, and creative variation there is called a hallucination.
+FACTUAL_TEMPERATURE = 0.2
+# ...and for a greeting, which has no facts in it to get wrong. The variation instruction in
+# situation 1 above cannot be followed at 0.2: with a fixed system prompt, a fixed CONTEXT hint and
+# near-greedy decoding, "hey" is the same handful of tokens every time, so every asker got the
+# byte-identical sentence no matter what the prompt asked for. The prompt supplies the intent and
+# this supplies the room to act on it; neither works alone.
+GREETING_TEMPERATURE = 1.0
+
+
 def generate_answer(
     question: str,
     context_chunks: list[str],
     history: list[dict] | None = None,
     *,
     asker: object | None = None,
+    temperature: float = FACTUAL_TEMPERATURE,
 ) -> str:
     # The old club_admin_denied flag is gone: access refusals are now decided centrally against
     # Page Visibility (api/ai.py step 2c, ai/topic_access.py) and arrive here as an ordinary
@@ -450,7 +477,7 @@ def generate_answer(
             response = _generate_content(
                 model=GENERATION_MODEL,
                 contents=contents,
-                config=types.GenerateContentConfig(system_instruction=_SYSTEM_INSTRUCTION, temperature=0.2, max_output_tokens=260),
+                config=types.GenerateContentConfig(system_instruction=_SYSTEM_INSTRUCTION, temperature=temperature, max_output_tokens=260),
             )
             if attempt > 0:
                 log.warning("ai.generate_answer.retry_succeeded")

@@ -84,7 +84,12 @@ from ..ai import (
     topic_access,
 )
 from ..ai.admin_retrieval import ai_denials_document
-from ..ai.gemini import GENERATION_MODEL, generate_answer
+from ..ai.gemini import (
+    FACTUAL_TEMPERATURE,
+    GENERATION_MODEL,
+    GREETING_TEMPERATURE,
+    generate_answer,
+)
 from ..ai.knowledge_base import (
     HOW_TO_GUIDES,
     SYSTEM_CAPABILITY,
@@ -160,12 +165,83 @@ _OUT_OF_SCOPE_DOCUMENT = (
 # What the asker is told when the SQL pipeline could not produce a query it was willing to run.
 # Deliberately vague to the USER (the real reason names tables and columns, which is exactly what a
 # prober wants) while the precise reason goes to the log.
+#
+# IT NO LONGER ASKS FOR A REWORDING. It used to end "suggest they try rephrasing or asking
+# something more specific", which is only honest advice when the wording was actually the problem.
+# It usually was not: this document is reached for any question the pipeline cannot express, so
+# "who is the head of logistics" - unanswerable at any level of specificity, because the app holds
+# no org chart - was met with "could you try rephrasing your question or asking about something
+# more specific?" The asker rephrased, hit the same wall, and rephrased again. Suggesting a fix
+# that cannot work is worse than admitting there isn't one.
 _SQL_FAILED_DOCUMENT = (
-    "The assistant could not look this up right now. Say briefly that you weren't able to retrieve "
-    "that at the moment and suggest they try rephrasing or asking something more specific. Do NOT "
-    "guess at an answer, do NOT state that they have none of something, and do not mention "
-    "databases, queries, or errors."
+    "The assistant could not look this up right now. Say briefly and plainly that you don't have "
+    "that information available. Do NOT guess at an answer, do NOT state that they have none of "
+    "something, and do not mention databases, queries, or errors. Do NOT suggest they rephrase the "
+    "question, reword it, or ask something more specific - the wording was not the problem, so a "
+    "rewrite would only send them round the same loop."
 )
+
+# The refusal for a question whose ANSWER this app does not hold for anyone - overwhelmingly a
+# staff or organisational-directory lookup ("who is the head of logistics", "who manages IT", "the
+# dean's contact details"). This system knows about clubs, events and the asker's own account; it
+# has never known the university's org chart, so there is no phrasing, no permission and no admin
+# grant that would produce an answer.
+#
+# Separated from _SQL_FAILED_DOCUMENT above because the two failures deserve different sentences.
+# "I couldn't retrieve that right now" implies a transient fault and invites a retry; the honest
+# reply here is that the information is not something the asker has access to through this
+# assistant, which is what the asker asked to be told plainly rather than deflected with.
+_NO_ACCESS_DOCUMENT = (
+    "The asker is asking for staff, personnel, or organisational-directory information - who holds "
+    "a position, who manages a department, someone's contact details. This app does not hold that "
+    "information and the assistant does not expose it to anyone. Tell them plainly and briefly "
+    "that they do not have access to that information here, in one sentence. Do NOT ask them to "
+    "rephrase, reword, or be more specific - no phrasing of this question has an answer, so "
+    "inviting another attempt is misleading. Do NOT guess a name, invent a position holder, or "
+    "substitute a club president or event organiser for the person they asked about. You may "
+    "briefly offer what you CAN help with (clubs, events, their own account) if it fits naturally."
+)
+
+
+# Chooses the WORDING of an already-decided refusal. It never decides WHETHER to refuse: every
+# caller has already established, through the deterministic layers above, that no answer is coming.
+# The only open question at that point is which honest sentence to say - and "you don't have access
+# to that" is the honest one for a directory lookup, where "try rephrasing" is not.
+#
+# Ordering the check this way is what makes a blunt regex safe here. Run as a GATE it would be a
+# liability ("who is the president of the Photography Club" would trip `who is` and lose a
+# perfectly answerable club question); run as a phrasing choice on a question already refused, its
+# worst possible failure is a slightly-off sentence attached to a refusal that was correct anyway.
+_PERSON_LOOKUP = re.compile(
+    r"\bwho\s+(is|are|was|were|runs?|leads?|heads?|manages?|handles?)\b"
+    r"|\b(head|manager|director|supervisor|dean|registrar|in charge of|responsible for)\b"
+    r"|\b(staff|personnel|employees?|directory|contact details?|phone number)\b",
+    re.IGNORECASE,
+)
+
+
+def _refusal_document(question: str, default: str) -> str:
+    return _NO_ACCESS_DOCUMENT if _PERSON_LOOKUP.search(question) else default
+
+
+def _navigation_cards(principal, data_classes: set[str], *, answered: bool, has_entity_card: bool) -> list[dict]:
+    """The "take me there" page cards that go under a DATA answer, if any.
+
+    Two conditions, and the second one is the fix. A page card is for a LOCATION answer - "where can
+    I find my registrations" classifies as data (my_registrations), resolves no how-to guide, and
+    would otherwise be prose with nothing to click - so it is suppressed when an entity card is
+    already there, because a specific event's card beats a link to the page listing every event.
+
+    `answered` is the condition that was missing. The entity-card check alone let a card through
+    under every refusal, since a refusal has no entity card either: a failed lookup, an impossible
+    question, a page denial and a privacy refusal all picked one up. In a real session the asker
+    asked who the head of logistics was, was told the assistant could not retrieve that, and got a
+    My Events card underneath - which does not merely add noise, it asserts the answer is on that
+    page and sends someone to look for something that was never there. A refusal offers nothing to
+    click; "I don't have that" is the entire reply."""
+    if not answered or has_entity_card:
+        return []
+    return topic_access.topic_cards(principal, data_classes)
 
 def _how_to_denied_document(guide_key: str) -> str:
     """The refusal for a how-to whose ACTION page this caller cannot reach.
@@ -314,7 +390,9 @@ def ask():
         topic_access.log_unanswerable(
             principal, question, reason="No topic matched - outside clubs, events, and app guidance"
         )
-        answer = generate_answer(question, [_OUT_OF_SCOPE_DOCUMENT], history, asker=principal)
+        answer = generate_answer(
+            question, [_refusal_document(question, _OUT_OF_SCOPE_DOCUMENT)], history, asker=principal
+        )
         _review(
             question, answer, principal,
             user_context=user_context, data_summary="No data was retrieved (out of scope).",
@@ -380,7 +458,21 @@ def ask():
         if privacy_document:
             kb_chunks.append(privacy_document)
 
-        answer = generate_answer(question, kb_chunks, history, asker=principal)
+        # A BARE greeting samples hot, everything else stays cold. "hey" has no retrieved fact in it
+        # to distort, and at the factual temperature it came back byte-identical every single time -
+        # the same sentence, the same name, turn after turn, which is what a canned auto-reply looks
+        # like. The condition is deliberately exact rather than `"greeting" in classes`: the moment a
+        # greeting arrives alongside a real topic ("hey, what clubs are there") the reply carries
+        # facts again, and so does any reply carrying a denial or privacy refusal - all of which must
+        # be stated precisely, not creatively.
+        bare_greeting = classes == {"greeting"} and not denied and not privacy_document
+        answer = generate_answer(
+            question,
+            kb_chunks,
+            history,
+            asker=principal,
+            temperature=GREETING_TEMPERATURE if bare_greeting else FACTUAL_TEMPERATURE,
+        )
         _step(7, "Answered from the knowledge base", step_started_at)
         _review(
             question, answer, principal,
@@ -488,7 +580,7 @@ def ask():
             reason="On-domain question the assistant has no way to answer from the available data",
             unsupported=True,
         )
-        result_document = _OUT_OF_SCOPE_DOCUMENT
+        result_document = _refusal_document(question, _OUT_OF_SCOPE_DOCUMENT)
         data_summary = "No data retrieved: the question could not be expressed against the available schema."
     else:
         # Generation or validation never converged. The precise reason (which can name tables and
@@ -500,7 +592,7 @@ def ask():
         topic_access.log_unanswerable(
             principal, question, reason=f"SQL pipeline failed: {outcome.failure_reason}"
         )
-        result_document = _SQL_FAILED_DOCUMENT
+        result_document = _refusal_document(question, _SQL_FAILED_DOCUMENT)
         data_summary = "No data retrieved: the query could not be generated or validated."
 
     # --- Steps 15-16: generate the final answer from the actual rows ----------------------------
@@ -523,11 +615,11 @@ def ask():
     # with that club's join dialog already open.
     event_cards, club_cards = cards.build(answer, data_classes, user_id=user_id)
 
-    # A "take me there" card for the topic's own page, but only when there is no entity card already:
-    # "where can I find my registrations" is a LOCATION question that classifies as data
-    # (my_registrations), resolves no how-to guide, and so used to get prose and nothing to click.
-    navigation_cards = (
-        [] if (event_cards or club_cards) else topic_access.topic_cards(principal, data_classes)
+    navigation_cards = _navigation_cards(
+        principal,
+        data_classes,
+        answered=outcome.ok and not denied and not privacy_document,
+        has_entity_card=bool(event_cards or club_cards),
     )
     _step(
         19,

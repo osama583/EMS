@@ -75,6 +75,19 @@ def _system_instruction() -> str:
         "- A step-by-step 'how do I...' is how_to ALONE, even when it mentions clubs or events. "
         "'How do I join a club' wants instructions, not a list of clubs - do not also return the "
         "topic it happens to name.",
+        "- WHO HOLDS A STAFF OR ORGANISATIONAL POSITION matches NO class - return an empty list. "
+        "'Who is the head of logistics', 'who manages the IT department', 'who is in charge of "
+        "facilities', 'who is the dean', staff or student directories, contact details, and user "
+        "headcounts are all the university's org chart and people directory, which this app does "
+        "not hold and this assistant does not expose. Returning a club/event class for one of "
+        "these is the specific mistake to avoid: it sends an unanswerable question down the "
+        "database path, which then fails and tells the asker to rephrase - so they rephrase a "
+        "question that has no answer here, and the loop repeats. An empty list gets them a "
+        "straight 'you don't have access to that' instead.",
+        "  THE TWO EXCEPTIONS, because these are club/event facts rather than org-chart facts: a "
+        "club's PRESIDENT ('who is the president of the Photography Club') is clubs/clubs_mine, "
+        "and an event's ORGANISER ('who is running the hackathon') is events. Both are real "
+        "columns in this app and stay answerable.",
         "",
         "If the question is a short follow-up that carries no topic of its own ('is it active', "
         "'what about that one', 'yes', 'show me the list'), classify it against what the RECENT "

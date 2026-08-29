@@ -42,21 +42,52 @@ log = logging.getLogger(__name__)
 MAX_CARDS = 6
 
 
+# Everything that is not a letter or a digit collapses to a single space, so a title matches the
+# way a reader would judge it to match rather than byte-for-byte.
+#
+# WHY, concretely. The old match escaped the title and required \b on both sides, which meant the
+# reply had to reproduce every apostrophe, hyphen, ampersand and run of spaces exactly as the
+# database stored them. Models do not: they write "APUs Hackathon" for "APU's Hackathon", "Tech -
+# Symposium" for "Tech – Symposium" (en dash to hyphen), and single-space a title stored with a
+# double space. Every one of those is the event the reader is looking at, and every one of them
+# silently produced no card - which is how a correct answer naming a real event ends up decorated
+# with a page link instead of that event's own card. Worse, \b is defined against word characters,
+# so a title ending in ")" or "!" could never match at all.
+_NON_ALNUM = re.compile(r"[^a-z0-9]+")
+# Apostrophes are DELETED rather than collapsed to a space, and the order matters. Collapsing turns
+# "APU's Hackathon" into "apu s hackathon" while the model's "APUs Hackathon" becomes "apus
+# hackathon" - still two different strings, so the exact mismatch this normalisation exists to
+# absorb would survive it. Deleting first lands both on "apus hackathon".
+_APOSTROPHE = re.compile(r"['’ʼ`]")
+
+
+def _normalise(text: str) -> str:
+    return _NON_ALNUM.sub(" ", _APOSTROPHE.sub("", text.lower())).strip()
+
+
 def _names_in(answer: str, titles: dict[str, int]) -> list[int]:
     """The ids whose titles appear in `answer`, longest title first.
 
     Longest-first matters: a club called "1" (there is one in the seed data) would otherwise match
-    the digit in every date and time in the reply. Requiring a word boundary on both sides handles
-    the rest - "Coding Society" must appear as those words, not as a fragment of something else."""
-    found: list[int] = []
-    for title, entity_id in sorted(titles.items(), key=lambda pair: -len(pair[0])):
-        if len(title.strip()) < 2:
+    the digit in every date and time in the reply. Word boundaries still apply - "Coding Society"
+    must appear as those words, not as a fragment of something else - but they are enforced by
+    padding both sides with a space after normalisation rather than by \\b, which is both stricter
+    about punctuation and undefined at a non-word character."""
+    # Padded, so " coding society " can only match on whole-word edges - the normalised equivalent
+    # of the \b anchors this replaced.
+    haystack = f" {_normalise(answer)} "
+    found: list[tuple[int, int]] = []
+    for title, entity_id in titles.items():
+        needle = _normalise(title)
+        if len(needle) < 2:
             # A one-character title cannot be matched reliably against prose; skipping it costs a
             # card, where a false match puts a completely unrelated card under the answer.
             continue
-        if re.search(rf"\b{re.escape(title)}\b", answer, re.IGNORECASE):
-            found.append(entity_id)
-    return found[:MAX_CARDS]
+        if f" {needle} " in haystack:
+            found.append((len(needle), entity_id))
+    # Longest first, so the more specific title leads when one contains another ("APU Coding
+    # Society" over "Coding").
+    return [entity_id for _length, entity_id in sorted(found, key=lambda pair: -pair[0])][:MAX_CARDS]
 
 
 def event_cards(answer: str, *, user_id: int | None) -> list[dict]:

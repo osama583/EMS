@@ -911,3 +911,230 @@ def test_a_genuinely_empty_public_result_still_states_zero():
 
     document = rows_to_document([], sql="SELECT COUNT(*) FROM request WHERE TRUE")
     assert "real, final, correct answer" in document
+
+
+# =================================================================================================
+# REGRESSIONS FROM ONE OBSERVED CHAT SESSION
+#
+# Four defects, each in a different layer, found in a single transcript. They are grouped here
+# because that transcript is the evidence for all four:
+#
+#   > hey
+#   Hey Daniel, need a hand with any clubs or events today?        <- byte-identical every greeting
+#   > tell me who is the manger of head or logistic
+#   I wasn't able to retrieve that information at the moment. Could you try rephrasing your
+#   question or asking about something more specific?  [My Events] <- wrong reason, stray card
+#   > suggest the event that has the most registered people
+#   To help me suggest the right event for you, could you tell me what you enjoy...?
+#                                                                  <- the criterion was already given
+#   > what event that has the most people registered in
+#   The event with the highest number of registrations is the Annual Tech Symposium, which
+#   currently has 150 people signed up.  [Explore Events][My Events] <- page links, not the event
+
+# --- a question carrying its own ranking criterion is a lookup, not a preference question ---------
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "suggest the event that has the most registered people",
+        "suggest a club with the most members",
+        "recommend the most popular event",
+        "what club do you suggest that has the highest number of members",
+    ],
+)
+def test_a_ranked_lookup_never_enters_the_ask_first_flow(question: str):
+    """"Suggest the event that has the most registered people" says exactly how to pick. Asking
+    "what do you enjoy?" back is not a clarification, it is a failure to read the question - and the
+    asker proved it by retyping the same question without the word "suggest" and getting the answer
+    immediately.
+
+    The line is RANKABLE: if an ORDER BY over real columns can settle it, the asker has already
+    chosen and there is nothing left to ask them."""
+    from app.ai import recommendation
+
+    assert not recommendation.is_recommendation(question)
+    assert recommendation.stage_for(question, []) == "recommend"
+
+
+@pytest.mark.parametrize(
+    "question",
+    ["suggest an event for me", "recommend a club", "anything good for me", "anything fun this term"],
+)
+def test_a_genuine_preference_question_still_asks_first(question: str):
+    """The guard above must not eat the flow it is narrowing. "Good", "fun" and "interesting" sound
+    like criteria but rank nothing, so they stay preference questions.
+
+    Phrasings here must be ones _RECOMMENDATION already covers. "any good events for me" is NOT -
+    the pattern requires "anything good", so "any good ..." has never been treated as a
+    recommendation. That gap predates this guard and is untouched by it."""
+    from app.ai import recommendation
+
+    assert recommendation.is_recommendation(question)
+    assert recommendation.stage_for(question, []) in ("ask", "clarify")
+
+
+# --- a refusal says what is true, and never invites a rewrite that cannot help ---------------------
+
+def test_no_refusal_document_invites_a_rephrasing():
+    """"Could you try rephrasing your question or asking about something more specific?" is honest
+    advice only when the wording was the problem. For "who is the head of logistics" it never was -
+    the app holds no org chart, so no phrasing has an answer - and the asker rephrased, hit the same
+    wall, and rephrased again. Every refusal document now forbids the invitation rather than
+    issuing it, so the words may still appear, but only as a prohibition aimed at the model."""
+    from app.api import ai as ai_api
+
+    documents = (
+        ai_api._SQL_FAILED_DOCUMENT,
+        ai_api._NO_ACCESS_DOCUMENT,
+        ai_api._OUT_OF_SCOPE_DOCUMENT,
+    )
+    for document in documents:
+        lowered = document.lower()
+        for phrase in ("rephras", "reword", "more specific"):
+            if phrase in lowered:
+                prohibition = lowered.split(phrase)[0].rsplit(".", 1)[-1]
+                assert "do not" in prohibition or "never" in prohibition, (
+                    f"{phrase!r} reads as advice to the asker, not a prohibition: {document}"
+                )
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "tell me who is the manger of head or logistic",  # the asker's own typos, verbatim
+        "who is the head of logistics",
+        "who manages the IT department",
+        "who is in charge of facilities",
+    ],
+)
+def test_a_directory_lookup_is_refused_as_no_access(question: str):
+    """A staff/org-chart lookup is told "you don't have access to that", not "I couldn't retrieve
+    it". The first is true and final; the second implies a transient fault and invites a retry."""
+    from app.api import ai as ai_api
+
+    assert ai_api._refusal_document(question, ai_api._SQL_FAILED_DOCUMENT) is ai_api._NO_ACCESS_DOCUMENT
+
+
+def test_a_lookup_the_app_can_answer_keeps_the_ordinary_wording():
+    """The no-access wording is for questions this app genuinely cannot answer for anyone. An
+    ordinary event or club question that merely failed keeps the generic refusal."""
+    from app.api import ai as ai_api
+
+    for question in ("what event has the most people registered in", "what clubs exist"):
+        assert ai_api._refusal_document(question, ai_api._SQL_FAILED_DOCUMENT) is ai_api._SQL_FAILED_DOCUMENT
+
+
+def test_the_person_lookup_pattern_only_ever_chooses_wording():
+    """_PERSON_LOOKUP is blunt on purpose, and is safe only because of WHERE it runs: every caller
+    has already established that no answer is coming, so it picks a sentence, never an outcome.
+
+    This pins that contract. "Who is the president of the Photography Club" trips the pattern, which
+    would be a real bug if the pattern gated anything - the clubs topic answers that question - and
+    is harmless here because reaching _refusal_document at all means it was refused already."""
+    import inspect
+
+    from app.api import ai as ai_api
+
+    assert ai_api._PERSON_LOOKUP.search("who is the president of the Photography Club")
+    body = inspect.getsource(ai_api._refusal_document).splitlines()
+    assert sum("_PERSON_LOOKUP" in line for line in body) == 1, (
+        "_PERSON_LOOKUP must stay a wording choice inside _refusal_document; using it as a gate "
+        "would refuse answerable questions such as 'who is the president of X club'."
+    )
+
+
+# --- a refusal offers nothing to click ------------------------------------------------------------
+
+def test_navigation_cards_never_appear_under_a_refusal():
+    """The stray "My Events" card under "I wasn't able to retrieve that". The absence of an entity
+    card used to be the only condition, and a refusal has no entity card either - so a failed
+    lookup, an impossible question, a page denial and a privacy refusal all picked one up. The card
+    does not merely add noise: it asserts the answer is on that page and sends someone to look for
+    something that was never there."""
+    from app.api import ai as ai_api
+
+    principal = _FakePrincipal((("student", _representative_unit("student")),))
+    topics = {"my_registrations"}
+
+    assert ai_api._navigation_cards(principal, topics, answered=True, has_entity_card=False), (
+        "a real location answer still deserves its page card"
+    )
+    assert ai_api._navigation_cards(principal, topics, answered=False, has_entity_card=False) == []
+
+
+def test_an_entity_card_still_beats_a_page_card():
+    """A specific event's card beats a link to the page listing every event, so the page card stays
+    suppressed whenever a real one was built."""
+    from app.api import ai as ai_api
+
+    principal = _FakePrincipal((("student", _representative_unit("student")),))
+    assert ai_api._navigation_cards(principal, {"events"}, answered=True, has_entity_card=True) == []
+
+
+# --- an event card survives the way a model actually writes a title -------------------------------
+
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [
+        ("The Annual Tech Symposium has 150 people signed up.", [7]),
+        ("Try the Annual Tech Symposium!", [7]),        # trailing punctuation
+        ("Check out Annual  Tech   Symposium.", [7]),    # collapsed whitespace
+        ("APUs Hackathon is on Friday.", [8]),           # apostrophe dropped by the model
+        ("APU's Hackathon is on Friday.", [8]),          # apostrophe kept
+    ],
+)
+def test_a_card_is_built_however_the_model_punctuates_the_title(answer: str, expected: list[int]):
+    """A correct answer naming a real event was decorated with a page link instead of that event's
+    own card. The match required the reply to reproduce every apostrophe, hyphen and run of spaces
+    exactly as stored, which models do not do - and a word-boundary anchor is undefined next to a
+    non-word character, so a title ending in "!" or ")" could never match at all."""
+    from app.ai.cards import _names_in
+
+    assert _names_in(answer, {"Annual Tech Symposium": 7, "APU's Hackathon": 8}) == expected
+
+
+def test_normalising_a_title_does_not_weaken_the_existing_guards():
+    """The one-character-title and longest-first rules are load-bearing and must survive the
+    normalisation: a club named "1" would otherwise match the digit in every date in a reply."""
+    from app.ai.cards import _names_in
+
+    assert _names_in("It runs on 1 October at 1pm", {"1": 99}) == []
+    assert _names_in("Try the APU Coding Society.", {"APU Coding Society": 1, "Coding": 2})[0] == 1
+
+
+# --- a greeting is written, not assembled ---------------------------------------------------------
+
+def test_the_greeting_prompt_hands_the_model_no_sentence_to_copy():
+    """Every "hey" came back as the same sentence because the prompt contained a ready-made one -
+    "need a hand with clubs or events?" - in quotes, and generation ran near-greedy. A model given a
+    phrase at a low temperature will reuse it, so the fix is both halves: no copyable phrase, and
+    room to vary. Without the first, the second only reshuffles the same words."""
+    from app.ai.gemini import _SYSTEM_INSTRUCTION
+
+    assert "need a hand with clubs" not in _SYSTEM_INSTRUCTION
+    assert "WRITE A DIFFERENT GREETING EVERY TIME" in _SYSTEM_INSTRUCTION
+
+
+def test_a_greeting_samples_hotter_than_a_fact():
+    """A greeting has no retrieved fact in it to distort, so it can afford the variation. Anything
+    that restates data must not - creative variation there is called a hallucination."""
+    from app.ai.gemini import FACTUAL_TEMPERATURE, GREETING_TEMPERATURE
+
+    assert GREETING_TEMPERATURE > FACTUAL_TEMPERATURE
+    assert FACTUAL_TEMPERATURE <= 0.3
+
+
+def test_the_greeting_hint_names_topics_without_supplying_wording(monkeypatch):
+    """The hint's job is to say which topics are safe to mention, computed live from page access.
+    It must not hand over a sentence - that is what produced the identical reply in the first
+    place - and it must still refuse to offer a topic the asker would then be denied."""
+    principal = _FakePrincipal((("student", _representative_unit("student")),))
+    hint = topic_access.greeting_hint_document(principal)
+    assert "Word the reply differently" in hint
+
+    real = identity.has_page_access
+    monkeypatch.setattr(identity, "has_page_access", lambda a, page_code: False)
+    starved = topic_access.greeting_hint_document(principal)
+    assert "not clubs or events" in starved
+    monkeypatch.setattr(identity, "has_page_access", real)
+

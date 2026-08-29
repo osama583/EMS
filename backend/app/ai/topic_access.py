@@ -145,17 +145,21 @@ def greeting_hint_document(principal) -> str:
     with". A greeting deserves a short, casual reply, not a menu; this only tells the model
     whether it's safe to casually mention clubs and/or events, computed from the same live
     Page Visibility grants so it can never offer a topic the asker would then be refused."""
+    # Appended to every branch below. The hint names the permitted TOPICS and deliberately supplies
+    # no sentence to copy: a greeting that arrives word-for-word identical on every "hey" reads as a
+    # canned auto-reply, and the surest way to produce one is to hand the model a phrase to reuse.
+    vary = " Word the reply differently from any greeting already in the conversation history."
     has_clubs = topic_allowed(principal, "clubs") or topic_allowed(principal, "clubs_mine")
     has_events = topic_allowed(principal, "events") or topic_allowed(principal, "my_registrations")
     if has_clubs and has_events:
-        return "This asker can ask about both clubs and events - casually offer help with either."
+        return "This asker can ask about both clubs and events - casually offer help with either." + vary
     if has_clubs:
-        return "This asker can ask about clubs but not events - casually offer help with clubs only."
+        return "This asker can ask about clubs but not events - casually offer help with clubs only." + vary
     if has_events:
-        return "This asker can ask about events but not clubs - casually offer help with events only."
+        return "This asker can ask about events but not clubs - casually offer help with events only." + vary
     return (
         "This asker has no clubs or events access - casually offer help with the app/their account "
-        "instead, not clubs or events."
+        "instead, not clubs or events." + vary
     )
 
 

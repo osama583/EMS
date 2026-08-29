@@ -73,8 +73,47 @@ _RECOMMENDATION = re.compile(
 _NAMES_EVENTS = re.compile(r"\bevents?\b|\bworkshops?\b|\btalks?\b|\bcompetitions?\b|\bactivit(y|ies)\b", re.IGNORECASE)
 _NAMES_CLUBS = re.compile(r"\bclubs?\b|\bsociet(y|ies)\b|\bjoin\b", re.IGNORECASE)
 
+# A question that carries its OWN objective selection criterion is a LOOKUP wearing a
+# recommendation's vocabulary, and must never enter the ask-first flow.
+#
+# The bug this fixes, observed end-to-end: "suggest the event that has the most registered people"
+# matched \bsuggest\b, so stage_for() returned "ask" and the assistant replied "could you tell me
+# what you enjoy - talks, workshops, or social activities?" to a question that had already stated
+# exactly which event it wanted. The asker re-typed it without the word "suggest" and got the right
+# answer immediately, which is the clearest possible evidence that the trigger, not the question,
+# was wrong.
+#
+# The line is drawn at RANKABLE: if the criterion can be computed by an ORDER BY over real columns
+# ("the most registered", "the biggest club", "the most popular"), the asker has already told us
+# how to choose and there is nothing left to ask them. A preference question is the opposite - it
+# names no criterion the data can rank ("anything good?", "something fun"), which is precisely why
+# it has to ask first. "Fun", "good" and "interesting" are deliberately absent here: they sound
+# like criteria but rank nothing, and treating them as such would delete the ask-first flow for the
+# exact questions it exists to serve.
+_EXPLICIT_CRITERION = re.compile(
+    r"\b(most|least|fewest|highest|lowest|biggest|largest|smallest|top|maximum|minimum|max|min)\b"
+    r"|\bpopular\b"
+    r"|\bhow many\b"
+    r"|\b(more|less|fewer) than\b|\bat least\b"
+    r"|\b(sorted|ranked|ordered|order) by\b",
+    re.IGNORECASE,
+)
+
+
+def has_explicit_criterion(question: str) -> bool:
+    """Does the question already say, objectively, how to pick? See _EXPLICIT_CRITERION."""
+    return bool(_EXPLICIT_CRITERION.search(question))
+
 
 def is_recommendation(question: str) -> bool:
+    """A PREFERENCE question - one this assistant cannot answer without asking what they like.
+
+    Checked criterion-first, so the single edit propagates everywhere at once: stage_for() returns
+    "recommend" (no ask-first detour), in_recommendation_thread() stops widening the query to the
+    whole candidate set, and api/ai.py adds no RECOMMENDATION STAGE chunk. All three are correct
+    for a ranked lookup - it wants one precise row, not a shortlist with reasons."""
+    if has_explicit_criterion(question):
+        return False
     return bool(_RECOMMENDATION.search(question))
 
 
