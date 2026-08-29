@@ -74,7 +74,7 @@ import { CharacterCounterComponent } from '../character-counter/character-counte
           }
         </span>
       }
-      @if (hasCharacterLimit()) { <app-character-counter [value]="value()" [maxLength]="maxLength()" /> }
+      @if (hasCharacterLimit() && showCharacterCounter()) { <app-character-counter [value]="value()" [maxLength]="maxLength()" /> }
       @if (hint() && !displayError()) { <small [id]="controlId() + '-hint'">{{ hint() }}</small> }
       <app-validation-message [controlId]="controlId()" [message]="displayError()" />
     </label>
@@ -103,6 +103,9 @@ export class FormFieldComponent {
   readonly min = input<number | string>('');
   readonly step = input<number | string>('');
   readonly maxLength = input(100);
+  /** Hides the "n / max" readout without lifting the maxlength cap — for short,
+   * self-evident fields (a login email) where the count is noise. */
+  readonly showCharacterCounter = input(true);
   readonly minLength = input<number | null>(null);
   readonly autocomplete = input('');
   readonly inputmode = input('');

@@ -38,6 +38,12 @@ interface ProcessPathMarker extends ProcessPathPosition {
   readonly progress: number;
 }
 
+/** A step's share of the route, as start/end fractions of total path length. */
+interface ProcessStepBand {
+  readonly start: number;
+  readonly end: number;
+}
+
 @Component({
   selector: 'app-how-it-works',
   imports: [RouterLink],
@@ -70,16 +76,34 @@ export class HowItWorksComponent implements AfterViewInit {
     const position = this.trackerPosition();
     return `translate(${position.x} ${position.y}) rotate(${position.angle})`;
   });
+  /**
+   * Each step's slice of the route, measured off the rendered path. The steps do
+   * not get equal shares: the route runs the full width across step 1, bends,
+   * and runs all the way back, so step 1 owns nearly a third of the total length
+   * while the rest own about a sixth each. Splitting scroll progress evenly
+   * instead drifts the highlight up to half a step away from the drawn line.
+   */
+  readonly stepBoundaries = signal<readonly ProcessStepBand[]>([]);
   readonly activeStepIndex = computed(() => {
     const progress = this.timelineProgress();
     if (progress <= 0) {
       return -1;
     }
 
-    return Math.min(
-      this.steps.length - 1,
-      Math.floor((Math.min(progress, 99.999) / 100) * this.steps.length),
-    );
+    const fraction = Math.min(progress, 99.999) / 100;
+    const bands = this.stepBoundaries();
+    if (bands.length !== this.steps.length) {
+      return Math.min(this.steps.length - 1, Math.floor(fraction * this.steps.length));
+    }
+
+    let index = 0;
+    for (let step = 0; step < bands.length; step += 1) {
+      if (fraction >= bands[step].start) {
+        index = step;
+      }
+    }
+
+    return index;
   });
   readonly steps: readonly ProcessStep[] = [
     {
@@ -225,8 +249,13 @@ export class HowItWorksComponent implements AfterViewInit {
   }
 
   stepProgress(index: number): number {
-    const scaledProgress = (this.timelineProgress() / 100) * this.steps.length;
-    return Math.max(0, Math.min(1, scaledProgress - index));
+    const fraction = this.timelineProgress() / 100;
+    const band = this.stepBoundaries()[index];
+    if (!band || band.end <= band.start) {
+      return Math.max(0, Math.min(1, fraction * this.steps.length - index));
+    }
+
+    return Math.max(0, Math.min(1, (fraction - band.start) / (band.end - band.start)));
   }
 
   private updateTimelineProgress(): void {
@@ -341,6 +370,12 @@ export class HowItWorksComponent implements AfterViewInit {
 
       const totalLength = pathEl.getTotalLength();
       this.pathTotalLength.set(Math.max(1, totalLength));
+      this.stepBoundaries.set(
+        bands.map((band) => ({
+          start: this.lengthAtDepth(pathEl, totalLength, band.top) / totalLength,
+          end: this.lengthAtDepth(pathEl, totalLength, band.bottom) / totalLength,
+        })),
+      );
       this.pathMarkers.set(
         Array.from({ length: this.steps.length * 2 }, (_, index) => {
           const progress = (index + 1) / (this.steps.length * 2 + 1);
@@ -349,6 +384,26 @@ export class HowItWorksComponent implements AfterViewInit {
       );
       this.updateTrackerPosition(this.timelineProgress() / 100);
     });
+  }
+
+  /**
+   * First length along the path at which it has descended to `depth`. The route
+   * only ever runs level or downwards, so y is monotonic along it and a binary
+   * search is exact; 20 halvings put a ~10,000-unit path inside a hundredth of a unit.
+   */
+  private lengthAtDepth(pathEl: SVGPathElement, totalLength: number, depth: number): number {
+    let low = 0;
+    let high = totalLength;
+    for (let iteration = 0; iteration < 20; iteration += 1) {
+      const middle = (low + high) / 2;
+      if (pathEl.getPointAtLength(middle).y < depth) {
+        low = middle;
+      } else {
+        high = middle;
+      }
+    }
+
+    return high;
   }
 
   private updateTrackerPosition(progress: number): void {

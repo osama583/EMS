@@ -14,6 +14,7 @@ import { DevUser, DevUsersService } from '../../../core/auth/dev-users.service';
 
 // TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
 interface DemoUserGroup { readonly label: string; readonly users: readonly DevUser[]; }
+const DEMO_PANEL_STORAGE_KEY = 'apu.login.demoUsers';
 
 @Component({
   selector: 'app-login',
@@ -54,6 +55,10 @@ export class LoginComponent implements OnDestroy {
   readonly demoUsers = signal<readonly DevUser[]>([]);
   readonly demoSearch = signal('');
   readonly selectedDemoEmail = signal<string | null>(null);
+  /** Hidden state survives a reload so the page can be demonstrated as the real
+   * thing without re-hiding the panel on every navigation. */
+  readonly demoPanelOpen = signal(true);
+  readonly demoPanelVisible = computed(() => this.demoUsers().length > 0 && this.demoPanelOpen());
   readonly demoGroups = computed<readonly DemoUserGroup[]>(() => {
     const query = this.demoSearch().trim().toLowerCase();
     const matches = (user: DevUser): boolean =>
@@ -81,6 +86,7 @@ export class LoginComponent implements OnDestroy {
     else this.timer = setTimeout(() => this.tickTypewriter(), 420);
 
     // TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
+    this.demoPanelOpen.set(this.readStoredFlag() !== 'hidden');
     this.devUsersService.list().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((users) => this.demoUsers.set(users));
   }
 
@@ -89,6 +95,20 @@ export class LoginComponent implements OnDestroy {
 
   // TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
   setDemoSearch(value: string): void { this.demoSearch.set(value); }
+
+  // TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
+  toggleDemoPanel(): void {
+    const open = !this.demoPanelOpen();
+    this.demoPanelOpen.set(open);
+    // Storage throws in private-browsing modes; the toggle still works, it just
+    // stops being remembered.
+    try { this.document.defaultView?.localStorage?.setItem(DEMO_PANEL_STORAGE_KEY, open ? 'visible' : 'hidden'); } catch { /* not persisted */ }
+  }
+
+  // TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
+  private readStoredFlag(): string | null {
+    try { return this.document.defaultView?.localStorage?.getItem(DEMO_PANEL_STORAGE_KEY) ?? null; } catch { return null; }
+  }
 
   // TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
   selectDemoUser(user: DevUser): void {

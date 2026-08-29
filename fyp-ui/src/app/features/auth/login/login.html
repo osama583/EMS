@@ -5,20 +5,18 @@
     </h1>
   </section>
 
-  <section class="login-access">
+  <section class="login-access" [class.login-access--clean]="!demoPanelVisible()">
     <form class="login-form" novalidate (submit)="$event.preventDefault(); submit()">
       <header class="login-form__header">
         <a class="login-brand" href="/" aria-label="Return to APU Events home">
           <img src="/assets/media/apu-logo-only.png" alt="" width="1254" height="1254" />
-          <img src="/assets/media/logo-text-black.webp" alt="Asia Pacific University" width="2008" height="783" />
         </a>
-        <p>APU Event Management System</p>
         <h2>Welcome back</h2>
         <span>Sign in with your assigned APU account to continue.</span>
       </header>
 
       <div class="login-form__fields">
-        <app-form-field controlId="login-email" name="email" label="Email" type="email" placeholder="name@apu.edu.my" autocomplete="username" [required]="true" [showRequiredIndicator]="false" [validateOnBlur]="false" [value]="email()" [error]="emailError()" (valueChange)="setEmail($event)" />
+        <app-form-field controlId="login-email" name="email" label="Email" type="email" placeholder="name@apu.edu.my" autocomplete="username" [required]="true" [showRequiredIndicator]="false" [showCharacterCounter]="false" [validateOnBlur]="false" [value]="email()" [error]="emailError()" (valueChange)="setEmail($event)" />
         <app-form-field controlId="login-password" name="password" label="Password" type="password" placeholder="Enter your password" autocomplete="current-password" [required]="true" [showRequiredIndicator]="false" [validateOnBlur]="false" [value]="password()" [error]="passwordError()" (valueChange)="setPassword($event)" />
         <button type="button" class="login-form__forgot" (click)="openForgotPassword()">Forgot password?</button>
       </div>
@@ -36,12 +34,21 @@
         Not an APU staff member or student? <button type="button" (click)="openRegister()">Register as a guest</button>
       </p>
 
-      <!-- TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode) -->
-      @if (demoUsers().length) {
+      <footer class="login-form__footer">Copyright {{ year }} Asia Pacific University of Technology & Innovation</footer>
+    </form>
+
+    <!-- TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode) -->
+    @if (demoUsers().length) {
+      @if (demoPanelVisible()) {
         <section class="login-demo-users" aria-labelledby="demo-users-heading">
           <div class="login-demo-users__heading">
-            <span id="demo-users-heading">Development demo users</span>
-            <small>Click an account to fill the form</small>
+            <div class="login-demo-users__title">
+              <span id="demo-users-heading">Development demo users</span>
+              <small>Click an account to fill the form</small>
+            </div>
+            <button type="button" class="login-demo-users__hide" (click)="toggleDemoPanel()" [attr.aria-expanded]="true">
+              <span class="material-symbols-rounded" aria-hidden="true">visibility_off</span>Hide
+            </button>
           </div>
           <label class="login-demo-users__search">
             <span class="material-symbols-rounded" aria-hidden="true">search</span>
@@ -76,10 +83,12 @@
             }
           </div>
         </section>
+      } @else {
+        <button type="button" class="login-demo-toggle" (click)="toggleDemoPanel()" [attr.aria-expanded]="false" aria-label="Show development demo users" title="Show development demo users">
+          <span class="material-symbols-rounded" aria-hidden="true">science</span>
+        </button>
       }
-
-      <footer class="login-form__footer">Copyright {{ year }} Asia Pacific University of Technology & Innovation</footer>
-    </form>
+    }
   </section>
 </main>
 
