@@ -165,10 +165,8 @@ def _quick_actions(cur, scope: Scope, keys: list[str], widgets: dict[str, Any]) 
 
 
 # --- Cache ----------------------------------------------------------------
-# 60 seconds per (user, profile, unit, outlets, period). Dashboard numbers do
-# not need to be sub-minute fresh, and the header shows the generation time so
-# nobody mistakes cached for live. In-process, therefore per-worker - the same
-# caveat the rate limiter already carries.
+# 60 seconds per (user, profile, unit, outlets, period). Dashboard numbers do not need to be sub-
+# minute fresh, and the header shows the generation time so nobody mistakes cached for live.
 
 _CACHE_TTL_SECONDS = 60
 _cache: dict[str, tuple[float, dict[str, Any]]] = {}
@@ -208,10 +206,8 @@ def _build_scope(
     today: dt.date | None = None,
 ) -> Scope:
     config = DashboardConfig.load(cur)
-    # R5: the outlet switcher's value is validated against the caller's own
-    # manager assignments before it reaches any query. An unrecognised value
-    # falls back to all of their outlets rather than 403ing - the parameter can
-    # only ever narrow a set they already hold.
+    # R5: the outlet switcher's value is validated against the caller's own manager assignments before
+    # it reaches any query.
     owned = sorted(principal.units_for_role("cafeteria-manager"))
     outlets = tuple(owned)
     if outlet and outlet != "all" and outlet in owned:
@@ -290,10 +286,7 @@ def build_document(
 
         results: dict[str, Any] = {}
         ordered_ids = (
-            # "hero" is optional in the same way "signature" and "alerts" are. A
-            # profile whose headline figure was removed does not get a promoted
-            # stand-in: the band above it simply becomes the page's opening
-            # statement, and the tiles below reflow into the freed width.
+            # "hero" is optional in the same way "signature" and "alerts" are.
             ([layout["hero"]] if layout.get("hero") else [])
             + list(layout["kpis"])
             + ([layout["signature"]] if layout.get("signature") else [])

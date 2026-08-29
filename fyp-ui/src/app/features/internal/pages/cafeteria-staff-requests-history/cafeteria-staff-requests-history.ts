@@ -28,11 +28,7 @@ const ACTION_TONES: Record<CafeteriaStaffAuditAction, InternalCellTone> = {
 };
 
 // Audit log of every cafeteria staff create/edit/suspend/restore/remove — GET
-// /catalog/cafeterias/staff-requests-history (see backend/app/api/cafeterias.py). Every search/
-// filter/sort/page control is a real server query param; the server already scopes visible rows
-// (Cafeteria Admin: every cafeteria; Cafeteria Manager: their own outlet's timeline, which may
-// include actions an Admin took there too — the 'Performed by' filter lets the Manager tell what
-// they are and are not responsible for). This is a pure history: no approve/reject here.
+// /catalog/cafeterias/staff-requests-history (see backend/app/api/cafeterias.py).
 @Component({
   selector: 'app-cafeteria-staff-requests-history',
   imports: [InternalDataPageComponent],

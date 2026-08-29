@@ -117,11 +117,7 @@ export class ClubService {
   sendJoinRequest(clubId: string, requesterUserId: string, reason: string): Observable<ClubJoinRequestRecord> {
     return this.http.post<ClubJoinRequestRecord>(`${this.baseUrl}/clubs/${encodeURIComponent(clubId)}/join-requests`, { requesterUserId, reason });
   }
-  // Pending requests for the clubs the caller presides over. Searched/filtered/paginated
-  // server-side (clubs.py's join_requests_inbox()) — the Club Requests inbox's search box and
-  // club dropdown are real query params, not a client-side filter over the whole set. Always
-  // scoped to the caller by the server (see that endpoint's docstring), so no presidentUserId
-  // is sent — one never was read server-side either.
+  // Pending requests for the clubs the caller presides over.
   getInbox(query: { q?: string; club?: string; page: number; pageSize: number; sort?: string; order?: 'asc' | 'desc' }): Observable<ClubJoinRequestPage> {
     let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
     if (query.q) params = params.set('q', query.q);

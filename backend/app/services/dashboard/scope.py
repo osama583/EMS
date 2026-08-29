@@ -2,7 +2,7 @@
 
 Everything in this module exists to keep one promise: a dashboard query is
 scoped in SQL, from the principal, never from a client parameter (rules R2 and
-R4 in docs/dashboards/01-role-hierarchy-and-access.md). A `Scope` is built once
+R4 in). A `Scope` is built once
 per request from the resolved profile and threaded through every widget, so a
 widget author cannot accidentally widen it - there is no other object to reach
 for.
@@ -197,10 +197,7 @@ class Scope:
 
 # --- R7 / R8 helpers ------------------------------------------------------
 
-# Column names that would carry a row identity out of an aggregate. R7 forbids
-# them in any widget crossing a scope boundary; enforced by strip_identity()
-# rather than left to review, because a leak added one widget at a time is
-# exactly the failure mode the rule exists to prevent.
+# Column names that would carry a row identity out of an aggregate.
 _IDENTIFYING_KEYS = frozenset(
     {
         "request_id",
@@ -277,7 +274,7 @@ def fold_tail(
 ) -> list[dict[str, Any]]:
     """Keep the top `limit` series and sum the rest into one "Other" row.
 
-    The all-pairs colour ceiling is three (docs/dashboards/03 § 6): past that,
+    The all-pairs colour ceiling is three: past that,
     yellow sits beside orange and the pair fails the CVD floor. Folding on the
     server rather than the client is what makes the ceiling enforceable - the
     client never receives a fourth slot to render.
@@ -352,7 +349,7 @@ def status_for(
     higher_is_better: bool = False,
 ) -> str:
     """Derive a KPI's status server-side so two clients cannot disagree about
-    whether 0.54 is a warning (docs/dashboards/03 § 4)."""
+    whether 0.54 is a warning."""
     if value is None:
         return "unknown"
     if higher_is_better:

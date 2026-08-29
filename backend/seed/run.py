@@ -321,17 +321,8 @@ def seed_nav(cur) -> None:
                 entry["sort_order"],
             ),
         )
-        # nav_page_grants is UNIQUE (page_code, grant_type), so a page can hold at
-        # most ONE row per type. Where the catalogue emits two grants of the same
-        # type (e.g. Inbox: the unit roles, plus Cafeteria Manager) they merge
-        # into a single row's role and unit sets.
-        #
-        # Merging turns two separate cross-products into one larger one, which in
-        # principle widens access - the merged Inbox row nominally allows
-        # "student in a cafeteria unit" and "cafeteria-manager in a school". In
-        # practice neither is reachable: role_unit governs which (role, unit)
-        # pairs may be assigned at all, and neither combination is linked there,
-        # so no user can ever hold one.
+        # nav_page_grants is UNIQUE (page_code, grant_type), so a page can hold at most ONE row per
+        # type.
         merged: dict[str, tuple[set[str], set[str]]] = {}
         for grant_type, role_codes, unit_codes in entry["grants"]:
             roles, units = merged.setdefault(grant_type, (set(), set()))

@@ -366,10 +366,8 @@ export class InternalMobileRecordListComponent {
   readonly open = output<InternalDataRecord>();
   readonly actionSelect = output<InternalRowActionEvent>();
 
-  // Only one card's menu open at a time, closed by an outside click or Escape — matches the
-  // hand-rolled menu in hub-my-clubs.ts. The previous <details>/<summary> version had neither:
-  // any number of cards could be expanded simultaneously, and closing one required clicking its
-  // own trigger again rather than just clicking elsewhere.
+  // Only one card's menu open at a time, closed by an outside click or Escape — matches the hand-
+  // rolled menu in hub-my-clubs.ts.
   readonly menuOpenFor = signal<string | number | null>(null);
 
   visibleActions(record: InternalDataRecord): readonly InternalRowAction[] {

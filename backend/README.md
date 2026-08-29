@@ -137,8 +137,4 @@ without leaving anything behind.
 
 ```bash
 .venv/Scripts/python -m docs.generate_openapi   # regenerate after route changes
-cd docs && python -m http.server 8080           # then open index.html
 ```
-
-`docs/openapi.json` is generated from the live URL map and each view's
-docstring, so the spec cannot drift from the code.

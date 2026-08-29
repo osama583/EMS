@@ -78,10 +78,7 @@ class Catalogue:
     owner_unit: str | None
     # A flat role that owns it instead (funding is the CFO's).
     owner_role: str | None
-    # Columns beyond the common label/description/active set, as
-    # {dtoField: column}. This IS the contract: only these fields are read back
-    # and only these may be written, so an added column stays private until it
-    # is named here.
+    # Columns beyond the common label/description/active set, as {dtoField: column}.
     fields: dict[str, str] = field(default_factory=dict)
     # Catalogues not scoped to a requirement have no requirement_id column.
     has_requirement: bool = True
@@ -92,11 +89,7 @@ class Catalogue:
     # table rather than a column: {dtoField: Collection}. Declared here so the
     # generic read/write paths handle them without special-casing a kind.
     collections: dict[str, "Collection"] = field(default_factory=dict)
-    # The owner decides the order these appear in, rather than the alphabetical
-    # default. Requires a sort_order column; enables PUT /options/reorder for
-    # this kind. Only venues need it today - a Logistics item list reads better
-    # alphabetically, a list of halls reads better in the order the CFO thinks
-    # of them.
+    # The owner decides the order these appear in, rather than the alphabetical default.
     ordered: bool = False
 
     @property
@@ -151,12 +144,8 @@ CATALOGUES: dict[str, Catalogue] = {
         collections={"dietaryInformationIds": Collection(
             "fmb_option_dietary_information", "fmb_option_id",
             "dietary_information_option_id", "dietaryInformation")}),
-    # University venues - the single source for every Inside University location
-    # dropdown in the system (event schedule, logistics, sound & light, food,
-    # mineral water, photography). CFO-owned like funding, and scoped to no
-    # requirement: a venue is not part of one department's request, it is where
-    # any of them happen. `ordered` because the CFO sets the order venues appear
-    # in, everywhere at once. See migration 032.
+    # University venues - the single source for every Inside University location dropdown in the
+    # system (event schedule, logistics, sound & light, food, mineral water, photography).
     "venue": Catalogue(
         "venue_options", "venue_option_id", None, "cfo",
         {"building": "building", "capacity": "capacity", "sortOrder": "sort_order"},

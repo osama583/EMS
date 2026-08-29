@@ -15,19 +15,12 @@ import { TaskCalendarComponent, TaskDateSelection } from '../../../../shared/com
 type PageMode = 'active' | 'history';
 interface RolePresentation { noun: string; begin: string; complete: string; beginIcon: string; columns: readonly InternalTableColumn[]; }
 
-// new Date().toISOString() converts to UTC first — for anyone east of UTC (e.g. UTC+8), the first
-// several hours of their local day still read back as "yesterday", so canStart()'s
-// deadline === today comparison silently failed on the actual scheduled day. The deadline's date
-// portion is a timezone-naive SQL DATE (just "the day", no time component), so today must be
-// built the same way: from the LOCAL calendar date, never a UTC conversion.
+// new Date().toISOString() converts to UTC first — for anyone east of UTC (e.g.
 function localIsoDate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-// 'Assigned To' shows who ELSE is on this same row (see RowAssignment's partners) — e.g. a big
-// Logistics setup can have two or more staff on one row, and each of them should see who they're
-// coordinating with without opening the task. Shared across every requirement's columns via
-// COMMON_END since the field means the same thing regardless of department.
+// 'Assigned To' shows who ELSE is on this same row (see RowAssignment's partners) — e.g.
 const COMMON_END: readonly InternalTableColumn[] = [{ key: 'assignedTo', label: 'Assigned To', width: '12rem' }, { key: 'status', label: 'Status', width: '9rem' }, { key: 'actions', label: 'Actions', actions: true, width: '8rem' }];
 // Row-level assignment (see migration 012 / RowAssignmentService) covers exactly these five
 // requirement kinds — F&B/cafeteria-staff use their own queue page (cafeteria-staff-tasks),
@@ -45,10 +38,9 @@ const DEFAULT_PRESENTATION: RolePresentation = {
   columns: [{ key: 'event', label: 'Event', width: '18rem' }, { key: 'request', label: 'Request', width: '15rem' }, { key: 'schedule', label: 'Schedule', width: '17rem', sortKey: 'schedule' }, { key: 'location', label: 'Location', width: '12rem' }, ...COMMON_END],
 };
 
-// Every list control here (search, status filter, date range, page, page size) is a real server
-// query param — GET /tasks/my-row-assignments?mode=&status=&q=&dateStart=&dateEnd=&page=&pageSize=
-// (see api/tasks.py's list_my_row_assignments()) — replicating hub-proposals.ts's pattern.
-// Nothing is filtered/paginated in the browser: each control change is its own scoped request.
+// Every list control here (search, status filter, date range, page, page size) is a real server query
+// param — GET /tasks/my-row-assignments?mode=&status=&q=&dateStart=&dateEnd=&page=&pageSize= (see
+// api/tasks.py's list_my_row_assignments()) — replicating hub-proposals.ts's pattern.
 @Component({
   selector: 'app-staff-tasks',
   imports: [InternalDataPageComponent, FormModalComponent, FeedbackBannerComponent, TaskCalendarComponent],
@@ -175,8 +167,8 @@ export class StaffTasksComponent {
 
   // The calendar's dot indicator reflects EVERY day with a task, independent of the current
   // page/filter/search — fetched separately from the main list (see GET /tasks/my-row-
-  // assignments/dates) rather than derived from the current page's items, which would only ever
-  // show dots for whatever happens to be on screen.
+  // assignments/dates) rather than derived from the current page's items, which would only ever show
+  // dots for whatever happens to be on screen.
   private loadDates(): void {
     this.service.myRowAssignmentDates(this.mode).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (dates) => this.taskDates.set(dates),

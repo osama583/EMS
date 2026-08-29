@@ -11,7 +11,7 @@ legitimate client next refreshes.
 Both are returned in the JSON body rather than set as cookies. The frontend is
 a separate origin calling a token-authenticated API, so there is no ambient
 credential for CSRF to abuse - the header must be set deliberately by our own
-code. See docs/security.md.
+code.
 """
 from __future__ import annotations
 
@@ -279,11 +279,7 @@ def change_own_password():
     return jsonify({"message": "Your password has been updated."})
 
 
-# This intentionally is not the administration directory.  Proposal authors
-# need a small, read-only list of internal colleagues to nominate co-owners,
-# and department heads need it to populate assignment pickers.  Sending those
-# pages through /admin/users made every non-system-admin workflow fail with a
-# 403, while opening /admin/users would expose account-management operations.
+# This intentionally is not the administration directory.
 _INTERNAL_DIRECTORY_SQL = """
     SELECT u.user_id AS id, u.full_name AS "displayName", u.email,
            COALESCE(s.department_or_school, st.school, 'APU Community') AS department
@@ -397,13 +393,9 @@ def register():
 
 
 # ---------------------------------------------------------------------------
-# TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
-#
-# Lists every active user plus the one shared plaintext demo password (every
-# seeded account uses the same password - see seed/run.py). Powers the login
-# page's searchable account picker. Inert unless DEMO_MODE=true; a deployment
-# that never sets it serves a 404 here regardless of anything else.
-# ---------------------------------------------------------------------------
+# TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode) Lists every active user plus
+# the one shared plaintext demo password (every seeded account uses the same password - see
+# seed/run.py).
 _DEV_USERS_SQL = """
     SELECT u.user_id AS id, u.full_name, u.email,
            COALESCE(s.department_or_school, st.school) AS department

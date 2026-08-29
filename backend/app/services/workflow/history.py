@@ -94,11 +94,10 @@ def history_for(cur, request_id: int) -> list[dict[str, Any]]:
     return [dict(row) for row in cur.fetchall()]
 
 
-# The whole-proposal reviewer chain has exactly these three stages (see
-# constants.REVIEWER_STAGES) - unlike actor_role (which is ambiguous: a Service
-# department's head-of-department and F&B's head-of-department share the same
-# role_code), the STAGE a resubmit row was sent back FROM (its previous_status)
-# unambiguously identifies which of the three it was.
+# The whole-proposal reviewer chain has exactly these three stages (see constants.REVIEWER_STAGES) -
+# unlike actor_role (which is ambiguous: a Service department's head-of-department and F&B's head-of-
+# department share the same role_code), the STAGE a resubmit row was sent back FROM (its
+# previous_status) unambiguously identifies which of the three it was.
 _REVIEWER_STAGE_LABELS: dict[str, str] = {
     "hos_hod_review": "HOS/HOD",
     "fmb_review": "F&B",

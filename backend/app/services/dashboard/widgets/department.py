@@ -211,9 +211,6 @@ def staff_balance(cur, scope: Scope) -> dict[str, Any]:
         title="Who's carrying how much work",
         subtitle="Jobs currently assigned to each staff member",
         # Vertical columns, matching caf_staff_workload (widgets/cafeteria.py).
-        # The two panels answer the same question for two roles and had drifted
-        # into two shapes; one column per person compares heights, which is the
-        # comparison this panel exists to make.
         chart="column-chart",
         series_list=[
             series(
@@ -254,11 +251,8 @@ def catalogue_health(cur, scope: Scope) -> dict[str, Any]:
     usage = capacity.catalogue_usage(cur, scope, department)
     off = quality.off_catalogue_rate(cur, scope, department)
     dead = [item for item in usage if item["value"] == 0]
-    # Same ring as caf_menu_performance (widgets/cafeteria.py): the top seven by
-    # share, everything else folded into one "Other" wedge. Folding rather than
-    # drawing forty slivers is what keeps the legend a ranking instead of a
-    # colour key nobody can read - and the table view below still carries every
-    # row, including the dead options the caption counts.
+    # Same ring as caf_menu_performance (widgets/cafeteria.py): the top seven by share, everything
+    # else folded into one "Other" wedge.
     ordered = sorted(usage, key=lambda item: item["value"], reverse=True)
     top = [item for item in ordered if item["value"] > 0][:7]
     other_total = sum(item["value"] for item in ordered[len(top) :] if item["value"] > 0)
@@ -295,9 +289,8 @@ def catalogue_health(cur, scope: Scope) -> dict[str, Any]:
 
 
 # --- Generic-department fallbacks ----------------------------------------
-# A service unit created after this design shipped has no detail table, so
-# every widget above that reads one is unavailable to it. These cover the
-# families that need only request_task and workflow_history.
+# A service unit created after this design shipped has no detail table, so every widget above that
+# reads one is unavailable to it.
 
 
 @widget("gen_clearance_rate")

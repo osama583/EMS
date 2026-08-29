@@ -107,19 +107,15 @@ export class ProposalReviewerViewComponent {
   readonly comment = signal('');
   readonly commentValidationError = signal(false);
 
-  // Per-partner conversation threads, already scoped server-side to what the CURRENT viewer may
-  // see — an authority gets back only their own thread (length 1), the applicant/co-owner gets
-  // every thread on the proposal (length may be > 1), which is what decides list-vs-single-thread
-  // rendering below, with no separate "am I the applicant" input needed.
+  // Per-partner conversation threads, already scoped server-side to what the CURRENT viewer may see —
+  // an authority gets back only their own thread (length 1), the applicant/co-owner gets every thread
+  // on the proposal (length may be > 1), which is what decides list-vs-single-thread rendering below,
+  // with no separate "am I the applicant" input needed.
   readonly conversations = signal<readonly ProposalConversation[]>([]);
   readonly activeConversationId = signal<string | null>(null);
 
   // Below the dock breakpoint .prv-layout is a single column, so the whole .prv-panel — Workflow
-  // Actions AND the conversation — stacks under the full proposal detail. Workflow Actions is
-  // fine down there (it is the end of the read), but burying the conversation at the bottom of
-  // the page made it read as missing. Docked, it behaves the way the panel does on a wide screen:
-  // present on the right, opened when you want it. See shared/viewport-query.ts and
-  // styles/_comments-dock.scss.
+  // Actions AND the conversation — stacks under the full proposal detail.
   protected readonly commentsDocked = viewportMatches(COMMENTS_DOCK_QUERY);
   protected readonly commentsOpen = signal(false);
   protected readonly hasComments = computed(() => this.conversations().length > 0 || this.reviewerComments().length > 0);
@@ -193,12 +189,8 @@ export class ProposalReviewerViewComponent {
 
   readonly stage = computed<ProposalStage | null>(() => this.proposal()?.workflow.stage ?? null);
   readonly stageLabel = computed(() => this.stage() ? stageLabel(this.stage()!) : '');
-  // Which stage a role owns is now a server-side authorization decision (system.md's "the
-  // backend owns the workflow" principle). The client-side approximation below exists only to
-  // decide whether to render the action panel at all — the server still validates and rejects
-  // any action from a role that doesn't actually own the current stage, regardless of what the
-  // UI shows. `readOnly` (an explicit input from the parent dispatch component) is the primary
-  // signal; this computed is a display convenience, not a security boundary.
+  // Which stage a role owns is now a server-side authorization decision (system.md's "the backend owns
+  // the workflow" principle).
   readonly canAct = computed(() => !this.readOnly());
 
   readonly currentUser = computed(() => this.auth.user());
@@ -238,9 +230,8 @@ export class ProposalReviewerViewComponent {
   });
 
   // The server computes this (see server/services/proposal-projection.service.js's
-  // canStillBeCancelled) using the same CANCELLATION_DEADLINE_DAYS config it enforces on
-  // POST /cancel, so the button state and the actual rule can never drift apart. The local
-  // date-parsing fallback below only applies to records that predate the field.
+  // canStillBeCancelled) using the same CANCELLATION_DEADLINE_DAYS config it enforces on POST /cancel,
+  // so the button state and the actual rule can never drift apart.
   readonly isWithinCancellationWindow = computed(() => {
     const proposal = this.proposal();
     if (!proposal) return false;
@@ -259,10 +250,8 @@ export class ProposalReviewerViewComponent {
   });
 
   // `readOnly` only suppresses the reviewer actions (approve/reject/resubmit) above — it's set
-  // whenever an applicant opens their own proposal from Ongoing (they own no reviewer stage
-  // there), which must not also hide their own, unrelated ability to cancel their application.
-  // Approved/Rejected/Cancelled are all terminal for cancellation server-side (authorize_cancel
-  // in authorization.py) — once fully approved, the applicant can no longer self-cancel.
+  // whenever an applicant opens their own proposal from Ongoing (they own no reviewer stage there),
+  // which must not also hide their own, unrelated ability to cancel their application.
   readonly canCancel = computed(() => {
     const proposal = this.proposal();
     if (!proposal) return false;

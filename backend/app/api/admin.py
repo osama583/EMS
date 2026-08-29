@@ -47,9 +47,8 @@ def _slug(value: str) -> str:
 
 
 # --- Users ----------------------------------------------------------------
-# The client's AdminUserRecord: camelCase, `active` rather than is_active, and
-# a roleLabel built from the user's first assignment. Aliased in SQL so the
-# projection is the contract rather than something reshaped in Python.
+# The client's AdminUserRecord: camelCase, `active` rather than is_active, and a roleLabel built from
+# the user's first assignment.
 _USER_SELECT = """
     SELECT u.user_id AS id, u.full_name AS "displayName", u.email,
            u.is_active AS active, u.archived_at,
@@ -456,10 +455,8 @@ def delete_assignment(user_id: int, assignment_id: int):
 
 
 # --- Units ----------------------------------------------------------------
-# A unit's code IS its identity - there is no surrogate key - so the client's
-# `id` and `code` are the same value, and `name` is the description column.
-# roleCodes comes from role_unit, aggregated in the same statement rather than
-# queried per row.
+# A unit's code IS its identity - there is no surrogate key - so the client's `id` and `code` are the
+# same value, and `name` is the description column.
 _UNIT_SELECT = """
     SELECT u.code AS id, u.code, u.description AS name, u.is_active AS active,
            u.archived_at,

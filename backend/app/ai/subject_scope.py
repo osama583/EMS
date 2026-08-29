@@ -49,16 +49,13 @@ SELF_SCOPED_CLASSES: frozenset[str] = frozenset({
     "event_organiser", "event_organiser_decisions", "clubs_mine",
 })
 
-# Third-person pronouns - covers "what tasks in HER proposal does SHE have",
-# which names nobody but is plainly about another person. Deliberately excludes
-# "they/them", which are too often impersonal in this domain ("what do they
-# require") to be a safe signal on their own.
+# Third-person pronouns - covers "what tasks in HER proposal does SHE have", which names nobody but is
+# plainly about another person.
 _THIRD_PERSON = re.compile(r"\b(her|hers|his|she|he|him)\b", re.IGNORECASE)
 
-# First-person framing anywhere in the question means the asker is talking about
-# themselves, and any name present is likely context rather than the subject
-# ("did I approve Ravi Chandran's registration" is the caller's OWN decision
-# log - a legitimate self-scoped question that must not be refused).
+# First-person framing anywhere in the question means the asker is talking about themselves, and any
+# name present is likely context rather than the subject ("did I approve Ravi Chandran's registration"
+# is the caller's OWN decision log - a legitimate self-scoped question that must not be refused).
 _FIRST_PERSON = re.compile(r"\b(i|me|my|mine|myself|i'?ve|i'?m)\b", re.IGNORECASE)
 
 
@@ -92,13 +89,7 @@ def other_person_in_question(
     someone - see _FIRST_PERSON."""
     if caller_user_id is None:
         return None
-    # An EXACTLY resolved other person outranks first-person framing. The _FIRST_PERSON early-return
-    # below exists so "what are MY clubs" is not read as a third-party question, but "is Mei Ling Tan
-    # in any of MY clubs" satisfies it too - and that shape was observed answering in full, including
-    # the negative "she is not in the Business Leaders Circle", which discloses another person's
-    # membership either way. Whose data is being asked FOR is decided by the named subject, not by
-    # whose possessive frames the sentence. Only the exact resolver is consulted here: the fuzzy one
-    # would turn any first-person question containing a name-like word into a refusal.
+    # An EXACTLY resolved other person outranks first-person framing.
     for candidate in name_candidates:
         target = resolve_name(candidate)
         if target is not None and target["user_id"] != caller_user_id:
@@ -144,12 +135,7 @@ def third_party_subject(
     return None
 
 
-# Sibling classes that belong to the same DOMAIN as a self-scoped class. When a question is
-# refused on privacy grounds, its whole domain has to go: "what proposals does Mei Yee have" hits
-# proposals_mine (self-scoped) and can also pick up proposals_review from the LLM verification
-# step. Dropping only the self-scoped one leaves the sibling for the page gate to refuse
-# separately, producing an answer that gives a privacy reason AND a "contact an administrator"
-# page reason for the same question - contradictory, and the page reason is not why it was refused.
+# Sibling classes that belong to the same DOMAIN as a self-scoped class.
 _DOMAIN_SIBLINGS: dict[str, frozenset[str]] = {
     "proposals_mine": frozenset({"proposals_mine", "proposals_review"}),
     "proposals_review": frozenset({"proposals_mine", "proposals_review"}),

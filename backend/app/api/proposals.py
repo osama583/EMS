@@ -100,26 +100,17 @@ _VISIBLE_SQL = """
 
 
 # --- Bucketing --------------------------------------------------------------
-# Mirrors the client's proposal-visibility.ts (proposalSectionForUser /
-# userOwnsCurrentProposalAction / roleOwnsWorkflowAction), ported to SQL so
-# Inbox/Ongoing/History become real server-side filters instead of "fetch
-# everything visible, bucket it in the browser." Three buckets:
-#   history: r.status is terminal (approved, rejected or cancelled)
-#   inbox:   the caller can act RIGHT NOW - either as the applicant on
-#            something sent back to them, or as whichever reviewer/department/
-#            cafeteria-manager identity currently owns the next action
-#   ongoing: visible, not terminal, not currently the caller's turn
-#
-# No proposal-visibility.ts-style "applicant-like short-circuit" is needed
-# here: in this app's actual role model, an applicant-like account (student/
-# lecturer/staff/external-user) never ALSO holds a reviewer/department-head/
-# cafeteria-manager role, so "is the applicant owed an action" and "does the
-# caller own a reviewer/department action" can never both be reachable for
-# the same proposal by the same account - a plain OR of the two is exact.
-#
-# A department task counts as owed to the applicant while 'resubmitted'
-# (department_review stays on request.status while sibling departments keep
-# working - see request_task's docstring), independent of r.status.
+# Mirrors the client's proposal-visibility.ts (proposalSectionForUser / userOwnsCurrentProposalAction
+# / roleOwnsWorkflowAction), ported to SQL so Inbox/Ongoing/History become real server-side filters
+# instead of "fetch everything visible, bucket it in the browser." Three buckets: history: r.status is
+# terminal (approved, rejected or cancelled) inbox: the caller can act RIGHT NOW - either as the
+# applicant on something sent back to them, or as whichever reviewer/department/ cafeteria-manager
+# identity currently owns the next action ongoing: visible, not terminal, not currently the caller's
+# turn No proposal-visibility.ts-style "applicant-like short-circuit" is needed here: in this app's
+# actual role model, an applicant-like account (student/ lecturer/staff/external-user) never ALSO
+# holds a reviewer/department-head/ cafeteria-manager role, so "is the applicant owed an action" and
+# "does the caller own a reviewer/department action" can never both be reachable for the same proposal
+# by the same account - a plain OR of the two is exact.
 _DEPARTMENT_PUSHBACK_SQL = """
     EXISTS (
         SELECT 1 FROM request_task t
@@ -167,12 +158,8 @@ _BUCKET_SQL = f"""
     END
 """
 
-# The human-readable status label list pages show. Mirrors stageLabel() plus
-# hub-proposals.ts's "Changes requested" override, computed once here instead
-# of on every row client-side. 'draft' is handled by the same CASE (proposal-
-# status.models.ts's stageLabel has no draft case; the client capitalises it
-# itself for Drafts, but a bucketed inbox/ongoing/history row is never a
-# draft, so this only needs to cover submitted-and-beyond).
+# The human-readable status label list pages show. Mirrors stageLabel() plus hub-proposals.ts's
+# "Changes requested" override, computed once here instead of on every row client-side.
 _STATUS_LABEL_SQL = f"""
     CASE
         WHEN r.applicant_user_id = %(user_id)s AND {_DEPARTMENT_PUSHBACK_SQL} THEN 'Changes requested'
@@ -303,10 +290,10 @@ def list_proposals():
             )
         """)
     elif requester == "acted-on":
-        # Same "durable acted-on" predicate as _VISIBLE_SQL's workflow_history clause - the
-        # Requester filter's "Acted On" option, offered only in History (see
-        # hub-proposals.ts's showActedOnOption): proposals a reviewer decided that are not
-        # their own and that they do not co-own.
+        # Same "durable acted-on" predicate as _VISIBLE_SQL's workflow_history clause - the Requester
+        # filter's "Acted On" option, offered only in History (see hub-proposals.ts's
+        # showActedOnOption): proposals a reviewer decided that are not their own and that they do not
+        # co-own.
         clauses.append("""
             r.applicant_user_id <> %(user_id)s
             AND NOT EXISTS (
@@ -399,12 +386,7 @@ def list_proposals():
     )
 
 
-# The proposal FORM's own sidebar page (route /app/forms/event-proposal) - not the
-# review/list pages. Whoever the admin's Page Visibility settings let see this page is
-# exactly "who could plausibly submit or edit a proposal," which is the eligibility rule
-# for the Co-owner/Organizer pickers below: both roles let someone act as the applicant
-# in the applicant's place (resubmit for Co-owners; help organise for Organizers), so
-# neither should ever offer someone who couldn't have the proposal form open themselves.
+# The proposal FORM's own sidebar page (route /app/forms/event-proposal) - not the review/list pages.
 _PROPOSAL_FORM_PAGE_CODE = "proposal-form"
 
 
@@ -414,10 +396,8 @@ def list_collaborator_candidates():
     """Active internal users eligible to be a Co-owner or Organizer/PIC on a proposal.
 
     Scoped server-side to whoever the Page Visibility admin settings grant access to
-    the proposal form itself (nav_page_grants on 'proposal-form') - see
-    docs/superpowers/specs/2026-08-20-proposal-api-bug-patterns.md for why this exists:
-    /auth/internal-users used to hand back literally every active internal account
-    (including ones with no proposal-facing role at all) to this same picker.
+    the proposal form itself (nav_page_grants on 'proposal-form'), rather than every
+    active internal account.
     """
     return jsonify(identity.users_with_page_access(_PROPOSAL_FORM_PAGE_CODE))
 
@@ -475,14 +455,13 @@ def list_categories():
 
 
 # --- Department requests (the department-scoped Requests hub) --------------
-# hub-requests.ts shows one row per (proposal, department_review task) for
-# whichever department-request kinds the caller is routed to (their headed
-# unit, or F&B for both fmb/waterNormal) - a DIFFERENT bucketing question from
-# _BUCKET_SQL above: a department's own row goes to history the moment THEIR
-# task is terminal (completed/cancelled), independent of sibling departments
-# or the whole proposal's r.status (parallel independence - see request_task's
-# docstring), and 'resubmitted' (they sent it back) is ongoing for them, not
-# inbox - they are waiting on the applicant now, not the other way around.
+# hub-requests.ts shows one row per (proposal, department_review task) for whichever department-
+# request kinds the caller is routed to (their headed unit, or F&B for both fmb/waterNormal) - a
+# DIFFERENT bucketing question from _BUCKET_SQL above: a department's own row goes to history the
+# moment THEIR task is terminal (completed/cancelled), independent of sibling departments or the whole
+# proposal's r.status (parallel independence - see request_task's docstring), and 'resubmitted' (they
+# sent it back) is ongoing for them, not inbox - they are waiting on the applicant now, not the other
+# way around.
 _TASK_BUCKET_SQL = """
     CASE
         WHEN t.status = ANY(%(task_terminal)s) THEN 'history'
@@ -502,10 +481,10 @@ def _routed_request_kinds() -> list[str]:
     return kinds
 
 
-# request_fmb_selection.status -> bucket, mirroring _TASK_BUCKET_SQL's rule but on the ORDER's
-# own status rather than a request_task's: 'pending' still needs the cafeteria manager's decision
-# (inbox), a terminal order is done (history), everything else - approved/preparing/ready/
-# resubmitted - is in progress for them (ongoing).
+# request_fmb_selection.status -> bucket, mirroring _TASK_BUCKET_SQL's rule but on the ORDER's own
+# status rather than a request_task's: 'pending' still needs the cafeteria manager's decision (inbox),
+# a terminal order is done (history), everything else - approved/preparing/ready/ resubmitted - is in
+# progress for them (ongoing).
 _ORDER_BUCKET_SQL = """
     CASE
         WHEN s.status = ANY(%(order_terminal)s) THEN 'history'

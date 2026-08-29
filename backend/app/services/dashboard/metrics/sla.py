@@ -14,17 +14,11 @@ from ....db import fetch_all, fetch_one
 from ..scope import Scope, num, ratio
 from .common import NON_COMMITTED_STATUSES, DepartmentSpec, iso_week_start
 
-# A department whose detail rows carry a start but no end has no "until when"
-# in the schema, so punctuality is measured against the start instant plus this
-# grace. Five minutes is the tolerance a coach pulling away or a serving window
-# opening is actually judged on - anything tighter measures clock-rounding, and
-# anything looser stops being "on time".
+# A department whose detail rows carry a start but no end has no "until when" in the schema, so
+# punctuality is measured against the start instant plus this grace.
 START_ONLY_GRACE_MINUTES = 5
 
-# The two department-level decisions a head can take on a task. There is no
-# 'send_back' action in this codebase - services/workflow/tasks.py writes
-# 'resubmit' with new_status='resubmitted' - and a query looking for the former
-# silently measures nothing.
+# The two department-level decisions a head can take on a task.
 DECISION_ACTIONS = ("approve", "resubmit")
 
 # The first-decision timestamp per task, as a lateral join. Shared by M10 and
@@ -237,10 +231,8 @@ def lane_time_breakdown(cur, scope: Scope, weeks: int | None = None) -> list[dic
     )
     out = []
     for row in rows:
-        # A negative segment means the timestamps interleaved (an assignment made
-        # before the formal approval, which the workflow permits). Clamped rather
-        # than dropped: the week still happened, and a stacked bar cannot render
-        # a negative segment without lying about the total.
+        # A negative segment means the timestamps interleaved (an assignment made before the formal
+        # approval, which the workflow permits).
         out.append(
             {
                 "x": row["week"].isoformat(),
@@ -347,11 +339,7 @@ def lead_time_distribution(cur, scope: Scope, spec: DepartmentSpec) -> list[dict
 
 
 # --- Cafeteria latencies (M17-M19) ---------------------------------------
-# These read the migration-018 timestamps. Rows created before that migration
-# carry a backfilled approximation derived from request-scoped history, which
-# cannot distinguish sibling orders on one proposal - every widget using them
-# renders the "approximate for orders before <date>" caption rather than
-# presenting the figure as measured.
+# These read the migration-018 timestamps.
 
 
 def task_deadline_sql(spec: DepartmentSpec, alias: str = "d") -> tuple[str, str]:

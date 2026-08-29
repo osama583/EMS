@@ -6,12 +6,7 @@ export interface SystemConfig {
   readonly maxEventCategories: number;
 
   // --- Dashboard thresholds (migration 018) --------------------------------
-  // Every SLA target, capacity assumption, risk window and forecast horizon the
-  // role dashboards read. None of them lives in code: an administrator retunes
-  // a department's SLA on /app/admin/settings/policies without a deploy, the
-  // same way the three values above already work. Per-unit overrides use a
-  // "__<unit_code>" suffix on the same code and are set directly in the config
-  // table; these are the fallbacks every unit inherits.
+  // Every SLA target, capacity assumption, risk window and forecast horizon the role dashboards read.
   readonly slaDecisionHours: number;
   readonly slaAssignmentHours: number;
   readonly slaFulfilmentLeadDays: number;

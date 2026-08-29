@@ -95,11 +95,7 @@ export interface FundingSubOption extends RequestOptionBase {
   readonly purchasingNote?: string;
 }
 
-// A university venue. The single source for every Inside University location
-// dropdown in the system — the event schedule and the four university-delivered
-// requests all read this one catalogue, so a venue the CFO archives disappears
-// from all of them at once and a venue they reorder moves in all of them at
-// once. See backend migration 032.
+// A university venue.
 export interface VenueOption extends RequestOptionBase {
   readonly kind: 'venue';
   readonly building?: string;

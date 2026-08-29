@@ -90,10 +90,7 @@ export class ProposalTableComponent {
   readonly columns = input.required<readonly ProposalTableColumn[]>();
   readonly rows = input.required<readonly EditableRow[]>();
   readonly avatarKey = input<string | null>(null);
-  // When set, this column renders a small thumbnail before its text. The image URL is read from
-  // `row[imageKey() + 'ImageUrl']` — callers resolve option ids to image URLs into the row data
-  // before passing it in (see event-proposal.ts's logisticsRowsWithImages()), keeping this
-  // component dumb/presentational like every other column here.
+  // When set, this column renders a small thumbnail before its text.
   readonly imageKey = input<string | null>(null);
   readonly emptyMessage = input('No records have been added yet.');
   readonly emptyIcon = input('group_add');

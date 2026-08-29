@@ -32,18 +32,10 @@ from ._helpers import date_order
 bp = Blueprint("ai_admin", __name__, url_prefix="/admin")
 
 DEFAULT_PAGE_SIZE = 25
-# The rows-per-page choices the client offers (PAGE_SIZE_OPTIONS in
-# internal-data-page.models.ts). Whitelisted rather than trusted, so a caller
-# cannot ask for a page of a million rows; anything else falls back to the
-# default. The page size used to be fixed here, which is why this log was the
-# one list in the app whose rows-per-page selector had a single option.
+# The rows-per-page choices the client offers (PAGE_SIZE_OPTIONS in internal-data-page.models.ts).
 ALLOWED_PAGE_SIZES = (5, 10, 15, 25)
 
-# The outcomes a row can carry. The first four are backend refusals made BEFORE an answer existed;
-# the last three are the security reviewer's verdicts on an answer that HAD been generated (see
-# migration 027). The admin page filters on these, which is the whole point of the column - "why
-# did this not go through" has different fixes per value: a grant, a guide, a feature, or nothing
-# (a blocked attack is the system working).
+# The outcomes a row can carry.
 VALID_OUTCOMES = (
     "page_denied", "how_to_page_denied", "out_of_scope", "unsupported",
     "harmful", "unrelated_question",

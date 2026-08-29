@@ -24,7 +24,7 @@ interface PersistedTokens extends AuthTokens {
  * localStorage is readable by any script on the origin, so a successful XSS can
  * read these. The alternative — httpOnly cookies — trades that for CSRF and
  * requires the API to be same-site, which it is not. Given a token-authenticated
- * cross-origin API, this is the standard trade; see backend/docs/security.md.
+ * cross-origin API, this is the standard trade.
  * Access tokens are short-lived to limit the window.
  */
 @Injectable({ providedIn: 'root' })

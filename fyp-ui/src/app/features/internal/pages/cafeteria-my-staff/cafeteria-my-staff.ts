@@ -15,11 +15,8 @@ import { DeleteConfirmDialogComponent } from '../../../../shared/components/dele
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog';
 import { DeletionMetadata, DeletionPreview } from '../../../../shared/models/deletion.models';
 
-// Cafeteria Manager's own staff-roster screen — scoped to their own cafeteria only (unlike
-// Cafeteria Admin's cross-cafeteria Staff Assignments page). Every add/edit/suspend/remove writes
-// user_unit_roles directly via CafeteriaService, the same mechanism the Admin's Staff Assignments
-// page uses — there is no approval step; the backend scopes the write to this Manager's own
-// cafeteria and to the 'cafeteria-staff' role (see cafeterias.py's _assert_may_staff).
+// Cafeteria Manager's own staff-roster screen — scoped to their own cafeteria only (unlike Cafeteria
+// Admin's cross-cafeteria Staff Assignments page).
 const PASSWORD_MIN_LENGTH = 8;
 const ROLE_CODE = 'cafeteria-staff' as const;
 
@@ -56,10 +53,8 @@ export class CafeteriaMyStaffComponent {
   readonly statusTarget = signal<CafeteriaAssignment | null>(null);
   readonly changingStatus = signal(false);
 
-  // Deleted tab — same page-level section switch as club-management.ts, only fetched the first
-  // time it's opened. Unlike the live list (filtered client-side to this Manager's own outlet by
-  // myStaff() below), the deleted list is scoped server-side (see cafeterias.py's
-  // list_deleted_assignments) — a Manager's token already limits it to their own cafeteria.
+  // Deleted tab — same page-level section switch as club-management.ts, only fetched the first time
+  // it's opened.
   readonly showDeleted = signal(false);
   readonly deletedStaff = signal<readonly (CafeteriaAssignment & DeletionMetadata)[]>([]);
   readonly deletedLoading = signal(false);
@@ -238,10 +233,8 @@ export class CafeteriaMyStaffComponent {
     if (event.action.key === 'remove') this.requestRemove(assignment);
   }
 
-  // Removing a posting is only ever safe if the person never did any real work under it here —
-  // an order claimed, a task assigned. The server (cafeterias.py's _assignment_blockers) is the
-  // authority on that; this asks it before offering the button, same as every other delete
-  // dialog in the app, rather than letting the click fail with a bare error.
+  // Removing a posting is only ever safe if the person never did any real work under it here — an
+  // order claimed, a task assigned.
   requestRemove(assignment: CafeteriaAssignment): void {
     this.clearMessages();
     this.removeTarget.set(assignment);

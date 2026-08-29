@@ -18,9 +18,9 @@ const VISIBLE_STATUSES: readonly EventRegistration['status'][] = ['confirmed', '
 const DEFAULT_PAGE_SIZE = 10;
 
 // Created by Me: events this organiser proposed (or co-owns) that are published, server-side
-// searched/filtered/paginated — search/status/page/pageSize are real query params to
-// events.py's my_organized_events(), which used to have no filtering or pagination at all and
-// returned the caller's entire organised-events list in one response.
+// searched/filtered/paginated — search/status/page/pageSize are real query params to events.py's
+// my_organized_events(), which used to have no filtering or pagination at all and returned the
+// caller's entire organised-events list in one response.
 @Component({
   selector: 'app-created-by-me',
   imports: [FormModalComponent, InternalPageStateComponent, InternalSearchFieldComponent, InternalFilterControlsComponent, InternalPaginationComponent],

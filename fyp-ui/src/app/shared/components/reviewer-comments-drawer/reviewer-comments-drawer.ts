@@ -5,19 +5,8 @@ import { DEPARTMENT_LABELS, ReviewerCommentEntry, initialsFor } from '../../../c
 import { COMMENTS_DOCK_QUERY, viewportMatches } from '../../viewport-query';
 import { ConversationThreadComponent } from '../conversation-thread/conversation-thread';
 
-// Two rendering shells over the same conversations/comments state:
-//   'drawer' - the ribbon-tab + pushed-layout sliding panel, extracted from event-proposal.ts
-//              (the whole-proposal resubmit form). Both this page and department-resubmit.ts wrap
-//              the component INSIDE a flex row alongside their own main content column — see
-//              :host { display: contents } so the ribbon/drawer participate as direct flex
-//              siblings of the caller's main column, matching .proposal-page's original layout.
-//   'panel'  - an always-visible sticky column, matching proposal-reviewer-view.ts's right-side
-//              Workflow Actions/Conversations panel design. No ribbon, no open/close, no sliding —
-//              department-resubmit.ts uses this so its comments are as visible as the reviewer's
-//              own read of the same thread, not hidden behind a toggle the applicant has to know
-//              to click.
-// Both variants share the same list -> thread -> Back flow (WhatsApp-style) and the same flat
-// `comments` snapshot fallback for a proposal with no conversation rows yet.
+// Two rendering shells over the same conversations/comments state: 'drawer' - the ribbon-tab + pushed-
+// layout sliding panel, extracted from event-proposal.ts (the whole-proposal resubmit form).
 @Component({
   selector: 'app-reviewer-comments-drawer',
   imports: [ConversationThreadComponent, NgTemplateOutlet],
@@ -145,25 +134,20 @@ export class ReviewerCommentsDrawerComponent {
   // 'drawer' (default): the sliding ribbon/panel used by event-proposal.ts. 'panel': the
   // always-visible sticky column used by department-resubmit.ts — see the class doc comment.
   readonly variant = input<'drawer' | 'panel'>('drawer');
-  // Set by the caller when the applicant landed here specifically to answer a resubmission
-  // request (as opposed to browsing an already-decided proposal from their history) — jumps the
-  // drawer straight into that conversation instead of opening on the Conversations list, since
-  // that is the one thread the applicant actually needs to read and reply to right now.
+  // Set by the caller when the applicant landed here specifically to answer a resubmission request (as
+  // opposed to browsing an already-decided proposal from their history) — jumps the drawer straight
+  // into that conversation instead of opening on the Conversations list, since that is the one thread
+  // the applicant actually needs to read and reply to right now.
   readonly initialConversationId = input<string | null>(null);
   // Two-way bindable ([( open )]) so a caller that needs to react to open/closed — or to open and
-  // close the drawer itself — can; defaults to open the moment there are comments to show. The
-  // caller does NOT have to resize its own main column in response: that column is `flex: 1 1 0`
-  // and absorbs whatever width the drawer gives up (see event-proposal.scss).
-  // Unused in 'panel' mode: the panel is always visible, nothing to open/close.
+  // close the drawer itself — can; defaults to open the moment there are comments to show.
   readonly open = model(true);
 
   readonly activeConversationId = signal<string | null>(null);
   private appliedInitialConversationId = false;
 
-  // Below the dock breakpoint neither shell has a column to live in: the drawer has no room left
-  // to push the form aside, and the panel would simply stack under the whole page. Both collapse
-  // to the shared dock (styles/_comments-dock.scss) - an edge tab plus a right-docked overlay -
-  // so every comments surface in the app behaves the same once the window gets narrow.
+  // Below the dock breakpoint neither shell has a column to live in: the drawer has no room left to
+  // push the form aside, and the panel would simply stack under the whole page.
   protected readonly compact = viewportMatches(COMMENTS_DOCK_QUERY);
   // Starts closed, deliberately: docked, the tab is what you should see first, and only a click
   // brings the conversation up over the page. `open` above stays the WIDE state, untouched by

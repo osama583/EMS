@@ -208,11 +208,9 @@ def update_status(task_id: int):
 
 
 # --- Row-level assignment ---------------------------------------------------
-# Logistics/Transportation/Photography/Sound & Light/Campus Tour route staff
-# per REQUESTED ROW, not per whole department task - see workflow/tasks.py's
-# row-assignment functions and migration 012's request_row_assignment. F&B
-# never reaches these (its own cafeteria-orders.py shared-pool flow); the
-# whole-task endpoints above still exist and work, just unused by these five.
+# Logistics/Transportation/Photography/Sound & Light/Campus Tour route staff per REQUESTED ROW, not
+# per whole department task - see workflow/tasks.py's row-assignment functions and migration 012's
+# request_row_assignment.
 
 @bp.get("/<int:task_id>/rows/<requirement_name>/assignments")
 @require_internal

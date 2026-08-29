@@ -11,11 +11,9 @@ export class PublishedEventService implements EventRegistrationApi {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiBaseUrl}/events`;
 
-  // Happening Soon, Explore Events (results + school facet), and the calendar each have their
-  // own scoped endpoint below (getHappeningSoon/searchEvents/getEventSchools/getEventsForRange)
-  // — nothing loads the full published-events table any more. Kept only for any future caller
-  // that genuinely needs every event; shareReplay(1) still applies so concurrent/repeat callers
-  // don't each refetch independently.
+  // Happening Soon, Explore Events (results + school facet), and the calendar each have their own
+  // scoped endpoint below (getHappeningSoon/searchEvents/getEventSchools/getEventsForRange) — nothing
+  // loads the full published-events table any more.
   private publishedEvents$: Observable<readonly PublishedEvent[]> | null = null;
 
   getPublishedEvents(): Observable<readonly PublishedEvent[]> {
@@ -81,19 +79,11 @@ export class PublishedEventService implements EventRegistrationApi {
     return this.http.get<readonly PublishedEvent[]>(`${this.baseUrl}/calendar`, { params: { start, end } });
   }
 
-  // The MASTER calendar's feed (/app/event-calendar) — a different population and a different
-  // rule set from getEventsForRange() above, which serves the public landing calendar. This one
-  // includes events still at department_review and returns visibility-redacted rows plus a
-  // per-date private-event count.
-  //
-  // It is three calls, not one, and the split is the point (see master-calendar.models.ts and
-  // events.py's master_calendar / master_calendar_day / master_calendar_event). Opening the page
-  // makes ONLY the first of them.
+  // The MASTER calendar's feed (/app/event-calendar) — a different population and a different rule set
+  // from getEventsForRange() above, which serves the public landing calendar.
 
-  // Tier 1 — the visible range's grid rows: date, time, title, category, provisional, plus the
-  // per-date private count. `q` is applied server-side over title/organiser/venue/category, so
-  // narrowing the calendar narrows the response instead of downloading the month and hiding
-  // most of it client-side.
+  // Tier 1 — the visible range's grid rows: date, time, title, category, provisional, plus the per-
+  // date private count.
   getMasterCalendarSummary(start: string, end: string, q = ''): Observable<MasterCalendarSummary> {
     let params = new HttpParams().set('start', start).set('end', end);
     if (q) params = params.set('q', q);
@@ -128,10 +118,7 @@ export class PublishedEventService implements EventRegistrationApi {
   getRegistrationCount(id: string): Observable<number> {
     return this.http.get<PublishedEvent>(`${this.baseUrl}/${encodeURIComponent(id)}`).pipe(map((event) => event.confirmedRegistrationCount));
   }
-  // Every registration awaiting this user's approval, across all of their own events. The actor
-  // is resolved server-side from the bearer token, so no email is sent. Searched/filtered/
-  // paginated server-side (events.py's pending_approvals()) — the Registrations inbox's search
-  // box and event dropdown are real query params, not a client-side filter over the whole set.
+  // Every registration awaiting this user's approval, across all of their own events.
   getMyPendingRegistrations(query: {
     q?: string; event?: string; page: number; pageSize: number; order?: 'asc' | 'desc';
   }): Observable<PendingEventRegistrationPage> {
@@ -168,9 +155,7 @@ export class PublishedEventService implements EventRegistrationApi {
   }
 
   // `reason` is required by the server when the event uses manual approval (max 100 characters);
-  // `paymentProof` is required when the event has a cost. The actor is the signed-in user, unless
-  // `guest` is supplied — an anonymous visitor registering for a public event with no account;
-  // the server creates/reuses a minimal record for them by email (see events.py's register()).
+  // `paymentProof` is required when the event has a cost.
   registerForEvent(
     eventId: string,
     paymentProof?: { url: string; fileName: string },
@@ -238,10 +223,7 @@ export class PublishedEventService implements EventRegistrationApi {
     return this.http.get<RegisteredEventsResponse>(`${this.baseUrl}/me/registrations`, { params: { scope: 'history', page: String(page), pageSize: String(pageSize) } });
   }
 
-  // Events I proposed (or co-own) that are now published — my own organiser dashboard (Created
-  // by Me). Server-side searched/filtered/paginated: search/status/page/pageSize are real query
-  // params to events.py's my_organized_events(), which filters, counts, and LIMIT/OFFSETs in
-  // SQL rather than the browser holding and filtering the whole organised-events list.
+  // Events I proposed (or co-own) that are now published — my own organiser dashboard (Created by Me).
   getMyOrganizedEvents(query: { q?: string; status?: 'upcoming' | 'ended'; page: number; pageSize: number }): Observable<SavedEventsResponse> {
     let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
     if (query.q) params = params.set('q', query.q);
@@ -261,11 +243,11 @@ export class PublishedEventService implements EventRegistrationApi {
     return this.http.get<readonly PendingEventRegistration[]>(`${this.baseUrl}/me/decided-registrations`);
   }
 
-  // History > Events (hub-history-events.ts): server-side searched/filtered/paginated merge of
-  // the two sources above (my own resolved registrations + registrations I decided as
-  // organiser), already re-bucketed into requester 'me'/'other' and de-duplicated - see
-  // events.py's registration_history()/_HISTORY_UNION_SQL for the query this replaces two
-  // unpaginated/lightly-paginated client-side-merged calls with.
+  // History > Events (hub-history-events.ts): server-side searched/filtered/paginated merge of the two
+  // sources above (my own resolved registrations + registrations I decided as organiser), already re-
+  // bucketed into requester 'me'/'other' and de-duplicated - see events.py's
+  // registration_history()/_HISTORY_UNION_SQL for the query this replaces two unpaginated/lightly-
+  // paginated client-side-merged calls with.
   getRegistrationHistoryPage(query: RegistrationHistoryQuery): Observable<RegistrationHistoryPage> {
     let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
     if (query.q) params = params.set('q', query.q);

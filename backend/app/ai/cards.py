@@ -98,10 +98,7 @@ def event_cards(answer: str, *, user_id: int | None) -> list[dict]:
         {
             "eventId": str(row["request_id"]),
             "eventTitle": row["event_title"],
-            # The frontend's model carries `similarity` from the vector era. Nothing ranks by
-            # distance any more, so it is reported as a constant rather than a fabricated score -
-            # the cards are the entities the answer named, which is a stronger relevance signal
-            # than a cosine distance ever was.
+            # The frontend's model carries `similarity` from the vector era.
             "similarity": 1.0,
             "eventImageUrl": row["eventImageUrl"],
             "firstDate": row["firstDate"],

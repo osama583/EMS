@@ -63,11 +63,7 @@ def _append_limit(sql: str) -> str:
     return f"{sql.rstrip().rstrip(';')} LIMIT {MAX_ROWS}"
 
 
-# Guard markers are instructions to sql_guard, not SQL. PUBLIC_COUNT_ONLY tells the guard "this
-# query is claiming the public-registration-count exemption"; Postgres has no idea what it means,
-# so it is rewritten to TRUE once the guard has finished proving the claim was honest. Replaced
-# rather than deleted so the surrounding AND/OR structure stays valid whatever shape the model
-# wrote it in.
+# Guard markers are instructions to sql_guard, not SQL.
 _MARKERS = re.compile(r"\bPUBLIC_COUNT_ONLY\b", re.IGNORECASE)
 
 
@@ -159,14 +155,7 @@ def rows_to_document(rows: list[dict], *, sql: str) -> str:
     # sensitivities, so they get different marker sets.
     lowered = (sql or "").lower()
 
-    # EMPTY: deliberately broad, and errs toward caution. Saying "you have none to show" when the
-    # rows were merely public-and-absent is a small loss; saying "nobody has registered" when the
-    # roster was simply not yours to read is a false statement about the world.
-    #
-    # The visibility clause counts too, and it is the only marker a GUEST query ever carries: with
-    # no user id anywhere in their SQL, every empty guest result was being reported as a fact about
-    # the world. Asked "show me the private events", a signed-out visitor was told "there are no
-    # private events" - there are three; they are simply not a guest's to see.
+    # EMPTY: deliberately broad, and errs toward caution.
     scoped_empty = any(
         marker in lowered for marker in ("user_id =", "applicant_user_id", "requester_user_id")
     ) or "event_visibility in" in lowered
@@ -174,15 +163,10 @@ def rows_to_document(rows: list[dict], *, sql: str) -> str:
     scoped_partial = _restricted_to_one_person(sql or "")
 
     if not rows:
-        # WHY the result is empty changes what the honest answer is, and conflating the two
-        # produced a false statement: "who registered for the Career Fair?" returned no rows
-        # (correctly - that roster is not this caller's to read) and the assistant answered "No one
-        # has registered", while the event's own card showed 5 registered. An empty SCOPED result
-        # says nothing about the world; it says something about the asker's access.
-        #
-        # The distinction is drawn from the query itself rather than guessed. A query that had to
-        # carry a personal ownership condition to run at all ("= <my id>", "events I organise") is
-        # scoped-empty; a query over publicly visible rows is genuinely empty.
+        # WHY the result is empty changes what the honest answer is, and conflating the two produced a
+        # false statement: "who registered for the Career Fair?" returned no rows (correctly - that
+        # roster is not this caller's to read) and the assistant answered "No one has registered",
+        # while the event's own card showed 5 registered.
         if scoped_empty:
             return (
                 "DATABASE RESULT: the query ran successfully and returned NO ROWS, but the query "
@@ -199,14 +183,8 @@ def rows_to_document(rows: list[dict], *, sql: str) -> str:
             "are none/none found. Do NOT say you lack access or could not look it up."
         )
     columns = list(rows[0].keys())
-    # WHAT the rows mean lives in the query's conditions, not in its column names, and only the
-    # column names survive into this block. Asked "am I president of any club?", the model was
-    # handed `club_name: APU Coding Society` - a bare club name with nothing saying the asker
-    # presides over it - and answered "No, you are not listed as the president of any club" while
-    # holding the two rows that prove otherwise. It was following ANSWER ONLY FROM THE DATABASE
-    # RESULT correctly; the block simply did not carry the fact that the filter had already been
-    # applied. Generalises past presidency to every question whose answer is in the WHERE clause
-    # ("clubs I'm in", "events I organise"), where the columns look identical either way.
+    # WHAT the rows mean lives in the query's conditions, not in its column names, and only the column
+    # names survive into this block.
     lines = [
         f"DATABASE RESULT ({len(rows)} row{'s' if len(rows) != 1 else ''}):",
         "  These rows ARE the answer to this question - the conditions the question asked for have"
@@ -229,12 +207,7 @@ def rows_to_document(rows: list[dict], *, sql: str) -> str:
         " are the clubs'.",
     ]
     if scoped_partial:
-        # The partial twin of the scoped-empty case above. Asked "who registered for the Career
-        # Fair?" about an event he does NOT organise, the asker got back the one row that was his
-        # to see - his own registration - and was told "Daniel Wong registered for the AI & Data
-        # Science Career Fair", which reads as the complete roster when five people are on it.
-        # Nothing leaked; the answer was still false. Rows restricted to the asker cannot answer a
-        # question about everyone.
+        # The partial twin of the scoped-empty case above.
         lines.append(
             "  SCOPE: these rows were RESTRICTED TO WHAT THIS ASKER MAY SEE, so they may be only"
             " their own slice of a larger set. If the question asked about OTHER people or about"

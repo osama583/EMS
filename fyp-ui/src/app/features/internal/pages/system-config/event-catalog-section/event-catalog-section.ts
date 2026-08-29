@@ -15,9 +15,8 @@ import { ToastService, apiErrorMessage } from '../../../../../shared/components/
 type SectionTab = 'active' | 'deleted';
 
 // Server-side derivation this mirrors exactly: services/unit-code.js's deriveUnitCode() — same
-// lowercase_with_underscores slug convention as unit.code/role.role_code/nav_page.page_code
-// (see page-visibility.ts's derivePageCode() for the identical client-side duplicate). Duplicated
-// client+server since there's no shared module reachable from both Express CommonJS and Angular TS.
+// lowercase_with_underscores slug convention as unit.code/role.role_code/nav_page.page_code (see page-
+// visibility.ts's derivePageCode() for the identical client-side duplicate).
 function deriveCatalogCode(name: string): string {
   return (name || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
 }
@@ -29,10 +28,8 @@ interface Draft {
 const EMPTY_DRAFT: Draft = { name: '', active: true };
 
 // Shared by both the Event Categories and Event Formats tabs in System Configuration — the two
-// entities are structurally identical (id, name, code, active + soft-delete), so one generic
-// component avoids duplicating the active-list/deleted-list/add-edit-modal logic twice. Mirrors
-// page-visibility.ts's Pages/Deleted tab structure (minus the Permissions tab, which has no
-// analog here).
+// entities are structurally identical (id, name, code, active + soft-delete), so one generic component
+// avoids duplicating the active-list/deleted-list/add-edit-modal logic twice.
 @Component({
   selector: 'app-event-catalog-section',
   imports: [InternalDataPageComponent, FormModalComponent, FormFieldComponent, FeedbackBannerComponent, DeleteConfirmDialogComponent],
@@ -174,7 +171,6 @@ export class EventCatalogSectionComponent {
   // ---------------------------------------------------------------------------
   // Delete (soft) / Deleted tab / Restore / Delete forever (purge) — mirrors page-visibility.ts's
   // deleteTarget/deletePreview/deletedPages structure.
-  // ---------------------------------------------------------------------------
   readonly deleteTarget = signal<EventCatalogEntry | null>(null);
   readonly deletePreview = signal<DeletionPreview | null>(null);
   readonly checkingDeletion = signal(false);

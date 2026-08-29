@@ -1,7 +1,4 @@
-// The rows-per-page choices, for every paginated list in the app. One constant
-// rather than a literal per page: six different sets had drifted into the
-// configs ([5,10,25], [10,25,50], [10,25,50,100], [9], [9,18,27], [6,12,24]),
-// so two tabs of the same page could offer different page sizes.
+// The rows-per-page choices, for every paginated list in the app.
 export const PAGE_SIZE_OPTIONS: readonly number[] = [5, 10, 15, 25];
 
 export interface InternalPageHeaderConfig {
@@ -63,10 +60,8 @@ export interface InternalDataCell {
   readonly avatar?: string;
   readonly badge?: boolean;
   readonly tone?: InternalCellTone;
-  // Opt-in: renders the badge as a real button (hover/focus states, primary-color on hover) and
-  // emits cellClick instead of just being static text. Used by pages where a badge is itself the
-  // affordance to open more detail (e.g. Page Visibility's roles badge opening the roles list)
-  // rather than needing a separate row action button for the same thing.
+  // Opt-in: renders the badge as a real button (hover/focus states, primary-color on hover) and emits
+  // cellClick instead of just being static text.
   readonly clickable?: boolean;
   // Optional Material Symbol name shown to the left of a clickable badge's text (e.g. 'share').
   readonly badgeIcon?: string;

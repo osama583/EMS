@@ -1,7 +1,4 @@
-// A candidate for club President — GET /clubs/eligible-presidents. id/displayName/email only:
-// every caller (club-management.ts's presidentOptions, president-change-request-modal.ts) only
-// ever builds a dropdown option out of these three, so the server never sends a "role" (it was
-// always the same hardcoded 'Member' string with no per-caller use).
+// A candidate for club President — GET /clubs/eligible-presidents.
 export interface ClubUserSummary {
   readonly id: string;
   readonly displayName: string;

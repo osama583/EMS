@@ -11,12 +11,10 @@ import { OptionCardViewModel } from '../../../../shared/components/option-card-g
 import { OptionItemDetailsModalComponent } from '../../../../shared/components/option-item-details-modal/option-item-details-modal';
 import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
 
-// Read-only cross-cafeteria menu view, one cafeteria at a time via a left-hand list —
-// /app/cafeteria-menus (F&B's earlier dropdown-based version of this same idea) was removed
-// 2026-08-17; this page is now the SINGLE menu-viewing surface for every role granted it via
-// Page Visibility (F&B included), not a bespoke per-role page. No route guard: like every other
-// page in the app, access is governed purely by this page's nav_page_grants row (see
-// server/db.js's seedNavPages()), enforced by roleGuard's auth.canAccess() check.
+// Read-only cross-cafeteria menu view, one cafeteria at a time via a left-hand list — /app/cafeteria-
+// menus (F&B's earlier dropdown-based version of this same idea) was removed 2026-08-17; this page is
+// now the SINGLE menu-viewing surface for every role granted it via Page Visibility (F&B included),
+// not a bespoke per-role page.
 @Component({
   selector: 'app-cafeteria-menu-oversight',
   imports: [InternalPageHeaderComponent, InternalSearchFieldComponent, InternalResetButtonComponent, OptionCardGridComponent, OptionItemDetailsModalComponent, LoadingStateComponent],

@@ -31,8 +31,8 @@ const TASK_STATUS_LABEL: Readonly<Record<string, string>> = {
 
 // Once a row HAS an assignee, its real progress is the row-assignment's own step
 // (assigned/preparing/completed) rather than the task-level status above - per-department wording
-// mirrors staff-tasks.ts's ROLE_PRESENTATION (the same steps the assigned staff member sees and
-// acts on: "Start Preparation" -> "Preparation Completed", etc.).
+// mirrors staff-tasks.ts's ROLE_PRESENTATION (the same steps the assigned staff member sees and acts
+// on: "Start Preparation" -> "Preparation Completed", etc.).
 const PROGRESS_STATUS_LABEL: Readonly<Partial<Record<DepartmentRequestKind, Readonly<Record<string, string>>>>> = {
   logistics: { assigned: 'Assigned — awaiting preparation', preparing: 'Preparing', completed: 'Preparation completed' },
   campusTour: { assigned: 'Assigned — awaiting tour', preparing: 'Tour in progress', completed: 'Tour completed' },
@@ -53,13 +53,11 @@ const ORDER_STATUS_LABEL: Readonly<Record<string, string>> = {
   cancelled: 'Cancelled',
 };
 
-// One row = one department request on one proposal, fetched already bucketed and paginated by
-// GET /proposals/requests?bucket=&page=&pageSize= (see proposals.py's list_department_requests) —
-// bucketed by the OWNING TASK's own status, not the whole proposal's, since a department's row
-// belongs in ITS OWN History the moment their task is done even while sibling departments (on the
-// same proposal) are still working. This used to fetch every visible proposal in full (including
-// every OTHER department's requests) and filter client-side per (proposal, requestKind) pair via
-// proposalSectionForUser() — see git history.
+// One row = one department request on one proposal, fetched already bucketed and paginated by GET
+// /proposals/requests?bucket=&page=&pageSize= (see proposals.py's list_department_requests) — bucketed
+// by the OWNING TASK's own status, not the whole proposal's, since a department's row belongs in ITS
+// OWN History the moment their task is done even while sibling departments (on the same proposal) are
+// still working.
 @Component({
   selector: 'app-hub-requests',
   imports: [InternalDataPageComponent, FormModalComponent],
@@ -133,10 +131,8 @@ export class HubRequestsComponent {
   }));
 
   constructor() {
-    // Debounces the search box only — every other control (sort/page/pageSize) already changes at
-    // a human pace and should refetch immediately. Same reactive pattern as hub-proposals.ts: every
-    // control here is a real GET /proposals/requests query param (q/sort/order/page/pageSize),
-    // resolved server-side — this used to fetch up to 200 rows once and never page past that.
+    // Debounces the search box only — every other control (sort/page/pageSize) already changes at a
+    // human pace and should refetch immediately.
     toObservable(this.search).pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe((value) => { this.debouncedSearch.set(value); this.page.set(1); });
 

@@ -129,10 +129,9 @@ def _clean_history(raw: object) -> list[dict]:
     return turns
 
 
-# Told to the model when the page gate refused one or more of a question's topics, so the answer
-# says plainly what it cannot cover instead of silently omitting it (an omission reads as "there is
-# nothing", which is a different and wrong answer). Authorization itself lives in
-# ai/topic_access.py; this is only how the already-made decision is worded.
+# Told to the model when the page gate refused one or more of a question's topics, so the answer says
+# plainly what it cannot cover instead of silently omitting it (an omission reads as "there is
+# nothing", which is a different and wrong answer).
 def _denied_document(denied_topics: list[str]) -> str:
     labels = sorted({topic_access.TOPIC_LABEL.get(t, t) for t in denied_topics})
     listed = labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + f" and {labels[-1]}"
@@ -188,9 +187,7 @@ def _how_to_denied_document(guide_key: str) -> str:
 
 
 # Best-effort "is there a person's name in this question" detector, feeding subject_scope's privacy
-# check - a capitalized two-or-more-word run ("Ahmad Firdaus"), the same shape full_name is stored
-# in. Deliberately conservative: find_user_by_name() only proceeds on an EXACT, UNAMBIGUOUS match,
-# so a false-positive candidate here just fails to resolve rather than picking the wrong person.
+# check - a capitalized two-or-more-word run ("Ahmad Firdaus"), the same shape full_name is stored in.
 _NAME_CANDIDATE = re.compile(r"\b([A-Z][a-zA-Z'-]+(?:\s+[A-Z][a-zA-Z'-]+)+)\b")
 # Sentence-initial question words are also capitalized ("Is Siti Nurhaliza...", "Has Ahmad...") and
 # would otherwise be swept into the name itself - stripped from a candidate's leading position.
@@ -253,18 +250,12 @@ def ask():
 
     # --- Step 3: classify the question ----------------------------------------------------------
     # LLM classification, with the recent turns supplied so a bare follow-up ("is it active") is
-    # resolved against what was actually being discussed. Replaces the old regex router (see
-    # ai/classifier.py's docstring for why); named_role/how_to_topic remain lookups against known
-    # fixed sets rather than model guesses.
+    # resolved against what was actually being discussed.
     step_started_at = time.perf_counter()
     try:
         classes = classifier.classify(question, history)
     except classifier.ClassificationUnavailable as exc:
-        # The classifier could not RUN (rate limit, network). That is an outage, not a verdict on
-        # the question, and the two used to be indistinguishable here: an empty class set fell
-        # through to step 6 and told the asker their question was outside what the assistant covers
-        # - while also filing it in the AI access log as an unsupported capability gap, which is the
-        # row an admin reads to decide what to build. Say what is actually true and log nothing.
+        # The classifier could not RUN (rate limit, network).
         log.warning("ai.ask.classifier_unavailable", extra={"error": str(exc)})
         return jsonify({
             "answer": (
@@ -284,10 +275,7 @@ def ask():
 
     # --- Step 4: PRIVACY scope - whose data is this? --------------------------------------------
     # Checked BEFORE the page gate, deliberately. Page access answers "may you reach this topic"; it
-    # does not answer "is this data yours". A self-scoped topic asked about someone else can never
-    # be satisfied by any grant, so citing page permissions would misdescribe the reason - and
-    # running the page check first strips the self-scoped class before this can see it, which
-    # produced exactly that wrong message.
+    # does not answer "is this data yours".
     step_started_at = time.perf_counter()
     third_party = subject_scope.third_party_subject(
         question,
@@ -307,10 +295,7 @@ def ask():
         log.info("ai.ask.third_party_refused", extra={"subject": third_party, "classes": sorted(self_scoped_hit)})
 
     # --- Step 5: PAGE VISIBILITY - may this caller ask about these topics at all? ---------------
-    # The single topic-level authorization gate (ai/topic_access.py), unchanged by this refactor. A
-    # denied topic is DROPPED rather than failing the whole request, so a question spanning an
-    # allowed and a denied topic still answers the part they may see, with the denial note telling
-    # the model to say plainly what it cannot cover.
+    # The single topic-level authorization gate (ai/topic_access.py), unchanged by this refactor.
     denied = topic_access.denied_topics(principal, classes)
     if denied:
         topic_access.log_denials(principal, denied, question)
@@ -339,13 +324,7 @@ def ask():
 
     # --- Step 7: KNOWLEDGE-BASE path ------------------------------------------------------------
     # Static/narrative topics, answered from knowledge_base.py's curated text - never Text-to-SQL,
-    # never vector search. There are no rows behind "how do I submit a proposal" or "what can my
-    # role do", and reconstructing a procedure from the schema every request would be slower and
-    # less reliable than the hand-written text that already exists.
-    #
-    # Also handles `not classes and (denied or privacy_document)` - every topic was refused, so
-    # there is nothing to query and no reason to run the SQL pipeline; the answer comes from the
-    # refusal note itself.
+    # never vector search.
     kb_classes = classes & classifier.KNOWLEDGE_BASE_CLASSES
     data_classes = classes & classifier.DATA_CLASSES
     if (not classes and (denied or privacy_document)) or (kb_classes and not data_classes):
@@ -361,28 +340,23 @@ def ask():
             kb_chunks.append(self_capability_document(principal.assignments if principal else ()))
         if "greeting" in classes:
             # A bare "hey"/"hi" deserves a short, casual reply, not the full enumerated capability
-            # list below - greeting_hint_document() only tells the model whether it's safe to
-            # casually mention clubs and/or events (or, having neither, to offer help with the
-            # app/account instead), computed live from the same page grants so it can never offer
-            # a topic the asker would then be refused.
+            # list below - greeting_hint_document() only tells the model whether it's safe to casually
+            # mention clubs and/or events (or, having neither, to offer help with the app/account
+            # instead), computed live from the same page grants so it can never offer a topic the
+            # asker would then be refused.
             kb_chunks.append(topic_access.greeting_hint_document(principal))
         if "askable" in classes:
             # "What can I ask about" gets the complete, exhaustive list - built live from this
-            # caller's page grants (the same nav_page_grants check that gates every other answer),
-            # so it can never offer a topic the assistant would immediately refuse. Deliberately
-            # not gated itself - asking what you may ask is always allowed, and the answer is
-            # already limited to what the caller passes.
+            # caller's page grants (the same nav_page_grants check that gates every other answer), so
+            # it can never offer a topic the assistant would immediately refuse.
             kb_chunks.append(topic_access.askable_topics_document(principal))
         if "role_capability" in classes and role:
             kb_chunks.append(role_capability_document(role))
         if "system_capability" in classes:
             kb_chunks.append(SYSTEM_CAPABILITY)
         if "how_to" in classes:
-            # Three-way, because a how-to is gated on the page its ACTION happens on:
-            #   no resolvable guide -> a general "how does this work" question, answered from the
-            #       system overview. Never gated: it names no action and exposes no one's data.
-            #   guide + page access -> the steps, plus a navigation card to that page.
-            #   guide, no page access -> refuse THIS guide only; other kb_chunks still answer.
+            # Three-way, because a how-to is gated on the page its ACTION happens on: no resolvable
+            # guide -> a general "how does this work" question, answered from the system overview.
             topic = classifier.how_to_topic(question)
             if topic is None:
                 kb_chunks.append(SYSTEM_CAPABILITY)
@@ -417,22 +391,8 @@ def ask():
         return jsonify({"answer": answer, **_EMPTY_PAYLOAD, "navigation": navigation_cards})
 
     # --- Step 7b: RECOMMENDATION questions ------------------------------------------------------
-    # "What fits me" is a preference question, and the assistant does not know the asker's
-    # preferences - nobody has told it. Answering it by listing rows is what produced the reply
-    # that motivated this: five events, no reason, no question, identical for every asker.
-    #
-    # The "ask" and "clarify" stages return WITHOUT querying at all: there is nothing to look up
-    # yet, because the thing that decides what to look up has not been established. Running the SQL
-    # pipeline first and then asking a question would waste two model calls to produce a reply that
-    # never uses their result.
-    # --- Step 7a: an antecedent-free fragment that could mean either domain ---------------------
-    # Same principle as the recommendation "clarify" stage below, applied to plain lookups: a
-    # question with no conversation behind it that lands in BOTH clubs and events, naming neither,
-    # has not actually been asked yet. Querying it anyway produced "which one got nobody" ->
-    # "I don't have access to information about event attendance or registration counts" - false
-    # twice, since counts are public and the asker was never told which domain was assumed. Returns
-    # WITHOUT querying, for the same reason the stages below do: there is nothing to look up until
-    # the thing that decides what to look up exists.
+    # "What fits me" is a preference question, and the assistant does not know the asker's preferences
+    # - nobody has told it.
     if recommendation.domain_ambiguous(question, history, data_classes):
         step_started_at = time.perf_counter()
         answer = generate_sql_answer(
@@ -483,8 +443,7 @@ def ask():
 
     # --- Steps 8-14: TEXT-TO-SQL path -----------------------------------------------------------
     # Row scope -> schema -> generate -> guard -> execute -> bounded recovery, all inside
-    # ai/text_to_sql.py. `data_classes` has already been through the privacy and page gates, so
-    # every topic here is one the caller may reach; the pipeline narrows from there to which ROWS.
+    # ai/text_to_sql.py.
     step_started_at = time.perf_counter()
     outcome = text_to_sql.run(
         question, principal, data_classes, history,
@@ -506,9 +465,7 @@ def ask():
     if privacy_document:
         extra_chunks.append(privacy_document)
     # A recommendation that reached here is stage "recommend": they have already told us what they
-    # like (or named the domain), so there is something real to ground a suggestion in. The stage
-    # line and their history both go to the model, which is what lets it give a REASON per item
-    # instead of listing whatever the query returned.
+    # like (or named the domain), so there is something real to ground a suggestion in.
     if recommendation_stage == "recommend" and recommendation.is_recommendation(question):
         extra_chunks.append(
             f"RECOMMENDATION STAGE: recommend. Name at most {recommendation.MAX_SUGGESTIONS} "
@@ -562,21 +519,13 @@ def ask():
 
     # --- Step 19: cards for the events/clubs the answer actually NAMES --------------------------
     # A suggestion is only useful if you can act on it, and a card is what makes it clickable: an
-    # event card opens the details popup with its Register button, a club card lands on Discover
-    # Clubs with that club's join dialog already open. Without these the assistant answers a
-    # "suggest something for me" question with a wall of text and no way to act on it, which is
-    # what it was doing after the vector retrieval that used to build them was removed.
-    #
-    # Matched on the ANSWER, not the query result: the model was given nine events and named three,
-    # and carding all nine would put six cards under a reply that never mentioned them. See
-    # ai/cards.py for the relevance rule and the visibility re-check.
+    # event card opens the details popup with its Register button, a club card lands on Discover Clubs
+    # with that club's join dialog already open.
     event_cards, club_cards = cards.build(answer, data_classes, user_id=user_id)
 
-    # A "take me there" card for the topic's own page, but only when there is no entity card
-    # already: "where can I find my registrations" is a LOCATION question that classifies as data
+    # A "take me there" card for the topic's own page, but only when there is no entity card already:
+    # "where can I find my registrations" is a LOCATION question that classifies as data
     # (my_registrations), resolves no how-to guide, and so used to get prose and nothing to click.
-    # Suppressed when entity cards exist, because those are the better destination - a card for the
-    # actual event beats a card for the page that lists it.
     navigation_cards = (
         [] if (event_cards or club_cards) else topic_access.topic_cards(principal, data_classes)
     )

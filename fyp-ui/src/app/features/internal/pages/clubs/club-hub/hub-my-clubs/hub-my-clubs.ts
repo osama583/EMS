@@ -130,9 +130,9 @@ export class HubMyClubsComponent {
   openCategoryPicker(club: ClubRecord): void { this.categoryPickerClub.set(club); }
   closeCategoryPicker(): void { this.categoryPickerClub.set(null); }
   // Merge only `categories` in — the PATCH /clubs/:id/categories response is a plain ClubRecord
-  // without the viewer* flags (those are only computed by GET /clubs's viewerUserId projection),
-  // so replacing the whole record would wipe viewerIsMember/viewerIsPresident and silently drop
-  // the club out of myClubs().
+  // without the viewer* flags (those are only computed by GET /clubs's viewerUserId projection), so
+  // replacing the whole record would wipe viewerIsMember/viewerIsPresident and silently drop the club
+  // out of myClubs().
   onCategoriesSaved(updated: ClubRecord): void {
     this.clubs.update((clubs) => clubs.map((item) => item.id === updated.id ? { ...item, categories: updated.categories } : item));
     this.categoryPickerClub.set(null);

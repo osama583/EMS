@@ -1,11 +1,8 @@
 import { ChangeDetectionStrategy, Component, ElementRef, afterRenderEffect, input, viewChild } from '@angular/core';
 import { ConversationMessage } from '../../../core/proposals/proposal-conversation.models';
 
-// Pure, WhatsApp-style rendering of one conversation's messages - no fetching, no state beyond
-// its inputs. Reused by ReviewerCommentsDrawerComponent (applicant side, once a conversation is
-// selected) and the reviewer/department inline comment cards (authority side, which only ever
-// gets their own single thread back from the server) - one bubble-rendering implementation
-// instead of duplicating this CSS/logic across every place that shows a comment thread.
+// Pure, WhatsApp-style rendering of one conversation's messages - no fetching, no state beyond its
+// inputs.
 @Component({
   selector: 'app-conversation-thread',
   template: `
@@ -36,9 +33,8 @@ export class ConversationThreadComponent {
 
   constructor() {
     // The thread renders inside a fixed-height box now (see reviewer-comments-drawer.scss), so a
-    // conversation longer than that box scrolls instead of stretching it - which leaves the
-    // newest message below the fold on open. Land on it the way every chat client does, on first
-    // render and whenever the message list changes.
+    // conversation longer than that box scrolls instead of stretching it - which leaves the newest
+    // message below the fold on open.
     afterRenderEffect(() => {
       this.messages();
       const el = this.list()?.nativeElement;

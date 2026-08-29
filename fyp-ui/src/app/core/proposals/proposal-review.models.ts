@@ -39,15 +39,9 @@ export interface FmbSelection {
   readonly managerComment: string;
 }
 
-// Fields on this interface fall into two groups:
-//   - ALWAYS present: sent by both GET /proposals (list rows) and GET /proposals/{id} (full
-//     detail) — see proposals.py service's project_list_item() vs project().
-//   - OPTIONAL (`?`): sent ONLY by the single-item GET /proposals/{id} detail fetch. The four
-//     list pages (Inbox/Ongoing/History via hub-proposals.ts, Drafts via records-page.ts) only
-//     ever render the always-present fields, so list rows omit the rest — bank details, agenda,
-//     discussions, event image, co-owners, and so on — rather than shipping a full proposal's
-//     worth of data for every row of a paginated table. Do not read an optional field from a
-//     ProposalReviewRecord that came from a list endpoint; fetch GET /proposals/{id} first.
+// Fields on this interface fall into two groups: - ALWAYS present: sent by both GET /proposals (list
+// rows) and GET /proposals/{id} (full detail) — see proposals.py service's project_list_item() vs
+// project().
 export interface ProposalReviewRecord {
   readonly id: number;
   readonly proposalId: string;
@@ -57,11 +51,9 @@ export interface ProposalReviewRecord {
   readonly schedule: string;
   readonly totalPax: number;
   readonly status: string;
-  // Server-computed, present only on GET /proposals list responses (not single-item reads):
-  // which of the four list pages this proposal belongs to for the CALLER specifically, and the
-  // human-readable label those pages show as the status badge. See proposals.py's _BUCKET_SQL /
-  // _STATUS_LABEL_SQL — replaces the client-side proposalSectionForUser()/displayStatus() that
-  // used to compute both from the full unbucketed list.
+  // Server-computed, present only on GET /proposals list responses (not single-item reads): which of
+  // the four list pages this proposal belongs to for the CALLER specifically, and the human-readable
+  // label those pages show as the status badge.
   readonly bucket?: 'inbox' | 'ongoing' | 'history' | 'drafts';
   readonly statusLabel?: string;
   // List rows DO include these two: records-page.ts's Drafts table reads shortIntroduction (the
@@ -74,10 +66,8 @@ export interface ProposalReviewRecord {
   readonly goals?: string;
   readonly benefits?: string;
   readonly requests?: readonly ProposalDepartmentRequest[];
-  // Structured (non-flattened) per-requirement rows — mirrors what event-proposal.ts's own
-  // requestRows form state holds (date/start/end/withLogo/etc. as individual fields, plus each
-  // option-picker field encoded as `${kind}:${option_id}`). `requests` above is a display-only
-  // projection with pre-joined strings and is NOT sufficient to repopulate the editable form.
+  // Structured (non-flattened) per-requirement rows — mirrors what event-proposal.ts's own requestRows
+  // form state holds (date/start/end/withLogo/etc.
   readonly requestRows?: Partial<Record<ProposalDepartmentKey, readonly EditableRow[]>>;
 
   // Full submission fields — everything the applicant filled out on the event-proposal form,
@@ -92,10 +82,7 @@ export interface ProposalReviewRecord {
   readonly scheduleRows?: readonly EditableRow[];
   readonly eventImage?: EventImageAsset | null;
   readonly eventVisibility?: EventVisibility;
-  // The clubs a 'Club Only' event is addressed to. Ids re-populate the proposal
-  // form's picker when a saved proposal is reopened; names are the frozen labels
-  // (request_clubs.club_name) that read-only views render. Both empty on every
-  // other visibility tier.
+  // The clubs a 'Club Only' event is addressed to.
   readonly eventClubs?: readonly string[];
   readonly eventClubNames?: readonly string[];
   readonly eventCategories?: readonly string[];

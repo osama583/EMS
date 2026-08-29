@@ -112,22 +112,6 @@ HOW_TO_GUIDES: dict[str, str] = {
 # The PAGE each how-to's action actually happens on - the machine-readable half of the prose above
 # ("open Forms > Proposal" -> "proposal-form"), and the thing that makes a how-to answer subject to
 # Page Visibility like every other answer.
-#
-# Why this exists: `how_to` used to be UNGATED (absent from topic_access.TOPIC_PAGES), so the only
-# thing standing between a caller and a set of instructions was the router. But "how do I join a
-# club" also classifies as {clubs, clubs_mine}, which ARE gated - so an ungranted caller got their
-# club topics denied, two rows written to ai_access_denial, and a degraded answer, for a question
-# that never asked for club data. The guide is now gated on its OWN page instead, and the router
-# stops emitting the incidental data classes (see query_router.classify's how-to suppression).
-#
-# SINGLE-PAGE TUPLES ARE DELIBERATE. TOPIC_PAGES uses ANY-of lists because a topic legitimately
-# spans several pages; a how-to describes ONE action on ONE page. An ANY-of list here would let an
-# unrelated grant unlock instructions for a page the caller cannot actually open - exactly the gap
-# this closes. The tuple type is kept only for shape-consistency with TOPIC_PAGES.
-#
-# `created-by-me` is deliberately NOT used for cancel_proposal even though that guide's prose says
-# "or your organiser view": seed/nav.py never creates that page, so has_page_access fails closed on
-# it forever. A page_code that can never pass is invisible dead weight a future reader would trust.
 HOW_TO_PAGES: dict[str, tuple[str, ...]] = {
     "submit_proposal": ("proposal-form",),
     "join_club": ("clubs-discover",),
@@ -153,34 +137,7 @@ HOW_TO_LABEL: dict[str, str] = {
 
 # --- self_capability: per-role facts, unioned per caller -----------------------
 
-# One entry per role_code: (capability text, backing page_code). EVERY line carries a real
-# page_code, checked LIVE against nav_page_grants (see self_capability_document) before it is ever
-# shown - so a capability whose page an admin revoked in /app/admin/page-visibility disappears from
-# the answer immediately, and a capability the role never had cannot be asserted at all.
-#
-# Rewritten because the previous version allowed page_code=None for "stable" lines, and those 12
-# ungated lines were the ones that went wrong - they printed unconditionally, so the assistant
-# stated things that were simply false for the account asking:
-#   - Cafeteria Manager was told "cannot submit an event proposal", while that account actually
-#     reaches my-requests/inbox/ongoing/history and can discuss proposals throughout.
-#   - Staff was told "submit an event proposal"; staff has NO proposal-form grant at all.
-#   - Club Admin and Cafeteria Admin were both told "browse and register for events"; neither holds
-#     explore-events.
-# Verified against the live grant table rather than written from memory, then re-checked per role
-# by the accuracy test below (see tests/test_role_capabilities.py).
-#
-# TABS matter as much as pages. Several capabilities live in a TAB of a shared page, not on a page
-# of their own, so the backing page_code is the page that actually hosts the tab:
-#   - Club join requests and their outcomes are NOT under clubs-my; the club tabs were folded into
-#     the shared Ongoing/History pages (see app.routes.ts: clubs/pending -> ongoing/clubs,
-#     clubs/history -> history/clubs), so those lines hang off `ongoing`/`history`.
-#   - My Events is one page with Saved/Pending/Registered/History tabs, all under `my-events`.
-#   - Drafts is its own grant (`drafts`), separate from submitting (`proposal-form`) - a role can
-#     hold one without the other, and staff does exactly that.
-#
-# NEGATIVE claims ("cannot X") are deliberately gone. They were the least reliable lines - a
-# statement about the absence of a grant goes stale the moment an admin adds it, and it is never
-# needed: a capability that is not listed is not claimed, which already says it.
+# One entry per role_code: (capability text, backing page_code).
 _ROLE_CAPABILITIES: dict[str, list[tuple[str, str]]] = {
     "student": [
         ("submit an event proposal", "proposal-form"),
@@ -296,14 +253,8 @@ _ROLE_CAPABILITIES: dict[str, list[tuple[str, str]]] = {
     ],
 }
 
-# Roles actually granted "My Requests" (Inbox/Ongoing/History/Drafts) and Forms>Proposal in the
-# nav catalogue - see seed/nav.py's ALL_UNIT_ROLES/cafeteria_manager_grant(). A Cafeteria Manager
-# gets Inbox/Ongoing/History (for order review) but never Drafts/Forms - they review, they don't
-# submit - so they are in the request-tracking set but not the submit set. Kept here, next to
-# _ROLE_CAPABILITIES, as the one place this nav fact is hand-encoded for the AI layer; ai.py's
-# proposals/event-organiser retrieval gates on these instead of running a live "0 rows" query for
-# a role that was never going to have any rows, which used to read to the asker as "you have zero
-# proposals right now" when the true fact is "this feature isn't part of your account at all".
+# Roles actually granted "My Requests" (Inbox/Ongoing/History/Drafts) and Forms>Proposal in the nav
+# catalogue - see seed/nav.py's ALL_UNIT_ROLES/cafeteria_manager_grant().
 ROLES_CAN_SUBMIT_PROPOSALS = frozenset({"head-of-school", "head-of-department", "lecturer", "staff", "student"})
 ROLES_CAN_TRACK_REQUESTS = ROLES_CAN_SUBMIT_PROPOSALS | {"cfo", "cafeteria-manager"}
 

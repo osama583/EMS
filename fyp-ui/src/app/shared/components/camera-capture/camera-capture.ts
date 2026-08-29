@@ -3,12 +3,10 @@ import { EVENT_IMAGE_UPLOAD_API, EventImageUploadApi } from '../../../core/event
 import { EventImageAsset } from '../../../core/events/published-event.models';
 import { ValidationMessageComponent } from '../validation-message/validation-message';
 
-// Delivery proof must be a photo taken right now of the actual order, not any
-// image already sitting in the device's gallery - a plain <input type="file">
-// (even with capture="environment") only *suggests* the camera on some mobile
-// browsers and falls back to a full file picker everywhere else (all
-// desktops). Talking to getUserMedia directly and rendering the live stream
-// in-page is the only way to force "camera, not picker" consistently.
+// Delivery proof must be a photo taken right now of the actual order, not any image already sitting in
+// the device's gallery - a plain <input type="file"> (even with capture="environment") only *suggests*
+// the camera on some mobile browsers and falls back to a full file picker everywhere else (all
+// desktops).
 @Component({
   selector: 'app-camera-capture',
   imports: [ValidationMessageComponent],

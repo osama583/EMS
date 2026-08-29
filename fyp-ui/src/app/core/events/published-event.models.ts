@@ -2,11 +2,8 @@
 // excluded from the guest-facing landing page/discovery surface — see events.py's
 // _published_clause()/_INTERNAL_VISIBLE. 'Private' is never surfaced on any discovery endpoint.
 export type EventVisibility = 'Public' | 'Private' | 'Club Only' | 'Internal';
-// 'Automatic' | 'Manual' are the backend's REGISTRATION_MODES (proposals.py) — published-event
-// reads (events.py's registrationMode column) only ever send these two. 'Approval Required' is
-// the proposal FORM's own UI label for 'Manual' (event-proposal.ts bridges the two on submit/load);
-// it is never present on a published event, so published-event call sites must compare against
-// 'Manual', not 'Approval Required'.
+// 'Automatic' | 'Manual' are the backend's REGISTRATION_MODES (proposals.py) — published-event reads
+// (events.py's registrationMode column) only ever send these two.
 export type RegistrationMode = 'Automatic' | 'Manual' | 'Approval Required';
 export type RegistrationStatus = 'confirmed' | 'pending' | 'duplicate' | 'rejected';
 
@@ -125,10 +122,9 @@ export interface EventSearchParams {
   readonly excludeRegistered?: boolean;
   readonly page?: number;
   readonly pageSize?: number;
-  // Skips building/decorating `items` server-side entirely (schedule/categories/audience
-  // sub-queries, event image, bank details, ...) and returns only `total` — for callers that
-  // just want a result count (the filter dialog's live "N events match" preview), not a page of
-  // full event records. See events.py's search_events().
+  // Skips building/decorating `items` server-side entirely (schedule/categories/audience sub-queries,
+  // event image, bank details, ...) and returns only `total` — for callers that just want a result
+  // count (the filter dialog's live "N events match" preview), not a page of full event records.
   readonly countOnly?: boolean;
 }
 

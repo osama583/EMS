@@ -30,10 +30,8 @@ export function defaultListViewMode(): ListViewMode {
 }
 
 // The ONE card/table switch used by every list in the app (system specification §8A: "If any page
-// offers switching between card and table view, all pages that display lists must implement the
-// same toggle with identical design"). The Clubs pages previously each carried their own copy of
-// this markup + SCSS while the shared data-page tables had no toggle at all; both now render this
-// component, so the control looks and behaves identically everywhere.
+// offers switching between card and table view, all pages that display lists must implement the same
+// toggle with identical design").
 @Component({
   selector: 'app-view-toggle',
   template: `

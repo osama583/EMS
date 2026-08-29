@@ -6,7 +6,7 @@
 // one-line change rather than a search across fourteen components.
 //
 // The categorical ramp was validated, not eyeballed, against a white surface
-// (docs/dashboards/03 § 6): all eight sit inside the L 0.43–0.77 band, clear a
+// All eight sit inside the L 0.43–0.77 band, clear a
 // 0.1 chroma floor, and the worst adjacent pair holds ΔE 9.1 under protanopia.
 // Slots 3, 4 and 5 fall under 3:1 contrast on white, which is an obligation
 // rather than a dismissal: every panel ships a table view, and any panel using
@@ -75,7 +75,7 @@
   --viz-deemphasis: var(--apu-blue-200);
 
   // --- Geometry ---------------------------------------------------------
-  // Mark specs from docs/dashboards/03 § 5, declared once so a column in one
+  // Mark specs declared once so a column in one
   // panel is the same weight as a column in another.
   --viz-stroke: 2px;
   --viz-marker: 8px;

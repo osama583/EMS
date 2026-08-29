@@ -1,4 +1,0 @@
-[
-{"id":"R4-39","as":"guest","q":"what events can i see?","intent":"guest/external tier scope","expect":"Public + Club Only only; no Internal/Private"},
-{"id":"R4-40","as":"student.computing@demo.apu.edu.my","q":"whats the weather tomorrow and which event has most ppl","intent":"mixed out-of-scope + in-scope in ONE message","expect":"refuse weather, answer the event part"}
-]

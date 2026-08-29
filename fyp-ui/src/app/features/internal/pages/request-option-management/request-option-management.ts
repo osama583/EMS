@@ -44,10 +44,7 @@ const KIND_LABELS: Readonly<Record<RequestOptionKind, string>> = {
   venue: 'Venue Management',
 };
 
-// Catalogues the owner puts in a deliberate order rather than reading
-// alphabetically. The order set here is the order the venue appears in every
-// dropdown in the system, so the page offers move-up/move-down instead of
-// asking anyone to type a sort number.
+// Catalogues the owner puts in a deliberate order rather than reading alphabetically.
 const ORDERED_KINDS: readonly RequestOptionKind[] = ['venue'];
 
 import { ImageUploadFieldComponent } from '../../../../shared/components/image-upload-field/image-upload-field';
@@ -140,10 +137,9 @@ export class RequestOptionManagementComponent {
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.filteredOptions().length / this.pageSize())));
   readonly visibleOptions = computed(() => this.filteredOptions().slice((this.page() - 1) * this.pageSize(), this.page() * this.pageSize()));
   readonly showCardToggle = computed(() => ['fmb', 'logistics', 'transportation'].includes(this.selectedKind()));
-  // Move up / move down are offered only when the rows on screen ARE the
-  // catalogue, in the catalogue's order: with a search or a status filter
-  // applied, "up" would mean past rows the CFO cannot currently see, and the
-  // result would look like the list reordered itself.
+  // Move up / move down are offered only when the rows on screen ARE the catalogue, in the catalogue's
+  // order: with a search or a status filter applied, "up" would mean past rows the CFO cannot
+  // currently see, and the result would look like the list reordered itself.
   readonly reorderable = computed(() =>
     ORDERED_KINDS.includes(this.selectedKind())
     && !this.search().trim()
@@ -323,11 +319,9 @@ export class RequestOptionManagementComponent {
   }
 
   // ---------------------------------------------------------------------------
-  // Deleted view
-  // ---------------------------------------------------------------------------
-  // Options | Deleted is a PAGE-level section switch, so it renders as the shared tab strip above
-  // the page title (same treatment as Users/Assignments/Deleted on the Admin Directory) rather
-  // than as a button in the header row. Tabs set the section directly instead of flipping it.
+  // Deleted view Options | Deleted is a PAGE-level section switch, so it renders as the shared tab
+  // strip above the page title (same treatment as Users/Assignments/Deleted on the Admin Directory)
+  // rather than as a button in the header row.
   setDeletedTab(deleted: boolean): void {
     if (this.showDeleted() === deleted) return;
     this.showDeleted.set(deleted);

@@ -66,12 +66,8 @@ export class InternalDataPageComponent {
   readonly cellClick = output<InternalCellClickEvent>();
   readonly sortChange = output<InternalSortChange>();
 
-  // Which view the reader is in. Opens on the viewport-appropriate default -
-  // cards on a phone, table on a desktop (defaultListViewMode) - and stays
-  // wherever they put it after that. The comment this replaces said narrow
-  // viewports "always render cards regardless"; they no longer do, since the
-  // toggle became authoritative at every width, which is exactly why the
-  // default has to know how wide the screen is.
+  // Which view the reader is in. Opens on the viewport-appropriate default - cards on a phone, table
+  // on a desktop (defaultListViewMode) - and stays wherever they put it after that.
   readonly viewMode = signal<ListViewMode>(defaultListViewMode());
   setViewMode(mode: ListViewMode): void { this.viewMode.set(mode); }
 

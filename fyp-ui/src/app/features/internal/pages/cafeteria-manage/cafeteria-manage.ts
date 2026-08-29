@@ -17,13 +17,10 @@ import { ToastService, apiErrorMessage } from '../../../../shared/components/toa
 
 type CafeteriaManageTab = 'active' | 'deleted';
 
-// Cafeteria Admin's own CRUD screen for cafeteria units — a Cafeteria is a `unit` row under the
-// hood (CAFETERIA_UNIT_PREFIX-coded, see server/services/unit-code.js), so this is intentionally
-// the exact same shape as the System Admin Units page, just scoped to CafeteriaService's
-// dedicated /api/cafeterias endpoints instead of every unit in the system. Deleted tab follows
-// the same 7-day soft-delete/restore/purge lifecycle as every other Admin Settings entity.
-// The deleted-items table names its first column differently per page (identity / name / label),
-// so the confirmation reads whichever cell actually carries the record's display name.
+// Cafeteria Admin's own CRUD screen for cafeteria units — a Cafeteria is a `unit` row under the hood
+// (CAFETERIA_UNIT_PREFIX-coded, see server/services/unit-code.js), so this is intentionally the exact
+// same shape as the System Admin Units page, just scoped to CafeteriaService's dedicated
+// /api/cafeterias endpoints instead of every unit in the system.
 function restoreLabelFor(record: InternalDataRecord): string {
   const named = Object.values(record.cells).find((cell) => !!cell?.primary);
   return named?.primary ? String(named.primary) : String(record.id);

@@ -70,10 +70,7 @@ export class CafeteriaService {
   purge(code: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/${encodeURIComponent(code)}/purge`).pipe(tap(() => this.refresh()));
   }
-  // What this posting's holder has actually done at this outlet — orders claimed, tasks
-  // assigned. A staff/manager assignment has no FK children of its own (the schema treats it as
-  // a leaf), but that misses the point: the PERSON does real work while holding it, and removing
-  // the posting used to walk away from that work with no check at all.
+  // What this posting's holder has actually done at this outlet — orders claimed, tasks assigned.
   checkAssignmentDeletion(assignmentId: string): Observable<DeletionPreview> {
     return this.http.get<DeletionPreview>(`${this.baseUrl}/assignments/${encodeURIComponent(assignmentId)}/deletion-check`);
   }
@@ -84,9 +81,7 @@ export class CafeteriaService {
   }
 
   // Server-side searched/filtered/paginated — GET /catalog/cafeterias/assignments with
-  // ?page/?pageSize, the same query params search()/staffAuditLog() above send. Only Staff
-  // Assignments uses this; every other caller of getAssignments()/assignments$ (the manager
-  // conflict check, other pickers) wants the full role-scoped list and is unaffected.
+  // ?page/?pageSize, the same query params search()/staffAuditLog() above send.
   searchAssignments(params: CafeteriaAssignmentQuery): Observable<Page<CafeteriaAssignment>> {
     let httpParams = new HttpParams().set('page', params.page).set('pageSize', params.pageSize);
     if (params.q) httpParams = httpParams.set('q', params.q);
@@ -126,9 +121,7 @@ export class CafeteriaService {
   }
 
   // Server-side searched/filtered/sorted/paginated audit trail of staff create/edit/suspend/
-  // restore/remove actions — GET /catalog/cafeterias/staff-requests-history. Nothing here is
-  // filtered or paginated client-side; the server already scopes rows to what the caller may see
-  // (Admin: every cafeteria; Manager: their own outlet only).
+  // restore/remove actions — GET /catalog/cafeterias/staff-requests-history.
   staffAuditLog(query: CafeteriaStaffAuditQuery): Observable<Page<CafeteriaStaffAuditEntry>> {
     let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
     if (query.q) params = params.set('q', query.q);

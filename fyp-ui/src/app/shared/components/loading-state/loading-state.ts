@@ -2,11 +2,8 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 export type LoadingStateVariant = 'spinner' | 'bars' | 'grid';
 
-// Single reusable loading indicator for anything that fetches data over the API and needs to
-// show the user something while it waits — full-page/detail views, popups/modals, and card
-// grids. Uses the shared shimmer/spin tokens and keyframes from _design-system.scss so every
-// loading state in the app looks and animates identically instead of each page hand-rolling
-// its own spinner or shimmer gradient.
+// Single reusable loading indicator for anything that fetches data over the API and needs to show the
+// user something while it waits — full-page/detail views, popups/modals, and card grids.
 @Component({
   selector: 'app-loading-state',
   template: `

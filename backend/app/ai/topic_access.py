@@ -76,17 +76,10 @@ TOPIC_PAGES: dict[str, tuple[str, ...]] = {
     "events": ("explore-events", "my-events"),
 }
 
-# Topics a signed-out GUEST may ask about even though they are gated for a
-# signed-in caller. A guest holds no assignments, so every grant check fails for
-# them by construction - without this, gating `events` at all would have silently
-# killed the public event browsing the landing page relies on.
+# Topics a signed-out GUEST may ask about even though they are gated for a signed-in caller.
 GUEST_OPEN_TOPICS: frozenset[str] = frozenset({"events"})
 
-# The how-to equivalent of GUEST_OPEN_TOPICS. Only registering for an event qualifies: guests can
-# genuinely register for a Public event with no account (see HOW_TO_GUIDES["register_event"] and
-# api/ai.py's module docstring on the public tier), so withholding those steps would refuse a guest
-# instructions for something they are actually allowed to do. Every other guide describes an action
-# behind a signed-in page.
+# The how-to equivalent of GUEST_OPEN_TOPICS.
 GUEST_OPEN_HOW_TO: frozenset[str] = frozenset({"register_event"})
 
 # Human-readable topic names for the denial message and the audit log, so a
@@ -100,22 +93,7 @@ TOPIC_LABEL: dict[str, str] = {
 }
 
 
-# What each topic means to the ASKER, for answering "what can I ask about?". Distinct from
-# TOPIC_LABEL above, which names a topic for a refusal message and an audit row ("system
-# administration"); this describes what you can actually ASK, with examples, because a bare noun
-# is a poor answer to "what can I ask" - "system administration" tells nobody they can ask how many
-# users exist.
-#
-# Deliberately keyed by TOPIC, not by role. The previous answer came from
-# knowledge_base.self_capability_document(), a hand-written per-ROLE list, and it had drifted in
-# both directions: it told a Cafeteria Manager they "cannot submit an event proposal" when that
-# account can in fact reach proposals_mine AND proposals_review, and it offered a System Admin a
-# broad capability list while the chat would actually refuse them events, clubs and proposals. A
-# topic's meaning is stable; which roles reach it is not - so only the meaning is written by hand,
-# and membership is always computed live from nav_page_grants.
-#
-# Several classes describe one thing to the asker (clubs/clubs_mine/clubs_admin are all "clubs"),
-# so duplicates here are expected and de-duplicated by askable_topics_document().
+# What each topic means to the ASKER, for answering "what can I ask about?".
 TOPIC_ASK_DESCRIPTION: dict[str, str] = {
     "events": "Published events - what's on, when and where, and finding one by topic",
     "my_registrations": "Your own event registrations and saved events",

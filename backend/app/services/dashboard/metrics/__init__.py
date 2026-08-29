@@ -1,6 +1,6 @@
 """The semantic layer: every number any dashboard can show, defined once.
 
-One module per metric family, matching docs/dashboards/02-metric-catalog.md:
+One module per metric family
 
     common    shared SQL vocabulary and the per-department table/column map
     flow      Family A - flow and throughput      (M01-M08)

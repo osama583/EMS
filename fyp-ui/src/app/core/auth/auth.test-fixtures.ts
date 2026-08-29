@@ -1,10 +1,7 @@
 import { AuthNavNode, AuthUser, AuthUserRole } from './auth.models';
 import { AuthTokens } from './token-store';
 
-// Shared AuthUser builder for specs. Before this existed every spec hand-wrote its own literal
-// against the PRE-RBAC-redesign shape (`role`, `functionLevel`, `unitId`, `unitKind`, the deleted
-// `UserRole` enum), so the whole test suite stopped compiling the moment identity became
-// `roles: AuthUserRole[]`. One builder means the next identity change touches one file.
+// Shared AuthUser builder for specs.
 
 export interface TestUserOptions {
   readonly email?: string;

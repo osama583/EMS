@@ -42,14 +42,8 @@ const SUGGESTION_CARD_PAGES: readonly (readonly SuggestionCard[])[] = Array.from
 
 function newMessageId(): string { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
 
-// A message's text is plain, un-marked-up prose from the model — never HTML — so it was rendered
-// as one flat <p> with newlines collapsed by the browser. The system prompt already tells the
-// model to put each list item on its own "-"-prefixed line (see gemini.py's FORMATTING section),
-// but that convention only shows up correctly if the template actually respects line breaks and
-// groups consecutive "-" lines into a real list, rather than displaying real newlines as spaces
-// and burying a count/listing in one run-on sentence. Parsed once per message here rather than
-// with a CSS white-space rule, since consecutive "-" lines need to become an actual <ul> (with a
-// visible bullet/row per item), not just a paragraph that happens to wrap.
+// A message's text is plain, un-marked-up prose from the model — never HTML — so it was rendered as
+// one flat <p> with newlines collapsed by the browser.
 export type AiMessageSegment =
   | { readonly kind: 'text'; readonly text: string }
   | { readonly kind: 'list'; readonly items: readonly string[] };
@@ -90,10 +84,7 @@ function segmentMessageText(text: string): readonly AiMessageSegment[] {
 }
 
 // Full-window mode has a real URL (/assistant) so it behaves like an actual page — refresh,
-// back/forward, and a bookmarkable link all work — rather than being a pure UI toggle. Kept as a
-// single TOP-LEVEL route (not also mirrored under /app) because /app's canActivateChild guard
-// (roleGuard) checks the URL against the caller's server-driven nav_page_grants, which has no
-// entry for a non-navigable utility route like this one and would bounce it to their default page.
+// back/forward, and a bookmarkable link all work — rather than being a pure UI toggle.
 function isAssistantUrl(url: string): boolean {
   return url.split(/[?#]/)[0] === '/assistant';
 }
@@ -149,10 +140,9 @@ export class AiAssistantComponent implements OnDestroy {
   // navigating away — see openEventFromCard().
   readonly selectedCardEvent = signal<PublishedEvent | null>(null);
 
-  // The active conversation drives everything the template renders — created
-  // lazily (see ensureConversationId()) so opening the panel for the first
-  // time never writes an empty conversation into localStorage. Not private:
-  // the full-page sidebar template highlights the active item in the list.
+  // The active conversation drives everything the template renders — created lazily (see
+  // ensureConversationId()) so opening the panel for the first time never writes an empty conversation
+  // into localStorage.
   readonly activeConversationId = signal<string | null>(this.store.activeId());
   readonly conversations = this.store.conversations;
   private readonly storedMessages = computed<readonly AiChatMessage[]>(() => {
@@ -178,19 +168,10 @@ export class AiAssistantComponent implements OnDestroy {
   private readonly pointerTracking: boolean;
   private readonly promptTimer?: ReturnType<typeof setInterval>;
   private askSubscription?: Subscription;
-  // The user message bubble for whatever ask() call is currently in flight, if any — set right
-  // before the HTTP call in send() and cleared on both success and error. Lets the identity-switch
-  // effect below recover a request it has to cancel (see that effect's own comment) instead of
-  // just silently dropping the user's message. Kept as the whole message object (not just its
-  // text) so recovery can carry the SAME bubble into the new conversation - moving it, rather
-  // than appending a second copy with a new id/timestamp, is what keeps the cancel-and-resend
-  // invisible in the UI: one bubble throughout, never two identical ones stacked.
+  // The user message bubble for whatever ask() call is currently in flight, if any — set right before
+  // the HTTP call in send() and cleared on both success and error.
   private pendingMessage: AiChatMessage | null = null;
   // True only while a recovered question (see above) is itself in flight after being re-sent.
-  // Guards against a SECOND identity-version bump landing while that resend is still pending:
-  // without this, the effect would read pendingQuestion again (the resend set it back), cancel
-  // the resend, and re-send it once more - repeating for every further bump instead of exactly
-  // once per original message.
   private recoveringQuestion = false;
   private hideTimer?: ReturnType<typeof setTimeout>;
   private restTimer?: ReturnType<typeof setTimeout>;
@@ -232,32 +213,11 @@ export class AiAssistantComponent implements OnDestroy {
     }
 
     // Resets to the new user's own (or the guest) conversation the instant AiConversationStore
-    // switches storage buckets (login/logout/account switch without a full reload) - without
-    // this, activeConversationId would keep pointing at an id from the PREVIOUS user's now-
-    // replaced conversation list, and the panel could keep rendering their messages (or, worse,
-    // silently start appending the new user's replies into what was the old user's thread id if
-    // it happened to collide). Skipped on the very first run (identityVersion starts at 0 and
-    // this effect fires once immediately) since activeConversationId is already correctly
-    // initialised from the store above.
-    //
-    // The cancel below is NOT optional: appendMessage() writes into whatever bucket is CURRENT
-    // when the response lands, keyed only by conversationId, so letting an in-flight ask() from
-    // the OLD bucket run to completion here would land the previous identity's question/answer
-    // inside the NEW identity's conversation list - a cross-account leak (most concretely: a
-    // guest's question appearing in the account they just logged into). So the in-flight request
-    // is always cancelled on a real switch. What it must NOT do is silently drop the message the
-    // user was actually waiting on - a login completing right as someone sends their first
-    // question was observed cancelling that request with nothing shown for it, and a naive
-    // "just resend the text" recovery was observed appending a SECOND, visibly duplicate bubble
-    // (the original send()'s bubble was still sitting in the OLD bucket's conversation, the
-    // resend's own bubble landed in the NEW one, and both rendered in the same view once the
-    // switch settled). Recovered by moving the SAME user bubble (see pendingMessage) into the
-    // NEW identity's conversation instead of appending a fresh copy - one bubble throughout, not
-    // two - once the switch has actually happened, rather than resending into the bucket that is
-    // about to be replaced. The original OLD-bucket conversation is left behind as an orphaned,
-    // unanswered stray question in that bucket's own history (never shown in THIS view, and only
-    // reachable by signing back into that same identity) - not ideal, but strictly a private,
-    // self-expiring (24h retention) leftover, not a user-visible duplicate.
+    // switches storage buckets (login/logout/account switch without a full reload) - without this,
+    // activeConversationId would keep pointing at an id from the PREVIOUS user's now- replaced
+    // conversation list, and the panel could keep rendering their messages (or, worse, silently start
+    // appending the new user's replies into what was the old user's thread id if it happened to
+    // collide).
     let firstIdentityRun = true;
     effect(() => {
       this.store.identityVersion();
@@ -272,13 +232,11 @@ export class AiAssistantComponent implements OnDestroy {
       this.error.set('');
       this.showHistory.set(false);
       this.activeConversationId.set(this.store.activeId());
-      // Deferred to a macrotask, outside this effect's own synchronous run: calling send()
-      // in-line here re-enters signal writes (typing/draft/pendingMessage) while Angular is
-      // still flushing THIS effect, which risks the effect being re-scheduled before the
-      // recovered request has a chance to complete - observed live as the same question being
-      // re-sent in a tight repeating burst instead of once. Zero-delay setTimeout is enough:
-      // it only needs to land after the current synchronous effect run (and this component's
-      // own signal writes above) has fully settled.
+      // Deferred to a macrotask, outside this effect's own synchronous run: calling send() in-line
+      // here re-enters signal writes (typing/draft/pendingMessage) while Angular is still flushing
+      // THIS effect, which risks the effect being re-scheduled before the recovered request has a
+      // chance to complete - observed live as the same question being re-sent in a tight repeating
+      // burst instead of once.
       if (recoveredMessage) {
         this.recoveringQuestion = true;
         setTimeout(() => this.send(recoveredMessage), 0);
@@ -333,11 +291,10 @@ export class AiAssistantComponent implements OnDestroy {
     this.showHistory.set(false);
     this.typing.set(false);
     this.askSubscription?.unsubscribe();
-    // The event-details popup opened from a suggestion card (see openEventFromCard()) is a sibling
-    // of the chat panel, not a child of it — closing the panel alone leaves it rendered and its
-    // page-scroll-lock held (see FormModalComponent.lockPage()) with no visible way back to it,
-    // since the chat surface that owned the card is now hidden. The page then reads as frozen:
-    // no scroll, and clicks land on an invisible locked backdrop. Always close it together with the panel.
+    // The event-details popup opened from a suggestion card (see openEventFromCard()) is a sibling of
+    // the chat panel, not a child of it — closing the panel alone leaves it rendered and its page-
+    // scroll-lock held (see FormModalComponent.lockPage()) with no visible way back to it, since the
+    // chat surface that owned the card is now hidden.
     this.selectedCardEvent.set(null);
     // Leaving full-page mode via the close button needs to actually navigate off /assistant —
     // otherwise the URL still says /assistant while the panel has collapsed to the floating widget.
@@ -353,11 +310,9 @@ export class AiAssistantComponent implements OnDestroy {
     }, this.reducedMotion ? 0 : REST_AFTER_CLOSE_MS);
   }
 
-  // Same body-scroll-lock convention explore-events.ts uses for its filter dialog
-  // (body.filters-open, see _explore-events.scss) — full-page mode takes over the whole
-  // viewport, so the page behind it must stop scrolling while it's open.
-  // Full-page mode is route-driven (see syncToRoute()) — navigating there/away is what flips
-  // `expanded`, keeping the URL and the panel's mode always in agreement.
+  // Same body-scroll-lock convention explore-events.ts uses for its filter dialog (body.filters-open,
+  // see _explore-events.scss) — full-page mode takes over the whole viewport, so the page behind it
+  // must stop scrolling while it's open.
   toggleExpanded(): void {
     if (this.expanded()) {
       void this.router.navigateByUrl(this.pageBeforeAssistant());
@@ -430,9 +385,9 @@ export class AiAssistantComponent implements OnDestroy {
 
   composerKeydown(event: KeyboardEvent): void { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.send(); } }
   // `recovered`, when passed, is an already-visible user bubble from a request the identity-switch
-  // effect had to cancel (see that effect's own comment) - carried into the new conversation
-  // instead of appending a second copy, so the login-triggered cancel-and-resend never shows two
-  // identical bubbles in the UI. A normal user-initiated send always omits it and appends fresh.
+  // effect had to cancel (see that effect's own comment) - carried into the new conversation instead
+  // of appending a second copy, so the login-triggered cancel-and-resend never shows two identical
+  // bubbles in the UI.
   send(recovered?: AiChatMessage): void {
     const text = recovered ? recovered.text : this.draft().trim();
     if (!text || this.typing()) { if (!text) this.error.set('Enter a question before sending.'); return; }
@@ -477,21 +432,16 @@ export class AiAssistantComponent implements OnDestroy {
   isCardSource(source: AiAssistantSource): boolean { return !!source.eventImageUrl; }
   hasCardSources(sources: readonly AiAssistantSource[] | undefined): boolean { return !!sources?.some((source) => this.isCardSource(source)); }
 
-  // No single-club detail route/deep-link exists yet (unlike events' ?event= param on
-  // explore-events) — Club Discover is the closest existing page, opened the same way a
-  // no-modal-available card click behaves elsewhere in this component.
-  // A navigation card from a how-to answer. The server already checked Page Visibility before
-  // emitting the card (see topic_access.page_card), and routePath comes from nav_page itself, so
-  // this just navigates — re-deriving the route here would risk drifting from the real nav tree.
+  // No single-club detail route/deep-link exists yet (unlike events' ?event= param on explore-events)
+  // — Club Discover is the closest existing page, opened the same way a no-modal-available card click
+  // behaves elsewhere in this component.
   openPageFromCard(page: { routePath: string }): void {
     void this.router.navigateByUrl(page.routePath);
     this.closePanel();
   }
 
-  // Carries the club id through as `?club=<id>`, which Discover Clubs uses to open that club's
-  // join dialog on arrival (see ClubDiscoverComponent.openClubFromQueryParam). The id used to be
-  // discarded entirely - the card dropped you on the unfiltered list to find the club again
-  // yourself, which makes a suggestion card no more useful than a plain sentence.
+  // Carries the club id through as `?club=<id>`, which Discover Clubs uses to open that club's join
+  // dialog on arrival (see ClubDiscoverComponent.openClubFromQueryParam).
   openClubFromCard(clubId: string): void {
     const underApp = this.router.url.startsWith('/app');
     void this.router.navigate([underApp ? '/app/clubs/discover' : '/login'], {
@@ -499,10 +449,9 @@ export class AiAssistantComponent implements OnDestroy {
     });
     this.closePanel();
   }
-  // Same route/query shape hub-proposals.ts's own row click uses: readOnly is true for any
-  // bucket other than 'inbox' (the only bucket where the reviewer/applicant can actually act) —
-  // see that file's onRowClick(). A 'drafts' proposal instead opens the proposal form itself,
-  // matching records-page.ts's openDraft(), since drafts have no review page to read-only view.
+  // Same route/query shape hub-proposals.ts's own row click uses: readOnly is true for any bucket
+  // other than 'inbox' (the only bucket where the reviewer/applicant can actually act) — see that
+  // file's onRowClick().
   openProposalFromCard(proposal: AiAssistantProposal): void {
     const underApp = this.router.url.startsWith('/app');
     if (!underApp) { void this.router.navigate(['/login']); this.closePanel(); return; }
@@ -515,11 +464,11 @@ export class AiAssistantComponent implements OnDestroy {
     }
     this.closePanel();
   }
-  // Seed/demo event images are frequently an external placeholder URL (placehold.co) that a
-  // browser extension, ad-blocker, or offline network can fail to load — same risk EventCardComponent
-  // guards against for a MISSING image (see EVENT_IMAGE_PLACEHOLDER); this additionally covers a
-  // present-but-unreachable URL, swapping in the same local inline-SVG placeholder rather than
-  // leaving a blank broken-image box in the chat.
+  // Seed/demo event images are frequently an external placeholder URL (placehold.co) that a browser
+  // extension, ad-blocker, or offline network can fail to load — same risk EventCardComponent guards
+  // against for a MISSING image (see EVENT_IMAGE_PLACEHOLDER); this additionally covers a present-but-
+  // unreachable URL, swapping in the same local inline-SVG placeholder rather than leaving a blank
+  // broken-image box in the chat.
   onCardImageError(event: Event): void {
     const img = event.target as HTMLImageElement;
     if (img.src !== EVENT_IMAGE_PLACEHOLDER) img.src = EVENT_IMAGE_PLACEHOLDER;
@@ -638,14 +587,8 @@ export class AiAssistantComponent implements OnDestroy {
   private scrollMessages(): void { setTimeout(() => { const area = this.messageArea()?.nativeElement; if (area) area.scrollTop = area.scrollHeight; }, 0); }
 
   // --- Living-orb behavior --------------------------------------------
-  //
-  // The orb alternates visible <-> peeking indefinitely:
-  //   15s visible (first load) -> 50s peeking -> 10s visible -> 50s peeking -> ...
-  // Both scheduling methods take an explicit duration (no defaulted args) so the
-  // "how long to wait" and "which phase we're waiting to reach" are never conflated.
-  // `wake()` is the interruption path (user noticed it) — it always jumps to visible
-  // immediately and, if `restart`, re-arms the loop's normal 10s visible duration
-  // rather than resetting back to the one-time 15s initial window.
+  // The orb alternates visible <-> peeking indefinitely: 15s visible (first load) -> 50s peeking ->
+  // 10s visible -> 50s peeking -> ...
 
   private scheduleFlipToPeeking(afterMs: number): void {
     if (this.reducedMotion || this.idleSuspended) return;

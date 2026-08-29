@@ -23,11 +23,8 @@ NON_COMMITTED_STATUSES = ("cancelled", "completed_rejected", "draft")
 # Matches TASK_TERMINAL in services/workflow/constants.py.
 OPEN_TASK_SQL = "t.status NOT IN ('completed', 'cancelled')"
 
-# event_requirements carries a machine name and nothing else, so the human label
-# is mapped here rather than joined. Keeping it out of the schema means a label
-# change is a deploy, but it also means the eight names cannot drift apart
-# between the proposal form and the dashboard, which they would if both were
-# free to edit the same column.
+# event_requirements carries a machine name and nothing else, so the human label is mapped here rather
+# than joined.
 REQUIREMENT_LABELS = {
     "logistics": "Logistics",
     "transportation": "Transportation",
@@ -75,10 +72,8 @@ class DepartmentSpec:
         self.label_column = label_column
         self.option_table = option_table
         self.option_pk = option_pk
-        # Every detail table names its catalogue FK `option_id` except campus
-        # tours, which carry two (start point and tour type) and so had to name
-        # them. Widgets read this rather than assuming, because assuming is how
-        # one department's off-catalogue rate silently returns zero.
+        # Every detail table names its catalogue FK `option_id` except campus tours, which carry two
+        # (start point and tour type) and so had to name them.
         self.option_fk = option_fk
         self.start_column = start_column
         self.end_column = end_column

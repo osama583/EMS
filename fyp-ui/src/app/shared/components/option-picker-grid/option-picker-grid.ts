@@ -2,11 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, input, output, signal } f
 import { ExpandableSearchComponent } from '../expandable-search/expandable-search';
 import { OptionPickerItem } from './option-picker-grid.models';
 
-// Image-aware alternative to app-searchable-dropdown, used only where the option list has a
-// thumbnail worth showing (currently just Logistics' Item/Need field in the proposal form).
-// Kept separate from SearchableDropdownComponent — that component is used everywhere else in
-// the app (staff pickers, category pickers, every other select field) and its SelectOption type
-// has no image field, so growing it here would risk unrelated UI.
+// Image-aware alternative to app-searchable-dropdown, used only where the option list has a thumbnail
+// worth showing (currently just Logistics' Item/Need field in the proposal form).
 const SEARCH_THRESHOLD = 8;
 
 @Component({

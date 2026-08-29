@@ -1,7 +1,7 @@
 """Workflow vocabulary: statuses, routing tables, and tunable config lookups.
 
 Every value here mirrors ems_database_schema.sql's CHECK constraints and the
-corrected state machine in docs/superpowers/specs/2026-08-10-*-design.md §3.
+corrected state machine in
 Nothing is hardcoded that the `config` table owns - thresholds are read live so
 an admin change takes effect without a deploy.
 """
@@ -51,9 +51,8 @@ SEL_CANCELLED = "cancelled"
 SEL_TERMINAL = (SEL_FULFILLED, SEL_CANCELLED)
 
 # --- Department routing ---------------------------------------------------
-# chk_task_routing makes these mutually exclusive: a task carries EITHER an
-# assigned_unit_code (the five Service-department requirements) OR an
-# assigned_role (the two flat-routed ones), never both.
+# chk_task_routing makes these mutually exclusive: a task carries EITHER an assigned_unit_code (the
+# five Service-department requirements) OR an assigned_role (the two flat-routed ones), never both.
 UNIT_CODE_FOR_REQUIREMENT = {
     "logistics": "logistics_and_facilities",
     "transportation": "transport_services",
@@ -77,10 +76,6 @@ FMB_REQUIREMENT = "fmb"
 FMB_UNIT_CODE = "food_beverage_services"
 
 # The one child table + its primary key column each requirement's rows live in.
-# Shared by proposals.py (clearing/rewriting one requirement's rows on a scoped
-# resubmission) and tasks.py (row-level assignment, below) - one definition, so
-# the two can never drift into disagreeing about which table backs which
-# requirement name.
 TABLE_FOR_REQUIREMENT = {
     "logistics": ("request_logistics", "request_logistics_id"),
     "transportation": ("request_transportation", "request_transportation_id"),
@@ -92,18 +87,11 @@ TABLE_FOR_REQUIREMENT = {
     "fundingPurchase": ("request_funding_purchase", "request_funding_purchase_id"),
 }
 
-# The five requirements whose rows can be individually assigned to staff (see
-# request_row_assignment, migration 012). fmb/waterNormal go through F&B's
-# existing cafeteria shared-pool flow instead (request_fmb_selection) and
-# fundingPurchase is never routed for approval at all - see
-# NON_WORKFLOW_REQUIREMENTS above.
+# The five requirements whose rows can be individually assigned to staff (see request_row_assignment,
+# migration 012).
 ROW_ASSIGNABLE_REQUIREMENTS = frozenset({"logistics", "transportation", "photoVideo", "soundLight", "campusTour"})
 
 # How many staff a single row of this requirement may have assigned at once.
-# None means unlimited. Transportation is capped at 1: one row is one vehicle,
-# one vehicle needs exactly one driver - a second assignee on the same row
-# would just be wrong, not merely uncommon, the way it can legitimately be for
-# a big Logistics or Photography row.
 MAX_ASSIGNEES_PER_ROW: dict[str, int | None] = {
     "logistics": None,
     "transportation": 1,
@@ -114,12 +102,9 @@ MAX_ASSIGNEES_PER_ROW: dict[str, int | None] = {
 
 HEAD_ROLE_CODES = ("head-of-school", "head-of-department")
 
-# request.status (snake_case) -> the client's ProposalStage vocabulary
-# (kebab-case, and completed_approved/completed_rejected collapse to a single
-# 'approved'/'rejected' with no 'completed_' prefix). Used for every value the
-# client compares stage-by-stage: workflow.stage, workflow.resumeStage, and the
-# top-level status field project() sends back. DRAFT has no client-side
-# enum member - the client checks status === 'draft' directly, unchanged.
+# request.status (snake_case) -> the client's ProposalStage vocabulary (kebab-case, and
+# completed_approved/completed_rejected collapse to a single 'approved'/'rejected' with no
+# 'completed_' prefix).
 STAGE_FOR_CLIENT = {
     SUBMITTED: "submitted",
     HOS_HOD_REVIEW: "hos-hod-review",

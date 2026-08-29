@@ -46,12 +46,8 @@ interface ProposalReviewSection { readonly title: string; readonly icon: string;
 const option = (label: string): SelectOption => ({ value: label, label });
 const options = (...labels: string[]): readonly SelectOption[] => labels.map(option);
 
-// Which option kinds each "Required for Event" checkbox needs, so the catalog only ever fetches
-// what the applicant actually selected rather than every dropdown in the system up front.
-// dietaryInformation/servingUnit ride along with fmb since they only ever render inside its rows.
-// Which catalogues each request popup has to load before it can render. The
-// five venue-backed requirements pull 'venue' as well as their own list — that
-// is what makes the Venue Management page the source for their Location field.
+// Which option kinds each "Required for Event" checkbox needs, so the catalog only ever fetches what
+// the applicant actually selected rather than every dropdown in the system up front.
 const REQUIREMENT_OPTION_KINDS: Record<RequirementKey, readonly RequestOptionKind[]> = {
   logistics: ['logistics', 'venue'],
   transportation: ['transportation'],
@@ -100,10 +96,8 @@ export class EventProposalComponent implements OnDestroy {
   readonly logisticsAvailability = signal<LogisticsAvailability | null>(null);
   readonly logisticsAvailabilityLoading = signal(false);
   readonly logisticsAvailabilityError = signal(false);
-  // Schedule date-congestion check. Advisory only: it never blocks saving the row or submitting
-  // the proposal, it just tells the organiser how busy the date they picked already is. Same
-  // debounce-and-token shape as the logistics availability check above, so a fast typist never
-  // sees a stale answer land after a newer one.
+  // Schedule date-congestion check. Advisory only: it never blocks saving the row or submitting the
+  // proposal, it just tells the organiser how busy the date they picked already is.
   private dateConflictTimer: ReturnType<typeof setTimeout> | undefined;
   private dateConflictSubscription: Subscription | undefined;
   private dateConflictRequestToken = 0;
@@ -124,23 +118,15 @@ export class EventProposalComponent implements OnDestroy {
   // never-submitted proposal has no conversations to fetch).
   readonly conversations = signal<readonly ProposalConversation[]>([]);
   readonly commentsPanelOpen = signal(true);
-  // True only when this proposal was opened because a reviewer/department sent it back for
-  // changes (not when the applicant is just reviewing an already-decided proposal from their
-  // history) — the signal for whether the comments drawer should jump straight into the
-  // conversation that needs a reply, rather than the Conversations list.
+  // True only when this proposal was opened because a reviewer/department sent it back for changes
+  // (not when the applicant is just reviewing an already-decided proposal from their history) — the
+  // signal for whether the comments drawer should jump straight into the conversation that needs a
+  // reply, rather than the Conversations list.
   readonly isResubmissionRequired = signal(false);
   // Which single thread put this proposal into resubmission_required — read straight from
   // record.workflow.resumeStage/departmentConfirmations in prefillFromRecord (the same source
-  // reviewerComments() uses, see allCommentEntries()), preferring the whole-proposal reviewer
-  // stage over a department if both are somehow present. Deliberately NOT "whichever conversation
-  // has the most recent message" — with multiple parallel department threads open, the most
-  // recent message is not necessarily the one that blocked the proposal.
-  //
-  // A task-thread conversation's partnerName is the RAW requirement key (e.g. "photoVideo" — see
-  // history.py's conversations_for(), unmapped from event_requirements.requirement_name), not a
-  // display label like DEPARTMENT_LABELS produces — so 'department' below is deliberately the raw
-  // key, matched against partnerName as-is. A reviewer-stage thread's partnerRoleLabel IS already
-  // the display label ("HOS/HOD"/"F&B"/"CFO"), so 'reviewerRoleLabel' matches that directly.
+  // reviewerComments() uses, see allCommentEntries()), preferring the whole-proposal reviewer stage
+  // over a department if both are somehow present.
   readonly pendingRequester = signal<{ department: string } | { reviewerRoleLabel: string } | null>(null);
   readonly pendingRequesterConversationId = computed<string | null>(() => {
     const requester = this.pendingRequester();
@@ -227,11 +213,7 @@ export class EventProposalComponent implements OnDestroy {
   // Club Only visibility is gated on being the President of at least one club — a data fact
   // (AuthUser.presidentOfClubIds, sourced from the clubs table), not a role check.
   private readonly isClubPresident = Boolean(this.applicant?.presidentOfClubIds?.length);
-  // The clubs a "Club Only" event is addressed to. Without this the tier was
-  // unenforceable: a president of two clubs produced an event that named neither,
-  // so it reached both clubs' members (and, before the server-side check, everyone
-  // else too). Options are the clubs THIS user presides over, fetched from
-  // /clubs/mine/presiding; the server re-checks presidency on save regardless.
+  // The clubs a "Club Only" event is addressed to.
   readonly presidingClubOptions = signal<readonly SelectOption[]>([]);
   readonly eventClubs = signal<readonly string[]>([]);
   // Only meaningful for Club Only, and only worth showing if there is a choice to
@@ -265,11 +247,6 @@ export class EventProposalComponent implements OnDestroy {
   });
 
   // record.eventCategories/eventFormat carry the frozen SNAPSHOT NAMEs (proposal-projection.
-  // service.js reads request_categories.category_name / request.event_format_snapshot, not ids)
-  // — the picker's `value` is a catalog id, so these need resolving back to the catalog's CURRENT
-  // id before the picker can highlight the right option. Held here (rather than resolved once,
-  // inline in prefillFromRecord) because the catalogs load asynchronously and may still be loading
-  // when the proposal record itself arrives — the effect() below re-resolves once both are ready.
   private readonly pendingCategoryNames = signal<readonly string[] | null>(null);
   private readonly pendingFormatName = signal<string | null>(null);
 
@@ -291,13 +268,12 @@ export class EventProposalComponent implements OnDestroy {
       });
     }
 
-    // Co-owner/Organizer candidates: anyone who can plausibly BE an applicant themselves —
-    // both roles can act in the applicant's place (a Co-owner can resubmit/continue exactly
-    // like the applicant; an Organizer helps run the event) — server-scoped to whoever the
-    // admin's Page Visibility settings grant the proposal form to (see
+    // Co-owner/Organizer candidates: anyone who can plausibly BE an applicant themselves — both roles
+    // can act in the applicant's place (a Co-owner can resubmit/continue exactly like the applicant;
+    // an Organizer helps run the event) — server-scoped to whoever the admin's Page Visibility
+    // settings grant the proposal form to (see
     // InternalUserDirectoryService.proposalCollaboratorCandidates$), NOT every active internal
-    // account. The old blanket /auth/internal-users fetch offered e.g. the CFO or a cafeteria
-    // manager as a co-owner candidate even though neither role could ever open this form.
+    // account.
     this.directory.proposalCollaboratorCandidates$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((users) => {
       this.staff.set(users.map((user) => ({
         value: user.displayName,
@@ -336,13 +312,7 @@ export class EventProposalComponent implements OnDestroy {
 
     // Only fetch the option catalog for requirement kinds the applicant has actually selected on
     // "Required for Event" — previously this loaded every dropdown option in the system (every
-    // department's items, every cafeteria's menu) unconditionally at page load. Checkboxes on
-    // step 2 just accumulate into selectedRequirements(); the fetch itself waits until the user
-    // actually reaches step 3 (Request Details) so ticking N boxes fires one batched request
-    // instead of N separate ones — and re-fires (still batched) if they go back and add more.
-    // currentStep() drives it (not just selectedRequirements()) so prefill from a draft/
-    // resubmission — which lands on step 0 with selectedRequirements already set — only fetches
-    // once the applicant actually reaches that step, not immediately on load.
+    // department's items, every cafeteria's menu) unconditionally at page load.
     effect(() => {
       if (this.currentStep() !== 3) return;
       this.loadRequestOptionCatalog();
@@ -367,12 +337,8 @@ export class EventProposalComponent implements OnDestroy {
     }
   }
 
-  // Fetches whichever option kinds the applicant's current selectedRequirements() need and
-  // haven't been loaded yet, batched into one request. Normally only fires once the applicant
-  // reaches step 3 (see the effect in the constructor); prefillFromRecord() also calls it
-  // directly for a resubmission/draft, since submit() validates every step immediately and the
-  // fundingPurchase check below needs the catalog loaded to recognize prefilled mainItem/subItem
-  // values as valid even if the applicant never revisits Request Details.
+  // Fetches whichever option kinds the applicant's current selectedRequirements() need and haven't
+  // been loaded yet, batched into one request.
   private loadVenueCatalog(): void {
     this.requestOptionSubscription.add(
       this.optionService.watchVenues().subscribe({
@@ -425,11 +391,8 @@ export class EventProposalComponent implements OnDestroy {
     );
     this.eventTitle.set(record.eventTitle);
     this.shortIntro.set(record.shortIntroduction);
-    // Every field below the always-present ones is optional on ProposalReviewRecord, because a
-    // LIST row omits them (see that interface's note). This method only ever runs on a detail
-    // record from GET /proposals/{id}, where they are all present - but the type cannot know
-    // that, so each falls back to the same empty value its own signal was declared with. The
-    // fallback is what the form already shows for a field nobody filled in; it never invents one.
+    // Every field below the always-present ones is optional on ProposalReviewRecord, because a LIST
+    // row omits them (see that interface's note).
     this.goals.set(record.goals ?? '');
     this.benefits.set(record.benefits ?? '');
     this.publicity.set(record.publicity ?? '');
@@ -457,11 +420,7 @@ export class EventProposalComponent implements OnDestroy {
     this.agenda.set(record.agenda ?? []);
     this.discussions.set(record.discussions ?? []);
     this.selectedRequirements.set(record.selectedRequirements ?? []);
-    // Use the server's structured per-requirement rows (date/start/end/withLogo/etc. as real
-    // fields) rather than reconstructing them from the flattened, display-only `record.requests`
-    // strings — that used to silently drop fields the editor needs (e.g. Mineral Water's
-    // withLogo, and every requirement's date/start/end), which then saved back as
-    // undefined/false and blanked the Request Details schedule after resubmission.
+    // Use the server's structured per-requirement rows (date/start/end/withLogo/etc.
     const structuredRows = record.requestRows ?? {};
     this.requestRows.set({
       logistics: [], transportation: [], photoVideo: [], soundLight: [], fmb: [], campusTour: [], waterNormal: [], fundingPurchase: [],
@@ -478,18 +437,13 @@ export class EventProposalComponent implements OnDestroy {
   readonly coOwnerDisplayColumns: readonly ProposalTableColumn[] = [
     { key: 'name', label: 'Staff Name', width: '14rem' }, { key: 'email', label: 'Email', width: '14rem' }, { key: 'role', label: 'Role', width: '12rem' },
   ];
-  // The saved-row table. `location` is the resolved text either branch produces
-  // (the venue's name, or the typed address), so the table and the review
-  // summary read the same whichever was used — and a row saved against a venue
-  // that has since been archived still shows the name it was saved with.
+  // The saved-row table.
   readonly scheduleColumns: readonly EditableTableColumn[] = [
     { key: 'date', label: 'Date', type: 'date', required: true }, { key: 'start', label: 'Start Time', type: 'time', required: true }, { key: 'end', label: 'End Time', type: 'time', required: true }, { key: 'location', label: 'Location', type: 'text', required: true },
   ];
 
-  // The row EDITOR's columns, which differ from the table's: Inside University
-  // picks a venue from the CFO's catalogue, Outside University types an
-  // address. Only one of the two is shown, chosen by the row being edited —
-  // showing both would let a row be saved claiming to be in two places.
+  // The row EDITOR's columns, which differ from the table's: Inside University picks a venue from the
+  // CFO's catalogue, Outside University types an address.
   scheduleEditorColumns(): readonly EditableTableColumn[] {
     const outside = String(this.tableDraft()['locationKind'] ?? INSIDE_UNIVERSITY) === OUTSIDE_UNIVERSITY;
     return [
@@ -504,10 +458,7 @@ export class EventProposalComponent implements OnDestroy {
     ];
   }
 
-  // Every Inside University dropdown in the app is built from this one list, in
-  // the order the CFO set. `selected` re-admits an archived venue when it is the
-  // value the row already holds: an old proposal must keep showing the venue it
-  // was submitted with, even though that venue is no longer offered to new rows.
+  // Every Inside University dropdown in the app is built from this one list, in the order the CFO set.
   venueSelectOptions(selected?: string | number): readonly SelectOption[] {
     const venues = this.venues();
     const current = String(selected ?? '');
@@ -748,20 +699,16 @@ export class EventProposalComponent implements OnDestroy {
   proposalColumns(columns: readonly EditableTableColumn[]): readonly ProposalTableColumn[] {
     return columns.map((column) => ({ key: column.key, label: column.label, width: column.width ?? '12rem' }));
   }
-  // Resolves each Logistics row's option id (stored as the OPTION ID, e.g. "logistics:3", not
-  // the image URL — see saveRequestRow()) to its imageDataUrl, added as a synthetic itemImageUrl
-  // field the read-only table's imageKey="item" input reads via `${imageKey}ImageUrl`. Keeps
-  // ProposalTableComponent dumb/presentational — it never sees the option catalog.
+  // Resolves each Logistics row's option id (stored as the OPTION ID, e.g.
   logisticsRowsWithImages(): readonly EditableRow[] {
     return this.requestRows().logistics.map((row) => {
       const option = this.optionService.find(this.requestOptionCatalog(), row['item']);
       return option?.kind === 'logistics' && option.imageDataUrl ? { ...row, itemImageUrl: option.imageDataUrl } : row;
     });
   }
-  // Same "raw catalog id, not label" gap as logisticsRowsWithImages() above, for every OTHER
-  // select-type request column (Transportation's Type, F&B's Food Type, Funding's Main/Sub Item,
-  // etc.) — ProposalTableComponent renders row['type'] etc. verbatim, and that value is stored as
-  // the option reference id (e.g. "transportation:2"), not the label the applicant picked.
+  // Same "raw catalog id, not label" gap as logisticsRowsWithImages() above, for every OTHER select-
+  // type request column (Transportation's Type, F&B's Food Type, Funding's Main/Sub Item, etc.) —
+  // ProposalTableComponent renders row['type'] etc.
   requestRowsForDisplay(definition: RequestDefinition): readonly EditableRow[] {
     return resolveDepartmentRowLabels(definition.key, definition.columns, this.requestRows()[definition.key], this.requestOptionCatalog());
   }
@@ -781,10 +728,9 @@ export class EventProposalComponent implements OnDestroy {
   openTableEditor(collection: TableEditorCollection): void {
     this.tableEditorCollection.set(collection);
     this.tableEditingIndex.set(null);
-    // A new schedule row starts Inside University — that is what nearly every
-    // event is, and leaving the required Location field blank would make the
-    // applicant confirm the default before the venue picker below it counts as
-    // filled in.
+    // A new schedule row starts Inside University — that is what nearly every event is, and leaving
+    // the required Location field blank would make the applicant confirm the default before the venue
+    // picker below it counts as filled in.
     this.tableDraft.set(collection === 'schedule' ? { locationKind: INSIDE_UNIVERSITY } : {});
     this.tableModalOpen.set(true);
     this.resetDateConflict();
@@ -1214,11 +1160,9 @@ export class EventProposalComponent implements OnDestroy {
   }
 
 
-  // "Save" for a proposal a reviewer sent back — persists every edited field without submitting
-  // it back into the workflow: the proposal stays in the applicant's Inbox at
-  // resumption_required, and the reviewer's comment is left in place so it's still visible next
-  // time this form is opened. Distinct from saveDraft(), which targets brand-new/'Draft' status
-  // proposals and would fail server-side on a resubmission_required one.
+  // "Save" for a proposal a reviewer sent back — persists every edited field without submitting it
+  // back into the workflow: the proposal stays in the applicant's Inbox at resumption_required, and
+  // the reviewer's comment is left in place so it's still visible next time this form is opened.
   saveEdits(): void {
     const proposalId = this.resubmitProposalId();
     if (proposalId === null) return;
@@ -1383,11 +1327,9 @@ export class EventProposalComponent implements OnDestroy {
       if (!Number.isInteger(value) || value <= 0) errors[`${step}.request.${key}.${index}.requestedPax`] = 'Requested Pax must be a positive whole number.';
       else if (this.totalPax() > 0 && value > this.totalPax()) errors[`${step}.request.${key}.${index}.requestedPax`] = `Requested Pax cannot exceed Total Expected Pax (${this.totalPax()}).`;
     });
-    // Final-submit safety net against the option's static total, since the dynamic
-    // window-aware remaining figure (logisticsRemainingQuantity()) only exists live for
-    // whichever row is currently open in the modal — requestFieldError() blocks that case
-    // before a row can even be added/saved. This catches the simpler "impossible regardless of
-    // timing" case for rows already in the table.
+    // Final-submit safety net against the option's static total, since the dynamic window-aware
+    // remaining figure (logisticsRemainingQuantity()) only exists live for whichever row is currently
+    // open in the modal — requestFieldError() blocks that case before a row can even be added/saved.
     if (key === 'logistics') rows.forEach((row, index) => {
       const option = this.optionService.find(this.requestOptionCatalog(), row['item']);
       const quantity = Number(row['quantity']);
@@ -1545,11 +1487,9 @@ export class EventProposalComponent implements OnDestroy {
     return fields.filter((field, index) => fields.findIndex((candidate) => candidate.label === field.label && candidate.target === field.target && candidate.table?.rowIndex === field.table?.rowIndex && candidate.table?.fieldKey === field.table?.fieldKey) === index);
   }
 
-  // A 'half' column only looks right when it has another 'half' beside it in the 2-column
-  // request-editor grid — a 'half' that lands alone on its row (an odd-length run, or a 'full'
-  // column resets pairing) would otherwise leave dead space next to it, so promote it to 'full'.
-  // A single left-to-right scan: consecutive 'half' columns pair up two at a time; any 'full'
-  // column resets pairing for the run that follows it.
+  // A 'half' column only looks right when it has another 'half' beside it in the 2-column request-
+  // editor grid — a 'half' that lands alone on its row (an odd-length run, or a 'full' column resets
+  // pairing) would otherwise leave dead space next to it, so promote it to 'full'.
   private fillDanglingHalves(columns: readonly EditableTableColumn[]): readonly EditableTableColumn[] {
     const result: EditableTableColumn[] = [];
     let pending: EditableTableColumn | null = null;
@@ -1568,11 +1508,7 @@ export class EventProposalComponent implements OnDestroy {
     const date = { key: 'date', label: 'Date', type: 'date', required: true, span: 'half' } as const;
     const start = { key: 'start', label: 'Start Time', type: 'time', required: true, span: 'half' } as const;
     const end = { key: 'end', label: 'End Time', type: 'time', required: true, span: 'half' } as const;
-    // Venue, not free text. Logistics, Sound & Light, Food, Mineral Water and
-    // Photography are all delivered BY the university, so the only place they
-    // can be delivered to is a university venue — and a request naming a place
-    // Logistics cannot find is exactly what free text produced. Enforced
-    // server-side too (proposals.py's VENUE_ONLY_REQUIREMENTS).
+    // Venue, not free text.
     const location = { key: 'venueId', label: 'Venue', type: 'select', required: true, options: this.activeSelectOptions('venue'), span: 'full' } as const;
     const notes = { key: 'notes', label: 'Notes', type: 'text', span: 'full' } as const;
     const definitions: readonly RequestDefinition[] = [

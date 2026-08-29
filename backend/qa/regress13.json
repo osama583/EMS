@@ -1,7 +1,0 @@
-[
-{"id":"RGD-a","as":"student.computing@demo.apu.edu.my","q":"Show me events in October.","intent":"THE FAILING CASE - false 'you are registered'","expect":"lists 6 October events, NO registration claim"},
-{"id":"RGD-b","as":"student.business@demo.apu.edu.my","q":"who registered for the AI & Data Science Career Fair?","intent":"D7 must STILL hold (non-organiser)","expect":"only-your-own hedge, not a full roster claim"},
-{"id":"RGD-c","as":"student.computing@demo.apu.edu.my","q":"who registered for the AI & Data Science Career Fair?","intent":"organiser still gets roster","expect":"5 names"},
-{"id":"RGD-d","as":"student.business@demo.apu.edu.my","q":"do i have any pending join requests?","intent":"scoped-empty must still hedge correctly","expect":"none, phrased as their own"},
-{"id":"RGD-e","as":"student.computing@demo.apu.edu.my","q":"what am i registered for?","intent":"own registrations still correct","expect":"Career Fair"}
-]

@@ -22,10 +22,8 @@ export class ProfileComponent {
     if (!user) return [];
     return [{ label: 'Email', value: user.email }];
   });
-  // Every (role, unit) pair this account holds, shown as its own tile — someone with more than
-  // one role (e.g. Student in one school AND Staff in another department) previously saw only
-  // roleLabel/department, which is a single-role convenience derived from just the FIRST role
-  // row (see identity.py's project_auth_user) and silently hid every other role they hold.
+  // Every (role, unit) pair this account holds, shown as its own tile — someone with more than one
+  // role (e.g.
   readonly roleDetails = computed(() => {
     const user = this.user();
     if (!user || user.roles.length === 0) return [{ role: 'Unassigned', unit: null as string | null }];

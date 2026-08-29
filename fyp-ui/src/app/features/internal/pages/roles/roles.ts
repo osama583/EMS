@@ -16,10 +16,8 @@ import { SearchableDropdownComponent } from '../../../../shared/components/searc
 import { SelectOption } from '../../../../shared/components/form-controls/form-controls.models';
 import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 
-// Server-side derivation this mirrors exactly: services/unit-code.js's deriveRoleCode(), also
-// used server-side to auto-slug roleName -> role_code (admin.routes.js POST /roles). Hyphenated
-// (not underscored like unit codes) to match the seeded protected roles' convention (e.g.
-// head-of-department, cafeteria-admin).
+// Server-side derivation this mirrors exactly: services/unit-code.js's deriveRoleCode(), also used
+// server-side to auto-slug roleName -> role_code (admin.routes.js POST /roles).
 function deriveRoleCode(roleName: string): string {
   return (roleName || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }

@@ -49,10 +49,9 @@ export interface MyRowAssignment {
   readonly schedule: string;
   readonly location: string;
   readonly notes: string;
-  // Raw ISO date-time (YYYY-MM-DDTHH:mm:ss) of the row's own scheduled start — unlike `schedule`
-  // (a pre-formatted display string), this is for date math: the My Tasks calendar's day-dot
-  // indicator and the same-day-start gate (see department-workflow.config.ts's
-  // requiresSameDayStart).
+  // Raw ISO date-time (YYYY-MM-DDTHH:mm:ss) of the row's own scheduled start — unlike `schedule` (a
+  // pre-formatted display string), this is for date math: the My Tasks calendar's day-dot indicator
+  // and the same-day-start gate (see department-workflow.config.ts's requiresSameDayStart).
   readonly deadline: string;
   // Display names of every OTHER staff member assigned to this SAME row (see migration 012 — a
   // row can have several assignees, e.g. two Logistics staff on one big chairs/tables setup).

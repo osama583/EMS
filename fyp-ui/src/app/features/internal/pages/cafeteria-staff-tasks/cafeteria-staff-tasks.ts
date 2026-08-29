@@ -20,11 +20,7 @@ type PageMode = 'active' | 'history';
 // Campus Tour) is unconditional here — cafeteria isn't a DepartmentRequestKind so it doesn't read
 // department-workflow.config.ts's requiresSameDayStart; this page enforces its own copy of it.
 
-// new Date().toISOString() converts to UTC first — for anyone east of UTC (e.g. UTC+8), the first
-// several hours of their local day still read back as "yesterday", so canStart()'s
-// serveDate === today comparison silently failed on the actual scheduled day. serveDate is a
-// timezone-naive SQL DATE (just "the day", no time component), so today must be built the same
-// way: from the LOCAL calendar date, never a UTC conversion.
+// new Date().toISOString() converts to UTC first — for anyone east of UTC (e.g.
 function localIsoDate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
@@ -38,10 +34,9 @@ const COLUMNS: readonly InternalTableColumn[] = [
   { key: 'actions', label: 'Actions', actions: true, width: '10rem' },
 ];
 
-// Every list control here (search, status filter, date range, page, page size) is a real server
-// query param — GET /cafeteria-orders?mode=&status=&q=&dateStart=&dateEnd=&page=&pageSize= (see
-// api/tasks.py's list_orders()) — same reactive pattern as staff-tasks.ts. Nothing is filtered or
-// paginated client-side.
+// Every list control here (search, status filter, date range, page, page size) is a real server query
+// param — GET /cafeteria-orders?mode=&status=&q=&dateStart=&dateEnd=&page=&pageSize= (see
+// api/tasks.py's list_orders()) — same reactive pattern as staff-tasks.ts.
 @Component({
   selector: 'app-cafeteria-staff-tasks',
   imports: [InternalDataPageComponent, FormModalComponent, FeedbackBannerComponent, TaskCalendarComponent, CameraCaptureComponent, ConfirmDialogComponent],

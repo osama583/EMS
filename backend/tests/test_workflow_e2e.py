@@ -510,10 +510,9 @@ def test_every_transition_is_recorded(cur):
 
 
 # --- Cafeteria order lifecycle (request_fmb_selection) --------------------
-# Previously untested end to end (migration 013 adds the 'ready' status and
-# delivery photo requirement) - these exercise the full staff-facing chain:
-# create (F&B) -> approve (cafeteria manager) -> claim/"Start Preparing" ->
-# ready/"Done Preparing" -> fulfil/"Delivered" (staff).
+# Previously untested end to end (migration 013 adds the 'ready' status and delivery photo
+# requirement) - these exercise the full staff-facing chain: create (F&B) -> approve (cafeteria
+# manager) -> claim/"Start Preparing" -> ready/"Done Preparing" -> fulfil/"Delivered" (staff).
 def _place_and_approve_order(cur, **create_overrides) -> tuple[int, int]:
     """A food proposal through fmb_review, with one cafeteria order approved
     and sitting in the Atrium Cafeteria's shared staff pool. Returns
@@ -528,10 +527,8 @@ def _place_and_approve_order(cur, **create_overrides) -> tuple[int, int]:
     )
     wf.submit(cur, request_id)
     wf.approve(cur, request_id, principal_for(cur, "hoshod@demo.apu.edu.my"))
-    # Below the high-pax threshold, hos_hod_review goes straight to
-    # department_review - fmb_review only gates high-pax proposals (see
-    # test_high_pax_runs_fmb_then_cfo_then_departments above). F&B can place a
-    # cafeteria order as soon as the proposal reaches department_review.
+    # Below the high-pax threshold, hos_hod_review goes straight to department_review - fmb_review
+    # only gates high-pax proposals (see test_high_pax_runs_fmb_then_cfo_then_departments above).
     assert status_of(cur, request_id) == "department_review"
 
     fmb_principal = principal_for(cur, "fmb@demo.apu.edu.my")

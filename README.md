@@ -29,19 +29,6 @@ npm start                                          # proxies /api to :5000
 
 Health check: `curl http://localhost:5000/health`
 
-## Documentation
-
-- [backend/docs/](backend/docs/README.md) — API reference, and the guides below
-- [api-design.md](backend/docs/api-design.md) — why the resources are shaped this way
-- [workflow.md](backend/docs/workflow.md) — the proposal state machine
-- [security.md](backend/docs/security.md) — auth, authorisation, known gaps
-- [database.md](backend/docs/database.md) — migrations and schema notes
-- [docs/dashboards/](docs/dashboards/README.md) — the ten role dashboards at
-  `/app/dashboard`: their metrics, access rules, insight rules and layouts
-
-Interactive API docs: `cd backend/docs && python -m http.server 8080`, then open
-`index.html`.
-
 ## Tests
 
 ```bash

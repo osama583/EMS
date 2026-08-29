@@ -44,10 +44,8 @@ export interface AiAccessDenialPage {
   readonly pageSize: number;
 }
 
-// Audit trail of chat questions the AI assistant refused because Page Visibility does not grant
-// the asker the pages that topic's data lives on (see backend app/ai/topic_access.py). Read-only
-// plus a manual clear: there is no automatic retention window for this table, deliberately, so
-// emptying it is an explicit admin decision rather than something that ages out silently.
+// Audit trail of chat questions the AI assistant refused because Page Visibility does not grant the
+// asker the pages that topic's data lives on (see backend app/ai/topic_access.py).
 @Injectable({ providedIn: 'root' })
 export class AiAccessLogService {
   private readonly http = inject(HttpClient);

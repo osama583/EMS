@@ -1,8 +1,4 @@
-// Pure, Angular-free types for the proposal approval chain. The actual state-transition
-// logic (who can act, what happens next) lives server-side — see system.md's stated
-// principle "the backend owns the workflow, not the frontend." This file only holds the
-// shared vocabulary (stage names) and pure display helpers the UI needs to render whatever
-// state the server returns.
+// Pure, Angular-free types for the proposal approval chain.
 export enum ProposalStage {
   Submitted = 'submitted',
   HosHodReview = 'hos-hod-review',

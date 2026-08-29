@@ -30,8 +30,6 @@ PROTECTED_ROLES = [
 
 # --- Units ----------------------------------------------------------------
 # Schools carry a head-of-school; Service departments carry a head-of-department.
-# The five workflow-routed departments must keep these exact codes - they are the
-# routing targets in workflow/constants.py's UNIT_CODE_FOR_REQUIREMENT.
 SCHOOL_UNITS = [
     ("school_of_computing", "School of Computing"),
     ("school_of_business", "School of Business"),
@@ -51,9 +49,8 @@ CAFETERIA_UNITS = [
 ]
 
 # --- Demo accounts --------------------------------------------------------
-# (email, display name, [(role_code, unit_code | None), ...])
-# One account per distinct position in the workflow, so every stage and every
-# department lane can be exercised end to end.
+# (email, display name, [(role_code, unit_code | None), ...]) One account per distinct position in the
+# workflow, so every stage and every department lane can be exercised end to end.
 SEED_ACCOUNTS = [
     ("applicant@demo.apu.edu.my", "Applicant Demo", [("student", "school_of_computing")]),
     ("hoshod@demo.apu.edu.my", "Rahim Abdullah", [("head-of-school", "school_of_computing")]),
@@ -225,12 +222,8 @@ FUNDING_SUB_OPTIONS = [
     ("Speaker & Talent", [("Speaker Honorarium", "Fee paid to an external speaker."), ("Travel & Accommodation", "Speaker travel costs.")]),
     ("Equipment Rental", [("AV Equipment Hire", "Third-party AV rental."), ("Furniture Hire", "Additional furniture.")]),
 ]
-# Menu items per cafeteria unit code.
-# (label, description, serving unit, dietary tag, unit price in RM).
-# Priced from the start: an unpriced menu item multiplies out to nothing, so
-# every food cost on the F&B and CFO dashboards would read RM 0 against real
-# portions. Migration 019 backfills the same figures onto databases seeded
-# before prices existed.
+# Menu items per cafeteria unit code. (label, description, serving unit, dietary tag, unit price in
+# RM).
 FMB_MENU = {
     CAFETERIA_UNITS[0][0]: [
         ("Nasi Lemak Set", "Coconut rice, sambal, egg, anchovies.", "Per Person", "Halal", 8.50),

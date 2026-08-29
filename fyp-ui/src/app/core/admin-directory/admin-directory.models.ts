@@ -59,19 +59,7 @@ export type AdminRoleDraft = { readonly roleName: string; readonly description: 
 export type NavEntryType = 'page' | 'folder';
 
 // A page is visible to a user if they match ANY of its grant rows — rows are OR'd together, each
-// independently typed, and a page has at most ONE row per grant_type (max 3 rows total). This is
-// what lets one page mix e.g. "CFO, any unit" (role) with "anyone in School of Computing" (unit)
-// at the same time, which a single permission_mode column could never express. See
-// nav_page_grants' comment in ems_database_schema.sql.
-// Each row holds a SET of roles/units (multi-select), not one of each:
-//   role:      roleCodes set, unitCodes empty — holds ANY of these roles, in any unit (flat roles
-//              only).
-//   unit_role: BOTH set — cross-product WITHIN the row: holds any role in roleCodes AND is in any
-//              unit in unitCodes.
-//   unit:      unitCodes set, roleCodes empty — holds ANY role, in any of these units.
-//   cafeteria: roleCodes set, unitCodes empty — holds any of these roles in ANY cafeteria. Unlike
-//              unit_role it names the group rather than today's members, so an outlet created later
-//              is covered without editing the grant (see migration 004).
+// independently typed, and a page has at most ONE row per grant_type (max 3 rows total).
 export type NavGrantType = 'role' | 'unit_role' | 'unit' | 'cafeteria';
 
 export interface AdminNavPageGrant {
@@ -106,8 +94,6 @@ export interface AdminNavPageRecord {
 
 // label/icon/parentPageCode/active only — permissions are managed separately via
 // AdminDirectoryRepository's grant methods (the Permissions tab), never through this draft.
-// sortOrder is never client-supplied: new/moved pages always land at the end of their sibling
-// list, assigned server-side (see nextSiblingSortOrder() in admin.routes.js).
 export type AdminNavPageDraft = {
   readonly label: string;
   readonly entryType: NavEntryType;

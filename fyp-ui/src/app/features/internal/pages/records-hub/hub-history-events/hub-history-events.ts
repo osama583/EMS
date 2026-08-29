@@ -12,26 +12,13 @@ import { FormModalComponent } from '../../../../../shared/components/form-modal/
 import { ViewToggleComponent, defaultListViewMode } from '../../../../../shared/components/view-toggle/view-toggle';
 
 type ViewMode = 'table' | 'card';
-// Filter dimension for 'other' rows: who actually clicked approve/reject — the viewer themself
-// (as the event's Owner or a co-owner) or a DIFFERENT co-owner. Independent of `requester`: 'me'
-// rows (the viewer's own registration) never carry this, since nobody decided FOR them via this
-// axis. Options are only offered to users who can plausibly organise an event at all — see
-// showDecidedByFilter below — since a viewer who can only attend, never organise, can never be
-// party to a decided-by-me/co-owner split.
+// Filter dimension for 'other' rows: who actually clicked approve/reject — the viewer themself (as the
+// event's Owner or a co-owner) or a DIFFERENT co-owner.
 type DecidedByFilter = 'all' | 'me' | 'co-owner';
 
-// History → Events: every resolved event registration decision — events the viewer registered for
-// that reached a final outcome, and registrations to the viewer's own events that the viewer
-// approved/rejected as organiser. Rows are keyed by requester identity (me vs. someone else), not
-// by who took the action, so the same person's request never appears twice. Saved events and
-// confirmed-and-upcoming registrations are NOT here — see /app/events/my-events for those, this
-// tab is only for resolved manual-approval decisions.
-//
-// The merge/re-bucketing/de-duplication this page used to do client-side (fetching up to 200
-// history rows plus the ENTIRE unpaginated decided-registrations list, every request) now happens
-// in one query server-side — see events.py's registration_history()/_HISTORY_UNION_SQL. Search,
-// the requester filter, and the decided-by filter are real query params; only the current page's
-// rows ever reach the browser.
+// History → Events: every resolved event registration decision — events the viewer registered for that
+// reached a final outcome, and registrations to the viewer's own events that the viewer
+// approved/rejected as organiser.
 @Component({
   selector: 'app-hub-history-events',
   imports: [ViewToggleComponent, FeedbackBannerComponent, InternalPageHeaderComponent, InternalDataPageComponent, FormModalComponent, InternalSearchFieldComponent, InternalFilterControlsComponent, InternalResetButtonComponent],
@@ -62,9 +49,8 @@ export class HubHistoryEventsComponent {
 
   // The decided-by-me/co-owner split only means anything for someone who could plausibly BE an
   // organiser at all — same "who can be an applicant" eligibility rule records-hub.ts's own
-  // showRegistrationsTab uses (auth.canAccess reads the already-loaded Page Visibility nav tree,
-  // no extra request). A pure attendee, who can never organise an event or decide someone else's
-  // registration, would see an option that always returns zero rows for them.
+  // showRegistrationsTab uses (auth.canAccess reads the already-loaded Page Visibility nav tree, no
+  // extra request).
   readonly showDecidedByFilter = computed(() => this.auth.canAccess('/app/forms/event-proposal'));
 
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / this.pageSize())));

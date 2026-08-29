@@ -212,10 +212,7 @@ export class MasterEventCalendarComponent {
     () => this.gridEntries().filter((entry) => this.entryMatches(entry, this.draftCategories())).length,
   );
 
-  // The exact [start, end] the visible surface needs. Month view renders a fixed 6-week (42-day)
-  // grid that spills into the neighbouring months, so the query must cover the whole grid or
-  // those spillover days would render empty. Week needs only its own span. Day is null: it is
-  // tier 2's job, and asking for a one-day range here as well would fetch the date twice.
+  // The exact [start, end] the visible surface needs.
   private readonly rangeQuery = computed<{ start: string; end: string; q: string } | null>(() => {
     const mode = this.viewMode();
     const q = this.debouncedSearch();
@@ -311,17 +308,7 @@ export class MasterEventCalendarComponent {
     this.destroyRef.onDestroy(() => this.document.body.classList.remove('calendar-dialog-open'));
     this.watchCompactLayout();
 
-    // TIER 1. Re-fetched whenever the visible range or the debounced search changes. switchMap
-    // cancels the in-flight request for a range the viewer has already navigated away from.
-    //
-    // catchError sits INSIDE the switchMap, on the request itself, and that placement is
-    // load-bearing rather than stylistic - the same rule EventCatalogEntryService documents.
-    // An error that reaches the outer subscriber terminates the whole subscription, so a single
-    // failed range request (the API restarting, a session expiring, one blip on the wire) would
-    // permanently kill this pipeline: from then on, navigating months, typing in the search box
-    // and switching views would all change rangeQuery and fetch NOTHING, with only the stale
-    // error left on screen. Handling it per-request keeps the stream alive, so the very next
-    // navigation tries again.
+    // TIER 1. Re-fetched whenever the visible range or the debounced search changes.
     toObservable(this.rangeQuery)
       .pipe(
         switchMap((query) => {

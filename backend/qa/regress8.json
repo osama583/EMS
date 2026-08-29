@@ -1,6 +1,0 @@
-[
-{"id":"RG8-a","as":"fmb@demo.apu.edu.my","q":"what can Cafeteria Staff access?","intent":"THE 500 CRASH","expect":"describes Cafeteria Staff, no error"},
-{"id":"RG8-b","as":"system.admin@demo.apu.edu.my","q":"what can a Student do in this app?","intent":"variation: different role named","expect":"describes Student, NOT System Admin"},
-{"id":"RG8-c","as":"student.computing@demo.apu.edu.my","q":"is Club Admin able to delete clubs?","intent":"variation: yes/no about a role","expect":"describes Club Admin"},
-{"id":"RG8-d","as":"cafeteria.admin@demo.apu.edu.my","q":"what can i do here?","intent":"self_capability no regression","expect":"cafeteria admin capabilities"}
-]

@@ -58,11 +58,8 @@ export class DashboardComponent {
   private readonly narrow = signal(false);
 
   constructor() {
-    // A profile and a period in the URL make the switcher shareable: "look at
-    // the Transport dashboard for this term" is a link rather than a set of
-    // instructions. Both are validated server-side against what the caller
-    // actually holds, so a hand-edited value can only ever reorder a list they
-    // already own (R4).
+    // A profile and a period in the URL make the switcher shareable: "look at the Transport dashboard
+    // for this term" is a link rather than a set of instructions.
     const params = this.route.snapshot.queryParamMap;
     const profile = params.get('profile');
     if (profile) this.service.profileId.set(profile);
@@ -84,9 +81,6 @@ export class DashboardComponent {
       if (document?.profile) this.announcement.set(`${document.profile.title} dashboard, ${document.period.label}.`);
     });
     // A cross-filter selection is scoped to the document it was made against.
-    // Keeping it across a profile or period change would narrow a chart to an
-    // option that period's catalogue may not even contain, and the reader would
-    // see an empty panel with no clue why.
     effect(() => {
       this.service.profileId();
       this.service.period();

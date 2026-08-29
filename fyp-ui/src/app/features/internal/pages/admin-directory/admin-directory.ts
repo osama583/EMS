@@ -67,10 +67,8 @@ interface AssignmentDraftRow {
   roleOptionsLoading: boolean;
 }
 
-// RBAC redesign: the Users form only edits identity fields (Full Name/Username/Email/Active) per
-// the design spec — role/unit assignment is managed on the Assignments tab instead, not this form.
-// The deleted-items table names its first column differently per page (identity / name / label),
-// so the confirmation reads whichever cell actually carries the record's display name.
+// RBAC redesign: the Users form only edits identity fields (Full Name/Username/Email/Active) per the
+// design spec — role/unit assignment is managed on the Assignments tab instead, not this form.
 function restoreLabelFor(record: InternalDataRecord): string {
   const named = Object.values(record.cells).find((cell) => !!cell?.primary);
   return named?.primary ? String(named.primary) : String(record.id);
@@ -124,11 +122,8 @@ export class AdminDirectoryComponent {
   readonly purging = signal(false);
 
   // ---------------------------------------------------------------------------
-  // Assignments tab (Users entity only) — one row per user, each carrying every (unit, role) pair
-  // they hold. The "Add Assignment" modal is shared between two entry points: the toolbar button
-  // (blank user picker, for a user with none yet) and a row's Edit action (user locked, existing
-  // rows listed with individual remove, plus the same "Add" control to queue new ones).
-  // ---------------------------------------------------------------------------
+  // Assignments tab (Users entity only) — one row per user, each carrying every (unit, role) pair they
+  // hold.
   readonly assignmentSearch = signal('');
   readonly assignmentPage = signal(1);
   readonly assignmentPageSize = signal(10);
@@ -204,10 +199,10 @@ export class AdminDirectoryComponent {
   );
 
   readonly unitOptions = computed<readonly SelectOption[]>(() => this.units().map((unit) => ({ value: unit.id, label: unit.name, description: unit.code })));
-  // Add/Edit Unit's Role multi-select — every active role is always offered (a role already
-  // linked to OTHER units is still selectable; only this unit's own current links start
-  // pre-checked, handled by unitDraft()/roleCodes() below), per the spec's "does not need to be
-  // Flat to be selected" requirement.
+  // Add/Edit Unit's Role multi-select — every active role is always offered (a role already linked to
+  // OTHER units is still selectable; only this unit's own current links start pre-checked, handled by
+  // unitDraft()/roleCodes() below), per the spec's "does not need to be Flat to be selected"
+  // requirement.
   readonly roleOptions = computed<readonly SelectOption[]>(() => this.roles().filter((role) => role.active).map((role) => ({ value: role.roleCode, label: role.roleName, description: role.description })));
   // Live-derived Unit Code preview for the Unit form — read-only, recomputed on every Unit Name
   // keystroke, using the exact same derivation as services/unit-code.js server-side.
@@ -333,8 +328,6 @@ export class AdminDirectoryComponent {
 
   // Existing-row remove inside the modal, independent of the draft-row save flow below — removes
   // immediately (same DELETE the standalone table used before grouping), not deferred to submit.
-  // Removing an assignment revokes that user's access immediately — confirmed first, like every
-  // other action that changes what somebody can do.
   readonly removeAssignmentTarget = signal<AssignmentRow | null>(null);
   readonly removeAssignmentMessage = computed(() => {
     const target = this.removeAssignmentTarget();
@@ -402,11 +395,8 @@ export class AdminDirectoryComponent {
     this.assignmentDraftRows.update((rows) => rows.map((row) => row.id === id ? { ...row, roleCode: value } : row));
   }
 
-  // One POST per draft row, in sequence — the backend only ever validates/accepts a single
-  // (roleCode, unitCode) pair per call. A row that fails (duplicate, head-role conflict, ...) is
-  // reported by name; rows before it are already saved and rows after it still get attempted.
-  // Existing-row removal already happened live (removeExistingAssignment above), so this only
-  // ever needs to add the new draft rows — zero of them is valid in edit mode (admin only removed).
+  // One POST per draft row, in sequence — the backend only ever validates/accepts a single (roleCode,
+  // unitCode) pair per call.
   saveAssignment(): void {
     if (!this.assignmentFormValid()) return;
     const userId = this.addAssignmentUserId();

@@ -46,16 +46,8 @@ interface RecordsPageDefinition {
   readonly records: readonly CollectionRecord[];
 }
 
-// 'drafts' is fetched server-side, one page at a time, filtered/sorted by GET
-// /proposals?bucket=drafts — see the constructor. Its `records` array below is left empty and
-// never read; only the display metadata (title/description/etc.) is used from this definition
-// table.
-// FLAGGED GAP (system specification §8F — flag, do not implement): 'notifications' is the ONLY
-// list in the app still backed by hardcoded client-side rows. There is no `notification` table in
-// ems_database_schema.sql and the specification describes no notification concept, so building a
-// real feed would mean inventing a new concept (a table, delivery rules, read state, and a
-// producer for every workflow transition). The sample rows below are therefore illustrative
-// placeholders, not data — everything else on every other page comes from the API.
+// 'drafts' is fetched server-side, one page at a time, filtered/sorted by GET /proposals?bucket=drafts
+// — see the constructor.
 const PAGE_DEFINITIONS: Readonly<Record<RecordsPageKind, RecordsPageDefinition>> = {
   drafts: {
     title: 'Drafts',
@@ -235,8 +227,6 @@ export class RecordsPageComponent {
 
   // 'notifications' keeps its original client-side search/filter/paginate over the static list
   // (unchanged behaviour — there is no server endpoint for it, see the FLAGGED GAP note above).
-  // 'drafts' is already filtered/sorted/paginated server-side, so filteredNotifications() /
-  // visibleNotifications() are simply not on its path.
   private readonly filteredNotifications = computed(() => {
     const query = this.search().trim().toLocaleLowerCase();
     return this.notificationRecords().filter((record) => {

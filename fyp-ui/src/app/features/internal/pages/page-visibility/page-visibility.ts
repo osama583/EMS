@@ -23,11 +23,8 @@ function derivePageCode(label: string): string {
   return (label || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
 }
 
-// Strips whatever can legally precede the root element in a standalone .svg file — a UTF-8 BOM,
-// an XML declaration (<?xml ... ?>), a DOCTYPE, and/or comments — so an SVG exported straight from
-// a design tool (which always includes the <?xml ... ?> prolog) still validates. What's left after
-// this is stored/rendered, so the saved value is always a bare <svg>...</svg> document, matching
-// every hand-authored seed icon's shape.
+// Strips whatever can legally precede the root element in a standalone .svg file — a UTF-8 BOM, an XML
+// declaration (<?xml ...
 function stripSvgProlog(text: string): string {
   return text
     .replace(/^﻿/, '')
@@ -137,9 +134,8 @@ export class PageVisibilityComponent {
   readonly folderOptions = computed<readonly SelectOption[]>(() => this.navPages().filter((p) => p.entryType === 'folder' && p.pageCode !== this.editingCode()).map((p) => ({ value: p.pageCode, label: p.label })));
 
   // ---------------------------------------------------------------------------
-  // Pages tab — label/icon/parent/route/sort order/active only. Permissions are managed
-  // exclusively in the Permissions tab below.
-  // ---------------------------------------------------------------------------
+  // Pages tab — label/icon/parent/route/sort order/active only. Permissions are managed exclusively in
+  // the Permissions tab below.
 
   readonly orderedPages = computed<readonly { readonly page: AdminNavPageRecord; readonly depth: number }[]>(() => {
     const pages = this.navPages();
@@ -201,11 +197,11 @@ export class PageVisibilityComponent {
     { key: 'status', ariaLabel: 'Filter pages by status', value: this.statusFilter(), options: [{ value: 'all', label: 'All statuses' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }] },
   ]);
 
-  // ImageUploadFieldComponent (reused here for the file-picker chrome — drag/replace/remove,
-  // filename display) previews via a plain <img src>, which can't apply currentColor recoloring;
-  // that's fine for this confirmation thumbnail (the real recolored render is NavIconComponent,
-  // used everywhere the icon actually appears — table rows, popover, sidebar) — a data: URL lets
-  // its <img> show the uploaded SVG without introducing a second upload/storage path.
+  // ImageUploadFieldComponent (reused here for the file-picker chrome — drag/replace/remove, filename
+  // display) previews via a plain <img src>, which can't apply currentColor recoloring; that's fine
+  // for this confirmation thumbnail (the real recolored render is NavIconComponent, used everywhere
+  // the icon actually appears — table rows, popover, sidebar) — a data: URL lets its <img> show the
+  // uploaded SVG without introducing a second upload/storage path.
   readonly iconPreviewDataUrl = computed(() => {
     const icon = this.draft().icon;
     // Legacy seeded pages store a Material Symbol ligature name (e.g. "help_center") in `icon`
@@ -321,11 +317,7 @@ export class PageVisibilityComponent {
     const draft: Partial<AdminNavPageDraft> = {
       label: d.label.trim(),
       entryType: d.entryType,
-      // Legacy seeded pages carry a Material Symbol ligature name (e.g. "settings") in `icon`
-      // rather than SVG markup — resending that verbatim fails server-side sanitizeSvgIcon()
-      // (expects a full <svg>...</svg> document) and 400s the save. Only forward `icon` when the
-      // draft actually holds SVG markup (freshly uploaded or already-SVG); otherwise omit the
-      // field so the existing value is left untouched.
+      // Legacy seeded pages carry a Material Symbol ligature name (e.g.
       icon: /^\s*<svg[\s>]/i.test(d.icon) ? d.icon : undefined,
       // sortOrder is never client-supplied — new pages/folders always land at the end of their
       // sibling list, and moving to a different parent re-appends there too (see
@@ -513,10 +505,8 @@ export class PageVisibilityComponent {
   }
 
   // ---------------------------------------------------------------------------
-  // Permissions tab — same table shell as the Pages tab (app-internal-data-page), one row per
-  // (page, grant) pair. "Add page" opens a modal: pick a page, then add a permission row to it.
-  // Each grant is independently typed and OR'd together — see AdminNavPageGrant's comment.
-  // ---------------------------------------------------------------------------
+  // Permissions tab — same table shell as the Pages tab (app-internal-data-page), one row per (page,
+  // grant) pair.
 
   readonly permissionsSearch = signal('');
   readonly permissionsTypeFilter = signal('all');
@@ -687,11 +677,7 @@ export class PageVisibilityComponent {
   closeGrantPopover(): void { this.grantPopoverRecordId.set(null); }
 
   // ---------------------------------------------------------------------------
-  // Add-permission modal — opened by the Permissions tab's "Add page" button. Folder dropdown
-  // narrows the Page dropdown below it (defaults to STANDALONE_PAGES_VALUE = top-level pages with
-  // no parent, so the common case doesn't require picking a folder first) + the same
-  // grant-type/role/unit picker used to add any permission row.
-  // ---------------------------------------------------------------------------
+  // Add-permission modal — opened by the Permissions tab's "Add page" button.
 
   readonly grantModalOpen = signal(false);
   // Set only when editing an existing permission row — save() then PUTs the edited role/unit sets
@@ -815,9 +801,9 @@ export class PageVisibilityComponent {
     if (this.newGrantType() === 'unit_role' && values.length) this.fetchGrantEligibleRoles(values);
   }
   // "Select all" / "Clear" shortcuts next to each multi-select — picking every currently-offered
-  // option is equivalent to "all roles"/"all units" since the row re-evaluates live against
-  // whatever roles/units exist, but expressing it as an explicit list (rather than a magic "any"
-  // sentinel) keeps the grant row's meaning self-contained and inspectable.
+  // option is equivalent to "all roles"/"all units" since the row re-evaluates live against whatever
+  // roles/units exist, but expressing it as an explicit list (rather than a magic "any" sentinel)
+  // keeps the grant row's meaning self-contained and inspectable.
   selectAllGrantRoles(): void { this.setNewGrantRoleCodes(this.newGrantRoleOptions().map((o) => o.value)); }
   selectAllGrantUnits(): void { this.setNewGrantUnitCodes(this.newGrantUnitOptions().map((o) => o.value)); }
 

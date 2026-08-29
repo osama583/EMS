@@ -86,12 +86,8 @@ def _system_instruction() -> str:
     return "\n".join(lines)
 
 
-# Classes answered entirely from knowledge_base.py's hand-written content - no database query, no
-# SQL generation. Static narrative text about the app itself: what it does, what a role can do,
-# how to perform an action, and what the asker may ask about. These deliberately did NOT move to
-# Text-to-SQL: there are no rows behind "how do I submit a proposal", and reconstructing a
-# procedure from the schema every time would be both slower and less reliable than the curated
-# text that already exists.
+# Classes answered entirely from knowledge_base.py's hand-written content - no database query, no SQL
+# generation.
 KNOWLEDGE_BASE_CLASSES: frozenset[str] = frozenset({
     "self_capability",
     "askable",
@@ -177,9 +173,5 @@ def classify(question: str, history: list[dict] | None = None) -> set[str]:
         log.warning("ai.classify.failed", extra={"error": str(exc)})
         # Refusing is right; refusing with the WRONG REASON is not, and returning an empty set here
         # said "no class matched", which api/ai.py can only read as "genuinely outside what this
-        # assistant covers". A rate-limited classifier therefore told a caller their perfectly
-        # ordinary question ("which event has the most people registered?") was out of scope, and
-        # recorded it in the AI access log as an unsupported capability gap - misleading the user
-        # and corrupting the one log an admin uses to decide what to build next. The caller needs
-        # to tell these apart, so the failure is raised rather than flattened into a valid answer.
+        # assistant covers".
         raise ClassificationUnavailable(str(exc)) from exc

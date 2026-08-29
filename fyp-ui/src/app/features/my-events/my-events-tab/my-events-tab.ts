@@ -22,10 +22,10 @@ interface TabEntry {
 // same set of choices every other list in the app offers.
 const DEFAULT_PAGE_SIZE = 10;
 
-// Every scope this component renders (saved/pending/registered/history) is now a real server
-// query: page/pageSize go straight through to events.py's search_saved()/my_registrations(),
-// which filter, count, and LIMIT/OFFSET in SQL - the browser only ever holds the one page of
-// events it's about to show, not the whole list sliced client-side.
+// Every scope this component renders (saved/pending/registered/history) is now a real server query:
+// page/pageSize go straight through to events.py's search_saved()/my_registrations(), which filter,
+// count, and LIMIT/OFFSET in SQL - the browser only ever holds the one page of events it's about to
+// show, not the whole list sliced client-side.
 @Component({
   selector: 'app-my-events-tab',
   imports: [EventCardComponent, EventDetailsModalComponent, InternalPageHeaderComponent, InternalPageStateComponent, InternalPaginationComponent],
@@ -36,11 +36,11 @@ export class MyEventsTabComponent {
   readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
   readonly pageSize = signal(DEFAULT_PAGE_SIZE);
   private readonly auth = inject(AuthService);
-  // Public: the template reads savedEvents.savedEventIds() directly (a signal owned by this
-  // injected service) rather than through a wrapping isSaved(id) method call — zoneless change
-  // detection does not reliably re-check a template after a signal write from a service the
-  // component only reaches through a method, since the method call itself isn't a tracked
-  // dependency the way a direct signal read in the template is.
+  // Public: the template reads savedEvents.savedEventIds() directly (a signal owned by this injected
+  // service) rather than through a wrapping isSaved(id) method call — zoneless change detection does
+  // not reliably re-check a template after a signal write from a service the component only reaches
+  // through a method, since the method call itself isn't a tracked dependency the way a direct signal
+  // read in the template is.
   readonly savedEvents = inject(SavedEventsService);
   private readonly eventService = inject(PublishedEventService);
   private readonly toast = inject(ToastService);
@@ -49,8 +49,8 @@ export class MyEventsTabComponent {
   readonly mode = input.required<MyEventsTabMode>();
   // MyEventsComponent's own shell already renders an "My Events" <h1> above this tab's outlet
   // (saved/registered), so this only draws its own header when embedded directly in a bucket
-  // (Ongoing/History) route that has no page header of its own — see app.routes.ts's
-  // ongoing/events entry, the only place this is set true.
+  // (Ongoing/History) route that has no page header of its own — see app.routes.ts's ongoing/events
+  // entry, the only place this is set true.
   readonly showHeader = input(false);
 
   readonly loading = signal(true);

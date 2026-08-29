@@ -8,14 +8,8 @@ import { InternalDataPageComponent } from '../../../../shared/components/interna
 import { InternalDataPageConfig, InternalDataRecord, InternalSortChange, InternalSortState } from '../../../../shared/components/internal-data-page/internal-data-page.models';
 import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 
-// Audit trail of chat questions the AI assistant refused because Page Visibility does not grant
-// the asker the pages that topic's data lives on (backend: app/ai/topic_access.py). Read-only, plus
-// a manual "Clear log" - this table has no automatic retention sweep, so emptying it is always a
-// deliberate admin action.
-//
-// Unlike most internal data pages, paging and search are SERVER-side (the log only grows, so
-// fetching every row to filter in the browser would get slower indefinitely): each search or page
-// change re-requests from the API rather than re-slicing a local array.
+// Audit trail of chat questions the AI assistant refused because Page Visibility does not grant the
+// asker the pages that topic's data lives on (backend: app/ai/topic_access.py).
 @Component({
   selector: 'app-ai-access-log',
   imports: [InternalDataPageComponent, FeedbackBannerComponent, ConfirmDialogComponent],
@@ -49,10 +43,7 @@ export class AiAccessLogComponent {
       asker: { primary: row.userEmail ?? 'Guest (not signed in)', secondary: row.userId ? `User #${row.userId}` : 'No account' },
       topic: { primary: row.topicLabel ?? '—', secondary: row.topic ?? undefined, badge: true, tone: 'warning' },
       question: { primary: row.question },
-      // "Why refused" replaces the old "Would need" column. A required-pages list only ever made
-      // sense for an access refusal, and the log now also records questions the assistant does not
-      // support at all (no topic, no pages). The pages/reason stay as the secondary line, so the
-      // detail is demoted rather than lost.
+      // "Why refused" replaces the old "Would need" column.
       outcome: {
         primary: this.outcomeLabel(row.outcome),
         secondary: row.requiredPages || row.reason || undefined,

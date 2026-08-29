@@ -1,5 +1,5 @@
 // RBAC redesign helpers — role checks against AuthUser.roles[] replacing UserRole enum
-// comparisons and FunctionLevel/UnitKind checks. See docs/superpowers/specs/
+// comparisons and FunctionLevel/UnitKind checks.
 // 2026-08-13-rbac-role-unit-redesign-design.md.
 import { AuthUser } from './auth.models';
 
@@ -44,10 +44,9 @@ export function isStaffLike(user: AuthUser): boolean {
   return hasAnyRole(user, STAFF_LIKE_ROLE_CODES);
 }
 
-// Saved-events access: every unit-scoped user, plus the two flat roles that had it under the
-// old model (external-user's own equivalent is handled separately — external accounts don't
-// reach the internal shell at all). Kept as an explicit allowlist rather than "has any role" so
-// cafeteria-admin/system-admin (never granted this before) don't silently gain it.
+// Saved-events access: every unit-scoped user, plus the two flat roles that had it under the old model
+// (external-user's own equivalent is handled separately — external accounts don't reach the internal
+// shell at all).
 export function roleCanUseSavedEvents(user: AuthUser): boolean {
   if (hasRole(user, 'cfo')) return true;
   return unitCodesFor(user).length > 0;

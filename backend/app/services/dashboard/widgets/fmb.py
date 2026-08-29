@@ -45,11 +45,7 @@ def gate_outcomes(cur, scope: Scope) -> dict[str, Any]:
     return panel(
         title="Gate outcomes",
         subtitle="Decisions at fmb_review, per week",
-        # Grouped columns, not stacked. Approved / sent back / rejected are three
-        # separate outcomes of one decision, not parts of a total worth adding
-        # up, and stacking them put all three inside a single column that read as
-        # one bar. column-chart draws a bar per series side by side whenever it
-        # is not stacked (see its `grouped` branch).
+        # Grouped columns, not stacked.
         chart="column-chart",
         series_list=[
             series("approved", "Approved", 1, [{"x": r["x"], "y": r["approved"]} for r in rows]),
@@ -286,10 +282,8 @@ def water_usage(cur, scope: Scope) -> dict[str, Any]:
         title="Water requested",
         subtitle="Bottles asked for this period, by branding",
         chart="bar-chart",
-        # A horizontal bar reads its MAGNITUDE from `x` and its category from
-        # `label` (see bar-chart.ts's rows()). Emitting {x: "With logo", y: 12}
-        # made every bar Number("With logo") - NaN - and printed the category
-        # where the value belongs, which is what made this panel look broken.
+        # A horizontal bar reads its MAGNITUDE from `x` and its category from `label` (see bar-
+        # chart.ts's rows()).
         series_list=[series("bottles", "Bottles", 1, [{"x": b["value"], "label": b["label"]} for b in bars])],
         axes={"x": {"type": "linear", "label": "Bottles", "format": FMT_COUNT}},
         table_view=table(

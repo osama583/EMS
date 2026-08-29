@@ -38,11 +38,11 @@ export interface AiAssistantClub {
   readonly categories?: string | null;
 }
 
-// requestId/bucket let the frontend link straight to the same page the equivalent records-hub
-// row would open (see hub-proposals.ts's row click: /app/proposals/review/{id} with a readOnly
-// flag derived from bucket) — bucket is 'inbox' | 'ongoing' | 'history' | 'drafts', computed
-// server-side (see backend's proposal_retrieval.bucket_for_status) so "pending"/"ongoing"/"in my
-// inbox" all resolve to the one real bucket a proposal is actually in, never a fixed status word.
+// requestId/bucket let the frontend link straight to the same page the equivalent records-hub row
+// would open (see hub-proposals.ts's row click: /app/proposals/review/{id} with a readOnly flag
+// derived from bucket) — bucket is 'inbox' | 'ongoing' | 'history' | 'drafts', computed server-side
+// (see backend's proposal_retrieval.bucket_for_status) so "pending"/"ongoing"/"in my inbox" all
+// resolve to the one real bucket a proposal is actually in, never a fixed status word.
 export interface AiAssistantProposal {
   readonly requestId: string;
   readonly requestCode: string;
@@ -71,20 +71,14 @@ export interface AiAssistantAnswer {
   readonly navigation?: readonly AiAssistantNavigation[];
 }
 
-// One prior turn, sent back to the server so it can resolve follow-up
-// questions ("what about the location?") — see backend/app/api/ai.py's
-// history handling. The server never stores this; the caller (ai-assistant.ts,
-// via AiConversationStore) is the only place it's persisted, in localStorage.
+// One prior turn, sent back to the server so it can resolve follow-up questions ("what about the
+// location?") — see backend/app/api/ai.py's history handling.
 export interface AiAssistantHistoryTurn {
   readonly question: string;
   readonly answer: string;
 }
 
-// Talks to POST /ai/ask (see backend/app/api/ai.py) — a RAG endpoint scoped to
-// published events. Public: the auth interceptor attaches a bearer token when
-// the caller is signed in, and the endpoint itself works with or without one
-// (see authenticate_optional() there) — a signed-out visitor still gets
-// Public/Club Only events answered.
+// Talks to POST /ai/ask (see backend/app/api/ai.py) — a RAG endpoint scoped to published events.
 @Injectable({ providedIn: 'root' })
 export class AiAssistantService {
   private readonly http = inject(HttpClient);

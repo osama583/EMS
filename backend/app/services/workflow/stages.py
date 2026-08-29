@@ -1,6 +1,6 @@
 """The single-actor review chain: submit, approve, reject, send back, resume, cancel.
 
-Stage order (docs/superpowers/specs/2026-08-10-*-design.md section 3):
+Stage order:
 
     submitted
       -> hos_hod_review          (skipped when the applicant heads their own School)

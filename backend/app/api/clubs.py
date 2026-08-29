@@ -811,10 +811,8 @@ def join_requests_inbox():
     where = ["c.user_id = %s", "j.status = 'pending'"]
     params: list = [principal.user_id]
 
-    # Sorted in SQL, not in the browser: the queue is paginated, so ordering the
-    # rows the client happens to be holding would sort one page of an arbitrary
-    # slice rather than the queue. Ties break on the primary key so a stable page
-    # boundary cannot drop or repeat a row between requests.
+    # Sorted in SQL, not in the browser: the queue is paginated, so ordering the rows the client
+    # happens to be holding would sort one page of an arbitrary slice rather than the queue.
     sort_key = request.args.get("sort", "requested")
     sort_column = _JOIN_REQUEST_SORT_COLUMNS.get(sort_key, _JOIN_REQUEST_SORT_COLUMNS["requested"])
     order = "ASC" if request.args.get("order", "asc") == "asc" else "DESC"
@@ -1011,11 +1009,8 @@ def eligible_presidents():
 
 
 # --- President Change Requests ---------------------------------------------
-# A President cannot leave their own club or be removed (remove_member() below
-# always blocks it) - the only way out is naming a replacement here for a Club
-# Admin to approve. Same request/decide/history shape as club_join_requests,
-# but paginated/filtered/sorted server-side (search_clubs()'s style) since
-# both the admin inbox and the President's own history need it.
+# A President cannot leave their own club or be removed (remove_member() below always blocks it) - the
+# only way out is naming a replacement here for a Club Admin to approve.
 
 _PCR_SELECT = """
     SELECT r.club_president_change_request_id AS id, r.club_id AS "clubId", c.club_name AS "clubName",
@@ -1031,10 +1026,7 @@ _PCR_SELECT = """
  LEFT JOIN users rb ON rb.user_id = r.resolved_by_user_id
 """
 
-# Sortable columns on the join-request queues. A whitelist, not interpolation of
-# whatever ?sort= carried, for the same reason _PCR_SORT_COLUMNS is one: the value
-# reaches an ORDER BY clause, and a dictionary lookup is what keeps it from being
-# able to say anything the server did not already choose to allow.
+# Sortable columns on the join-request queues.
 _JOIN_REQUEST_SORT_COLUMNS = {
     "requested": "j.created_at",
     "club": "c.club_name",

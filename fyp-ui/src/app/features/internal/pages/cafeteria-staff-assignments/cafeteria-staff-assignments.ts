@@ -24,13 +24,9 @@ const ROLE_OPTIONS: readonly SelectOption[] = [
   { value: 'cafeteria-staff', label: 'Cafeteria Staff' },
 ];
 
-// Cafeteria Admin's dedicated user-assignment screen: pick a user, a cafeteria, and a role
-// (Cafeteria Manager or Cafeteria Staff) — writes a real user_unit_roles row via
-// CafeteriaService, the same mechanism the System Admin Assignments tab uses for every other
-// role. Only users holding NO role yet are offered (see cafeterias.routes.js's
-// GET /assignable-users) — this page never lists a user's other roles/units, matching "the data
-// or user in cafeteria should not be showing even to the admin system" (System Admin's own
-// Users/Assignments screens are unaffected — a separate, general-purpose view over the same rows).
+// Cafeteria Admin's dedicated user-assignment screen: pick a user, a cafeteria, and a role (Cafeteria
+// Manager or Cafeteria Staff) — writes a real user_unit_roles row via CafeteriaService, the same
+// mechanism the System Admin Assignments tab uses for every other role.
 @Component({
   selector: 'app-cafeteria-staff-assignments',
   imports: [InternalDataPageComponent, FormModalComponent, FeedbackBannerComponent, DeleteConfirmDialogComponent, ConfirmDialogComponent, SearchableDropdownComponent, FormFieldComponent, StatusToggleComponent],
@@ -109,9 +105,8 @@ export class CafeteriaStaffAssignmentsComponent {
       && !this.managerConflict();
   });
   // A cafeteria may have at most one Cafeteria Manager — checked against every OTHER assignment
-  // (excluding the one currently being edited, so re-saving a manager row onto the same
-  // cafeteria isn't blocked by its own existing row). Mirrors the server-side guard in
-  // cafeterias.routes.js exactly; this is a fast client-side check, the server still enforces it.
+  // (excluding the one currently being edited, so re-saving a manager row onto the same cafeteria
+  // isn't blocked by its own existing row).
   readonly managerConflict = computed<CafeteriaAssignment | null>(() => {
     if (this.selectedRoleCode() !== 'cafeteria-manager' || !this.selectedCafeteriaCode()) return null;
     return this.assignments().find((a) =>
@@ -174,10 +169,10 @@ export class CafeteriaStaffAssignmentsComponent {
     mobile: { eyebrow: 'Deleted', status: `${a.daysRemaining}d left`, title: a.displayName, details: [{ icon: 'schedule', text: `Deleted ${this.formatDate(a.deletedAt)}` }] },
   })));
 
-  // Drives the table: search/role/page/pageSize, refetched from the server on every change or
-  // whenever the service signals a mutation (create/update/remove/restore) via refreshed$ - the
-  // same query params the page used to compute in the browser (filteredAssignments/pageSlice)
-  // are now sent to the server instead.
+  // Drives the table: search/role/page/pageSize, refetched from the server on every change or whenever
+  // the service signals a mutation (create/update/remove/restore) via refreshed$ - the same query
+  // params the page used to compute in the browser (filteredAssignments/pageSlice) are now sent to the
+  // server instead.
   private readonly query$ = toObservable(computed(() => ({
     page: this.page(), pageSize: this.pageSize(), q: this.search().trim(), role: this.roleFilter(),
   })));

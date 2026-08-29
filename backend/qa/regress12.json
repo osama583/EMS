@@ -1,7 +1,0 @@
-[
-{"id":"RGC-a","as":"student.computing@demo.apu.edu.my","q":"which has more ppl this or that","intent":"THE FAILING CASE - dangling referent","expect":"CLARIFY which two; no invented pair"},
-{"id":"RGC-b","as":"student.business@demo.apu.edu.my","q":"whats the one with the most people","intent":"'the one with' but self-contained superlative","expect":"either clarify or answer; must not invent"},
-{"id":"RGC-c","as":"student.computing@demo.apu.edu.my","turns":["Show me events in October.","which one has the most people?"],"intent":"history present -> must NOT clarify","expect":"answers from context"},
-{"id":"RGC-d","as":"student.computing@demo.apu.edu.my","q":"which one got nobody","intent":"cross-domain clarify still works","expect":"CLARIFY"},
-{"id":"RGC-e","as":"student.computing@demo.apu.edu.my","q":"which event has the most people registered?","intent":"no over-clarification","expect":"Career Fair (5)"}
-]

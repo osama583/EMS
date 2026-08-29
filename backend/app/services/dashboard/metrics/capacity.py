@@ -24,11 +24,7 @@ def _horizon_params(scope: Scope, horizon: int | None = None) -> dict[str, Any]:
 
 
 # --- M30 · Stock commitment ratio ----------------------------------------
-# Only defined where the catalogue carries a capacity column. A/V and
-# Photography deliberately have none (gap G3) - their managers allocate at
-# review time - so those two dashboards use M31/M34/M35 instead, which is the
-# reason their signature panels are a timeline and a funnel rather than a
-# heatmap.
+# Only defined where the catalogue carries a capacity column.
 
 
 def logistics_commitment(cur, scope: Scope, horizon: int | None = None) -> list[dict[str, Any]]:

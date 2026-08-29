@@ -45,10 +45,7 @@ export class PoliciesTabComponent {
   readonly thresholds = signal<Record<string, number>>({});
 
   constructor() {
-    // configService.paxReviewerThreshold()/etc. are read once above as plain signal snapshots
-    // (not computed()), so if the real GET resolves after this component has already
-    // constructed with DEFAULT_CONFIG, that later value would otherwise never reach these local
-    // editable copies. Re-sync once, the moment loading flips to false.
+    // configService.paxReviewerThreshold()/etc.
     effect(() => {
       if (this.configService.loading()) return;
       const config = this.configService.config();

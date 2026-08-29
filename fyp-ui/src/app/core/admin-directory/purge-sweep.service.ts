@@ -18,11 +18,9 @@ export interface PurgeSweepResult {
 }
 
 // There is no server this app runs on yet to hang a scheduled job off of (see
-// backend/scripts/purge_deleted.py's docstring), so the 7-day retention sweep — permanently
-// removing everything that has sat in a "Deleted" bin longer than the recovery window — is
-// triggered here on demand by a System Admin instead of running automatically. Every entity in
-// the system's soft-delete registry is covered in one call; a record something still references
-// is left in the bin and reported as blocked rather than force-removed.
+// backend/scripts/purge_deleted.py's docstring), so the 7-day retention sweep — permanently removing
+// everything that has sat in a "Deleted" bin longer than the recovery window — is triggered here on
+// demand by a System Admin instead of running automatically.
 @Injectable({ providedIn: 'root' })
 export class PurgeSweepService {
   private readonly http = inject(HttpClient);

@@ -22,11 +22,9 @@ export interface AiConversation {
 }
 
 // Keyed by WHO is signed in, not a single fixed key - localStorage has no concept of "the current
-// user", so without this, one browser used by two different accounts (or a guest, then someone
-// signing in) would read and continue each other's chat history verbatim, including anything
-// that history contains about the previous asker's own registrations/proposals/decisions. 'guest'
-// is its own fixed bucket (never merged with any signed-in user's), so a signed-out visitor's
-// chat is likewise never inherited by whoever logs in next on that machine.
+// user", so without this, one browser used by two different accounts (or a guest, then someone signing
+// in) would read and continue each other's chat history verbatim, including anything that history
+// contains about the previous asker's own registrations/proposals/decisions.
 const STORAGE_KEY_PREFIX = 'ai-assistant.conversations.v2.';
 const GUEST_BUCKET = 'guest';
 const RETENTION_MS = 24 * 60 * 60 * 1000; // 24 hours, per spec
@@ -37,13 +35,8 @@ function newId(): string {
 }
 
 // Validates every message's shape too, not just the conversation wrapper — a message missing
-// `text`/`sender`, or with `sources`/`clubs` as something other than an array, would otherwise
-// reach the template unchanged and throw inside the @for/.length/.some() calls there. That throw
-// happens mid-render, after the header/earlier DOM is already painted — exactly the "header gone,
-// panel frozen, unscrollable" symptom a corrupted localStorage entry would produce, and one that
-// persists across reload/new tabs because localStorage is shared. Better to drop the bad entry
-// here, once, than let a bad response payload (or a future schema change) brick the widget for
-// good the next time anyone opens it.
+// `text`/`sender`, or with `sources`/`clubs` as something other than an array, would otherwise reach
+// the template unchanged and throw inside the @for/.length/.some() calls there.
 function isValidMessage(value: unknown): value is AiChatMessage {
   if (!value || typeof value !== 'object') return false;
   const m = value as Record<string, unknown>;
@@ -67,13 +60,10 @@ function isConversationArray(value: unknown): value is AiConversation[] {
   );
 }
 
-// Owns the AI assistant's chat history in localStorage: every conversation
-// (not just the currently open one) survives a page reload, and any message
-// older than 24h is dropped automatically the next time this loads — a plain
-// TTL sweep on read, not a scheduled job, since nothing needs to react to the
-// expiry the instant it happens. Kept separate from AiAssistantComponent so
-// the orb's animation logic doesn't have to know how persistence works, and
-// so a future "chat history" surface elsewhere could reuse this same store.
+// Owns the AI assistant's chat history in localStorage: every conversation (not just the currently
+// open one) survives a page reload, and any message older than 24h is dropped automatically the next
+// time this loads — a plain TTL sweep on read, not a scheduled job, since nothing needs to react to
+// the expiry the instant it happens.
 @Injectable({ providedIn: 'root' })
 export class AiConversationStore {
   private readonly auth = inject(AuthService);
@@ -89,28 +79,17 @@ export class AiConversationStore {
   private readonly _activeId = signal<string | null>(this._conversations()[0]?.id ?? null);
   readonly activeId = this._activeId.asReadonly();
 
-  // Bumped every time the storage bucket switches (login/logout/account switch) - a component
-  // holding its OWN "which conversation is open" signal (AiAssistantComponent.activeConversationId)
-  // has no other way to learn its cached id may now belong to a different user's list; it watches
-  // this counter and resets to activeId() whenever it changes. A counter rather than the key
-  // itself since components only need to know "something changed", not what to.
+  // Bumped every time the storage bucket switches (login/logout/account switch) - a component holding
+  // its OWN "which conversation is open" signal (AiAssistantComponent.activeConversationId) has no
+  // other way to learn its cached id may now belong to a different user's list; it watches this
+  // counter and resets to activeId() whenever it changes.
   private readonly _identityVersion = signal(0);
   readonly identityVersion = this._identityVersion.asReadonly();
 
   constructor() {
     // Re-point at the new user's own bucket (or the guest bucket, on logout) the moment identity
-    // changes - without this, a component that grabbed `conversations()`/`activeId()` before a
-    // login would keep rendering the PREVIOUS user's messages until something else forced a
-    // re-read. AiAssistantComponent additionally clears its own open conversation on this same
-    // transition (see its identityReset effect) so a stale message list can't stay on screen.
-    //
-    // On a LOGOUT specifically (a real signed-in user -> no user, not a login/account-switch),
-    // the just-left user's own bucket is DELETED outright, not merely switched away from -
-    // leaving it sitting in localStorage for its full 24h retention window is exactly the leak
-    // this whole per-user-bucket scheme exists to prevent if anything on the same machine can
-    // still reach it (e.g. a signed-out visitor's chat panel staying open on the same tab/
-    // conversation). A login or account-switch, by contrast, deliberately does NOT delete the
-    // previous bucket - that user's own history should still be there when they sign back in.
+    // changes - without this, a component that grabbed `conversations()`/`activeId()` before a login
+    // would keep rendering the PREVIOUS user's messages until something else forced a re-read.
     effect(() => {
       const currentUserId = this.auth.user()?.id;
       const nextKey = this.storageKeyFor(currentUserId);
@@ -179,13 +158,8 @@ export class AiConversationStore {
     if (this._conversations().some((c) => c.id === id)) this._activeId.set(id);
   }
 
-  // Idempotent by message id: the cancel-and-resend recovery path in AiAssistantComponent (see
-  // its identity-switch effect) can call this again for the SAME bubble - e.g. the identity
-  // "switch" turns out to be a same-bucket no-op, or the resend lands in a conversation that
-  // already holds the original append from before the cancel. Silently dropping a re-append of an
-  // id already present (in ANY conversation, not just this one - a stale copy could be sitting in
-  // whichever conversation the pre-cancel append landed in) is what keeps that recovery from ever
-  // rendering the same user bubble twice in one view.
+  // Idempotent by message id: the cancel-and-resend recovery path in AiAssistantComponent (see its
+  // identity-switch effect) can call this again for the SAME bubble - e.g.
   appendMessage(conversationId: string, message: AiChatMessage): void {
     const now = Date.now();
     let list = this._conversations();

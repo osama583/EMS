@@ -13,10 +13,7 @@ import { ToastService } from '../../../../../shared/components/toast/toast.servi
 
 export const REJECTION_COMMENT_MIN_LENGTH = 20;
 
-// Inbox tab for club Presidents: requests to join their club, awaiting their decision. Rebuilt on
-// the same InternalDataPageComponent shell every other hub-* tab uses (header + counter, search,
-// filter, card/table toggle, pagination, shared loading/empty states) so this tab no longer looks
-// like a bespoke plain list next to its siblings.
+// Inbox tab for club Presidents: requests to join their club, awaiting their decision.
 @Component({
   selector: 'app-hub-club-requests',
   imports: [InternalDataPageComponent, FeedbackBannerComponent, ProposalCommentDialogComponent, ConfirmDialogComponent],

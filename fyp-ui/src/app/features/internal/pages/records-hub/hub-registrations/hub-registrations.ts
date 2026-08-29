@@ -10,11 +10,9 @@ import { InternalDataPageComponent } from '../../../../../shared/components/inte
 import { InternalCellClickEvent, InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent, InternalSortChange, InternalSortState } from '../../../../../shared/components/internal-data-page/internal-data-page.models';
 import { ToastService, apiErrorMessage } from '../../../../../shared/components/toast/toast.service';
 
-// Inbox tab for events whose registration_approval is 'manual': the applicant (or a co-owner)
-// reviews each person who asked to attend — name, email and their ≤100-character reason — and
-// approves or rejects. This is a plain single-approver flow, not a workflow stage: there is no
-// request_task behind it (see ems_database_schema.sql's comment above event_registration), which
-// is why it is its own tab rather than a row in the Proposals list.
+// Inbox tab for events whose registration_approval is 'manual': the applicant (or a co-owner) reviews
+// each person who asked to attend — name, email and their ≤100-character reason — and approves or
+// rejects.
 @Component({
   selector: 'app-hub-registrations',
   imports: [InternalDataPageComponent, FeedbackBannerComponent, ConfirmDialogComponent, FormModalComponent],

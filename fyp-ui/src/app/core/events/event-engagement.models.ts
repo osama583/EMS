@@ -36,9 +36,7 @@ export interface RegisteredEventsResponse {
 
 // GET /events/me/registration-history — the merged, server-side searched/filtered/paginated
 // replacement for fetching registration history (getRegistrationHistory) and every decided
-// registration (getDecidedRegistrations) separately and re-bucketing/filtering them in the
-// browser. `requester`/`decidedByIsViewer` are computed server-side; see events.py's
-// _HISTORY_UNION_SQL for the exact bucketing rule.
+// registration (getDecidedRegistrations) separately and re-bucketing/filtering them in the browser.
 export interface RegistrationHistoryRow {
   readonly key: string;
   readonly requester: 'me' | 'other';

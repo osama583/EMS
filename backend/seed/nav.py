@@ -85,11 +85,8 @@ def nav_catalogue() -> list[dict]:
     # --- Top level --------------------------------------------------------
     page("how-it-works", "How It Works", "help_center", "/app/how-it-works", None, 0,
          grants_for(["lecturer", "student"]))
-    # Ten roles hold a dashboard (docs/dashboards/01 § 1): both head roles across
-    # every unit, the CFO, and every Cafeteria Manager. The cafeteria grant is a
-    # `cafeteria` row rather than a unit_role row enumerating outlets - enumerating
-    # outlets is exactly what went stale in commit 7ee8930 and left a new outlet's
-    # staff with an empty sidebar.
+    # Ten roles hold a dashboard (docs/dashboards/01 § 1): both head roles across every unit, the CFO,
+    # and every Cafeteria Manager.
     page("dashboard", "Dashboard", "space_dashboard", "/app/dashboard", None, 1,
          grants_for([*HEAD_ROLES, "cfo"]) + [cafeteria_manager_grant()])
     # Cafeteria Manager gets Inbox/Ongoing/History for the per-order food
@@ -116,11 +113,8 @@ def nav_catalogue() -> list[dict]:
          grants_for(ALL_INTERNAL_ROLES))
     page("my-events", "My Events", "favorite", "/app/events/my-events", "events", 1,
          grants_for(ALL_UNIT_ROLES))
-    # The university-wide master calendar. Route is top-level (/app/event-calendar) even though
-    # the nav entry sits under Events - route_path and the nav tree are independent.
-    # Granted to every internal role plus Cafeteria Managers: the calendar is a planning surface,
-    # and per-event visibility is enforced server-side (events.py's master_calendar), so a broad
-    # page grant never means broad access to event DETAIL.
+    # The university-wide master calendar. Route is top-level (/app/event-calendar) even though the
+    # nav entry sits under Events - route_path and the nav tree are independent.
     page("event-calendar", "Event Calendar", "calendar_month", "/app/event-calendar", "events", 3,
          grants_for(ALL_INTERNAL_ROLES) + [cafeteria_manager_grant()])
 
@@ -138,9 +132,8 @@ def nav_catalogue() -> list[dict]:
          "my-cafeteria-folder", 0, [cafeteria_manager_grant()])
 
     # --- Dropdown Settings ------------------------------------------------
-    # Each kind is granted only to the department that actually owns it. A
-    # uniform grant would show a Logistics head a link to the Sound & Light
-    # dropdown that the API would then refuse on click.
+    # Each kind is granted only to the department that actually owns it. A uniform grant would show a
+    # Logistics head a link to the Sound & Light dropdown that the API would then refuse on click.
     folder("dropdown-settings", "Dropdown Settings", "tune", 16, [
         ("unit_role", ["head-of-department"], SERVICE_UNIT_CODES),
         ("role", ["cfo"], []),
@@ -158,10 +151,7 @@ def nav_catalogue() -> list[dict]:
         # Funding is the CFO's flat-role workflow - no owning unit.
         ("fundingMain", "Funding Main Items", "account_balance_wallet", None),
         ("fundingSub", "Funding Sub-items", "account_tree", None),
-        # University venues, also the CFO's. Registered here rather than as a
-        # page of its own precisely so it is not a special case: it gets the
-        # same route, the same management page, the same Page Visibility row and
-        # the same role-grant plumbing as the twelve catalogues above it.
+        # University venues, also the CFO's.
         ("venue", "Venue Management", "location_city", None),
     ]
     for index, (kind, label, icon, unit_code) in enumerate(dropdown_kinds):

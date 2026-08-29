@@ -1,7 +1,0 @@
-[
-{"id":"RG3-a","as":"student.business@demo.apu.edu.my","q":"who registered for the AI & Data Science Career Fair?","intent":"THE FAILING CASE - scoped-partial roster","expect":"Must NOT imply Daniel is the only registrant"},
-{"id":"RG3-b","as":"student.computing@demo.apu.edu.my","q":"who registered for the AI & Data Science Career Fair?","intent":"ORGANISER - must still get full roster","expect":"All 5 names (Aina organises it)"},
-{"id":"RG3-c","as":"student.computing@demo.apu.edu.my","q":"am i the president of any club?","intent":"D6 fix must NOT regress","expect":"YES: Single Clubs + APU Coding Society"},
-{"id":"RG3-d","as":"student.business@demo.apu.edu.my","q":"do i have any pending join requests?","intent":"true negative must NOT regress","expect":"none"},
-{"id":"RG3-e","as":"student.computing@demo.apu.edu.my","q":"what am i registered for?","intent":"own data - scoped but question IS about self","expect":"Career Fair; must not hedge as incomplete"}
-]

@@ -454,11 +454,7 @@ def test_the_vector_database_is_gone():
 
 # --- the users table cannot be enumerated ---------------------------------------------------------
 # Regression tests for a real hole found by smoke-testing the finished pipeline: `users` had no
-# required predicate, on the reasoning that it is "only ever joined". That was a hope, not a rule.
-# `SELECT users.full_name, users.email FROM users` touched no other table, so no other table's
-# predicate applied, and users had none of its own - the whole staff-and-student directory, from a
-# guest account, past a guard that reported no problem. The AI reviewer caught it, but the reviewer
-# is the second line of defence; the deterministic layer has to hold on its own.
+# required predicate, on the reasoning that it is "only ever joined".
 
 @pytest.mark.parametrize(
     "sql",
@@ -573,11 +569,8 @@ def test_a_write_keyword_inside_a_literal_is_still_rejected():
 
 
 # --- aliases -------------------------------------------------------------------------------------
-# Required predicates are written with real table names, but models naturally alias
-# (`FROM request r ... WHERE r.status = ...`). Matching the literal string would mean forbidding
-# aliases outright, so both sides are alias-expanded before comparison. Getting that expansion
-# one-sided broke EVERY event query - a total outage rather than a leak, but the reason both sides
-# are now normalised the same way.
+# Required predicates are written with real table names, but models naturally alias (`FROM request r
+# ...
 
 def test_an_aliased_query_still_satisfies_its_predicate():
     scope = _guest_scope()
@@ -645,11 +638,7 @@ def test_suppression_never_empties_the_class_set():
 
 
 # --- a predicate that is present but inert -------------------------------------------------------
-# Rule 7 is a textual check: it proves the required condition is THERE, not that it BITES. Those
-# are different claims, and adversarial testing of the finished guard found the gap between them -
-# `WHERE CASE WHEN 1=1 THEN true ELSE (<predicate>) END` contains the predicate verbatim and
-# passed cleanly while doing nothing. The fix rejects the constructs that make neutralisation
-# possible, rather than trying to prove a boolean expression's effect.
+# Rule 7 is a textual check: it proves the required condition is THERE, not that it BITES.
 
 @pytest.mark.parametrize(
     "template",
@@ -710,10 +699,8 @@ def test_a_scalar_subquery_cannot_leak_another_table():
 
 
 # --- recommendations ask before they suggest ------------------------------------------------------
-# From a real session: "can u suggest event for me" returned five events, no reason, no question,
-# and the same five for every asker. Three faults - it never asked what they liked, it guessed
-# "events" for a question that named neither domain, and it dumped the catalogue instead of
-# shortlisting. These test the deterministic half; the prompt enforces the wording.
+# From a real session: "can u suggest event for me" returned five events, no reason, no question, and
+# the same five for every asker.
 
 @pytest.mark.parametrize(
     "question",
@@ -835,11 +822,9 @@ def test_topic_cards_are_capped():
 
 
 # --- registration COUNTS are public; registrant IDENTITIES are not --------------------------------
-# The whole event_registration table was originally treated as private, so "how many people
-# registered for the hackathon" answered 0 for a caller who organises nothing - while Explore
-# Events displayed "5 registered" on that event's own card, to that same user. The count is shipped
-# to every viewer by api/events.py's _event_select (confirmedRegistrationCount), so refusing to
-# state it was never a privacy win; it just made the assistant look broken.
+# The whole event_registration table was originally treated as private, so "how many people registered
+# for the hackathon" answered 0 for a caller who organises nothing - while Explore Events displayed "5
+# registered" on that event's own card, to that same user.
 
 def _cafeteria_manager_scope():
     """A caller who organises nothing and has registered for nothing - the account the bug was

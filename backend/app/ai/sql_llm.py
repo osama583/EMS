@@ -185,12 +185,8 @@ def generate_sql(
 
 
 # =================================================================================================
-# 2. FINAL ANSWER, GROUNDED IN THE EXECUTED RESULT
-# =================================================================================================
-# A different prompt from gemini.py's _SYSTEM_INSTRUCTION, which stays in use for the
-# knowledge-base path. This one's whole job is "turn these rows into a sentence", and its central
-# rule is that the rows are the only permitted source of fact - the same grounding guarantee the
-# retrieval path had, now over a query result instead of retrieved documents.
+# 2. FINAL ANSWER, GROUNDED IN THE EXECUTED RESULT A different prompt from gemini.py's
+# _SYSTEM_INSTRUCTION, which stays in use for the knowledge-base path.
 
 _SQL_ANSWER_SYSTEM_INSTRUCTION = """You are the assistant embedded in a university event and club
 management system. A database query has already been run for the asker's question, under their own
@@ -325,18 +321,8 @@ def generate_sql_answer(
 
 
 # =================================================================================================
-# 3. INDEPENDENT SECURITY REVIEWER
-# =================================================================================================
-# Runs AFTER the answer exists, never in front of it, so it adds nothing to the latency of
-# producing the reply. Its only job is to judge the finished interaction: it never writes an
-# answer, never touches the database, and never decides permissions - the backend acts on its
-# verdict (see api/ai.py).
-#
-# It is a SECOND line of defence, not the boundary. The real boundary is deterministic and has
-# already passed by the time this runs: Page Visibility gated the topic, scope_rules constrained
-# the rows, and sql_guard verified the query. This catches what a rule cannot express - an answer
-# that came from authorised rows but reveals more than it should, or a question that was probing
-# the system rather than asking it something.
+# 3. INDEPENDENT SECURITY REVIEWER Runs AFTER the answer exists, never in front of it, so it adds
+# nothing to the latency of producing the reply.
 
 _REVIEW_SYSTEM_INSTRUCTION = """You are a security reviewer for a university event and club
 management system's chat assistant. You do NOT answer questions. You review one completed

@@ -45,12 +45,7 @@ export class RequestOptionService {
   purge(id: string): Observable<void> { return this.repository.purgeOption(id).pipe(tap(() => this.refresh())); }
   reorder(kind: RequestOptionKind, ids: readonly string[]): Observable<readonly RequestOption[]> { return this.repository.reorderOptions(kind, ids).pipe(tap(() => this.refresh())); }
 
-  // Every Inside University venue dropdown in the system reads this, and only
-  // this. Active-only, so a venue the CFO archived stops being offered for new
-  // selections everywhere at once; already-saved rows keep rendering from the
-  // label frozen onto them at save time (backend migration 032), which is what
-  // keeps archived venues correct in historical records. The server returns
-  // them in the CFO's order, so that order is what every dropdown shows.
+  // Every Inside University venue dropdown in the system reads this, and only this.
   watchVenues(): Observable<readonly RequestOption[]> { return this.watchActive('venue'); }
   getDeleted(): Observable<readonly ArchivedRequestOption[]> { return this.repository.getDeletedOptions(); }
   getById(id: string): Observable<RequestOption> { return this.repository.getOption(id); }

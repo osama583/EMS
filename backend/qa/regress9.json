@@ -1,8 +1,0 @@
-[
-{"id":"RG9-a","as":"student.computing@demo.apu.edu.my","q":"which one got nobody","intent":"THE FAILING CASE - ambiguous fragment","expect":"CLARIFY club or event; no false access claim"},
-{"id":"RG9-b","as":"student.computing2@demo.apu.edu.my","q":"what's the biggest one","intent":"D3 original failure (R1-06)","expect":"CLARIFY, not a guess"},
-{"id":"RG9-c","as":"student.business@demo.apu.edu.my","q":"which one?","intent":"pure fragment","expect":"CLARIFY"},
-{"id":"RG9-d","as":"student.computing@demo.apu.edu.my","q":"how many events have nobody registered?","intent":"MUST NOT over-clarify - names events","expect":"3 - answer directly"},
-{"id":"RG9-e","as":"student.computing@demo.apu.edu.my","q":"which club has the most members?","intent":"MUST NOT over-clarify - names clubs","expect":"answer directly"},
-{"id":"RG9-f","as":"student.computing@demo.apu.edu.my","turns":["Show me the clubs.","which one has the most members?"],"intent":"history present -> must NOT clarify","expect":"answers about clubs using context"}
-]

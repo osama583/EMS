@@ -56,11 +56,8 @@ export class HubHistoryClubsComponent {
     return this.entries()
       .filter((entry) => requester === 'all' || entry.requester === requester)
       .filter((entry) => !search || entry.request.clubName.toLowerCase().includes(search))
-      // This tab MERGES two server-ordered lists (requests I made, and requests I
-      // decided as President), so the interleave has to happen somewhere. The
-      // DIRECTION is the server's - both endpoints were asked for the same
-      // ?order= - and this only merges two already-ordered lists on the same
-      // key, rather than re-deciding the ordering in the browser.
+      // This tab MERGES two server-ordered lists (requests I made, and requests I decided as
+      // President), so the interleave has to happen somewhere.
       .sort((a, b) => {
         const left = new Date(a.request.resolvedAt ?? a.request.createdAt).getTime();
         const right = new Date(b.request.resolvedAt ?? b.request.createdAt).getTime();

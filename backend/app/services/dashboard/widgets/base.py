@@ -193,7 +193,7 @@ def panel(
     the words "No data" alone - a reader who cannot tell an empty period from a
     broken query will assume the second.
 
-    `mobile` names the phone fallback form (see docs/dashboards/70 § 4.2). A
+    `mobile` names the phone fallback form. A
     thirty-column heatmap is unreadable at any cell size on a 390px screen, so
     it becomes a ranked list of breaches rather than a squeezed heatmap.
 
@@ -230,9 +230,7 @@ def panel(
 
 
 # --- Formatting vocabulary ------------------------------------------------
-# The client formats; the server names the format. Keeping the vocabulary here
-# rather than in each widget means a new format is added in one place and every
-# widget that wants it spells it the same way.
+# The client formats; the server names the format.
 
 FMT_NUMBER = "number"
 FMT_PERCENT = "percent"

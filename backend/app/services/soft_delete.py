@@ -84,10 +84,8 @@ class DeletionRule:
     # The entity's own deactivate flag, cleared alongside archived_at so an
     # archived row can never read as live. None for tables that have none.
     active_column: str | None = None
-    # Child rows that exist only to serve this parent and carry no independent
-    # meaning (link tables, resolved requests). They never block the delete;
-    # the purge removes them just before the parent, in the order given, so
-    # foreign keys stay satisfied without relying on ON DELETE CASCADE.
+    # Child rows that exist only to serve this parent and carry no independent meaning (link tables,
+    # resolved requests).
     owned_children: tuple[tuple[str, str], ...] = ()
 
 
@@ -125,10 +123,7 @@ DELETION_RULES: dict[str, DeletionRule] = {
                 "WHERE m.club_id = %s AND m.user_id <> c.user_id",
                 "{n} member(s) have joined this club",
             ),
-            # Every application ever received, decided or not. A processed
-            # application is the clearest evidence the club was in real use, and
-            # it is history that belongs to the applicant as much as to the club
-            # - deleting the club must never be what erases it.
+            # Every application ever received, decided or not.
             _dep(
                 "SELECT count(*) AS c FROM club_join_requests WHERE club_id = %s",
                 "{n} join request(s) have been received",
@@ -138,21 +133,17 @@ DELETION_RULES: dict[str, DeletionRule] = {
                 "{n} president change request(s) have been submitted",
             ),
         ),
-        # Only the two rows created by the act of creating the club itself: the
-        # president's own membership, and the categories picked on the form.
-        # Nothing here is evidence of use, so nothing here blocks the delete -
-        # but the club is only ever purged once the checks above pass, so these
-        # are removed from an untouched club and never from a used one.
+        # Only the two rows created by the act of creating the club itself: the president's own
+        # membership, and the categories picked on the form.
         owned_children=(
             ("club_category_links", "club_id"),
             ("club_members", "club_id"),
         ),
     ),
     # --- Accounts ---------------------------------------------------------
-    # An account that has done anything in the workflow is never deleted: the
-    # proposals, approvals and assignments it left behind name it, and removing
-    # it would blank a name out of somebody else's record. Only an account that
-    # never acted - created by mistake, wrong address, duplicate - can go.
+    # An account that has done anything in the workflow is never deleted: the proposals, approvals and
+    # assignments it left behind name it, and removing it would blank a name out of somebody else's
+    # record.
     "user": DeletionRule(
         table="users",
         pk="user_id",
@@ -234,15 +225,9 @@ DELETION_RULES: dict[str, DeletionRule] = {
 
 
 # --- Catalogues and options ----------------------------------------------
-# Both are the same shape - an admin-managed lookup list that proposals point
-# at - so their rules are generated rather than written out one by one, which
-# also means a new catalogue cannot be added without a usage check.
-#
-# The FK is what matters here. Some of this code carried a comment claiming
-# submitted proposals store an option's LABEL rather than its id, so deleting
-# one could never affect history; the schema says otherwise (request_fmb,
-# request_logistics, request_transportation and the rest all hold a real
-# option_id), and those references are counted accordingly.
+# Both are the same shape - an admin-managed lookup list that proposals point at - so their rules are
+# generated rather than written out one by one, which also means a new catalogue cannot be added
+# without a usage check.
 DELETION_RULES["event_category"] = DeletionRule(
     table="event_category", pk="event_category_id", label="event category", name_column="name",
     active_column="active",
@@ -278,11 +263,8 @@ _OPTION_RULES: dict[str, tuple[str, str, tuple[tuple[str, str], ...]]] = {
                    (("request_funding_purchase", "sub_option_id"),)),
     "fmb": ("fmb_options", "fmb_option_id",
             (("request_fmb", "option_id"), ("request_fmb_selection", "fmb_option_id"))),
-    # servingUnit and dietaryInformation are referenced only by other OPTIONS
-    # (a menu item's serving unit, its dietary tags), never by a proposal
-    # directly. options.py's _dependents already walks those option-to-option
-    # references from the CATALOGUES registry, so declaring them here too would
-    # report the same blocker twice.
+    # servingUnit and dietaryInformation are referenced only by other OPTIONS (a menu item's serving
+    # unit, its dietary tags), never by a proposal directly.
     "servingUnit": ("serving_unit_options", "serving_unit_option_id", ()),
     "dietaryInformation": ("dietary_information_options", "dietary_information_option_id",
                            (("fmb_option_dietary_information", "dietary_information_option_id"),)),

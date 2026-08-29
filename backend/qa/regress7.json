@@ -1,7 +1,0 @@
-[
-{"id":"RG7-a","as":"student.computing2@demo.apu.edu.my","q":"which clubs am i a member of?","intent":"THE FAILING CASE","expect":"all 3: Photography, 1, Single Clubs"},
-{"id":"RG7-b","as":"student.computing@demo.apu.edu.my","q":"what am i registered for?","intent":"generalization: own registrations","expect":"complete set"},
-{"id":"RG7-c","as":"student.business@demo.apu.edu.my","q":"which clubs am i a member of?","intent":"generalization: another user","expect":"Business Leaders Circle + APU Photography Club"},
-{"id":"RG7-d","as":"student.computing@demo.apu.edu.my","q":"what events are coming up?","intent":"BROWSE must still be concise (no regression)","expect":"not required to list all 8 exhaustively"},
-{"id":"RG7-e","as":"student.computing2@demo.apu.edu.my","q":"any club less than 20?","intent":"no regression on invented membership","expect":"5 clubs, no membership claim"}
-]

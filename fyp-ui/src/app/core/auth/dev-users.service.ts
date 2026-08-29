@@ -1,9 +1,5 @@
-// TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)
-//
-// Fetches the shared-password demo account list for the login page's
-// account picker. The backend endpoint 404s unless DEMO_MODE=true is set on
-// the server, which this service treats identically to "no demo users" —
-// there is no separate frontend flag to keep in sync.
+// TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode) Fetches the shared-password
+// demo account list for the login page's account picker.
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, of } from 'rxjs';

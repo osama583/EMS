@@ -116,11 +116,9 @@ def _event_visibility_predicates(user_id: int | None, email: str | None) -> tupl
         return (
             "request.status = 'completed_approved' AND request.event_visibility = 'Public'",
         )
-    # A signed-in caller: the shared tiers, OR a 'Club Only' event addressed to a club they
-    # are a MEMBER of, OR their own event at any visibility (including Private) - the
-    # my_organized_events owner_clause. The Club Only branch is a membership test, not a
-    # tier: without it the assistant would answer questions about events the asker cannot
-    # see in the UI, which is the same leak _published_clause closes.
+    # A signed-in caller: the shared tiers, OR a 'Club Only' event addressed to a club they are a
+    # MEMBER of, OR their own event at any visibility (including Private) - the my_organized_events
+    # owner_clause.
     owned = _owner_clause("request", "request.request_id", user_id, email or "")
     club_member = (
         "(request.event_visibility = 'Club Only' AND EXISTS ("
@@ -143,10 +141,7 @@ def build_scope(principal, topics: set[str]) -> Scope:
     user_id = principal.user_id if principal is not None else None
     email = getattr(principal, "email", None) if principal is not None else None
     is_student = principal is not None and principal.has_role("student")
-    # "Club admin" here means the clubs_admin topic survived the page gate, i.e. Page Visibility
-    # grants Manage Clubs / Club Category. Never principal.has_role("club-admin"): that is the
-    # exact drift topic_access.py was written to remove (a custom role granted the page was
-    # refused; a club-admin whose page was revoked was still answered).
+    # "Club admin" here means the clubs_admin topic survived the page gate, i.e.
     is_club_admin = "clubs_admin" in topics
 
     predicates: dict[str, tuple[str, ...]] = {}
@@ -169,23 +164,8 @@ def build_scope(principal, topics: set[str]) -> Scope:
 
         # Registrations split into a PUBLIC half and a PRIVATE half, and conflating them was a real
         # bug: the whole table was treated as private, so "how many people registered for the
-        # hackathon" answered 0 for a caller who organises nothing - while the Explore Events page
-        # was displaying "5 registered" on the card for that very event, to that very user.
-        #
-        # HOW MANY is public. api/events.py's _event_select ships confirmedRegistrationCount and
-        # pendingRegistrationCount on EVERY published event to EVERY viewer, guests included (it is
-        # also what enforces the max_pax "full" badge). Refusing to count is therefore not a privacy
-        # win - it withholds a number already printed on the page and makes the assistant look
-        # broken.
-        #
-        # WHO is private, and stays exactly as private as it was. Names, emails, reasons for
-        # attending, payment state - those are the caller's own rows, or the roster of an event the
-        # caller organises, and nothing else.
-        #
-        # The split is enforced by COLUMN, not by trusting the query's shape: PUBLIC_COUNT_ONLY
-        # below is checked in sql_guard, which rejects any query using that predicate while
-        # selecting an identifying column. A predicate cannot express "you may aggregate but not
-        # project", so the guard does that half.
+        # hackathon" answered 0 for a caller who organises nothing - while the Explore Events page was
+        # displaying "5 registered" on the card for that very event, to that very user.
         count_only = _COUNT_ONLY
         if user_id is not None:
             owner_of_event = (
@@ -249,13 +229,9 @@ def build_scope(principal, topics: set[str]) -> Scope:
                 f"EXISTS (SELECT 1 FROM clubs c_pres WHERE c_pres.user_id = {user_id}"
                 " AND c_pres.club_id = {table}.club_id)"
             )
-            # Same split as event_registration above, for the same reason: HOW MANY members a club
-            # has is public - `GET /clubs` is @require_auth and returns "memberCount" for every
-            # club to any signed-in caller, and the Discover Clubs UI even sorts by it. Restricting
-            # club_members to self/president made the assistant refuse a number the asker can read
-            # on screen ("I don't have access to club membership details"), which is the
-            # over-refusal half of the same bug as leaking a roster. WHO is in a club stays private;
-            # sql_guard's rule 7b enforces the count/identify split by column.
+            # Same split as event_registration above, for the same reason: HOW MANY members a club has
+            # is public - `GET /clubs` is @require_auth and returns "memberCount" for every club to
+            # any signed-in caller, and the Discover Clubs UI even sorts by it.
             predicates["club_members"] = (
                 f"club_members.user_id = {user_id}",
                 president_of.format(table="club_members"),
@@ -287,40 +263,7 @@ def build_scope(principal, topics: set[str]) -> Scope:
                     "Do not write a query that looks for their memberships or eligible clubs."
                 )
 
-    # `users` is readable for NAMES only, and only as a JOIN target - never as the subject of a
-    # query. "List every user", "who has role X", "what is someone's email" is the admin directory,
-    # which this assistant does not cover (api/ai.py's scope statement).
-    #
-    # This needs a real predicate, not just an instruction. `users` was originally left
-    # unconstrained on the reasoning that it is only ever joined - but "only ever joined" was a
-    # hope, not a rule, and `SELECT users.full_name, users.email FROM users` passed the guard
-    # cleanly: no other table was touched, so no other table's predicate applied, and users had
-    # none of its own. That is the entire staff-and-student directory, from a guest account.
-    #
-    # The predicate below forces every users row to be REACHED THROUGH something the caller is
-    # already authorised to see - an event they can see, a club, or (signed in) themselves. It
-    # cannot be satisfied by a bare enumeration, because a bare enumeration is exactly what it
-    # excludes. users.email is additionally excluded outright further down for anyone but the
-    # asker, since a name is all an answer ever needs.
-    # Satisfiable in exactly two ways, both of which mean "this person was reached THROUGH
-    # something already authorised" rather than enumerated:
-    #
-    #   a JOIN condition tying users.user_id to a column on an authorised row. This is what an
-    #   ordinary "who organises this event" / "who is the president" question produces naturally,
-    #   and it is the reason the predicate is written as the join itself rather than as a
-    #   correlated EXISTS: requiring an EXISTS would reject every legitimate join, forcing the
-    #   model into a strictly worse query shape to satisfy a rule that was meant to constrain
-    #   nothing it was already doing.
-    #
-    #   the asker themselves, for a signed-in caller.
-    #
-    # What NONE of them permit is `FROM users` with no join at all - which is the directory dump
-    # this predicate exists to stop. A bare SELECT/COUNT over users matches no option and is
-    # rejected.
-    # Only the joins whose OTHER table this question can actually reach: advertising a club join
-    # in an events-only question would offer the model a route the table allow-list then rejects.
-    # `predicates` at this point already has an entry for every table the topics above put in play,
-    # so its keys ARE this question's reachable set.
+    # `users` is readable for NAMES only, and only as a JOIN target - never as the subject of a query.
     joins_by_table = {
         "request": "users.user_id = request.applicant_user_id",
         "event_registration": "users.user_id = event_registration.user_id",

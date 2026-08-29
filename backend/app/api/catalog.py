@@ -35,14 +35,9 @@ CONFIG_FIELDS: dict[str, str] = {
     "paxReviewerThreshold": "HIGH_PAX_THRESHOLD",
     "cancellationDaysLimit": "CANCELLATION_DEADLINE_DAYS",
     "maxEventCategories": "MAX_EVENT_CATEGORIES",
-    # --- Dashboard thresholds still read by a live widget (migration 018) --
-    # The rest of the sixteen dashboard-threshold codes this migration seeded
-    # were removed along with the metrics/widgets that existed only to read
-    # them. These three remain because forward-looking capacity/demand panels,
-    # every weekly trend series, and the R8 bucket-suppression rule still read
-    # them. Per-unit overrides use a `__<unit_code>` suffix on the same code
-    # and are not editable from this form; the resolver falls back to these
-    # defaults.
+    # --- Dashboard thresholds still read by a live widget (migration 018) -- The rest of the sixteen
+    # dashboard-threshold codes this migration seeded were removed along with the metrics/widgets that
+    # existed only to read them.
     "forecastHorizonDays": "FORECAST_HORIZON_DAYS",
     "dashboardTrendWeeks": "DASHBOARD_TREND_WEEKS",
     "minBucketSize": "MIN_BUCKET_SIZE",

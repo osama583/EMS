@@ -7,12 +7,8 @@ import { FormModalComponent } from '../form-modal/form-modal';
 import { ConfirmDialogComponent } from '../confirm-dialog/confirm-dialog';
 import { ToastService, apiErrorMessage } from '../toast/toast.service';
 
-// Roster popup opened from My Clubs — lets a member or President see who else belongs to a club
-// (name, email, role, date joined), read-only. Leaving a club is a page-level action (see
-// hub-my-clubs.ts), not handled here. The President may still remove another member from this
-// table — that capability has nowhere else to live. The President themselves has no action on
-// their own row: DELETE /clubs/{id}/members/{userId} always blocks removing the President, so the
-// only way for them to stop presiding is a President Change Request (see the Inbox tab).
+// Roster popup opened from My Clubs — lets a member or President see who else belongs to a club (name,
+// email, role, date joined), read-only.
 @Component({
   selector: 'app-club-roster-modal',
   imports: [FormModalComponent, ConfirmDialogComponent],

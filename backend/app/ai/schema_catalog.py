@@ -39,9 +39,6 @@ from ..db import query
 log = logging.getLogger(__name__)
 
 # Every table the assistant may read, and nothing else. sql_guard.py enforces this exact set.
-# Grouped by the topic that needs them, because the SQL prompt only ever ships the groups the
-# classified topic actually requires (see document_for_topics) - a club question is not given the
-# event tables to get confused by.
 TABLE_GROUPS: dict[str, tuple[str, ...]] = {
     "events": (
         "request",
@@ -62,15 +59,7 @@ TABLE_GROUPS: dict[str, tuple[str, ...]] = {
         "users",
     ),
     # Always available, because every answer names people and every scope predicate expresses "the
-    # asker" through one of these. Deliberately the MINIMUM that achieves that: `users` to resolve
-    # a name, `student` because club membership is students-only (a rule a query must be able to
-    # express), and `staff` because co-ownership of an event is matched through staff_id.
-    #
-    # role/unit/user_unit_roles are NOT here. Describing them would let a question drift into "who
-    # holds which role", which is the admin directory - explicitly outside this assistant's scope
-    # (see api/ai.py's scope statement), and something Page Visibility gates as a page rather than
-    # as rows. A caller's own roles are already in the prompt as authenticated context; they never
-    # need to be queried for.
+    # asker" through one of these.
     "identity": (
         "users",
         "student",
@@ -81,17 +70,6 @@ TABLE_GROUPS: dict[str, tuple[str, ...]] = {
 ALLOWED_TABLES: frozenset[str] = frozenset(t for group in TABLE_GROUPS.values() for t in group)
 
 # Columns that exist on an allowed table but must never reach the model or a generated query.
-#
-# users.password is the obvious one - a credential, and an assistant that can read it is an
-# account-takeover tool.
-#
-# users.email is here for a less obvious but equally real reason: no answer this assistant gives
-# needs it. Every question it supports is answered with a person's NAME ("Aina Rahman organises
-# that event", "you're a member of three clubs"), and the asker's own email is already in the
-# prompt as authenticated context. Leaving the column queryable bought nothing and made the whole
-# staff-and-student directory one careless join away - "list the organisers of every public event"
-# is a legitimate-looking question that would have returned a contact list. Excluding the column
-# outright is a stronger guarantee than any instruction telling the model not to select it.
 EXCLUDED_COLUMNS: dict[str, frozenset[str]] = {
     "users": frozenset({"password", "email"}),
 }

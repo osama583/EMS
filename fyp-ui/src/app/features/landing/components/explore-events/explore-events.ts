@@ -105,18 +105,11 @@ export class ExploreEventsComponent {
   readonly draftCustomTo = signal('');
   readonly currentPage = signal(1);
   // Writable — the internal variant's pagination control lets the user pick 9/18/27 (see
-  // changePageSize). Its per-variant DEFAULT is seeded reactively in the constructor (an effect
-  // keyed off variant(), not a one-time check) so it's still correct even if the variant input
-  // arrives after construction — e.g. TestBed's setInput(), or any binding path that resolves
-  // later than a static template attribute would. The public variant never exposes a page-size
-  // control, so this only ever changes there via that reactive default.
+  // changePageSize).
   readonly pageSize = signal(INTERNAL_PAGE_SIZE);
 
-  // The single source of truth for what's on screen, for BOTH variants — always the current
-  // page of GET /events/search results. There is no separate client-side filtering path: the
-  // public landing page is just this same server search, permanently scoped to Public-visibility
-  // events (see buildSearchParams), with no filter UI offered. One filter implementation, one
-  // place it can drift from the backend's (the backend's _list_events_filters already mirrors it).
+  // The single source of truth for what's on screen, for BOTH variants — always the current page of
+  // GET /events/search results.
   private readonly pageEvents = signal<readonly PublishedEvent[]>([]);
   readonly resultCount = signal(0);
   readonly pagedPublishedEvents = computed(() => this.pageEvents());
@@ -165,10 +158,9 @@ export class ExploreEventsComponent {
   );
 
   // Only Students and Lecturers can ever be part of a club (as a member or as President — see
-  // AuthUser.presidentOfClubIds, a data fact, not a role) — every other internal role has no
-  // path to club participation, so offering the "Club Only" filter to them would be misleading
-  // UI, not just a functional gap. RBAC redesign: 'student'/'lecturer' are now literal role_codes
-  // (same eligibility rule as club-identity.service.js's isEligibleForClub() server-side).
+  // AuthUser.presidentOfClubIds, a data fact, not a role) — every other internal role has no path to
+  // club participation, so offering the "Club Only" filter to them would be misleading UI, not just a
+  // functional gap.
   private readonly canSeeClubOnlyFilter = computed(() => {
     const user = this.auth.user();
     if (!user) return false;
@@ -242,12 +234,10 @@ export class ExploreEventsComponent {
       this.document.body.classList.remove('filters-open');
     });
 
-    // Deep link from anywhere that links to a specific event by id (currently
-    // the AI assistant's event-card sources — see ai-assistant.ts) — a
-    // ?event=<id> query param opens that event's details modal directly,
-    // fetching it on its own if the current page/filter happened not to
-    // include it rather than requiring the caller to already be on the page
-    // that lists it.
+    // Deep link from anywhere that links to a specific event by id (currently the AI assistant's
+    // event-card sources — see ai-assistant.ts) — a ?event=<id> query param opens that event's details
+    // modal directly, fetching it on its own if the current page/filter happened not to include it
+    // rather than requiring the caller to already be on the page that lists it.
     const eventId = this.route.snapshot.queryParamMap.get('event');
     if (eventId) {
       this.publishedEventService.getEventDetails(eventId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
@@ -272,13 +262,9 @@ export class ExploreEventsComponent {
       });
 
     // variant() is a signal input, so it is not guaranteed to be readable at its final value the
-    // moment the constructor runs — a static template attribute (`variant="internal"`) resolves
-    // before construction, but other binding paths (TestBed's setInput(), a structural directive)
-    // resolve after. A one-time `if (this.variant() === ...)` check in the constructor body would
-    // silently lock the component onto whatever variant() happened to read at that instant. This
-    // effect instead reacts to variant() itself, seeding the per-variant page size once and
-    // firing the internal-only setup (school/catalog option fetches) once, whenever variant()
-    // actually resolves — construction-time or not.
+    // moment the constructor runs — a static template attribute (`variant="internal"`) resolves before
+    // construction, but other binding paths (TestBed's setInput(), a structural directive) resolve
+    // after.
     let setupDoneFor: 'public' | 'internal' | null = null;
     effect(() => {
       const current = this.variant();
@@ -345,10 +331,10 @@ export class ExploreEventsComponent {
   }
 
   private buildSearchParams(filters: FilterSelection, customFrom: string, customTo: string, page: number, pageSize: number): EventSearchParams {
-    // The public variant offers no filter UI, no auth-aware exclusion, and only ever wants
-    // Public-visibility events — everything else (category/school/format/date/time/
-    // registration/cost/visibility) is the internal variant's applied filters, which stay
-    // empty here since filterGroups/openFilters are never reachable on the public variant.
+    // The public variant offers no filter UI, no auth-aware exclusion, and only ever wants Public-
+    // visibility events — everything else (category/school/format/date/time/
+    // registration/cost/visibility) is the internal variant's applied filters, which stay empty here
+    // since filterGroups/openFilters are never reachable on the public variant.
     if (this.variant() === 'public') {
       return {
         q: this.searchTerm().trim() || undefined,
@@ -491,10 +477,10 @@ export class ExploreEventsComponent {
 
   toggleSaved(eventId: string): void { this.favourites.toggle(eventId); }
 
-  // A method (not a template-bound signal expression) reading this component's OWN signal is
-  // still tracked correctly by zoneless change detection — unlike the old isSaved() wrapper this
-  // replaced, which read a signal owned by an INJECTED service and silently missed its updates
-  // (see explore-events.html's [saved] binding, now reading favourites.savedEventIds() directly).
+  // A method (not a template-bound signal expression) reading this component's OWN signal is still
+  // tracked correctly by zoneless change detection — unlike the old isSaved() wrapper this replaced,
+  // which read a signal owned by an INJECTED service and silently missed its updates (see explore-
+  // events.html's [saved] binding, now reading favourites.savedEventIds() directly).
   registrationStatus(eventId: string): RegistrationStatus | null {
     return this.registrationStatusByEventId().get(eventId) ?? null;
   }

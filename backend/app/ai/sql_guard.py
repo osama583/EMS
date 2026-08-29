@@ -72,19 +72,7 @@ _FORBIDDEN_CONSTRUCTS = (
     "into outfile", "\\g", "\\copy",
 )
 
-# Rule 7 checks that a required predicate is PRESENT. Present is not the same as effective: a
-# query can contain the predicate verbatim and still neutralise it, which is the one way a purely
-# textual check can be satisfied without being obeyed. Found by adversarial testing of the finished
-# guard, not in theory - `WHERE CASE WHEN 1=1 THEN true ELSE (<predicate>) END` passed cleanly.
-#
-# Rather than try to prove a boolean expression's effect (which needs a real parser and an
-# evaluator, and would still be arguable), these reject the CONSTRUCTS that make neutralisation
-# possible at all. None of them has any place in a generated read query:
-#   - a tautology (1=1, true or ...) short-circuits any condition OR'd with it;
-#   - CASE in a WHERE clause makes a predicate conditional on something else;
-#   - OFFSET/FETCH tricks and `WHERE false` are not neutralisation but are equally never generated.
-# The model is not told about these because it never writes them; a query that contains one is
-# either confused or hostile, and both are worth rejecting.
+# Rule 7 checks that a required predicate is PRESENT.
 _NEUTRALISING_CONSTRUCTS = (
     (re.compile(r"\bcase\s+when\b", re.IGNORECASE), "CASE in a query condition"),
     (re.compile(r"\b(\d+)\s*=\s*\1\b"), "a tautology (n = n)"),
@@ -93,11 +81,8 @@ _NEUTRALISING_CONSTRUCTS = (
     (re.compile(r"\bor\s+'[^']*'\s*=\s*'[^']*'", re.IGNORECASE), "a constant string comparison in an OR"),
 )
 
-# The marker scope_rules emits for "counting registrations is public, identifying registrants is
-# not" (see its event_registration block). It is a required PREDICATE like any other, so rule 7
-# proves it is present; rule 7b then proves the query it appears in is genuinely a count. Rewritten
-# to TRUE before execution (sql_runner._strip_markers) - it is an instruction to this guard, not a
-# condition the database has any way to evaluate.
+# The marker scope_rules emits for "counting registrations is public, identifying registrants is not"
+# (see its event_registration block).
 _COUNT_ONLY_MARKER = "PUBLIC_COUNT_ONLY"
 
 # Columns that turn a count into a disclosure. A registration COUNT is on every event card already;
@@ -110,18 +95,7 @@ _IDENTIFYING_REGISTRATION_COLUMNS = (
 
 _COMMENT_BLOCK = re.compile(r"/\*.*?\*/", re.DOTALL)
 _COMMENT_LINE = re.compile(r"--[^\n]*")
-# Single-quoted string literals, doubled '' handled as an escaped quote inside one. Blanked out
-# before the TABLE and COLUMN rules run, because those rules read dots as qualification and a
-# literal is full of dots that are nothing of the kind: an email in a WHERE clause
-# ('student.computing@demo.apu.edu.my') parses as student.computing, demo.apu and edu.my, and the
-# column rule then rejects a perfectly valid query for referencing a column named "computing" on a
-# table named "student". That was a live false rejection, not a hypothetical - it burned all three
-# retry attempts on two of the first real questions put through the pipeline.
-#
-# Blanked, NOT deleted, so offsets and word boundaries either side stay intact. The keyword and
-# construct rules deliberately still run against the text WITH literals present: a literal
-# containing "DROP TABLE" is harmless on its own, but it is also not something any legitimate
-# generated query contains, and rejecting it costs nothing.
+# Single-quoted string literals, doubled '' handled as an escaped quote inside one.
 _STRING_LITERAL = re.compile(r"'(?:[^']|'')*'")
 # Table references: the name following FROM / JOIN / UPDATE-style clauses. Deliberately broad -
 # over-matching produces a false rejection (safe), under-matching would let a table past (unsafe).
@@ -248,17 +222,11 @@ def validate(sql: str, *, allowed_tables: tuple[str, ...], scope) -> str:
             if re.search(rf"\b{re.escape(column)}\b", lowered):
                 raise SqlRejected(f"Column {table}.{column} is not readable.")
 
-    # Structure-only view: string literals blanked so their contents cannot be read as table or
-    # column references (see _STRING_LITERAL). Every identifier rule below works from this; the
-    # predicate check further down deliberately keeps the original, since a required predicate
-    # contains literals of its own that must match verbatim.
+    # Structure-only view: string literals blanked so their contents cannot be read as table or column
+    # references (see _STRING_LITERAL).
     structural = _STRING_LITERAL.sub(lambda m: "'" + " " * (len(m.group(0)) - 2) + "'", cleaned)
     # ...and with the argument-separator FROM blanked, so a date-part expression is not read as a
-    # table clause. `EXTRACT(MONTH FROM event_schedule.date)` made _TABLE_REF capture the column's
-    # qualifier as a table, which rejected every "which events are in October" query (three
-    # attempts, all correct) and answered a confident, wrong "there are no events in October".
-    # Length-preserving, so every rule below still works on the same offsets, and narrow enough
-    # that a FROM in any other position is still a real table reference and still checked.
+    # table clause.
     structural = _blank_function_from(structural)
 
     allowed = {t.lower() for t in allowed_tables}
@@ -299,21 +267,8 @@ def validate(sql: str, *, allowed_tables: tuple[str, ...], scope) -> str:
                 f"Column '{column}' does not exist on table '{table}'.", repairable=True
             )
 
-    # 7. required scope predicates - the row-level authorization check
-    #
-    # Compared against an ALIAS-EXPANDED form of the query, not the raw text. Predicates are
-    # written with real table names (`request.status = ...`), but a model naturally writes
-    # `FROM request r ... WHERE r.status = ...`, which is the same condition and was being
-    # rejected as a missing one - the model then burned every retry attempt rewriting a query that
-    # was correct the first time. Requiring the literal string would have meant forbidding aliases
-    # outright, which is a worse constraint than resolving them.
-    #
-    # Expansion uses the alias map already built for rule 5, so a query cannot smuggle a different
-    # table in under an alias the guard resolved differently to the database: rule 4 has already
-    # confirmed every aliased table is one this question allows.
-    # Expanded from `cleaned`, NOT from `structural`: a required predicate contains string literals
-    # of its own ('completed_approved', 'Public'), and matching against the blanked form would
-    # compare a predicate that has them to a query that no longer does - failing every time.
+    # 7. required scope predicates - the row-level authorization check Compared against an ALIAS-
+    # EXPANDED form of the query, not the raw text.
     normalised_sql = _normalise(_expand_aliases(cleaned, aliases))
     for table, predicates in scope.required_predicates.items():
         if not predicates:
@@ -323,12 +278,7 @@ def validate(sql: str, *, allowed_tables: tuple[str, ...], scope) -> str:
         # actually reads.
         if not re.search(rf"\b{re.escape(table)}\b", structural_lower):
             continue  # table not used by this query
-        # The PREDICATE is alias-expanded too, with the same map. It carries aliases of its own
-        # (co_request/s_request, from scope_rules._owner_clause), and those names appear in the
-        # query's own FROM/JOIN clauses - so the query-side expansion rewrites them, and comparing
-        # against an unexpanded predicate compares two texts that were normalised differently.
-        # That mismatch failed EVERY event query, which is a total outage rather than a leak, but
-        # it is exactly the kind of thing "compare the two sides the same way" prevents.
+        # The PREDICATE is alias-expanded too, with the same map.
         if not any(
             _normalise(_expand_aliases(predicate, aliases)) in normalised_sql
             for predicate in predicates
@@ -339,13 +289,8 @@ def validate(sql: str, *, allowed_tables: tuple[str, ...], scope) -> str:
                 repairable=True,
             )
 
-    # 7b. PUBLIC_COUNT_ONLY means exactly that - aggregate, never identify.
-    #
-    # A predicate is a row filter, and no row filter can express "you may COUNT these rows but not
-    # PROJECT them". That is a column-level rule, so it is enforced here instead. The marker lets a
-    # caller answer "how many people registered for the hackathon" - a number the event's own card
-    # already shows everyone - without it becoming a way to read the attendee list of an event they
-    # have nothing to do with.
+    # 7b. PUBLIC_COUNT_ONLY means exactly that - aggregate, never identify. A predicate is a row
+    # filter, and no row filter can express "you may COUNT these rows but not PROJECT them".
     if _COUNT_ONLY_MARKER.lower() in normalised_sql:
         if not re.search(r"\bcount\s*\(", structural_lower):
             raise SqlRejected(

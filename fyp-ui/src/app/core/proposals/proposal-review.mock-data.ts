@@ -1,9 +1,5 @@
-// SPEC FIXTURES ONLY.
-//
-// Nothing in the running application reads this file any more - every proposal
-// comes from the API. It survives because several specs need a realistic
-// ProposalReviewRecord to flush through HttpTestingController. Do not import it
-// from application code.
+// SPEC FIXTURES ONLY. Nothing in the running application reads this file any more - every proposal
+// comes from the API.
 
 import { EditableRow } from '../../shared/components/form-controls/form-controls.models';
 import { DepartmentRequestKind } from '../departments/department-workflow.config';

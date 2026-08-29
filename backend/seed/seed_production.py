@@ -49,10 +49,7 @@ ATRIUM = "cafeteria__atrium_cafeteria"
 FOOD_COURT = "cafeteria__level_3_food_court"
 CAFETERIAS = (ATRIUM, FOOD_COURT)
 
-# Which requirements each kind of event actually asks for. Drawn from what the
-# event is, not at random: a campus tour needs Student Services, a 5K run needs
-# water and a first-aid-adjacent logistics setup, an internal meeting needs a
-# room and coffee.
+# Which requirements each kind of event actually asks for.
 REQUIREMENT_MIX = {
     "fair":        ["logistics", "soundLight", "photoVideo", "fundingPurchase"],
     "seminar":     ["logistics", "soundLight"],
@@ -846,10 +843,8 @@ class Spec:
     # carry - the label is only used for the agenda, which is still free text.
     venue: tuple[str, str]
     event_format: str
-    # Set only for an Off Campus event: the street address that goes in the
-    # schedule's Outside University branch. None means the event is held at
-    # `venue` and the schedule is Inside University. Decided here rather than in
-    # make_payload so the format and the location can never disagree.
+    # Set only for an Off Campus event: the street address that goes in the schedule's Outside
+    # University branch.
     external_location: str | None
     day: date
     days: int
@@ -873,12 +868,7 @@ def _routed_requirements(kinds: list[str]) -> list[str]:
 
 
 derive_fmb_cycle = (
-    # Walked in order across the in-flight proposals so the F&B lane is not left
-    # to chance. Each mode lands an order on a different screen: 'assigned'
-    # leaves it pending in the Cafeteria Manager's inbox, 'preparing' puts some
-    # in the staff shared pool and some claimed, 'pending' is F&B's own inbox,
-    # 'sendback' is the applicant's. Random sampling produced none of the first
-    # two often enough, and an empty shared pool is a screen nobody can test.
+    # Walked in order across the in-flight proposals so the F&B lane is not left to chance.
     "assigned", "preparing", "assigned", "pending", "preparing",
     "complete", "assigned", "sendback", "preparing", "assigned",
 )
@@ -900,11 +890,7 @@ def _plan_departments(routed: list[str], outcome: str, rng: random.Random,
     modes = {name: rng.choices(choices, weights=weights, k=1)[0] for name in routed}
     if fmb_mode and wf.constants.FMB_REQUIREMENT in modes:
         modes[wf.constants.FMB_REQUIREMENT] = fmb_mode
-    # 'pending' and 'sendback' are the only two modes that cannot terminate on
-    # their own. Without one of them the last lane to finish would trip
-    # check_all_tasks_resolved and the proposal would silently publish itself
-    # instead of staying in department review - and a water-only F&B lane
-    # terminates the moment it is approved, so 'assigned' is no guarantee.
+    # 'pending' and 'sendback' are the only two modes that cannot terminate on their own.
     if not any(mode in ("pending", "sendback") for mode in modes.values()):
         modes[rng.choice(routed)] = "pending"
     return modes
@@ -1025,10 +1011,9 @@ def build_specs(cat: Catalogue, ctx: Ctx, rng: random.Random, high_pax: int,
                 resubmit_at = "hos_hod_review"
 
             fmb_mode = None
-            # Only a proposal that actually asked for FOOD can exercise the
-            # cafeteria flow: a water-only request folds into the same F&B task,
-            # but approving it IS the fulfilment (tasks.py::approve_task), so it
-            # never produces an order for a manager to accept.
+            # Only a proposal that actually asked for FOOD can exercise the cafeteria flow: a water-
+            # only request folds into the same F&B task, but approving it IS the fulfilment
+            # (tasks.py::approve_task), so it never produces an order for a manager to accept.
             if outcome == "department_review" and "fmb" in requirements:
                 fmb_mode = derive_fmb_cycle[fmb_turn % len(derive_fmb_cycle)]
                 fmb_turn += 1
@@ -1121,10 +1106,7 @@ def make_payload(cat: Catalogue, rng: random.Random, ctx: Ctx, spec: Spec) -> di
     title, intro, goals, benefits, categories, pax, kind = spec.template
     first = spec.day.isoformat()
     venue_ref, venue_label = spec.venue
-    # What the agenda's free-text location column says. The agenda is a
-    # running-order note ("Registration desk, 09:00"), not a bookable slot, so
-    # it stays text - it is the one location field in the form that is not a
-    # venue dropdown.
+    # What the agenda's free-text location column says.
     where = spec.external_location or venue_label
     schedule = []
     for offset in range(spec.days):
@@ -1147,10 +1129,7 @@ def make_payload(cat: Catalogue, rng: random.Random, ctx: Ctx, spec: Spec) -> di
         "benefits": benefits,
         "applicantDepartment": ctx.unit_label.get(spec.applicant_unit or "", ""),
         "eventVisibility": spec.visibility,
-        # The audience behind "Club Only". _pick_visibility only ever returns that
-        # tier when the applicant actually presides over a club (see there), so this
-        # resolves to exactly that club - the same one-club-per-proposal shape a real
-        # president submitting from the form would produce.
+        # The audience behind "Club Only".
         "eventClubs": (
             [str(ctx.club_ids_by_name[spec.club])]
             if spec.visibility == "Club Only" and spec.club in ctx.club_ids_by_name
@@ -1446,11 +1425,9 @@ def drive_proposal(cur, ctx: Ctx, cat: Catalogue, rng: random.Random, spec: Spec
     clock.stamp()
     status = _walk_stages(cur, ctx, rng, spec, clock, request_id)
 
-    # When the reviewers are done and the proposal drops into department review,
-    # the organiser starts promoting it - that, not the moment the last crew
-    # finishes setting up chairs, is when people actually sign up. Registration
-    # timestamps are spread from here, otherwise every attendee would appear to
-    # have registered in the last hour before the doors opened.
+    # When the reviewers are done and the proposal drops into department review, the organiser starts
+    # promoting it - that, not the moment the last crew finishes setting up chairs, is when people
+    # actually sign up.
     opened_at = clock.at
 
     if status == "department_review":
@@ -1504,10 +1481,8 @@ def seed_registrations(cur, ctx: Ctx, rng: random.Random, published: list[dict])
         wanted = int(pax * rng.uniform(0.30, 0.85))
         chosen = rng.sample(pool, min(len(pool), max(3, wanted)))
 
-        # Registration opens when the reviewers are done and closes when the
-        # event starts (or now, for one still to come). A proposal approved
-        # unusually late still gets a short, valid window rather than one that
-        # runs past its own event.
+        # Registration opens when the reviewers are done and closes when the event starts (or now, for
+        # one still to come).
         opened = event["opened_at"]
         event_start = datetime.combine(spec.day, datetime.min.time()) + timedelta(hours=9)
         closes = min(event_start, now)
@@ -1600,10 +1575,7 @@ def seed_engagement(cur, ctx: Ctx, rng: random.Random, published: list[dict]) ->
 
 
 # --- Phase 10: validation ---------------------------------------------------
-# Each check is (name, counting SQL, repair SQL or None). Repairs only ever
-# clamp a timestamp back into order - a rule violation that cannot be fixed by
-# moving a clock is reported rather than papered over, because it would mean the
-# generator built the wrong shape and that is a bug, not a data blemish.
+# Each check is (name, counting SQL, repair SQL or None).
 CHECKS: list[tuple[str, str, str | None]] = [
     ("approval recorded before submission",
      """SELECT count(*) AS c FROM workflow_history h JOIN request r ON r.request_id = h.request_id
@@ -1674,10 +1646,9 @@ CHECKS: list[tuple[str, str, str | None]] = [
      """SELECT count(*) AS c FROM event_registration er
          WHERE er.registered_at::date >
                (SELECT max(s."date") + 1 FROM event_schedule s WHERE s.request_id = er.request_id)""",
-     # GREATEST, not a bare subtraction: pulling a late registration back to the
-     # day before the event pushes it before the proposal was even submitted
-     # whenever the event was approved within a day of running, which just trades
-     # one broken ordering for another.
+     # GREATEST, not a bare subtraction: pulling a late registration back to the day before the event
+     # pushes it before the proposal was even submitted whenever the event was approved within a day
+     # of running, which just trades one broken ordering for another.
      """UPDATE event_registration er
            SET registered_at = GREATEST(
                    (SELECT min(s."date") FROM event_schedule s
@@ -1758,11 +1729,7 @@ def validate(cur, *, repair: bool) -> list[tuple[str, int, int]]:
 
 
 # --- Phase 8: prove every screen has something on it ------------------------
-# (role, screen, SQL returning one column `c`). The SQL is the same predicate
-# the API uses for that bucket - see app/api/proposals.py's _BUCKET_SQL /
-# _TASK_BUCKET_SQL / _ORDER_BUCKET_SQL and app/api/events.py's
-# _published_clause - so a green line here means the screen really has rows,
-# not that something vaguely similar exists.
+# (role, screen, SQL returning one column `c`).
 COVERAGE: list[tuple[str, str, str]] = [
     ("Applicant", "Inbox (changes requested)", """
         SELECT count(*) AS c FROM request r WHERE r.status = 'resubmission_required'

@@ -27,10 +27,9 @@ import { SearchableDropdownComponent } from '../searchable-dropdown/searchable-d
 import { ToastService, apiErrorMessage } from '../toast/toast.service';
 import { COMMENTS_DOCK_QUERY, viewportMatches } from '../../viewport-query';
 
-// A "Create Order" click that hasn't been sent to the server yet — same shape as
-// FmbSelectionDraft (what actually gets POSTed) plus a local id and the display text the modal
-// already has on hand (cafeteria name, menu item label), so the staged row can render without
-// re-fetching anything. id is negative so it never collides with a real request_fmb_selection id.
+// A "Create Order" click that hasn't been sent to the server yet — same shape as FmbSelectionDraft
+// (what actually gets POSTed) plus a local id and the display text the modal already has on hand
+// (cafeteria name, menu item label), so the staged row can render without re-fetching anything.
 interface StagedFmbOrder extends FmbSelectionDraft {
   readonly id: number;
   readonly cafeteriaName: string;
@@ -669,18 +668,17 @@ export class ProposalDepartmentViewComponent {
   readonly allowAssignment = input(true);
   readonly readOnly = input(false);
   readonly actionComplete = output<number>();
-  // Emitted instead of actionComplete when an action only disposed of PART of what's on this
-  // page (currently: resubmitting one F&B cafeteria selection while sibling selections for the
-  // same cafeteria are still pending) — the parent should refresh its copy of the proposal and
-  // keep the detail view open, rather than navigating away as it does for actionComplete.
+  // Emitted instead of actionComplete when an action only disposed of PART of what's on this page
+  // (currently: resubmitting one F&B cafeteria selection while sibling selections for the same
+  // cafeteria are still pending) — the parent should refresh its copy of the proposal and keep the
+  // detail view open, rather than navigating away as it does for actionComplete.
   readonly proposalRefreshed = output<ProposalReviewRecord>();
 
   readonly departments = computed(() => departmentsForRole(this.role()));
   readonly staffUnitCode = computed(() => staffUnitCodeForManager(this.role()));
   // Whether THIS department's approval requires naming who does the work (Logistics/AV/
-  // Photography/Transportation/Campus Tour: yes: F&B/Cafeteria Manager: no, they use the
-  // cafeteria-order flow instead). Drives whether the Approve modal below asks for a team member
-  // at all — see assignmentRequiredForManager()'s config in department-workflow.config.ts.
+  // Photography/Transportation/Campus Tour: yes: F&B/Cafeteria Manager: no, they use the cafeteria-
+  // order flow instead).
   readonly assignmentRequired = computed(() => this.allowAssignment() && assignmentRequiredForManager(this.role()));
   // null = unlimited assignees per row (Logistics/Photography/Sound & Light/Campus Tour); 1 =
   // exactly one (Transportation) — drives whether each row's picker renders multi- or single-select.
@@ -693,9 +691,9 @@ export class ProposalDepartmentViewComponent {
   readonly assigning = signal(false);
   readonly staffOptions = computed(() => this.staffUsers().map((user) => ({ value: String(user.userId), label: user.displayName, description: user.email })));
   // Row assignment state while the Approve modal is open: taskId resolved once, then each row's
-  // CURRENT server-side assignees (already-assigned staff, shown pre-selected) plus any pending
-  // change the manager makes before hitting Confirm Approval — nothing is sent to the server until
-  // then, matching every other confirm-modal action in this component.
+  // CURRENT server-side assignees (already-assigned staff, shown pre-selected) plus any pending change
+  // the manager makes before hitting Confirm Approval — nothing is sent to the server until then,
+  // matching every other confirm-modal action in this component.
   private approveTaskId = signal<number | null>(null);
   private readonly initialRowAssignees = signal<ReadonlyMap<number, ReadonlySet<number>>>(new Map());
   readonly rowAssigneeSelections = signal<ReadonlyMap<number, readonly number[]>>(new Map());
@@ -719,10 +717,9 @@ export class ProposalDepartmentViewComponent {
   readonly selectionComment = signal('');
   readonly selectionCommentValidationError = signal(false);
 
-  // Cafeteria Manager reviews the fmb selections routed to their OWN cafeteria differently from
-  // every other manager: instead of one atomic approve/resubmit for the whole department task,
-  // each cafeteria selection (request_fmb_selection row) has its own independent lifecycle. This
-  // flag switches the template from the shared department-wide panel to the per-selection list.
+  // Cafeteria Manager reviews the fmb selections routed to their OWN cafeteria differently from every
+  // other manager: instead of one atomic approve/resubmit for the whole department task, each
+  // cafeteria selection (request_fmb_selection row) has its own independent lifecycle.
   readonly isCafeteriaSelectionView = computed(() => hasRole(this.role(), 'cafeteria-manager'));
 
   readonly myCafeteriaSelections = computed<readonly FmbSelection[]>(() => {
@@ -732,12 +729,9 @@ export class ProposalDepartmentViewComponent {
     return selections.filter((selection) => selection.cafeteriaCode === cafeteriaCode);
   });
 
-  // F&B's head-of-department fans each raw food/water request out into one or more concrete
-  // cafeteria orders (createFmbSelection, one row per order) — a SEPARATE view from
-  // isCafeteriaSelectionView above: F&B creates orders, the owning Cafeteria Manager approves
-  // them. Both can be true for the SAME proposal (F&B creating a new order while earlier orders
-  // for other cafeterias sit in their managers' inboxes), but never for the same viewing user,
-  // since 'cafeteria-manager' and F&B's 'head-of-department' are different roles.
+  // F&B's head-of-department fans each raw food/water request out into one or more concrete cafeteria
+  // orders (createFmbSelection, one row per order) — a SEPARATE view from isCafeteriaSelectionView
+  // above: F&B creates orders, the owning Cafeteria Manager approves them.
   readonly isFmbCreateOrderView = computed(() =>
     hasRole(this.role(), 'head-of-department', 'food_beverage_services') && this.departments().includes('fmb'),
   );
@@ -765,11 +759,8 @@ export class ProposalDepartmentViewComponent {
   readonly createOrderValid = computed(() => !!this.createOrderCafeteria() && !!this.createOrderMenuItemId() && Number(this.createOrderQuantity()) > 0);
 
   // "Create Order" used to POST immediately, one call per order — F&B could not build up a batch
-  // without each click round-tripping to the server and to the owning Cafeteria Manager's inbox
-  // right away. Orders are now staged here (draft + display fields, no request_fmb_selection row
-  // yet) and only sent, all at once, when F&B clicks Approve (see approve() below) — matching
-  // every other department's "one action, one send" shape, where Approve is the single moment the
-  // department's decision becomes visible to anyone else.
+  // without each click round-tripping to the server and to the owning Cafeteria Manager's inbox right
+  // away.
   private nextStagedOrderId = -1;
   readonly stagedOrders = signal<readonly StagedFmbOrder[]>([]);
   readonly sendingStagedOrders = signal(false);
@@ -853,10 +844,9 @@ export class ProposalDepartmentViewComponent {
     return { partnerName, partnerRoleLabel: active.partnerRoleLabel, initials: initialsFor(partnerName) };
   });
 
-  // Photography/Videography and Sound & Light never collect a quantity on the applicant's form
-  // (see department-request-columns.ts's column definitions for those two keys — no `quantity`
-  // column exists), so proposals.py's row projection always sends back "" for it. Showing the
-  // column anyway makes it look like data went missing; drop it for those two departments only.
+  // Photography/Videography and Sound & Light never collect a quantity on the applicant's form (see
+  // department-request-columns.ts's column definitions for those two keys — no `quantity` column
+  // exists), so proposals.py's row projection always sends back "" for it.
   private static readonly QUANTITY_COLUMN: ProposalTableColumn = { key: 'quantity', label: 'Quantity', width: '10rem' };
   private static readonly NO_QUANTITY_DEPARTMENTS: ReadonlySet<DepartmentRequestKind> = new Set(['photoVideo', 'soundLight']);
   readonly requestColumns = computed<readonly ProposalTableColumn[]>(() => {
@@ -882,10 +872,10 @@ export class ProposalDepartmentViewComponent {
   });
 
   constructor() {
-    // Loaded lazily, per-task, when the Approve modal opens for a department that requires
-    // assignment (see openApproveModal() below) — GET /tasks/:id/assignable-staff, the same
-    // endpoint the actual assignment call (POST /tasks/:id/assignments) authorizes against, so the
-    // picker can never offer someone that call would then reject.
+    // Loaded lazily, per-task, when the Approve modal opens for a department that requires assignment
+    // (see openApproveModal() below) — GET /tasks/:id/assignable-staff, the same endpoint the actual
+    // assignment call (POST /tasks/:id/assignments) authorizes against, so the picker can never offer
+    // someone that call would then reject.
     this.cafeterias.list().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((cafeterias) => this.cafeteriaOptions.set(cafeterias));
 
     effect(() => {
@@ -994,11 +984,9 @@ export class ProposalDepartmentViewComponent {
       });
       return;
     }
-    // F&B: every staged order (see confirmCreateOrder above) becomes a real
-    // request_fmb_selection row now, in one batch — this is the single moment they become
-    // visible to the owning Cafeteria Managers, matching every other department's "one action,
-    // one send" shape. Falls through to the same confirmDepartment() call below once they're all
-    // created (or immediately, if nothing was staged).
+    // F&B: every staged order (see confirmCreateOrder above) becomes a real request_fmb_selection row
+    // now, in one batch — this is the single moment they become visible to the owning Cafeteria
+    // Managers, matching every other department's "one action, one send" shape.
     if (this.isFmbCreateOrderView() && this.stagedOrders().length) {
       this.sendingStagedOrders.set(true);
       const staged = this.stagedOrders();
@@ -1112,11 +1100,8 @@ export class ProposalDepartmentViewComponent {
         this.toast.info('Sent back to F&B', 'Only this order is affected — the rest continue as normal.');
         this.selectionComment.set('');
         // Same exception as approveSelection above: this only disposes of ONE order — if this
-        // cafeteria still has other pending selections on the same proposal, stay put so the
-        // manager can work through the rest instead of being bounced back to Ongoing after each
-        // one. Read the reloaded record sendBackFmbSelection() resolves with (this.proposal() is
-        // still the pre-action snapshot at this point), not myCafeteriaSelections(), which is
-        // derived off it.
+        // cafeteria still has other pending selections on the same proposal, stay put so the manager
+        // can work through the rest instead of being bounced back to Ongoing after each one.
         const cafeteriaCode = this.auth.user()?.cafeteriaCode;
         const stillPending = (record.fmbSelections ?? []).some(
           (order) => order.cafeteriaCode === cafeteriaCode && order.status === 'pending',
@@ -1129,11 +1114,8 @@ export class ProposalDepartmentViewComponent {
   }
 
   // ---------------------------------------------------------------------------
-  // F&B: stage a cafeteria order fulfilling a raw food/water request row. One row = one order;
-  // F&B repeats this per cafeteria/dish until the request's pax/quantity is covered. Nothing is
-  // sent to the server here — see stagedOrders above and approve() below, which is the one moment
-  // every staged order actually becomes a request_fmb_selection row (createFmbSelection()).
-  // ---------------------------------------------------------------------------
+  // F&B: stage a cafeteria order fulfilling a raw food/water request row. One row = one order; F&B
+  // repeats this per cafeteria/dish until the request's pax/quantity is covered.
   openCreateOrderModal(row: EditableRow): void {
     this.editingStagedOrderId.set(null);
     this.createOrderTarget.set(row);
@@ -1283,9 +1265,9 @@ export class ProposalDepartmentViewComponent {
   }
 
   // Same exception as the Cafeteria Manager's approveSelection/resubmitSelection: re-sending or
-  // cancelling disposes of only ONE order a manager sent back — if others are still awaiting F&B
-  // here (resubmittedSelections, unlike the manager's queue, isn't scoped to a single cafeteria),
-  // stay put so F&B can work through the rest instead of being bounced to Ongoing after each one.
+  // cancelling disposes of only ONE order a manager sent back — if others are still awaiting F&B here
+  // (resubmittedSelections, unlike the manager's queue, isn't scoped to a single cafeteria), stay put
+  // so F&B can work through the rest instead of being bounced to Ongoing after each one.
   private afterResubmittedOrderHandled(proposalId: number, record: ProposalReviewRecord): void {
     const stillResubmitted = (record.fmbSelections ?? []).some((order) => order.status === 'resubmitted');
     if (stillResubmitted) this.proposalRefreshed.emit(record);

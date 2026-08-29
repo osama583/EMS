@@ -1,6 +1,0 @@
-[
-{"id":"RGF-a","as":"guest","q":"show me the private events","intent":"THE FAILING CASE","expect":"must NOT claim none exist"},
-{"id":"RGF-b","as":"guest","q":"what events are coming up?","intent":"guest browse no regression","expect":"public events listed"},
-{"id":"RGF-c","as":"student.business@demo.apu.edu.my","q":"do i have any pending join requests?","intent":"legit zero must still be stated","expect":"none, stated plainly"},
-{"id":"RGF-d","as":"student.computing@demo.apu.edu.my","q":"which event has the most people registered?","intent":"no regression","expect":"Career Fair 5"}
-]

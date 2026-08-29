@@ -15,13 +15,8 @@ import { InternalDataPageComponent } from '../../../../shared/components/interna
 import { InternalSortChange, InternalSortState, InternalDataPageConfig, InternalDataRecord, InternalFilterChange, InternalRowActionEvent } from '../../../../shared/components/internal-data-page/internal-data-page.models';
 import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 
-// Club category management, on its own page (same shell as My Menu / Dropdown Box Options at
-// request-option-management.ts) instead of the old ClubCategoryManagerComponent popup. Unlike
-// that popup, both tabs are server-driven: search, the active/inactive filter, and the page slice
-// all happen in SQL via ClubService.searchCategories() (GET /club-categories/search) — the browser
-// never fetches rows it isn't about to show. "Active only" is the default query exactly like every
-// other list in the app; switching to "Inactive" or opening the Deleted tab issues a fresh request
-// rather than filtering something already sitting in memory.
+// Club category management, on its own page (same shell as My Menu / Dropdown Box Options at request-
+// option-management.ts) instead of the old ClubCategoryManagerComponent popup.
 @Component({
   selector: 'app-club-category-management',
   imports: [
@@ -266,9 +261,8 @@ export class ClubCategoryManagementComponent {
   }
 
   // ---------------------------------------------------------------------------
-  // Deleted tab — a page-level section switch (same treatment as My Menu | Deleted), only
-  // fetched the first time it's opened so a viewer who never looks at it never pays for the call.
-  // ---------------------------------------------------------------------------
+  // Deleted tab — a page-level section switch (same treatment as My Menu | Deleted), only fetched the
+  // first time it's opened so a viewer who never looks at it never pays for the call.
   setDeletedTab(deleted: boolean): void {
     if (this.showDeleted() === deleted) return;
     this.showDeleted.set(deleted);

@@ -68,10 +68,10 @@ export class InternalLayoutComponent {
   // FALLBACK_NAVIGATION stands in until the real one loads (same constant navigationFor() itself
   // falls back to in role-navigation.ts for an unresolvable AuthUser).
   readonly navigation = computed(() => this.auth.navigation() ?? FALLBACK_NAVIGATION);
-  // Single ordered list — folders and standalone pages interleaved in their real sort order
-  // (oldest first, newest last) — rendered by the templates as one sidebar list instead of two
-  // separate item/section blocks (which used to always show every standalone page above every
-  // folder, regardless of when each was added).
+  // Single ordered list — folders and standalone pages interleaved in their real sort order (oldest
+  // first, newest last) — rendered by the templates as one sidebar list instead of two separate
+  // item/section blocks (which used to always show every standalone page above every folder,
+  // regardless of when each was added).
   readonly navEntries = computed(() => this.navigation().entries);
   readonly sections = computed(() => this.navEntries().flatMap((entry) => (entry.kind === 'section' ? [entry.section] : [])));
   readonly defaultRoute = computed(() => this.navigation().defaultRoute);

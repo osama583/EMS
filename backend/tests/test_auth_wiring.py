@@ -84,19 +84,8 @@ def test_inbound_request_id_is_echoed_back(client):
 
 
 # --- Optional authentication on the public endpoints ---------------------------------------
-#
-# authenticate_optional() backs the endpoints that are public but personalise themselves for a
-# signed-in caller (/ai/ask, the event discovery routes). It used to swallow EVERY token failure
-# and carry on as a guest, which made an expired access token indistinguishable from having no
-# account at all: the answer came back 200, so auth.interceptor.ts never saw the 401 that triggers
-# its refresh-and-replay, and a signed-in student was silently answered as a signed-out visitor
-# for the rest of that tab's life. The chat then refused clubs - a topic their role does grant -
-# with the "an administrator has not granted your role" wording, because a guest genuinely is
-# granted nothing (see ai/topic_access.py's GUEST_OPEN_TOPICS, which leaves `events` as the one
-# topic a guest keeps, exactly matching the symptom: events offered, clubs refused).
-#
-# Presenting a credential that does not verify is now a 401, the same as on any protected route.
-# Presenting NO credential is still a guest, which is what keeps the public tier working.
+# authenticate_optional() backs the endpoints that are public but personalise themselves for a signed-
+# in caller (/ai/ask, the event discovery routes).
 
 
 def _expired_access_token(user_id: int = 1) -> str:

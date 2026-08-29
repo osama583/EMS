@@ -38,7 +38,7 @@ class ResolvedProfile:
         return f"{self.key}:{self.unit_code}" if self.unit_code else self.key
 
 
-# Ordered by authority tier (docs/dashboards/01 § 1). The first match is the
+# Ordered by authority tier. The first match is the
 # default profile; the rest become entries in the header's profile switcher.
 DASHBOARD_TIERS: tuple[tuple[str, Callable[[Principal], Any], ...], ...] = (
     ("cfo", lambda p: p.has_role("cfo")),
@@ -59,10 +59,8 @@ DEPARTMENT_PROFILE = {
     "transport_services": "hod_transport",
 }
 
-# A service department a System Admin creates later has no known detail table
-# and no capacity column, so it degrades to the flow/SLA/quality/people families
-# rather than erroring. Documented here so "what happens to a new unit" has an
-# answer that is not "find out in production".
+# A service department a System Admin creates later has no known detail table and no capacity column,
+# so it degrades to the flow/SLA/quality/people families rather than erroring.
 GENERIC_DEPARTMENT_PROFILE = "hod_generic"
 
 PROFILE_TITLES = {
@@ -209,61 +207,44 @@ def school_signature(cur, unit_code: str) -> str:
 
 
 # --- The layouts ----------------------------------------------------------
-# Bands 1, 3, 4 and 5 share a skeleton across all ten roles. Band 2 - the
-# signature panel - is the widest, tallest element on the page and is different
-# for every one of them. That is what makes these ten dashboards rather than one
-# dashboard with ten titles.
+# Bands 1, 3, 4 and 5 share a skeleton across all ten roles. Band 2 - the signature panel - is the
+# widest, tallest element on the page and is different for every one of them.
 
 PROFILES: dict[str, dict[str, Any]] = {
-    # ---------------------------------------------------------------- A/V --
-    # No stock at all: sound_light_options carries a technical_description and
-    # nothing else. The only scarce resource is technician-hours against
-    # overlapping event windows, so the signature panel is a collision timeline
-    # rather than an inventory chart.
+    # ---------------------------------------------------------------- A/V -- No stock at all:
+    # sound_light_options carries a technical_description and nothing else.
     "hod_av": {
         "counts": "dept_request_counts",
         "hero": "dept_jobs_at_risk",
         "kpis": ["dept_on_time_completion", "dept_pushback_rate"],
-        # No signature panel and no alerts rail. The Risk List and "At risk this
-        # week" both restated the hero - the same rows, counted on the tile and
-        # then listed twice below it - so the page now says it once. Both fields
-        # are optional, the way "counts" already was.
+        # No signature panel and no alerts rail.
         "signature": None,
         "panels": ["dept_staff_balance", "dept_catalogue_health"],
         "alerts": None,
         "quickActions": ["review_inbox", "assign_work", "catalogue"],
         "mobileKpis": ["dept_on_time_completion", "dept_pushback_rate"],
     },
-    # -------------------------------------------------------- Logistics --
-    # The one department whose constraint is a day total rather than an hour:
-    # an item issued in the morning is not back by the afternoon. Hence a
-    # heatmap where A/V gets a timeline.
+    # -------------------------------------------------------- Logistics -- The one department whose
+    # constraint is a day total rather than an hour: an item issued in the morning is not back by the
+    # afternoon.
     "hod_logistics": {
         "counts": "dept_request_counts",
         "hero": "dept_jobs_at_risk",
         "kpis": ["dept_on_time_completion", "dept_pushback_rate"],
-        # No signature panel and no alerts rail. The Risk List and "At risk this
-        # week" both restated the hero - the same rows, counted on the tile and
-        # then listed twice below it - so the page now says it once. Both fields
-        # are optional, the way "counts" already was.
+        # No signature panel and no alerts rail.
         "signature": None,
         "panels": ["dept_staff_balance", "dept_catalogue_health"],
         "alerts": None,
         "quickActions": ["review_inbox", "assign_work", "catalogue"],
         "mobileKpis": ["dept_on_time_completion", "dept_pushback_rate"],
     },
-    # -------------------------------------------------------- Transport --
-    # Two ceilings, vehicles and drivers. A single ratio is a lie here: reading
-    # "1.5" without knowing whether it means no bus or no driver sends the head
-    # to the wrong meeting, so the hero names which one binds.
+    # -------------------------------------------------------- Transport -- Two ceilings, vehicles and
+    # drivers.
     "hod_transport": {
         "counts": "dept_request_counts",
         "hero": "dept_jobs_at_risk",
         "kpis": ["dept_on_time_completion", "dept_pushback_rate"],
-        # No signature panel and no alerts rail. The Risk List and "At risk this
-        # week" both restated the hero - the same rows, counted on the tile and
-        # then listed twice below it - so the page now says it once. Both fields
-        # are optional, the way "counts" already was.
+        # No signature panel and no alerts rail.
         "signature": None,
         "panels": ["dept_staff_balance", "dept_catalogue_health"],
         "alerts": None,
@@ -277,43 +258,30 @@ PROFILES: dict[str, dict[str, Any]] = {
         "counts": "dept_request_counts",
         "hero": "dept_jobs_at_risk",
         "kpis": ["dept_on_time_completion", "dept_pushback_rate"],
-        # No signature panel and no alerts rail. The Risk List and "At risk this
-        # week" both restated the hero - the same rows, counted on the tile and
-        # then listed twice below it - so the page now says it once. Both fields
-        # are optional, the way "counts" already was.
+        # No signature panel and no alerts rail.
         "signature": None,
         "panels": ["dept_staff_balance", "dept_catalogue_health"],
         "alerts": None,
         "quickActions": ["review_inbox", "assign_work", "catalogue"],
         "mobileKpis": ["dept_on_time_completion", "dept_pushback_rate"],
     },
-    # ------------------------------------------------------ Photography --
-    # The only department that accumulates work *after* the event. Forward
-    # panels show a shot as done; the deliverable has not shipped. Hence a
-    # funnel, and a four-segment lane bar where everyone else has three.
+    # ------------------------------------------------------ Photography -- The only department that
+    # accumulates work *after* the event.
     "hod_photography": {
         "counts": "dept_request_counts",
         "hero": "dept_jobs_at_risk",
         "kpis": ["dept_on_time_completion", "dept_pushback_rate"],
-        # No signature panel and no alerts rail. The Risk List and "At risk this
-        # week" both restated the hero - the same rows, counted on the tile and
-        # then listed twice below it - so the page now says it once. Both fields
-        # are optional, the way "counts" already was.
+        # No signature panel and no alerts rail.
         "signature": None,
         "panels": ["dept_staff_balance", "dept_catalogue_health"],
         "alerts": None,
         "quickActions": ["review_inbox", "assign_work", "catalogue"],
         "mobileKpis": ["dept_on_time_completion", "dept_pushback_rate"],
     },
-    # ------------------------------------------------------------- F&B --
-    # A gatekeeper, a department lane, and a supply orchestrator at once. The
-    # signature panel is the routing decision: which outlet should take the next
-    # order, judged on measured behaviour rather than capacity on paper.
+    # ------------------------------------------------------------- F&B -- A gatekeeper, a department
+    # lane, and a supply orchestrator at once.
     "hod_fmb": {
-        # Four bands, no hero. The on-time delivery rate that used to lead the
-        # page is gone, and nothing was promoted in its place: the counts strip
-        # is the page's opening statement now, and the four money tiles below it
-        # reflow into the width the hero card used to take.
+        # Four bands, no hero.
         "counts": "fmb_request_counts",
         "hero": None,
         "kpis": [
@@ -333,9 +301,9 @@ PROFILES: dict[str, dict[str, Any]] = {
     },
     "hod_generic": {
         # No detail table is known for this unit (see maybe_spec()), so neither
-        # dept_jobs_at_risk/dept_risk_list (needs a department spec to find a
-        # deadline column) nor dept_catalogue_health (needs an option table)
-        # can run here - this profile keeps the flow/quality fallback shape.
+        # dept_jobs_at_risk/dept_risk_list (needs a department spec to find a deadline column) nor
+        # dept_catalogue_health (needs an option table) can run here - this profile keeps the
+        # flow/quality fallback shape.
         "counts": "dept_request_counts",
         "hero": "gen_clearance_rate",
         "kpis": ["gen_open_backlog", "gen_first_pass_yield"],
@@ -345,11 +313,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "quickActions": ["review_inbox", "assign_work"],
         "mobileKpis": ["gen_open_backlog", "gen_first_pass_yield"],
     },
-    # ----------------------------------------------------------- School --
-    # One profile, two shapes. The signature panel and three of the KPIs are
-    # chosen by school_signature() from the school's own trailing-term data,
-    # which is why a school that becomes commercial gets the commercial view
-    # without anyone editing this file.
+    # ----------------------------------------------------------- School -- One profile, two shapes.
     "hos_school": {
         "hero": {"service": "hos_end_to_end", "commercial": "hos_cost_per_pax"},
         "kpis": {
@@ -393,17 +357,11 @@ PROFILES: dict[str, dict[str, Any]] = {
             "commercial": ["hos_gate_latency", "hos_collection_rate", "hos_cost_per_pax_kpi"],
         },
     },
-    # -------------------------------------------------------------- CFO --
-    # Nearly blind outside their own gate under _VISIBLE_SQL: clause 5 fires
-    # only at cfo_review, and cfo_review is only reached above HIGH_PAX_THRESHOLD.
-    # Every panel here is an R7 aggregate, and the signature panel exists to
-    # quantify exactly what the gate does not see.
+    # -------------------------------------------------------------- CFO -- Nearly blind outside their
+    # own gate under _VISIBLE_SQL: clause 5 fires only at cfo_review, and cfo_review is only reached
+    # above HIGH_PAX_THRESHOLD.
     "cfo": {
-        # Reduced to the money question and the gate behind it. The forward-spend
-        # hero, the coverage/collection/queue tiles, the gate matrix and the four
-        # analysis panels are gone, and so is the attention rail with its quick
-        # actions - the page is now the status strip, four figures, the two
-        # funding charts that read as a pair, and gate decisions.
+        # Reduced to the money question and the gate behind it.
         "counts": "cfo_request_counts",
         "hero": None,
         "kpis": [
@@ -428,23 +386,15 @@ PROFILES: dict[str, dict[str, Any]] = {
         "mobileKpis": ["cfo_total_spend", "cfo_cafeteria_cost", "cfo_cost_per_pax"],
     },
     "cafeteria_manager": {
-        # Orders at Risk / Risk List does not apply here (see cafeteria.py's
-        # module docstring: assignment happens right before prep starts, not on
-        # approval, so the "unstarted work due soon" shape the HOD Risk List
-        # looks for is never a real signal for this role). The live at-risk hero
-        # this profile used to carry (caf_orders_at_risk) existed only to read
-        # the now-removed AT_RISK_WINDOW_DAYS threshold and has been removed
-        # along with it; the counts strip's own Late tile covers the same
-        # signal at a coarser grain.
+        # Orders at Risk / Risk List does not apply here (see cafeteria.py's module docstring:
+        # assignment happens right before prep starts, not on approval, so the "unstarted work due
+        # soon" shape the HOD Risk List looks for is never a real signal for this role).
         "counts": "caf_request_counts",
         "hero": None,
         "kpis": ["caf_on_time", "caf_pushback_rate"],
         "signature": "caf_service_board",
         "panels": ["caf_staff_workload", "caf_menu_performance"],
-        # No alerts rail. Everything caf_at_risk used to raise is already on
-        # this page a band higher - the hero is the live at-risk count, and the
-        # Late tile on the counts strip is the same queue - so the rail only
-        # restated it further down.
+        # No alerts rail.
         "alerts": None,
         "quickActions": [],
         "mobileKpis": ["caf_on_time", "caf_pushback_rate"],

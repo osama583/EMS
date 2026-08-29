@@ -132,11 +132,7 @@ _CLUB_CLASSES = frozenset({"clubs", "clubs_mine", "clubs_admin", "president_chan
 _EVENT_CLASSES = frozenset({"events", "my_registrations", "event_organiser", "event_organiser_decisions"})
 
 
-# Referents that point at something said earlier and carry no meaning without it. Kept to phrases
-# that are unresolvable BY CONSTRUCTION - "this or that" names two things while identifying
-# neither - so a question containing one with no conversation behind it cannot have been answered,
-# only guessed at. Bare "which one" is deliberately absent: it already reaches the no-topic path
-# and clarifies there, and catching it here would fire on "which one has the most members".
+# Referents that point at something said earlier and carry no meaning without it.
 _DANGLING_REFERENT = re.compile(
     r"\bthis or that\b|\bthe other one\b|\bthat one\b|\bthis one\b|\bthe one with\b",
     re.IGNORECASE,

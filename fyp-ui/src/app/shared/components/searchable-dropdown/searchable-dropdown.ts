@@ -52,12 +52,8 @@ export class SearchableDropdownComponent {
   readonly touched = signal(false);
   private readonly submitted = signal(false);
   private readonly resetForSession = signal(false);
-  // Floating-panel coordinates (viewport-relative), recomputed whenever the panel opens or the
-  // page scrolls/resizes underneath it. Rendering the panel with position:fixed at these
-  // coordinates — instead of position:absolute relative to this component — lets it escape any
-  // ancestor's overflow:hidden/auto clipping (e.g. a scrollable modal body), which otherwise cuts
-  // the options list off behind the modal footer. null until measured (first open, before the
-  // panel exists in the DOM to measure against).
+  // Floating-panel coordinates (viewport-relative), recomputed whenever the panel opens or the page
+  // scrolls/resizes underneath it.
   readonly panelPosition = signal<{ top: number; left: number; width: number } | null>(null);
   readonly filteredOptions = computed(() => { const query = this.query().trim().toLowerCase(); return query ? this.options().filter((option) => `${option.label} ${option.description ?? ''}`.toLowerCase().includes(query)) : this.options(); });
   readonly selectedOptions = computed(() => { const values = Array.isArray(this.value()) ? this.value() as readonly string[] : [this.value() as string]; return this.options().filter((option) => values.includes(option.value)); });
@@ -72,12 +68,9 @@ export class SearchableDropdownComponent {
   @HostListener('window:resize') onWindowResize(): void { if (this.open()) this.measurePanelPosition(); }
 
   constructor() {
-    // Scroll events don't bubble, so a plain (bubbling) listener never sees a modal body or any
-    // other ancestor scrolling underneath the trigger — capture-phase is required to catch those
-    // and keep the floating panel's position in sync instead of drifting away from the trigger.
-    // rAF-throttled: a scrollable modal body can fire dozens of scroll events per second, and
-    // measuring+re-rendering the floating panel on every single one (rather than once per frame)
-    // is what made the panel visibly judder/"shake" while scrolling underneath it.
+    // Scroll events don't bubble, so a plain (bubbling) listener never sees a modal body or any other
+    // ancestor scrolling underneath the trigger — capture-phase is required to catch those and keep
+    // the floating panel's position in sync instead of drifting away from the trigger.
     let scrollFrame: number | null = null;
     const onScroll = (event: Event) => {
       if (!this.open()) return;

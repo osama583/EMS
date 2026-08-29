@@ -26,15 +26,8 @@ import { ToastService, apiErrorMessage } from '../../../../shared/components/toa
 import { ReviewerCommentsDrawerComponent } from '../../../../shared/components/reviewer-comments-drawer/reviewer-comments-drawer';
 import { ReviewerCommentEntry, allCommentEntries } from '../../../../core/proposals/proposal-status.models';
 
-// A department can only send its OWN task back with a comment (it has no reject) - see
-// tasks.py's send_task_back. This page is the applicant's answer to exactly that: fix and resend
-// ONE department's request rows, with everything else on the proposal (other departments' rows,
-// already-approved content) left untouched server-side (see proposals.py's
-// resubmit_department_task/write_single_requirement_rows). It deliberately does NOT reuse
-// event-proposal.ts's full form - that component edits the whole proposal, which is correct only
-// when a REVIEWER stage sent everything back (status=resubmission_required), not when a single
-// department's task is 'resubmitted' while the rest of department review continues in parallel.
-// See docs/superpowers/specs/2026-08-20-proposal-api-bug-patterns.md.
+// A department can only send its OWN task back with a comment (it has no reject) - see tasks.py's
+// send_task_back.
 @Component({
   selector: 'app-department-resubmit',
   imports: [FormFieldComponent, SearchableDropdownComponent, FormModalComponent, ProposalTableComponent, LoadingStateComponent, ReviewerCommentsDrawerComponent],
@@ -86,9 +79,6 @@ export class DepartmentResubmitComponent {
     (this.definition()?.columns ?? []).map((column) => ({ key: column.key, label: column.label, width: column.width ?? '12rem' })),
   );
   // Table rows for display only — resolves each select column's stored catalog id (e.g.
-  // "transportation:2") to its label, since ProposalTableComponent renders row values raw. The
-  // edit modal keeps using rows()/draft() directly with the real ids; only this read-only view
-  // needs the resolved text.
   readonly displayRows = computed<readonly EditableRow[]>(() => {
     const definition = this.definition();
     if (!definition) return this.rows();
@@ -96,26 +86,17 @@ export class DepartmentResubmitComponent {
   });
 
   // Every comment currently waiting on the applicant across the WHOLE proposal, not just this one
-  // department's - matches event-proposal.ts's reviewerComments so the applicant sees the same
-  // full picture in the same drawer UI, whichever department's request they're resending here.
-  // (Two or more departments pushed back at once is rare in this workflow, but when it happens
-  // there's no reason to hide the other one's comment just because this page only edits one of them.)
+  // department's - matches event-proposal.ts's reviewerComments so the applicant sees the same full
+  // picture in the same drawer UI, whichever department's request they're resending here.
   readonly reviewerComments = computed<readonly ReviewerCommentEntry[]>(() => {
     const proposal = this.proposal();
     return proposal ? allCommentEntries(proposal.workflow) : [];
   });
 
-  // This page always exists to answer ONE specific department's own send-back (the route already
-  // names it via :department), so the drawer should default straight into that department's
-  // conversation rather than the Conversations list — unlike event-proposal.ts, there's no
-  // ambiguity to resolve here, the department is already known from the route.
-  //
-  // A task-thread conversation's partnerName is the RAW requirement key (e.g. "photoVideo" —
-  // see history.py's conversations_for(), which sets it from event_requirements.requirement_name
-  // unmapped), not a display label — reviewer-comments-drawer.ts's own conversationSummaries()
-  // maps it through DEPARTMENT_LABELS only for rendering. Comparing against a mapped label here
-  // (as this used to) compares "Photography / Videography" against the raw "photoVideo" and never
-  // matches, so match the raw department key directly instead.
+  // This page always exists to answer ONE specific department's own send-back (the route already names
+  // it via :department), so the drawer should default straight into that department's conversation
+  // rather than the Conversations list — unlike event-proposal.ts, there's no ambiguity to resolve
+  // here, the department is already known from the route.
   readonly pendingRequesterConversationId = computed<string | null>(() => {
     const department = this.department();
     return this.conversations().find((c) => c.partnerName === department)?.conversationId ?? null;

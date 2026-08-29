@@ -1,8 +1,0 @@
-[
-{"id":"RG2-a","as":"student.computing@demo.apu.edu.my","q":"am i the president of any club?","intent":"THE FAILING CASE (2 clubs)","expect":"YES: APU Coding Society + Single Clubs"},
-{"id":"RG2-b","as":"applicant@demo.apu.edu.my","q":"am i the president of any club?","intent":"variation: club named '1'","expect":"YES: club '1'"},
-{"id":"RG2-c","as":"applicant@demo.apu.edu.my","q":"what clubs do i run?","intent":"variation: different phrasing","expect":"club '1'"},
-{"id":"RG2-d","as":"student.business@demo.apu.edu.my","q":"which clubs am i a member of?","intent":"generalization: membership not presidency","expect":"Business Leaders Circle (Daniel Wong)"},
-{"id":"RG2-e","as":"hoshod@demo.apu.edu.my","q":"am i the president of any club?","intent":"TRUE NEGATIVE - must still say no","expect":"NO - Rahim presides over nothing"},
-{"id":"RG2-f","as":"student.computing@demo.apu.edu.my","q":"which event has the most people registered?","intent":"PREVIOUSLY PASSING - no regression","expect":"Career Fair (5)"}
-]

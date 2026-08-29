@@ -11,10 +11,8 @@ migrations 001-028 already constrain.
 from __future__ import annotations
 
 # --- Org chart additions ---------------------------------------------------
-# Two more Schools, so the portfolio has units with very different volumes:
-# Computing is busy, Business is moderate, Engineering is quiet and Media is
-# brand new. Adding these means the nav grants that name every unit have to
-# learn about them too - see seed_production.extend_nav_grants().
+# Two more Schools, so the portfolio has units with very different volumes: Computing is busy,
+# Business is moderate, Engineering is quiet and Media is brand new.
 NEW_SCHOOL_UNITS = [
     ("school_of_engineering", "School of Engineering"),
     ("school_of_media_arts", "School of Media and Communication"),
@@ -50,9 +48,9 @@ NEW_DEPARTMENT_STAFF = [
 ]
 
 # --- Student body ----------------------------------------------------------
-# Built combinatorially rather than listed one by one: 100+ hand-typed names add
-# nothing a seeded shuffle of a realistic name pool does not, and the pool is
-# easier to keep representative of an APU cohort.
+# Built combinatorially rather than listed one by one: 100+ hand-typed names add nothing a seeded
+# shuffle of a realistic name pool does not, and the pool is easier to keep representative of an APU
+# cohort.
 GIVEN_NAMES = [
     "Aisyah", "Amirul", "Nur Hidayah", "Muhammad Danial", "Farhan", "Syafiqah",
     "Izzat", "Nabila", "Haikal", "Alia", "Zulhilmi", "Damia", "Aqil", "Batrisyia",
@@ -96,10 +94,9 @@ EXTERNAL_GUESTS = [
 ]
 
 # --- Clubs -----------------------------------------------------------------
-# (club name, description, [category names], member count, activity tier)
-# activity tier drives how many proposals the club runs: 'high' clubs are the
-# ones every screen is full of, 'none' clubs exist and recruit but have never
-# run an event - the brief's "some should have very few events".
+# (club name, description, [category names], member count, activity tier) activity tier drives how
+# many proposals the club runs: 'high' clubs are the ones every screen is full of, 'none' clubs exist
+# and recruit but have never run an event - the brief's "some should have very few events".
 NEW_CLUBS = [
     ("APU Robotics Club", "Builds competition robots and runs open build nights every Thursday.",
      ["Technology", "Academic"], 34, "high"),
@@ -126,16 +123,9 @@ NEW_CLUBS = [
 ]
 
 # --- Locations -------------------------------------------------------------
-# University venues are NOT listed here any more. They live in venue_options,
-# seeded from seed/data.py's VENUE_OPTIONS and managed by the CFO at
-# /app/dropdown-options/venue - see migration 032. seed_production reads them
-# back out of the table (Catalogue.venue), so this file cannot drift from what
-# the app actually offers, and there is no second copy to update.
-#
-# What does still belong here is the opposite case: addresses that are NOT
-# university venues, used by Off Campus events to exercise the schedule's
-# Outside University branch. These are free text by definition - there is
-# nothing to look them up in.
+# University venues are NOT listed here any more. They live in venue_options, seeded from
+# seed/data.py's VENUE_OPTIONS and managed by the CFO at /app/dropdown-options/venue - see migration
+# 032.
 EXTERNAL_LOCATIONS = [
     "Kuala Lumpur Convention Centre, Hall 5",
     "Sunway Pyramid Convention Centre",
@@ -147,12 +137,8 @@ EXTERNAL_LOCATIONS = [
 ]
 
 # --- Event catalogue -------------------------------------------------------
-# (title, short introduction, goals, benefits, [category ids], pax, kind)
-# `kind` picks the requirement mix (see seed_production.REQUIREMENT_MIX) and the
-# default venue class. Category ids are event_category rows seeded by seed/run.py:
-#   1 Academic & Career   2 Workshops & Training  3 Sports & Wellness
-#   4 Culture & Community 5 Clubs & Societies     6 Entertainment & Social
-#   7 Volunteering
+# (title, short introduction, goals, benefits, [category ids], pax, kind) `kind` picks the requirement
+# mix (see seed_production.REQUIREMENT_MIX) and the default venue class.
 EVENTS = [
     # --- Career and academic -------------------------------------------------
     ("Graduate Employability Summit", "A full-day summit with recruiters from 30 employers across tech, finance and engineering.",

@@ -263,7 +263,7 @@ def revenue_exposure(cur, scope: Scope, *, request_filter: str = "", extra: dict
     Exposure, not revenue: `cost_amount x active registrations` is what is owed,
     and the gap to the approved share is what is outstanding. Counts and sums
     only - no registrant reaches this response (R9, and
-    `backend/docs/security.md` on attendee identity).
+    attendee identity is organiser-only).
     """
     row = fetch_one(
         cur,

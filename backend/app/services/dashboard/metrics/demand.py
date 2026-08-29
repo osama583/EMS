@@ -241,7 +241,7 @@ def registration_conversion(cur, scope: Scope, *, request_filter: str = "", extr
     """M46 - registrations against capacity for the caller's approved events.
 
     Counts only. Attendee identity is out of scope for every dashboard
-    (`backend/docs/security.md` records the attendee list as organiser-only),
+    (the attendee list is organiser-only),
     and the divergence between the two series is the whole signal anyway.
     """
     rows = fetch_all(

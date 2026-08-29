@@ -17,10 +17,7 @@ import { LoadingStateComponent } from '../../../../shared/components/loading-sta
 
 type ViewKind = 'applicant' | 'reviewer' | 'department' | null;
 
-// Full-page proposal detail (replaces the old popup modal). Always fetches the full proposal by
-// id (GET /proposals/:id, include_children=True) regardless of how the caller navigated here -
-// the row a list page (Inbox/Ongoing/History) passes via router state is a lighter, children-free
-// projection meant only for that list's own columns, not a substitute for the detail view's data.
+// Full-page proposal detail (replaces the old popup modal).
 @Component({
   selector: 'app-proposal-review-page',
   imports: [ProposalReviewerViewComponent, ProposalDepartmentViewComponent, LoadingStateComponent],
@@ -36,13 +33,13 @@ export class ProposalReviewPageComponent {
   private readonly workflow = inject(ProposalWorkflowService);
   private readonly destroyRef = inject(DestroyRef);
 
-  // The route config (`proposals/review/:id`) is identical for every proposal, so Angular's
-  // default RouteReuseStrategy reuses this same component instance when navigating from one
-  // proposal's detail page to another (or back to the same id with different query params) -
-  // it does NOT destroy/recreate the component, so anything read once from `route.snapshot` or
+  // The route config (`proposals/review/:id`) is identical for every proposal, so Angular's default
+  // RouteReuseStrategy reuses this same component instance when navigating from one proposal's detail
+  // page to another (or back to the same id with different query params) - it does NOT
+  // destroy/recreate the component, so anything read once from `route.snapshot` or
   // `router.getCurrentNavigation()`/`history.state` at construction time goes stale on every
-  // subsequent in-place navigation (the symptom: the eye icon does nothing until the URL is
-  // edited by hand, which forces a full reload). Track the live paramMap/queryParamMap instead.
+  // subsequent in-place navigation (the symptom: the eye icon does nothing until the URL is edited by
+  // hand, which forces a full reload).
   private readonly queryParams = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
 
   readonly allowAssignment = computed(() => (this.queryParams().get('allowAssignment') ?? 'true') !== 'false');
@@ -74,32 +71,21 @@ export class ProposalReviewPageComponent {
     const proposal = this.proposal();
     if (!user || !proposal) return null;
     if (userIsApplicantForProposal(user, proposal)) return 'applicant';
-    // F&B's head-of-department is dual-purpose on the SAME proposal: the fmb-review WHOLE-
-    // PROPOSAL reviewer stage (approve/reject/resubmit, same as HOS/HOD/CFO) happens before
-    // department-review, where F&B becomes one of possibly several routed DEPARTMENTS picking
-    // cafeteria orders for its own request kinds. requestKindsForManager(user) is unconditionally
-    // non-empty for F&B regardless of stage, so it cannot tell these apart on its own - while the
-    // proposal is still at fmb-review, F&B has not reached department-review yet and must see the
-    // full reviewer view, never the department (order-picking) one.
+    // F&B's head-of-department is dual-purpose on the SAME proposal: the fmb-review WHOLE- PROPOSAL
+    // reviewer stage (approve/reject/resubmit, same as HOS/HOD/CFO) happens before department-review,
+    // where F&B becomes one of possibly several routed DEPARTMENTS picking cafeteria orders for its
+    // own request kinds.
     if (proposal.workflow.stage === ProposalStage.FmbReview && hasRole(user, 'head-of-department', 'food_beverage_services')) return 'reviewer';
-    // A department manager is a unit-scoped head-of-department/head-of-school who actually owns
-    // at least one request kind. Owning only OPTION kinds is not enough: the CFO curates the
-    // Funding/Purchase catalogs but reviews proposals at the cfo_review stage as a reviewer, so
-    // it must fall through to the reviewer view. Cafeteria Managers act per cafeteria order and
-    // use the department view's per-selection mode.
+    // A department manager is a unit-scoped head-of-department/head-of-school who actually owns at
+    // least one request kind.
     if (requestKindsForManager(user).length > 0 || hasRole(user, 'cafeteria-manager')) return 'department';
     return 'reviewer';
   });
 
   constructor() {
-    // route.paramMap fires on every navigation to this route config, including when the
-    // component instance is being REUSED for a different :id (see the note above) - unlike a
-    // one-shot constructor read, this re-runs the whole load every time. Always fetch the full
-    // record by id here: the row passed via router state (from Inbox/Ongoing/History's list
-    // page) is projected with include_children=False on the server (see proposals.py's
-    // list_proposals()), so it never carries requestRows/requests/coOwners/organizers/agenda/etc.
-    // Using it as a substitute used to render a blank/broken detail view with no API call at all
-    // - looking like the eye icon "did nothing" - instead of an actually-wrong request.
+    // route.paramMap fires on every navigation to this route config, including when the component
+    // instance is being REUSED for a different :id (see the note above) - unlike a one-shot
+    // constructor read, this re-runs the whole load every time.
     this.route.paramMap.pipe(
       switchMap((params) => {
         this.loading.set(true);
@@ -113,13 +99,10 @@ export class ProposalReviewPageComponent {
   }
 
   // Every action a reviewer/department/applicant can take here (approve, reject, resubmit-to-
-  // applicant, confirm-department, resubmit-department, F&B selection approve/resubmit, cancel)
-  // emits actionComplete — once any of them completes, leave this proposal's detail view and
-  // land on Ongoing rather than staying in place, so the actor doesn't have to navigate back
-  // manually to see it move out of their Inbox. The one exception is a Cafeteria Manager
-  // resubmitting ONE F&B selection while others for their cafeteria are still pending on the same
-  // proposal — proposal-department-view.ts emits proposalRefreshed instead in that case, so the
-  // manager stays on the page and works through the rest without being bounced out after each one.
+  // applicant, confirm-department, resubmit-department, F&B selection approve/resubmit, cancel) emits
+  // actionComplete — once any of them completes, leave this proposal's detail view and land on Ongoing
+  // rather than staying in place, so the actor doesn't have to navigate back manually to see it move
+  // out of their Inbox.
   handleActionComplete(_id: number): void {
     void this.router.navigateByUrl('/app/ongoing/proposals');
   }

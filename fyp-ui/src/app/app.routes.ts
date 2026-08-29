@@ -427,10 +427,10 @@ export const routes: Routes = [
       { path: 'clubs/pending', pathMatch: 'full', redirectTo: 'ongoing/clubs' },
       { path: 'clubs/history', pathMatch: 'full', redirectTo: 'history/clubs' },
       { path: 'clubs/browse', pathMatch: 'full', redirectTo: 'clubs/discover' },
-      // Three separate System Configuration pages, each its own sidebar entry under the
-      // 'System Configuration' folder (see db.js's backfillSplitSystemConfigNavPages()/seedRoles())
-      // — previously one 'admin/settings' page with an in-page tab strip, which meant opening any
-      // one tab injected (and fetched from) all three services at once.
+      // Three separate System Configuration pages, each its own sidebar entry under the 'System
+      // Configuration' folder (see db.js's backfillSplitSystemConfigNavPages()/seedRoles()) —
+      // previously one 'admin/settings' page with an in-page tab strip, which meant opening any one
+      // tab injected (and fetched from) all three services at once.
       { path: 'admin/settings', pathMatch: 'full', redirectTo: 'admin/settings/policies' },
       {
         path: 'admin/settings/policies',
@@ -483,11 +483,7 @@ export const routes: Routes = [
         data: { eyebrow, title, description, icon },
       })),
       // Catches any admin-created Page Visibility route (/app/<page_code>, auto-derived — see
-      // admin.routes.js's deriveNavRoutePath()) that has no real component wired up yet. Safe as
-      // a wildcard because roleGuard's canActivateChild already ran and confirmed the URL is in
-      // the logged-in user's own nav tree before this route is ever reached — an admin adding a
-      // page here shows the shared placeholder immediately, no separate route-table edit needed,
-      // until a developer builds the real page and adds its own explicit route above this one.
+      // admin.routes.js's deriveNavRoutePath()) that has no real component wired up yet.
       { path: '**', loadComponent: placeholderPage },
     ],
   },

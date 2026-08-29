@@ -14,14 +14,10 @@ from ..scope import Scope, num
 from .common import NON_COMMITTED_STATUSES, DepartmentSpec
 
 
-# The Risk List's threshold, per department, in the unit its own deadline is
-# naturally read in - minutes for a same-day dispatch job (transport, campus
-# tour, photo/video), hours for food (prep starts shortly before serve, never
-# ten hours out), a day for the rest, where the crew has genuine multi-day
-# lead time. A single days-wide window (see at_risk_tasks above) would flag
-# every transport job as "at risk" always, since none of them are ever booked
-# more than a day out to begin with - the threshold has to match how far in
-# advance the work is normally staffed, not one global number.
+# The Risk List's threshold, per department, in the unit its own deadline is naturally read in -
+# minutes for a same-day dispatch job (transport, campus tour, photo/video), hours for food (prep
+# starts shortly before serve, never ten hours out), a day for the rest, where the crew has genuine
+# multi-day lead time.
 _RISK_THRESHOLD_MINUTES: dict[str, int] = {
     "transport_services": 10,
     "student_services": 10,

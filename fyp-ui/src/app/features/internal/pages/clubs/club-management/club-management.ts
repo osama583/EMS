@@ -49,10 +49,10 @@ export class ClubManagementComponent {
   readonly clubs = signal<readonly ClubRecord[]>([]);
   readonly total = signal(0);
   readonly totalPages = signal(1);
-  // Loaded only when the Add/Edit modal actually opens (see openAdd/editClub) — not eagerly on
-  // page load, since most visits to this page never open the form at all, and re-fetched on
-  // every open rather than cached so a student's eligibility can never go stale while the page
-  // sits open in a background tab.
+  // Loaded only when the Add/Edit modal actually opens (see openAdd/editClub) — not eagerly on page
+  // load, since most visits to this page never open the form at all, and re-fetched on every open
+  // rather than cached so a student's eligibility can never go stale while the page sits open in a
+  // background tab.
   readonly eligiblePresidents = signal<readonly ClubUserSummary[]>([]);
   readonly presidentsLoading = signal(false);
   readonly categories = signal<readonly ClubCategoryRecord[]>([]);
@@ -195,11 +195,9 @@ export class ClubManagementComponent {
     toObservable(this.search).pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
       .subscribe((value) => { this.debouncedSearch.set(value); this.page.set(1); });
 
-    // Every search/filter/sort/page control below is a real server query param (GET
-    // /clubs/search) — the browser never loads the full club table to filter/sort/paginate it
-    // locally, same treatment as cafeteria-staff-requests-history.ts's staffAuditLog().
-    // reload$ folds into the same query signal (via reloadTick) so a save/status-change mutation
-    // re-runs the current search/filter/sort/page exactly as-is, same as the categories page.
+    // Every search/filter/sort/page control below is a real server query param (GET /clubs/search) —
+    // the browser never loads the full club table to filter/sort/paginate it locally, same treatment
+    // as cafeteria-staff-requests-history.ts's staffAuditLog().
     const query$ = toObservable(computed(() => ({
       q: this.debouncedSearch(),
       status: this.statusFilter(),

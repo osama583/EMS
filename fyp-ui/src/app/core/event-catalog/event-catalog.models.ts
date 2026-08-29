@@ -1,11 +1,8 @@
 import { Observable } from 'rxjs';
 import { DeletionMetadata, DeletionPreview } from '../../shared/models/deletion.models';
 
-// Event Categories & Event Formats — two structurally-identical, id-backed admin-managed
-// catalogs (System Configuration -> Event Categories / Event Formats, server/routes/
-// event-catalog.routes.js). `code` is server-derived from `name` (deriveUnitCode(), same slug
-// convention as unit.code/role.role_code/nav_page.page_code) and immutable once created — never
-// sent by the client on create/update.
+// Event Categories & Event Formats — two structurally-identical, id-backed admin-managed catalogs
+// (System Configuration -> Event Categories / Event Formats, server/routes/ event-catalog.routes.js).
 export interface EventCatalogEntry {
   readonly id: string;
   readonly name: string;

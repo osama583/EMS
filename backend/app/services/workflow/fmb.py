@@ -351,8 +351,8 @@ def claim_selection(cur, selection_id: int, staff_user_id: int) -> dict:
         previous_status=SEL_APPROVED,
         new_status=SEL_PREPARING,
     )
-    # NOT _project_selection() here: cafeteria-order.service.ts's claim()/ready()/fulfil() read
-    # this response body directly as RawCafeteriaOrder (snake_case, including claimed_by_user_id/
+    # NOT _project_selection() here: cafeteria-order.service.ts's claim()/ready()/fulfil() read this
+    # response body directly as RawCafeteriaOrder (snake_case, including claimed_by_user_id/
     # delivery_photo_url/delivered_at - none of which FmbSelection carries), unlike the F&B-facing
     # create/approve/send-back/edit calls above, which the frontend ignores and reloads instead.
     return load_selection(cur, selection_id)

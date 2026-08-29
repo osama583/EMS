@@ -5,10 +5,9 @@ import { Toast, ToastRequest } from './toast.models';
 // toast is also dismissible via its own close button (system specification §8C).
 const DEFAULT_DURATION_MS = 5000;
 
-// Pulls the most useful message out of an HttpErrorResponse: the backend's own
-// { message } body if there is one (every route in server/ throws WorkflowError with a
-// human-readable message), otherwise the caller's fallback. Keeps error toasts specific
-// ("The cancellation deadline for this event has passed") instead of generic.
+// Pulls the most useful message out of an HttpErrorResponse: the backend's own { message } body if
+// there is one (every route in server/ throws WorkflowError with a human-readable message), otherwise
+// the caller's fallback.
 export function apiErrorMessage(error: unknown, fallback: string): string {
   const body = (error as { error?: unknown } | null)?.error;
   if (typeof body === 'string' && body.trim()) return body;

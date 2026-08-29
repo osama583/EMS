@@ -50,12 +50,8 @@ CHILD_TABLES = (
 EVENT_VISIBILITIES = ("Private", "Public", "Club Only", "Internal")
 REGISTRATION_MODES = ("Automatic", "Manual")
 
-# Where each requirement-row select field's value ("{kind}:{n}", see
-# app.api.options.option_id) resolves to: its catalogue table, primary key
-# column, and label column. The applicant form never sends a display label for
-# these fields - only the id - so the label snapshotted onto the request_*
-# tables (item/type/service/foodType/optionLabel/mainItem/subItem) has to be
-# looked up here at save time.
+# Where each requirement-row select field's value ("{kind}:{n}", see app.api.options.option_id)
+# resolves to: its catalogue table, primary key column, and label column.
 _OPTION_CATALOGUES: dict[str, tuple[str, str]] = {
     "logistics": ("logistics_options", "logistics_option_id"),
     "transportation": ("transportation_options", "transportation_option_id"),
@@ -73,10 +69,8 @@ _OPTION_CATALOGUES: dict[str, tuple[str, str]] = {
 # event schedule - the four delivery requests are venue-only by requirement.
 INSIDE, OUTSIDE = "inside", "outside"
 
-# Requirements whose location must be a catalogue venue, never free text, with
-# the label the applicant sees for each. Photography is included: it carries the
-# same location field and reads from the same dropdown, so leaving it free-text
-# would have kept one corner of the form on the old approach.
+# Requirements whose location must be a catalogue venue, never free text, with the label the applicant
+# sees for each.
 VENUE_ONLY_REQUIREMENTS = {
     "logistics": "Logistics",
     "soundLight": "Sound & Light",
@@ -215,10 +209,7 @@ def validate(cur, payload: dict, *, draft: bool, applicant: dict | None = None) 
             errors.append("Add at least one scheduled date, time and location.")
         for index, row in enumerate(schedule, start=1):
             outside = str(row.get("locationKind") or "").strip().lower() == OUTSIDE
-            # Inside University means a venue from the catalogue; Outside means
-            # a typed address. Exactly one of the two has to be present, and
-            # which one is decided by the row, not by whichever field happens to
-            # be filled - a half-switched row is a real error, not a guess.
+            # Inside University means a venue from the catalogue; Outside means a typed address.
             located = bool(str(row.get("location") or "").strip()) if outside else bool(row.get("venueId"))
             if not (row.get("date") and row.get("start") and row.get("end") and located):
                 what = "an external location" if outside else "a venue"
@@ -226,11 +217,9 @@ def validate(cur, payload: dict, *, draft: bool, applicant: dict | None = None) 
             elif str(row["end"]) <= str(row["start"]):
                 errors.append(f"Schedule row {index} ends before it starts.")
 
-        # The four university-delivered requests are venue-only by requirement
-        # (migration 032): there is nowhere to deliver a stage or a tray of food
-        # but a university venue, and free text there is what used to send
-        # Logistics to a place they could not find. Enforced here as well as in
-        # the form, because the form is not the only thing that can POST.
+        # The four university-delivered requests are venue-only by requirement (migration 032): there
+        # is nowhere to deliver a stage or a tray of food but a university venue, and free text there
+        # is what used to send Logistics to a place they could not find.
         request_rows = payload.get("requestRows")
         request_rows = request_rows if isinstance(request_rows, dict) else {}
         for requirement, label in VENUE_ONLY_REQUIREMENTS.items():
@@ -251,21 +240,9 @@ def validate(cur, payload: dict, *, draft: bool, applicant: dict | None = None) 
         errors.append("Registration approval must be Automatic or Manual.")
 
     # --- Club Only audience -----------------------------------------------
-    # "Club Only" used to be a bare string with no club behind it, which made it
-    # unenforceable: a president of two clubs produced a row that named neither,
-    # so both clubs' members saw the event (and, since no server-side check
-    # existed at all, so did everyone else). The audience is now explicit, and
-    # validated on two axes:
-    #
-    #   1. non-empty  - a Club Only event addressed to nobody is invisible under
-    #      the new read rule, so it is a mistake, not a valid state. Mirrors the
-    #      DB-level trigger in migration 029; checked here so the user gets a
-    #      field error instead of an IntegrityError.
-    #   2. authorised - the applicant must actually PRESIDE over each club named.
-    #      This is the real access-control check: without it a president of the
-    #      Photography Club could simply post into the Dancing Club's feed by
-    #      sending its id. The client only ever offers clubs it believes the user
-    #      presides over, but the client is not the authority.
+    # "Club Only" used to be a bare string with no club behind it, which made it unenforceable: a
+    # president of two clubs produced a row that named neither, so both clubs' members saw the event
+    # (and, since no server-side check existed at all, so did everyone else).
     applicant_user_id = (applicant or {}).get("user_id")
     club_ids = _club_id_list(payload)
     if visibility == "Club Only":
@@ -304,10 +281,8 @@ def validate(cur, payload: dict, *, draft: bool, applicant: dict | None = None) 
             )
 
     if not draft:
-        # Mineral water is typed in rather than picked (migration 028), so the
-        # count is now free text from a number input and has to be checked here.
-        # Draft-exempt like every other row rule above: an unfinished repeat-row
-        # is work in progress, and _write_water_normal_rows skips it.
+        # Mineral water is typed in rather than picked (migration 028), so the count is now free text
+        # from a number input and has to be checked here.
         water_rows = (payload.get("requestRows") or {}).get("waterNormal")
         for index, row in enumerate(water_rows if isinstance(water_rows, list) else [], start=1):
             raw = (row or {}).get("quantity")
@@ -485,9 +460,7 @@ def _resolve_category(cur, value: Any) -> dict | None:
 
 def write_children(cur, request_id: int, payload: dict) -> None:
     # --- Categories: freeze the name alongside the id ---------------------
-    # request_categories' PK is (request_id, category_id) - a repeated value in the
-    # payload (e.g. a duplicate emitted by the picker, or two saves racing) would
-    # otherwise 500 with a UniqueViolation instead of just being stored once.
+    # request_categories' PK is (request_id, category_id) - a repeated value in the payload (e.g.
     seen_category_ids: set[int] = set()
     for value in payload.get("eventCategories") or []:
         row = _resolve_category(cur, value)
@@ -501,10 +474,8 @@ def write_children(cur, request_id: int, payload: dict) -> None:
         )
 
     # --- Club Only audience: freeze the name, keep membership live -------
-    # Only written for Club Only (validate() rejects clubs on any other tier), so
-    # switching visibility away and re-saving drops the audience with the rest of
-    # the children. club_name is frozen exactly like category_name above; who can
-    # SEE the event is resolved live against club_members at read time.
+    # Only written for Club Only (validate() rejects clubs on any other tier), so switching visibility
+    # away and re-saving drops the audience with the rest of the children.
     if _text(payload, "eventVisibility") == "Club Only":
         for club_id in _club_id_list(payload):
             row = fetch_one(
@@ -795,9 +766,6 @@ def _write_funding_purchase_rows(cur, request_id: int, rows: list[dict]) -> None
 
 # One writer + one child table per department requirement — keys match
 # event_requirements.requirement_name and DepartmentRequestKind on the client.
-# Reused by both the whole-form save (write_children, above) and a single
-# department's scoped resubmission (write_single_requirement_rows, below), so
-# there is exactly one place that knows how to persist each requirement's rows.
 _REQUIREMENT_ROW_WRITERS = {
     "logistics": _write_logistics_rows,
     "transportation": _write_transportation_rows,
@@ -982,10 +950,7 @@ def project(cur, request: dict, *, include_children: bool = True) -> dict[str, A
         "FROM event_schedule WHERE request_id = %s ORDER BY event_schedule_id",
         (request_id,),
     )
-    # The Club Only audience. Two shapes because two consumers: the proposal form
-    # re-populates its picker from ids (so reopening a Club Only proposal shows
-    # the clubs it was addressed to), while read-only views render the frozen
-    # names. Empty for every other visibility tier.
+    # The Club Only audience.
     club_rows = fetch_all(
         cur,
         "SELECT club_id, club_name FROM request_clubs WHERE request_id = %s ORDER BY club_name",

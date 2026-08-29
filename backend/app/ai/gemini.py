@@ -29,13 +29,8 @@ from ..config import config
 
 log = logging.getLogger(__name__)
 
-# EMBEDDING_MODEL/EMBEDDING_DIMENSIONS are gone with the vector store - nothing is embedded any
-# more (see the removal note further down).
-#
-# gemini-3.6-flash answers correctly but was observed taking 30-50s per call
-# (even for a trivial one-line prompt) — unusable for a chat widget. The lite
-# model responds in ~1s with no observed quality loss for this task's short,
-# grounded-in-context answers.
+# EMBEDDING_MODEL/EMBEDDING_DIMENSIONS are gone with the vector store - nothing is embedded any more
+# (see the removal note further down).
 GENERATION_MODEL = "models/gemini-3.1-flash-lite"
 
 _client: genai.Client | None = None
@@ -43,10 +38,7 @@ _client: genai.Client | None = None
 # reasoning as _client above) - index 0 is always the primary key's client; index 1 (if
 # gemini_api_key_2 is set) is the failover key's client.
 _generation_clients_cache: list[genai.Client] | None = None
-# Which client in _generation_clients() to try FIRST. Starts at 0 (primary) and is only ever
-# advanced by _generate_content() on a confirmed 429 - a sticky failover, not a per-call
-# rotation: once the primary is known to be exhausted, every later call goes straight to the
-# secondary instead of paying for a doomed retry against the primary again first.
+# Which client in _generation_clients() to try FIRST.
 _active_generation_client_index = 0
 
 
@@ -107,15 +99,7 @@ def _generate_content(**kwargs):
 
 
 # --- Removed with the Text-to-SQL refactor -------------------------------------------------------
-# embed_text() is gone: nothing is embedded any more. The vector store it fed (event_embeddings /
-# club_embeddings) was deleted along with ai_db.py, sync.py, backfill.py and retrieval.py -
-# structured questions are answered by generating SQL against the primary database instead (see
-# ai/text_to_sql.py), so there is no index to build and nothing that can go stale.
-#
-# classify_llm() is gone too, but only because it was PROMOTED rather than deleted: it used to be
-# the rescue path for questions the regex router missed, and it is now the only classifier there
-# is. It lives in ai/classifier.py, which owns the class vocabulary's prompt and the
-# history-aware follow-up resolution the old fallback could not do.
+# embed_text() is gone: nothing is embedded any more.
 
 
 _FALLBACK = (
@@ -123,11 +107,9 @@ _FALLBACK = (
     "like \"what's on this month\" or \"tell me about the hackathon.\""
 )
 
-# The hallucination guard only applies to the second bucket below (event-fact questions): the
-# model is told, explicitly and repeatedly, that CONTEXT is the only permitted source of facts
-# there, and given a concrete fallback to fall back to instead of "sound confident and improvise".
-# Greetings/capability questions are deliberately carved out of that guard — routing "hey" through
-# a context-only-or-refuse rule produces a dead-end "I don't know", which is unhelpful, not safe.
+# The hallucination guard only applies to the second bucket below (event-fact questions): the model is
+# told, explicitly and repeatedly, that CONTEXT is the only permitted source of facts there, and given
+# a concrete fallback to fall back to instead of "sound confident and improvise".
 _SYSTEM_INSTRUCTION = """You are the assistant embedded in a university event and club management system,
 reachable through the chat orb on every page. You answer exactly FOUR kinds of question:
   1. ABOUT THE ASKER - their own name, role(s), school email, and what their account can do.
@@ -459,12 +441,9 @@ def generate_answer(
     asker_line = f"ASKER: {asker.full_name} (user_id={asker.user_id})\n\n" if asker is not None else ""
     contents.append(types.Content(role="user", parts=[types.Part(text=f"{asker_line}CONTEXT:\n{context}\n\nQUESTION:\n{question}")]))
 
-    # One retry on a transient failure (network blip, momentary API error) before giving up - a
-    # single dropped call used to surface immediately as the frontend's generic "couldn't reach
-    # the assistant" with no recovery attempt at all. Errors are already logged with a full stack
-    # trace by errors.py's unhandled-exception handler; this only adds a second attempt, a short
-    # fixed backoff (no need for exponential backoff at N=1), and a log line distinguishing "the
-    # first attempt failed but the retry succeeded" from a genuine hard failure.
+    # One retry on a transient failure (network blip, momentary API error) before giving up - a single
+    # dropped call used to surface immediately as the frontend's generic "couldn't reach the
+    # assistant" with no recovery attempt at all.
     last_error: Exception | None = None
     for attempt in range(2):
         try:

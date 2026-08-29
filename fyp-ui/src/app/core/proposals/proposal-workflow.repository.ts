@@ -25,12 +25,10 @@ export interface FmbSelectionDraft {
   readonly notes?: string;
 }
 
-// FmbSelectionDraft/Edit's fmbOptionId is a RequestOption id, the composite "fmb:<n>" form
-// (see request-option.service.ts/options.py's option_id()) - POST/PATCH /cafeteria-orders,
-// unlike the general /options catalogue routes, wants just the bare row number, and has no
-// parse_option_id() of its own to unwrap a composite id server-side. `Number("fmb:3")` is NaN,
-// which JSON.stringify sends as `null`, which the backend's required() rejects as "missing" -
-// this strips the "fmb:" prefix before it ever leaves the client.
+// FmbSelectionDraft/Edit's fmbOptionId is a RequestOption id, the composite "fmb:<n>" form (see
+// request-option.service.ts/options.py's option_id()) - POST/PATCH /cafeteria-orders, unlike the
+// general /options catalogue routes, wants just the bare row number, and has no parse_option_id() of
+// its own to unwrap a composite id server-side.
 function fmbOptionRowId(optionId: string): number {
   return Number(optionId.includes(':') ? optionId.split(':')[1] : optionId);
 }
@@ -69,10 +67,7 @@ export interface ProposalListQuery {
   readonly statusLabel?: string;
   // Exact match on one of the proposal's event categories — see listCategories(). Drafts only.
   readonly category?: string;
-  // 'mine' = the caller is the applicant. 'co-owned' = the caller is a co-owner, not the
-  // applicant. 'acted-on' = neither owner nor co-owner, but the caller reviewed/actioned it
-  // (head-of-school/department, FMB head, CFO, department staff) — only offered to those
-  // roles by hub-proposals.ts. Omit for all three. History's Requester filter.
+  // 'mine' = the caller is the applicant. 'co-owned' = the caller is a co-owner, not the applicant.
   readonly requester?: 'mine' | 'co-owned' | 'acted-on';
 }
 

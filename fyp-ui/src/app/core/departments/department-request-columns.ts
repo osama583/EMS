@@ -9,10 +9,9 @@ export interface DepartmentRequestDefinition {
   readonly columns: readonly EditableTableColumn[];
 }
 
-// A 'half' column only looks right when it has another 'half' beside it in a 2-column request-
-// editor grid — promote a lone 'half' (an odd-length run, or right after a 'full' resets pairing)
-// to 'full' so it never lands alone. Mirrors event-proposal.ts's fillDanglingHalves exactly (same
-// bug class: a column definition list that's edited over time can drift out of pairs).
+// A 'half' column only looks right when it has another 'half' beside it in a 2-column request- editor
+// grid — promote a lone 'half' (an odd-length run, or right after a 'full' resets pairing) to 'full'
+// so it never lands alone.
 function fillDanglingHalves(columns: readonly EditableTableColumn[]): readonly EditableTableColumn[] {
   const result: EditableTableColumn[] = [];
   let pendingHalf: EditableTableColumn | null = null;
@@ -133,11 +132,8 @@ export function resolveDepartmentRowLabels(
       const raw = String(row[column.key] ?? '');
       const option = catalog.find((item) => item.id === raw);
       if (option) { resolved[column.key] = option.label; continue; }
-      // Unresolvable means the catalogue row is gone from the ACTIVE list — an
-      // archived venue, most often. The row still carries the label frozen onto
-      // it when it was saved, so display that rather than the raw "venue:3",
-      // which is what keeps an archived venue reading correctly on an old
-      // record. Falls through to the raw value only if there is no snapshot.
+      // Unresolvable means the catalogue row is gone from the ACTIVE list — an archived venue, most
+      // often.
       if (column.key === 'venueId' && row['location']) resolved[column.key] = row['location'];
     }
     return resolved;

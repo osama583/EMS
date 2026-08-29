@@ -475,10 +475,9 @@ def test_colour_slots_are_integers_not_hexes():
 
 
 # --- Populated data -------------------------------------------------------
-# The empty-database tests above and these are not redundant: empty data
-# catches a missing NULLIF, populated data catches a panel that divides by a
-# count it assumed was non-zero, a fold that drops the wrong series, or a chart
-# that only renders once it has three points. Neither finds the other's bugs.
+# The empty-database tests above and these are not redundant: empty data catches a missing NULLIF,
+# populated data catches a panel that divides by a count it assumed was non-zero, a fold that drops
+# the wrong series, or a chart that only renders once it has three points.
 
 
 def _preview():

@@ -5,20 +5,17 @@ import { ArchivedEventCatalogEntry, EventCatalogDraft, EventCatalogEntry } from 
 import { EventCatalogRepositoryImpl, EventCatalogResource } from './event-catalog.repository';
 
 // Base class shared by EventCategoryService/EventFormatService below — each subclass just fixes
-// `resource` to 'categories' or 'formats' against the identical REST surface. Exposed as two
-// distinctly-named injectable services (rather than one service callers must parameterize) to
-// match this codebase's existing one-service-per-entity convention (AdminDirectoryService, etc.).
+// `resource` to 'categories' or 'formats' against the identical REST surface.
 export abstract class EventCatalogEntryService {
   private readonly repository = inject(EventCatalogRepositoryImpl);
   private readonly refreshRequests = new BehaviorSubject<void>(undefined);
 
-  // catchError inside the switchMap (not around the whole pipe) is load-bearing: shareReplay
-  // replays a completed/errored source verbatim to every future subscriber, including ones that
-  // arrive after a later refresh() — so if getEntries() ever errors even once (a transient
-  // network blip), the shared stream would die permanently and no subsequent create/update/
-  // refresh() would ever repopulate entriesSignal again (create/update themselves still succeed
-  // against the API; only the list view would stay stuck empty). Falling back to `of([])` keeps
-  // entries$ alive so the next refreshRequests.next() gets a fresh switchMap attempt.
+  // catchError inside the switchMap (not around the whole pipe) is load-bearing: shareReplay replays a
+  // completed/errored source verbatim to every future subscriber, including ones that arrive after a
+  // later refresh() — so if getEntries() ever errors even once (a transient network blip), the shared
+  // stream would die permanently and no subsequent create/update/ refresh() would ever repopulate
+  // entriesSignal again (create/update themselves still succeed against the API; only the list view
+  // would stay stuck empty).
   private readonly entries$: Observable<readonly EventCatalogEntry[]> = this.refreshRequests.pipe(
     switchMap(() => this.repository.getEntries(this.resource).pipe(catchError(() => of([] as readonly EventCatalogEntry[])))),
     shareReplay({ bufferSize: 1, refCount: true }),
@@ -32,12 +29,8 @@ export abstract class EventCatalogEntryService {
   readonly deletedLoading = signal(false);
 
   // `resource` is read by the constructor below (via entries$'s first subscription, which fires
-  // synchronously since refreshRequests is a BehaviorSubject) — it must therefore be passed in
-  // through this constructor parameter rather than left as a subclass field initializer.
-  // Base-class constructor bodies run BEFORE derived-class field initializers, so
-  // `protected readonly resource = 'categories'` on EventCategoryService would still read as
-  // undefined at that point, producing a GET /api/event-catalog/undefined on first load that only
-  // self-corrects once something later calls refresh() (e.g. after create/update).
+  // synchronously since refreshRequests is a BehaviorSubject) — it must therefore be passed in through
+  // this constructor parameter rather than left as a subclass field initializer.
   constructor(protected readonly resource: EventCatalogResource) {
     this.entries$.subscribe({
       next: (entries) => { this.entriesSignal.set(entries); this.loading.set(false); },

@@ -54,12 +54,10 @@ export class AdminDirectoryService {
   updateNavPageGrant(pageCode: string, grantId: number, draft: AdminNavPageGrantDraft): Observable<AdminNavPageGrant> { return this.repository.updateNavPageGrant(pageCode, grantId, draft).pipe(tap(() => this.refresh())); }
   setNavPageGrantActive(pageCode: string, grantId: number, active: boolean): Observable<AdminNavPageGrant> { return this.repository.setNavPageGrantActive(pageCode, grantId, active).pipe(tap(() => this.refresh())); }
   removeNavPageGrant(pageCode: string, grantId: number): Observable<AdminNavPageGrant> { return this.repository.removeNavPageGrant(pageCode, grantId).pipe(tap(() => this.refresh())); }
-  // Every mutation above (users/units/roles/nav pages) can change what the CURRENT admin's own
-  // sidebar should show — a role gaining/losing a nav_page grant, a unit being renamed, a page
-  // being added — so every one of them re-syncs the logged-in session's nav tree here, not just
-  // this page's own table. Subscribing to the auth refresh is fire-and-forget: it already
-  // swallows its own errors (see AuthService.refreshSession()) and this page's own success/error
-  // messaging is driven by the mutation's own request, not by this side effect.
+  // Every mutation above (users/units/roles/nav pages) can change what the CURRENT admin's own sidebar
+  // should show — a role gaining/losing a nav_page grant, a unit being renamed, a page being added —
+  // so every one of them re-syncs the logged-in session's nav tree here, not just this page's own
+  // table.
   refresh(): void {
     this.refreshRequests.next();
     this.auth.refreshSession().subscribe();

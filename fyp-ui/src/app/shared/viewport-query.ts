@@ -1,12 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { DestroyRef, Signal, inject, signal } from '@angular/core';
 
-// One breakpoint for every reviewer-comments surface in the app. Below it none of the three
-// layouts that host a comments panel still has a right-hand column to put it in
-// (proposal-reviewer-view's and proposal-department-view's .prv-layout, department-resubmit's
-// grid, event-proposal's pushed drawer), so instead of letting the conversation stack at the
-// very bottom of the page they all collapse to the same thing: an edge tab that opens a
-// right-docked overlay. Kept here rather than in each caller so the number cannot drift.
+// One breakpoint for every reviewer-comments surface in the app.
 export const COMMENTS_DOCK_QUERY = '(max-width: 72rem)';
 
 // Live `matchMedia` result as a signal. Call from an injection context (a field initialiser or a

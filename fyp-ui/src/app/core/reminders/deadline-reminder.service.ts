@@ -12,11 +12,8 @@ export interface ReminderTask {
   readonly awaitingStart: boolean;
 }
 
-// Deadline-based reminders for Cafeteria Staff tasks only (per spec — not used by the 5
-// row-assignment departments). Purely client-side/tab-open: no service worker, no push. Starting
-// 3h before an unstarted task's deadline, `urgentIds` includes it (the page binds a continuous
-// CSS pulse animation to that) and a synthesized beep plays once per elapsed hour until the task
-// is started, at which point both stop immediately.
+// Deadline-based reminders for Cafeteria Staff tasks only (per spec — not used by the 5 row-assignment
+// departments).
 @Injectable({ providedIn: 'root' })
 export class DeadlineReminderService {
   private readonly destroyRef = inject(DestroyRef);

@@ -48,34 +48,12 @@ from ._helpers import body, date_order, paged, pagination, required
 
 bp = Blueprint("events", __name__, url_prefix="/events")
 
-# One definition of "published", used by every query below so the list and the
-# detail view can never disagree about what is visible.
-#
-# 'Public' is visible to anyone, guests included.
-# 'Internal' is visible to any authenticated internal user, guests excluded - it exists for
-# events that should reach the whole APU community but not the public web.
-# 'Club Only' is visible ONLY to members of the clubs the event names (request_clubs) -
-# see _CLUB_MEMBER_VISIBLE below. This is enforced HERE, on the server. It previously was
-# not: the tier sat in both tuples below and the only gate was a client-side filter asking
-# "is this a student or lecturer?", so every Club Only event reached the whole university
-# and every guest.
-# 'Private' is never returned here at all - it has no discovery surface.
+# One definition of "published", used by every query below so the list and the detail view can never
+# disagree about what is visible.
 _GUEST_VISIBLE = "('Public')"
 _INTERNAL_VISIBLE = "('Public', 'Internal')"
 
-# 'Club Only' is deliberately absent from BOTH tuples above. It is no longer a tier
-# anyone can read by virtue of being signed in - it is addressed to specific clubs
-# (request_clubs, migration 029) and only their members may see it. That check is
-# this predicate, spliced in alongside the tier list rather than into it:
-#
-# Bound by NAME (%(user_id)s), not position: the /me endpoints already pass
-# {"user_id": ...} dicts into queries built from this same clause, so a named
-# parameter drops straight into them. Call sites that build their own filters
-# merge _viewer_params() into their dict - see there.
-#
-# Membership is read LIVE from club_members (the club_name in request_clubs is a
-# display snapshot only), so joining a club grants access to its already-published
-# events and leaving revokes it, with no backfill needed.
+# 'Club Only' is deliberately absent from BOTH tuples above.
 _CLUB_MEMBER_VISIBLE = """(
         r.event_visibility = 'Club Only'
         AND EXISTS (
@@ -103,34 +81,23 @@ def _viewer_params(include_internal: bool, principal) -> dict:
 
 def _published_clause(include_internal: bool, owner_clause: str | None = None) -> str:
     visible = _INTERNAL_VISIBLE if include_internal else _GUEST_VISIBLE
-    # Club Only is only ever reachable by an authenticated caller, and include_internal
-    # is precisely "authenticated and not external" - the same population that can hold
-    # a club membership (see isEligibleForClub: students and lecturers). A guest query
-    # therefore never carries the membership branch at all, and never binds :user_id.
+    # Club Only is only ever reachable by an authenticated caller, and include_internal is precisely
+    # "authenticated and not external" - the same population that can hold a club membership (see
+    # isEligibleForClub: students and lecturers).
     tiers = f"r.event_visibility IN {visible}"
     if include_internal:
         tiers = f"({tiers} OR {_CLUB_MEMBER_VISIBLE})"
     status_and_visibility = f"r.status = 'completed_approved' AND {tiers}"
     if not owner_clause:
         return status_and_visibility
-    # my_organized_events() is the one caller that passes owner_clause: this is the
-    # caller's own organiser dashboard, so ownership is REQUIRED, not merely one way in
-    # among others - otherwise every other public/club/internal event in the system
-    # would show up on it too. Ownership also bypasses the visibility check (rather
-    # than being AND'ed with it) so a 'Private' event - which has no discovery surface
-    # for anyone else, see the module comment above - still reaches its own
-    # creator/co-owner. Still requires completed_approved, same as every other viewer -
-    # an owner doesn't get to see their own event before/without it actually being published.
+    # my_organized_events() is the one caller that passes owner_clause: this is the caller's own
+    # organiser dashboard, so ownership is REQUIRED, not merely one way in among others - otherwise
+    # every other public/club/internal event in the system would show up on it too.
     return f"r.status = 'completed_approved' AND ({owner_clause})"
 
 
-# Column list matches the frontend's PublishedEvent model field for field, so
-# no client-side remapping is needed. Registration counts are computed here
-# rather than shipping the registration rows for the browser to count.
-# An event is "upcoming" while any of its schedule rows hasn't ended yet - once every row's
-# date is in the past, discovery hides it. Mirrors the "ended" convention used by
-# my_organized_events()'s ?status=upcoming|ended filter, just applied unconditionally here since
-# public discovery has no reason to ever surface an event nobody can still attend.
+# Column list matches the frontend's PublishedEvent model field for field, so no client-side remapping
+# is needed.
 _NOT_ENDED = """NOT EXISTS (
         SELECT 1 FROM request r2
          WHERE r2.request_id = r.request_id
@@ -1000,12 +967,9 @@ def decided_registrations():
     return jsonify(rows)
 
 
-# Requester bucket: 'me' when the viewer is the person who registered (their own request,
-# whether or not they also happened to decide it themself as organiser of their own event),
-# 'other' when the viewer decided someone ELSE's request as organiser/co-owner. Computed once
-# here in SQL rather than reconstructed client-side from two separate result sets, which is what
-# hub-history-events.ts used to do after fetching the whole unpaginated history AND the whole
-# unpaginated decided-registrations list.
+# Requester bucket: 'me' when the viewer is the person who registered (their own request, whether or
+# not they also happened to decide it themself as organiser of their own event), 'other' when the
+# viewer decided someone ELSE's request as organiser/co-owner.
 _HISTORY_UNION_SQL = """
     WITH history AS (
         -- The viewer's OWN registrations that reached a final outcome: confirmed-and-ended, or
@@ -1375,49 +1339,13 @@ def set_reminders():
 
 
 # ============================================================================
-# Master event calendar
-#
-# The university-wide calendar (/app/event-calendar). Deliberately SEPARATE from
-# the discovery endpoints above, which only ever expose completed_approved rows.
-# Two things differ here and neither could be folded into _published_clause
-# without changing what the public landing page shows:
-#
-#   1. WHEN an event appears. Not at submission - an event lands on the master
-#      calendar once it has cleared the last single-actor approval gate and
-#      reached department_review. Which gate that is depends on the pax routing
-#      the workflow already implements (services/workflow/stages.py):
-#        * normal flow   - HOS/HOD approved, then straight to department_review
-#        * high-pax flow - fmb_review then CFO approved, then department_review
-#      Both converge on department_review, so "has reached department_review" IS
-#      the rule for both, with no pax comparison needed here. Reading the status
-#      rather than re-deriving the threshold means this can never drift out of
-#      sync with the state machine that actually moves proposals.
-#      completed_approved is included too: a fully approved event obviously
-#      still belongs on the calendar.
-#
-#   2. Cancellation. cancel() sets status='cancelled', which is neither of the
-#      two statuses above, so a cancelled proposal drops off the calendar the
-#      moment it is cancelled with no extra bookkeeping. Same for a rejection.
+# Master event calendar The university-wide calendar (/app/event-calendar).
 _MASTER_CALENDAR_STATUSES = ("department_review", "completed_approved")
 
-# Roles that see everything regardless of the event's visibility tier. The CFO
-# and the F&B head are the two higher-authority actors in the workflow (they are
-# the approval gates for high-pax events), and both need to see the true state
-# of the calendar to plan against it - an event they cannot see is one they
-# cannot resource. This is the ONLY bypass of the tiering below.
+# Roles that see everything regardless of the event's visibility tier.
 _FULL_VISIBILITY_ROLES = ("cfo",)
 
-# How the four tiers resolve for an ordinary (non-CFO/F&B) viewer of the master
-# calendar. Note this is NOT the same rule as public discovery:
-#   Public / Internal - full details to anyone who can open the page at all. The
-#     page itself is gated by nav page-visibility, so "can see the page" already
-#     means "is an authenticated internal user".
-#   Club Only - full details to members of the named club(s) only (live
-#     membership via club_members, exactly as _CLUB_MEMBER_VISIBLE does);
-#     everyone else gets a redacted placeholder row, not a hidden one, so the
-#     date still reads as occupied.
-#   Private - never returned as a row at all. Only a per-date count is sent (see
-#     _private_counts), so no title/organiser/venue can leak client-side.
+# How the four tiers resolve for an ordinary (non-CFO/F&B) viewer of the master calendar.
 _MASTER_OPEN_TIERS = ("Public", "Internal")
 
 
@@ -1434,30 +1362,7 @@ def _sees_all_events(principal) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# The master calendar is served in THREE tiers, deliberately. The grid asks for
-# the least it can paint a cell with; everything heavier is fetched only once a
-# viewer asks for it by clicking:
-#
-#   GET /master-calendar        tier 1 - one small row per OCCURRENCE (date,
-#                               start/end, title, category, provisional) plus
-#                               the per-date private count. This is what paints
-#                               the month/week grid, the mobile dots, the
-#                               in-view counts and the category legend.
-#   GET /master-calendar/day    tier 2 - one day's rows plus the two fields a
-#                               day-list row adds (venue, organiser). One day,
-#                               never a range, fetched when a day is opened.
-#   GET /master-calendar/{id}   tier 3 - the detail dialog's payload
-#                               (description, format, pax, cost, registration,
-#                               club audience, every session). One event,
-#                               fetched when the dialog opens.
-#
-# Tiers 1 and 2 are ONE statement each. Tier 1 used to ship the entire detail
-# payload for every event in the visible range - image, description, expected
-# pax, cost, club audience - and assembled it with three extra queries per event
-# (schedule, categories, clubs) on top of a correlated registration count. Over
-# a 42-day month grid that is hundreds of round trips and a payload measured in
-# fields nobody has asked to see, to draw chips that carry a title and a time.
-# ---------------------------------------------------------------------------
+# The master calendar is served in THREE tiers, deliberately.
 
 # Appended to the range query for everyone except CFO/F&B. A Private event is
 # excluded in SQL rather than filtered out afterwards, so nothing about it ever

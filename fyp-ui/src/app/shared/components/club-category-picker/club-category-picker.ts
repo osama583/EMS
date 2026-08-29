@@ -11,10 +11,7 @@ import { ToastService } from '../toast/toast.service';
 export const CLUB_CATEGORY_MIN = 1;
 export const CLUB_CATEGORY_MAX = 3;
 
-// President self-service popup: change which 1-3 categories a club they preside over is listed
-// under. Categories themselves stay a Club Admin-managed lookup list (see
-// /app/club-category, ClubCategoryManagementComponent) — this picker only assigns from the
-// active list, data-driven end to end via ClubService.setClubCategories() -> PATCH /clubs/:id/categories.
+// President self-service popup: change which 1-3 categories a club they preside over is listed under.
 @Component({
   selector: 'app-club-category-picker',
   imports: [FormModalComponent, SearchableDropdownComponent],

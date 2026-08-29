@@ -9,9 +9,8 @@ import { SearchableDropdownComponent } from '../searchable-dropdown/searchable-d
 import { ToastService, apiErrorMessage } from '../toast/toast.service';
 
 // President self-service popup: a sitting President can't leave or be removed from their own club
-// (DELETE /clubs/{id}/members/{userId} always blocks it), so this is the only way off the role —
-// name an eligible (student) replacement and send it to a Club Admin for approval. Same
-// self-service shape as club-category-picker.ts, one field instead of a multi-select.
+// (DELETE /clubs/{id}/members/{userId} always blocks it), so this is the only way off the role — name
+// an eligible (student) replacement and send it to a Club Admin for approval.
 @Component({
   selector: 'app-president-change-request-modal',
   imports: [FormModalComponent, SearchableDropdownComponent],

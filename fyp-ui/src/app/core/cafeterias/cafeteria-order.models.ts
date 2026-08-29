@@ -1,8 +1,4 @@
 // request_fmb_selection — one cafeteria order (migration 013 adds 'ready' + delivery photo).
-// Staff-facing lifecycle: approved -> preparing ("Start Preparing") -> ready ("Done Preparing")
-// -> fulfilled ("Delivered", requires deliveryPhotoUrl). The DB/API value stays 'fulfilled' so
-// F&B's existing read-only order view keeps working — only this staff-facing UI calls it
-// "Delivered".
 export type CafeteriaOrderStatus = 'pending' | 'approved' | 'resubmitted' | 'preparing' | 'ready' | 'fulfilled' | 'cancelled';
 
 export interface CafeteriaOrder {

@@ -29,21 +29,10 @@ const STATUS_TONES: Record<PresidentChangeRequestRecord['status'], InternalCellT
   pending: 'warning', approved: 'success', rejected: 'danger',
 };
 
-// Single tab that serves both sides of the President Change Request workflow, scoped entirely by
-// the server per role (clubs.py's president_change_requests_inbox/mine/history):
-//   - Club Admin / System Admin, Inbox bucket:   pending requests, decide (approve/reject) — this
-//                                                  is genuinely actionable for them, so Inbox is
-//                                                  the right place.
-//   - Club Admin / System Admin, History bucket: every decided request, read-only.
-//   - Club President, Ongoing bucket:             their own PENDING submitted request, read-only —
-//                                                  someone else (Club Admin) decides it, so it is
-//                                                  never actionable for the President themself and
-//                                                  does not belong in their Inbox (see records-hub
-//                                                  .ts's showPresidentChangeTab split).
-//   - Club President, History bucket:             their own DECIDED requests, read-only.
-// Mirrors cafeteria-staff-requests-history.ts's server-driven toObservable/switchMap pagination
-// pipeline rather than hub-club-requests.ts's older client-side filtered/paginated pattern, since
-// this page must be server-paginated/filtered/sorted per the spec.
+// Single tab that serves both sides of the President Change Request workflow, scoped entirely by the
+// server per role (clubs.py's president_change_requests_inbox/mine/history): - Club Admin / System
+// Admin, Inbox bucket: pending requests, decide (approve/reject) — this is genuinely actionable for
+// them, so Inbox is the right place.
 @Component({
   selector: 'app-hub-president-change-requests',
   imports: [InternalDataPageComponent, FeedbackBannerComponent, ProposalCommentDialogComponent, ConfirmDialogComponent],
@@ -57,10 +46,8 @@ export class HubPresidentChangeRequestsComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
 
-  // Which bucket ('inbox' | 'ongoing' | 'history') this instance is mounted under — same
-  // route-data convention as staff-tasks.ts's `taskPage`, read from the parent RecordsHubComponent's
-  // data. 'ongoing' only ever applies to a non-admin President (see records-hub.ts's
-  // showPresidentChangeTab) — Club/System Admin never route here.
+  // Which bucket ('inbox' | 'ongoing' | 'history') this instance is mounted under — same route-data
+  // convention as staff-tasks.ts's `taskPage`, read from the parent RecordsHubComponent's data.
   readonly bucket = (this.route.snapshot.data['bucket'] as 'inbox' | 'ongoing' | 'history' | undefined) ?? 'inbox';
 
   readonly rejectionCommentMinLength = PCR_REJECTION_COMMENT_MIN_LENGTH;

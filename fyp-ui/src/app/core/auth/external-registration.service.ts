@@ -36,10 +36,8 @@ export class ExternalRegistrationService implements ExternalRegistrationApi {
   private readonly auth = inject(AuthService);
   private readonly http = inject(HttpClient);
 
-  // Step 1: the backend stages the submitted form under a 6-digit code and
-  // emails it — no account exists yet. Step 2 (verifyOtp) checks the code and
-  // only then creates the account, so an abandoned or never-verified attempt
-  // never becomes a row in the database.
+  // Step 1: the backend stages the submitted form under a 6-digit code and emails it — no account
+  // exists yet.
   registerExternalUser(request: ExternalUserRegistrationRequest): Observable<ExternalUserRegistrationResponse> {
     return this.http
       .post<StartRegistrationResponse>(`${environment.apiBaseUrl}/auth/register/start`, request)

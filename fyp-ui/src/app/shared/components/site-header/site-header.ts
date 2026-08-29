@@ -46,10 +46,9 @@ export class SiteHeaderComponent implements AfterViewInit {
 
   readonly isScrolled = signal(false);
   readonly forceCompact = input(false);
-  // /my-events isn't the landing page - none of navItems' hash anchors (#happening-soon etc.)
-  // exist there, and the page already has its own tabs/heading (my-events.html), so the section
-  // nav and "My Events" link would be redundant/dead weight. Logout (or Login, for a guest who
-  // somehow lands here signed out) stays - it's still the only sign-out affordance on this route.
+  // /my-events isn't the landing page - none of navItems' hash anchors (#happening-soon etc.) exist
+  // there, and the page already has its own tabs/heading (my-events.html), so the section nav and "My
+  // Events" link would be redundant/dead weight.
   readonly minimal = input(false);
   readonly menuOpen = signal(false);
   readonly activeSection = signal('#home');

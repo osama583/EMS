@@ -4,11 +4,9 @@ import { DeletionPreview } from '../../models/deletion.models';
 
 // Standard delete-confirmation flow for every soft-deletable Admin Settings entity: names exactly
 // what's about to be deleted, states the 7-day recovery window, and — critically — shows the
-// dependency check's result INSIDE the dialog (loading while the preview request is in flight,
-// then either the blocking reasons with the Delete button disabled, or a "clear to delete"
-// confirmation) rather than only surfacing a blocker after the admin clicks through. See
-// server/services/soft-delete.service.js's previewDeletion()/softDelete() — this dialog's
-// `preview` input is exactly that endpoint's response, fetched by the calling page before opening.
+// dependency check's result INSIDE the dialog (loading while the preview request is in flight, then
+// either the blocking reasons with the Delete button disabled, or a "clear to delete" confirmation)
+// rather than only surfacing a blocker after the admin clicks through.
 @Component({
   selector: 'app-delete-confirm-dialog',
   imports: [FormModalComponent],
@@ -70,26 +68,19 @@ export class DeleteConfirmDialogComponent {
   readonly entityLabel = input('');
   readonly checkingDependencies = input(false);
   readonly preview = input<DeletionPreview | null>(null);
-  // Guards against a call site that opens this dialog without ever running the dependency
-  // check: with no preview the button would otherwise stay enabled and fire a delete the
-  // server is certain to refuse, so the user sees a red toast instead of the reasons. Delete
-  // stays disabled until a preview arrives. A purge confirmation that has already been gated
-  // elsewhere passes false.
+  // Guards against a call site that opens this dialog without ever running the dependency check: with
+  // no preview the button would otherwise stay enabled and fire a delete the server is certain to
+  // refuse, so the user sees a red toast instead of the reasons.
   readonly requirePreview = input(true);
   readonly deleting = input(false);
-  // Shown under the blocking reasons to name the way forward. Deletion is only ever refused
-  // because the record is already in use, and the answer is always the same — deactivate it —
-  // so this defaults to saying so rather than leaving every dialog to repeat it, and every
-  // entity gives the same explanation. Override for a kind with different advice; pass '' to
-  // show reasons alone.
+  // Shown under the blocking reasons to name the way forward.
   readonly blockedHint = input(
     'Records that have been used cannot be deleted, because other records depend on them. ' +
       'Deactivate it instead to take it out of use while keeping that history intact.',
   );
   // True for a "Delete forever" / purge confirmation (immediate, unrecoverable) rather than the
-  // default 7-day-recoverable soft-delete this dialog otherwise confirms — swaps the title/body
-  // copy accordingly. Existing soft-delete call sites don't pass this, so default false preserves
-  // today's behavior everywhere unchanged.
+  // default 7-day-recoverable soft-delete this dialog otherwise confirms — swaps the title/body copy
+  // accordingly.
   readonly permanent = input(false);
   readonly confirm = output<void>();
   readonly cancel = output<void>();

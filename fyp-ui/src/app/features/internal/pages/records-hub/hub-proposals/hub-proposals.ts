@@ -29,14 +29,9 @@ const BUCKET_COPY: Readonly<Record<RecordsHubBucket, { title: string; descriptio
   history: { title: 'Proposals', description: 'Completed proposals — approved, rejected, or cancelled.', empty: 'No proposal history found' },
 };
 
-// Every list control here (search, status filter, sort, page, page size) is a real server query
-// param — GET /proposals?bucket=&q=&statusLabel=&sort=&order=&page=&pageSize= — computed by
-// proposals.py's list_proposals()/_BUCKET_SQL/_STATUS_LABEL_SQL. This used to fetch every visible
-// proposal in one 200-row request and filter/bucket/paginate it all in the browser (see git
-// history); that meant a fifth tab of proposals would silently stop being fetched at all past
-// page 1, and every navigation between Inbox/Ongoing/History re-fetched the same full set. Now
-// each keystroke/filter/sort/page change is its own scoped request for exactly what that page
-// needs to show.
+// Every list control here (search, status filter, sort, page, page size) is a real server query param
+// — GET /proposals?bucket=&q=&statusLabel=&sort=&order=&page=&pageSize= — computed by proposals.py's
+// list_proposals()/_BUCKET_SQL/_STATUS_LABEL_SQL.
 @Component({
   selector: 'app-hub-proposals',
   imports: [InternalDataPageComponent],
@@ -56,16 +51,14 @@ export class HubProposalsComponent {
   readonly search = signal('');
   private readonly debouncedSearch = signal('');
   readonly statusFilter = signal('All');
-  // Who the proposal belongs to, not who acted on it — 'mine' is the viewer's own submissions,
-  // 'co-owned' is theirs as a co-owner (not the applicant), 'acted-on' is neither but the viewer
+  // Who the proposal belongs to, not who acted on it — 'mine' is the viewer's own submissions, 'co-
+  // owned' is theirs as a co-owner (not the applicant), 'acted-on' is neither but the viewer
   // reviewed/decided it (heads of school/department and CFO only — see showActedOnOption below).
-  // Available on all three buckets, not just History. See proposals.py's ?requester= param.
   readonly requesterFilter = signal<'All' | 'mine' | 'co-owned' | 'acted-on'>('All');
 
   // 'Acted On' only makes sense for roles that actually review/decide proposals rather than just
-  // author or co-own them — head-of-school/department and CFO (FMB head is a head-of-department
-  // on the food_beverage_services unit, already covered by isHeadOfAnyUnit). Everyone else never
-  // has a workflow_history row as an actor, so the option would always return zero rows for them.
+  // author or co-own them — head-of-school/department and CFO (FMB head is a head-of-department on the
+  // food_beverage_services unit, already covered by isHeadOfAnyUnit).
   private readonly showActedOnOption = computed(() => {
     const user = this.auth.user();
     return !!user && (isHeadOfAnyUnit(user) || hasRole(user, 'cfo'));
@@ -111,11 +104,10 @@ export class HubProposalsComponent {
             statusLabel: query.statusLabel,
             requester: query.requester === 'All' ? undefined : query.requester,
           }).pipe(
-            // Caught HERE, inside switchMap, not in the terminal subscribe's error callback:
-            // an error reaching subscribe()'s error handler ends the whole outer subscription
-            // permanently, so every later filter/sort/page change would silently do nothing —
-            // exactly the "page gets broken, no other API works" symptom one bad filter combo
-            // used to cause.
+            // Caught HERE, inside switchMap, not in the terminal subscribe's error callback: an error
+            // reaching subscribe()'s error handler ends the whole outer subscription permanently, so
+            // every later filter/sort/page change would silently do nothing — exactly the "page gets
+            // broken, no other API works" symptom one bad filter combo used to cause.
             catchError(() => {
               this.error.set('Proposals could not be loaded.');
               this.loading.set(false);
@@ -184,15 +176,11 @@ export class HubProposalsComponent {
     },
   ]);
 
-  // For the Inbox bucket specifically: an applicant with TWO OR MORE departments simultaneously
-  // asking for changes on the same proposal gets one visual row PER department here, not one row
-  // for the whole proposal — each department's pushback is answered independently on its own
-  // department-resubmit page (see openProposal() below), so each needs its own actionable row,
-  // the same way it would if these were genuinely separate proposals. This only ever expands a
-  // row into MORE rows; every other bucket/case (single department, reviewer send-back, any other
-  // role's row) renders exactly one row per proposal, unchanged. Pagination/`total` still count
-  // proposals, not these expanded display rows — this app's workflow makes >1 simultaneous
-  // department pushback rare, so the rare page showing a couple of extra rows costs nothing.
+  // For the Inbox bucket specifically: an applicant with TWO OR MORE departments simultaneously asking
+  // for changes on the same proposal gets one visual row PER department here, not one row for the
+  // whole proposal — each department's pushback is answered independently on its own department-
+  // resubmit page (see openProposal() below), so each needs its own actionable row, the same way it
+  // would if these were genuinely separate proposals.
   readonly sharedRecords = computed<readonly InternalDataRecord[]>(() => this.items().flatMap((item): readonly InternalDataRecord[] => {
     const status = item.statusLabel ?? item.status;
     const splitDepartments = this.bucket === 'inbox' && item.workflow.stage !== ProposalStage.ResubmissionRequired && userIsApplicantForProposal(this.auth.user(), item)
@@ -264,11 +252,9 @@ export class HubProposalsComponent {
       return;
     }
     if (proposalNeedsApplicantAction(item) && userIsApplicantForProposal(this.auth.user(), item)) {
-      // Exactly one department asked for changes: the applicant only needs to fix and resend that
-      // ONE department's request, not touch the rest of an already-in-progress proposal — see
-      // department-resubmit.ts and proposals.py's resubmit_department_task(). Two or more
-      // departments waiting at once produce split rows instead (handled above); a reviewer stage
-      // sending the WHOLE proposal back (ResubmissionRequired) still goes to the full form below.
+      // Exactly one department asked for changes: the applicant only needs to fix and resend that ONE
+      // department's request, not touch the rest of an already-in-progress proposal — see department-
+      // resubmit.ts and proposals.py's resubmit_department_task().
       const awaitingDepartments = departmentsAwaitingApplicant(item);
       if (item.workflow.stage !== ProposalStage.ResubmissionRequired && awaitingDepartments.length === 1) {
         void this.router.navigate(['/app/proposals/department-resubmit', id, awaitingDepartments[0]]);

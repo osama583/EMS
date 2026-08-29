@@ -6,14 +6,8 @@ import { ProposalStage, isReviewerStage } from './proposal-status.models';
 
 export type ProposalVisibilitySection = 'inbox' | 'ongoing' | 'history';
 
-// RBAC redesign: "is this user an applicant-like proposal owner" is external-user plus any
-// unit-scoped user holding 'staff'/'lecturer'/'student'. Deliberately EXCLUDES
-// head-of-school/head-of-department — matching the old APPLICANT_ROLES list's precedent, which
-// never included HosHod even though a head CAN submit their own proposal (that triggers a
-// distinct self-review skip handled server-side in workflow.service.js's submitProposal(), not a
-// visibility-layer "applicant" concern) — heads are primarily reviewers/department owners for
-// this display filter's purposes. Club President is a data fact layered on a Student/Lecturer
-// account (see AuthUser.presidentOfClubIds), not its own role — already covered below.
+// RBAC redesign: "is this user an applicant-like proposal owner" is external-user plus any unit-scoped
+// user holding 'staff'/'lecturer'/'student'.
 function isApplicantLike(user: AuthUser): boolean {
   if (isExternalUser(user)) return true;
   return hasRole(user, 'staff') || hasRole(user, 'lecturer') || hasRole(user, 'student');
@@ -24,22 +18,19 @@ function headOfSchoolUnitCode(user: AuthUser): string | undefined {
   return user.roles.find((r) => r.roleCode === 'head-of-school')?.unitCode ?? undefined;
 }
 
-// Cafeteria Manager's relation to a proposal is per-SELECTION (request_fmb_selection rows routed
-// to their own cafeteria via fmbSelections[].cafeteriaCode), not a whole-ProposalStage gate like
-// HOS/HOD/F&B/CFO below — a proposal can sit in DepartmentReview (or later) with the manager's
-// own selection still 'pending' while sibling selections for OTHER cafeterias are already
-// fulfilled. See workflow.service.js's approveFmbSelection/resubmitFmbSelection and
-// proposal-department-view.ts's isCafeteriaSelectionView for the actual approve/resubmit UI.
+// Cafeteria Manager's relation to a proposal is per-SELECTION (request_fmb_selection rows routed to
+// their own cafeteria via fmbSelections[].cafeteriaCode), not a whole-ProposalStage gate like
+// HOS/HOD/F&B/CFO below — a proposal can sit in DepartmentReview (or later) with the manager's own
+// selection still 'pending' while sibling selections for OTHER cafeterias are already fulfilled.
 function myCafeteriaSelections(user: AuthUser, proposal: ProposalReviewRecord) {
   const cafeteriaCode = user.cafeteriaCode;
   if (cafeteriaCode === undefined) return [];
   return (proposal.fmbSelections ?? []).filter((selection) => selection.cafeteriaCode === cafeteriaCode);
 }
 
-// The server owns workflow transitions; this is purely a display-layer mapping from "which stage
-// is active" to "which reviewer identity's inbox it belongs in" — used only to decide what
-// Angular shows, never to decide what happens next. This mirrors workflow.service.js's
-// isHosHodOfUnit/isManagerOfUnit checks for display purposes.
+// The server owns workflow transitions; this is purely a display-layer mapping from "which stage is
+// active" to "which reviewer identity's inbox it belongs in" — used only to decide what Angular shows,
+// never to decide what happens next.
 function userMatchesReviewerForStage(user: AuthUser, stage: ProposalStage): boolean {
   switch (stage) {
     case ProposalStage.HosHodReview: return headOfSchoolUnitCode(user) !== undefined;
@@ -67,12 +58,9 @@ export function userIsApplicantForProposal(user: AuthUser | null, proposal: Prop
   const applicantName = proposal.applicant.trim().toLowerCase();
   if (userEmail && applicantEmail && userEmail === applicantEmail) return true;
   if (userName && applicantName && userName === applicantName) return true;
-  // List rows (Inbox/Ongoing/History) are projected without children — see
-  // proposals.py's list_proposals()/include_children=False — so coOwners is absent
-  // there; only the full detail fetch (GET /proposals/:id) populates it. A list row
-  // still needs a same-user/same-name applicant check to work (hub-proposals.ts's
-  // openProposal() calls this before it has the full record), so an undefined
-  // coOwners here means "this row has no co-owner data available," not zero co-owners.
+  // List rows (Inbox/Ongoing/History) are projected without children — see proposals.py's
+  // list_proposals()/include_children=False — so coOwners is absent there; only the full detail fetch
+  // (GET /proposals/:id) populates it.
   return (proposal.coOwners ?? []).some((coOwner) => {
     const coOwnerEmail = String(coOwner['email'] ?? '').trim().toLowerCase();
     const coOwnerName = String(coOwner['name'] ?? '').trim().toLowerCase();
@@ -88,10 +76,10 @@ export function departmentAwaitingApplicant(proposal: ProposalReviewRecord): boo
 }
 
 // Which department(s), if any, are currently waiting on the applicant to fix and resend their own
-// request — used to route the applicant to the scoped department-resubmit page (see
-// hub-proposals.ts's openProposal()) instead of the whole-proposal form when exactly one
-// department sent its task back, since fixing one department's request should never require
-// touching (or risk overwriting) content the rest of the proposal already had approved.
+// request — used to route the applicant to the scoped department-resubmit page (see hub-proposals.ts's
+// openProposal()) instead of the whole-proposal form when exactly one department sent its task back,
+// since fixing one department's request should never require touching (or risk overwriting) content
+// the rest of the proposal already had approved.
 export function departmentsAwaitingApplicant(proposal: ProposalReviewRecord): readonly DepartmentRequestKind[] {
   return proposal.workflow.departmentConfirmations
     .filter((entry) => entry.status === 'resubmitted')
@@ -128,15 +116,13 @@ function isReviewerOrDepartmentOwner(user: AuthUser): boolean {
 }
 
 // Whether `user` currently owns an action on `proposal` — the single source of truth for "is this
-// actually this user's job right now", used to keep restricted proposals out of a role's Inbox in
-// the first place rather than showing them and then blocking the action. This is a read-only
-// display filter over server-reported state, not a transition decision (the backend's
-// isHosHodOfUnit in workflow.service.js is the real authority — this mirrors it for display).
+// actually this user's job right now", used to keep restricted proposals out of a role's Inbox in the
+// first place rather than showing them and then blocking the action.
 function roleOwnsWorkflowAction(user: AuthUser, proposal: ProposalReviewRecord): boolean {
-  // Cafeteria Manager: independent of ProposalStage entirely — they own action the moment ANY of
-  // their own cafeteria's selections is 'pending' (freshly created or edited-and-resent by F&B),
-  // same "parallel independence" precedent as DepartmentReview's per-department confirmations
-  // below, just one level more granular (per-selection, not per-department).
+  // Cafeteria Manager: independent of ProposalStage entirely — they own action the moment ANY of their
+  // own cafeteria's selections is 'pending' (freshly created or edited-and-resent by F&B), same
+  // "parallel independence" precedent as DepartmentReview's per-department confirmations below, just
+  // one level more granular (per-selection, not per-department).
   if (hasRole(user, 'cafeteria-manager')) return myCafeteriaSelections(user, proposal).some((selection) => selection.status === 'pending');
   // F&B: a Cafeteria Manager pushing one order back puts that order squarely on F&B's desk, even
   // though the fmb department task itself is already 'approved'. Same per-selection granularity as
@@ -174,10 +160,10 @@ function userIsRelatedToProposal(user: AuthUser, proposal: ProposalReviewRecord,
   if (userIsApplicantForProposal(user, proposal)) return true;
   const routedKinds = requestKindsForRole(user);
   if (requestKind && routedKinds.length && !routedKinds.includes(requestKind)) return false;
-  // Cafeteria Manager: related the moment ANY selection exists for their own cafeteria, at any
-  // status (including fulfilled/cancelled, so past orders still surface in History) — unlike
-  // reviewerHasRelation()/departmentConfirmations below, which are keyed off whole-proposal stage
-  // or department, neither of which line up with "one specific cafeteria's own orders."
+  // Cafeteria Manager: related the moment ANY selection exists for their own cafeteria, at any status
+  // (including fulfilled/cancelled, so past orders still surface in History) — unlike
+  // reviewerHasRelation()/departmentConfirmations below, which are keyed off whole-proposal stage or
+  // department, neither of which line up with "one specific cafeteria's own orders."
   if (hasRole(user, 'cafeteria-manager')) return myCafeteriaSelections(user, proposal).length > 0;
   if (reviewerHasRelation(user, proposal)) return true;
   const ownedDepartments = departmentsForRole(user);

@@ -361,12 +361,9 @@ def unassign_staff(cur, task_id: int, staff_user_id: int, actor_user_id: int) ->
 
 
 # --- Row-level assignment ---------------------------------------------------
-# Logistics/Transportation/Photography/Sound & Light/Campus Tour: a manager
-# assigns staff to a SPECIFIC requested row, not the whole department task -
-# see migration 012's request_row_assignment and constants.ROW_ASSIGNABLE_
-# REQUIREMENTS/MAX_ASSIGNEES_PER_ROW. F&B never reaches this code path (its
-# flow is the cafeteria shared pool, fmb.py); fundingPurchase has no task at
-# all (NON_WORKFLOW_REQUIREMENTS).
+# Logistics/Transportation/Photography/Sound & Light/Campus Tour: a manager assigns staff to a
+# SPECIFIC requested row, not the whole department task - see migration 012's request_row_assignment
+# and constants.ROW_ASSIGNABLE_ REQUIREMENTS/MAX_ASSIGNEES_PER_ROW.
 
 def _assert_row_belongs_to_task(cur, task: dict, requirement_name: str, row_id: int) -> None:
     if requirement_name not in ROW_ASSIGNABLE_REQUIREMENTS:
