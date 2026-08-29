@@ -1,46 +1,25 @@
-// display: contents so this component's two top-level elements (ribbon, drawer) become direct
+// display: contents so this component's two top-level elements (tab, drawer) become direct
 // flex-row siblings of whatever `.xxx__main` column the caller lays out beside them — the
 // caller owns the flex row itself (see event-proposal.scss's .proposal-page /
 // department-resubmit.scss's equivalent), this component only owns the drawer's own visuals.
 :host { display: contents; }
 
-$comments-drawer-width: min(22rem, 85vw);
-$comments-drawer-width-mobile: min(20rem, 90vw);
+// Width and height both come from the shared dock tokens in styles/_comments-dock.scss, which is
+// also what sizes the docked overlay this collapses to on a narrow window and the comments cards
+// on the reviewer/department views. One definition, so the same surface is the same size
+// everywhere it appears. In short:
+//   width  — FLUID. It hands width back to the page's main column as the viewport narrows
+//            instead of holding one hard 22rem at every size, which is what squeezed the form
+//            column (and its step indicator) into a broken layout on smaller windows.
+//   height — FIXED, never content-derived. The box is always tall enough for roughly five or
+//            six message bubbles and stays exactly that tall whether the thread holds one
+//            message or fifty; everything past that scrolls inside it.
 
-// Toggle ribbon: a solid blue vertical side tab pinned to the right edge, text reading
-// bottom-to-top — matches the site's "Apply Now! / Enquire Now!" edge-tab pattern. `position:
-// fixed` so it overlays the sticky .internal-topbar (z-index 30) instead of sitting below it in
-// the stacking order. Hidden while the drawer is open (see the @if in the template).
-.comments-ribbon {
-  position: fixed;
-  z-index: 31;
-  top: calc(var(--header-height, 7rem) + 1.25rem);
-  right: 0;
-  padding: 1rem .55rem;
-  border: 0;
-  border-radius: 0 .4rem .4rem 0;
-  background: var(--apu-blue-600);
-  color: var(--apu-white);
-  font-size: .82rem;
-  font-weight: 700;
-  letter-spacing: .02em;
-  white-space: nowrap;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  cursor: pointer;
-  box-shadow: .15rem -.2rem .75rem rgb(5 24 48 / 15%);
-  transition: background var(--motion-control) var(--ease-standard);
-}
-.comments-ribbon:hover,
-.comments-ribbon:focus-visible { background: var(--apu-blue-700); }
-
-// Sticky + viewport-height-capped (not `align-self: stretch`) so the drawer always gets a real,
-// predictable height to lay its own header/body grid out against — `stretch` used to size it off
-// whatever height its flex-row sibling (the page's main content column) happened to be, which
-// looked fine on a long form (event-proposal) but left the drawer visibly cut off top and bottom
-// on a short page (department-resubmit, whose main column is just one small table). Being sticky
-// also gives every caller the "scrolls independently from the left side" behavior for free: the
-// drawer pins to the viewport while .xxx__main scrolls normally past it.
+// Sticky and fixed-height (--comments-dock-height): the drawer always gets the same real height to
+// lay its header/body grid out against, independent both of its flex-row sibling's height and of
+// how much conversation it happens to be showing. Being sticky also gives every caller the
+// "scrolls independently from the left side" behaviour for free: the drawer pins to the viewport
+// while .xxx__main scrolls normally past it.
 .comments-drawer {
   flex: 0 0 auto;
   align-self: flex-start;
@@ -48,40 +27,39 @@ $comments-drawer-width-mobile: min(20rem, 90vw);
   overflow: hidden;
   position: sticky;
   top: .75rem;
-  max-height: calc(100svh - 1.5rem);
+  height: var(--comments-dock-height);
   border: 0 solid var(--apu-border);
   border-radius: var(--radius-card);
   background: var(--apu-white);
   transition: width var(--motion-control) var(--ease-standard), border-color var(--motion-control) var(--ease-standard);
 }
 // Full card frame (border all round + shadow), not just a left divider — the drawer reads as a
-// fixed-size boxed panel with its own top/bottom/right edges, matching .comments-panel's card
-// look, instead of bleeding to the page edge (the old margin-right: -$shell-content-inline-padding)
-// which left no room for a right-hand border to show.
+// self-contained boxed panel with its own top/bottom/right edges, matching .comments-panel's
+// card look, instead of bleeding to the page edge.
 .comments-drawer--open {
-  width: $comments-drawer-width;
+  width: var(--comments-dock-width);
   margin-left: 1.75rem;
   border-width: 1px;
   box-shadow: var(--internal-card-shadow);
 }
+// `auto minmax(0, 1fr)`: the header keeps its natural height and stays put, while the body row
+// is explicitly allowed to be shorter than its content — which is what lets the single scroller
+// inside it (the list, or the thread's <ol>) actually scroll instead of pushing the box taller.
+// The inner width matches the drawer's so the contents never reflow mid-transition.
 .comments-drawer__inner {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: var(--space-3);
-  width: $comments-drawer-width;
+  width: var(--comments-dock-width);
   height: 100%;
   min-height: 0;
   padding: var(--space-4);
   background: var(--apu-white);
 }
-// The header above already carries its own border-bottom, and the drawer itself now carries its
-// own full border/shadow (see .comments-drawer--open) — the scrollable message/list area (grid
-// row 2, 1fr) just needs to fill and scroll inside that fixed box, no border of its own.
-.comments-drawer__inner app-conversation-thread,
-.comments-drawer__inner > .comments-drawer__list {
-  min-height: 0;
-  overflow-y: auto;
-}
+// One scroll container per body, and it is the child's (the thread's <ol>, or the list) — not
+// this wrapper's. Nesting two `overflow-y: auto` boxes left the outer one owning the scroll and
+// the inner one unconstrained, which is how a long thread used to stretch the panel.
+.comments-drawer__inner > app-conversation-thread { min-height: 0; overflow: hidden; }
 .comments-drawer__header {
   display: flex;
   align-items: flex-start;
@@ -92,7 +70,7 @@ $comments-drawer-width-mobile: min(20rem, 90vw);
 }
 .comments-drawer__header > .material-symbols-rounded { flex-shrink: 0; color: var(--apu-blue-600); }
 .comments-drawer__header > div { flex: 1 1 auto; min-width: 0; }
-.comments-drawer__header h3 { margin: 0; color: var(--apu-blue-600); font-size: 1.05rem; }
+.comments-drawer__header h3 { margin: 0; color: var(--apu-blue-600); font-size: 1.05rem; overflow-wrap: anywhere; }
 .comments-drawer__subtitle { margin: .15rem 0 0; color: var(--apu-text-muted); font-size: .78rem; line-height: 1.4; }
 .comments-drawer__close {
   flex-shrink: 0;
@@ -128,7 +106,18 @@ $comments-drawer-width-mobile: min(20rem, 90vw);
 // Flat inbox-style list (matches a standard chat app's conversation list): each row is avatar +
 // name/timestamp + preview, separated by a hairline, no per-row card/box/background. Replaces the
 // earlier boxed-bubble-per-row look, which read as message bubbles rather than a list of people.
-.comments-drawer__list { display: grid; align-content: start; gap: 0; list-style: none; margin: 0; padding: 0; overflow-y: auto; min-height: 0; }
+.comments-drawer__list {
+  display: grid;
+  align-content: start;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
 .comments-drawer__list li { border-bottom: 1px solid var(--apu-border); }
 .comments-drawer__list li:last-child { border-bottom: 0; }
 .comments-drawer__entry { display: flex; gap: .7rem; align-items: flex-start; padding: .7rem .1rem; }
@@ -159,65 +148,39 @@ $comments-drawer-width-mobile: min(20rem, 90vw);
 
 // 'panel' variant: an always-visible sticky column, matching proposal-reviewer-view.scss's
 // .prv-panel-card design (card border/shadow/radius) rather than the drawer's slide-in/overlay
-// treatment — no ribbon, no open/close, nothing for the applicant to know to click. Sticky +
-// height-capped for the same "scrolls independently of the left column" reason as .comments-drawer
-// above; the header stays put while the list/thread (flex: 1 1 auto below) scrolls internally.
-.comments-panel {
+// treatment — no ribbon, no open/close, nothing for the applicant to know to click. Same
+// fixed-height contract as the drawer above (five-or-six messages tall, scroll past that), so
+// the two variants of this component are one box in two different shells.
+// The card itself: header on top, one scrolling body underneath, matching
+// proposal-reviewer-view.scss's .prv-panel-card. Carries no position and no size, so the two
+// shells that use it can each say where it goes without fighting each other — .comments-panel
+// below (the wide sticky column) and the global .comments-dock-surface (the narrow right-docked
+// overlay, styles/_comments-dock.scss).
+.comments-card {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  position: sticky;
-  top: 1.25rem;
-  width: min(22rem, 100%);
-  max-height: calc(100svh - 2.5rem);
   padding: 1.2rem 1.25rem;
   border: 1px solid var(--apu-border);
   border-radius: var(--radius-card);
   background: var(--apu-surface);
-  box-shadow: var(--internal-card-shadow);
   overflow: hidden;
 }
-.comments-panel .comments-drawer__header { flex-shrink: 0; padding-bottom: .85rem; border-bottom: 1px solid var(--apu-border); }
-.comments-panel .comments-drawer__list,
-.comments-panel app-conversation-thread { flex: 1 1 auto; min-height: 0; }
+.comments-card .comments-drawer__header { flex-shrink: 0; padding-bottom: .85rem; border-bottom: 1px solid var(--apu-border); }
+.comments-card .comments-drawer__list,
+.comments-card > app-conversation-thread { flex: 1 1 auto; min-height: 0; }
+.comments-card > app-conversation-thread { overflow: hidden; }
 
-@media (max-width: 64rem) {
-  // The panel stops being sticky once there's no room for a real two-column layout beside it —
-  // matches proposal-reviewer-view.scss's own breakpoint for the same reason (.prv-panel).
-  .comments-panel { position: static; width: auto; max-height: none; overflow: visible; }
-  .comments-panel .comments-drawer__list,
-  .comments-panel app-conversation-thread { overflow: visible; }
+// 'panel' variant, wide: an always-visible sticky column, no tab and no open/close — nothing for
+// the applicant to know to click. Same fixed height as every other comments surface.
+.comments-panel {
+  position: sticky;
+  top: 1.25rem;
+  width: 100%;
+  height: var(--comments-dock-height);
+  box-shadow: var(--internal-card-shadow);
 }
 
-// Mobile: the drawer stops being a pushed layout sibling and becomes a centered, near-full-screen
-// popup overlay with a backdrop — a side-by-side push has no room to work with on a small
-// viewport, so this switches the same markup to fixed positioning instead of resizing in place.
-@media (max-width: 48rem) {
-  .comments-ribbon { top: auto; bottom: calc(4.5rem + var(--space-4)); right: var(--space-3); padding: .6rem .9rem; border-radius: var(--radius-pill); writing-mode: horizontal-tb; }
-  .comments-drawer {
-    position: fixed;
-    z-index: 90;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    width: auto;
-    background: rgb(5 24 48 / 45%);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--motion-control) var(--ease-standard);
-  }
-  .comments-drawer--open {
-    width: auto;
-    border-width: 0;
-    box-shadow: none;
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .comments-drawer__inner {
-    width: min(#{$comments-drawer-width-mobile}, calc(100vw - 2rem));
-    max-height: calc(100dvh - 4rem);
-    padding: var(--space-4);
-    border-radius: var(--radius-container);
-    box-shadow: var(--shadow-overlay);
-  }
+@media (prefers-reduced-motion: reduce) {
+  .comments-drawer { transition: none; }
 }

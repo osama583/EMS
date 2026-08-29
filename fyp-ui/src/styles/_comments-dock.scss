@@ -1,0 +1,167 @@
+/* ----------------------------------------------------------------------
+   Comments dock
+
+   One treatment shared by every reviewer-comments surface in the app. On a
+   wide screen each of those surfaces is a card in a right-hand column and
+   this file does nothing. Below COMMENTS_DOCK_QUERY (see
+   shared/viewport-query.ts, which drives these classes on/off) that column
+   stops existing, and the alternative the layouts used to fall back on was
+   letting the conversation stack at the very bottom of the page, under
+   everything else — reachable only by scrolling past the whole proposal.
+
+   Instead the card docks: a tab on the right edge, and the same card as a
+   right-docked overlay when that tab is clicked. Closing it puts the tab
+   back. That is exactly what the desktop drawer already does, so the phone
+   is not a different interaction, just a narrower one.
+
+   Global rather than per-component because four separate templates render a
+   comments card of their own; the geometry tokens below are the single
+   definition of how wide/tall/where that surface is, and the drawer
+   component consumes them too.
+   ---------------------------------------------------------------------- */
+
+:root {
+  --comments-dock-width: clamp(19rem, 26vw, 24rem);
+  /* Tall enough for roughly five or six message bubbles, and FIXED at that:
+     the surface must not resize itself as a thread grows or as a different
+     conversation is opened. Anything past it scrolls inside. */
+  --comments-dock-height: min(40rem, 100svh - 3rem);
+  /* Clears both sticky bars: the desktop .internal-topbar (5.5rem) and the
+     phone stack of .mobile-topbar (3.75rem) + .internal-topbar (3rem). */
+  --comments-dock-top: 8.5rem;
+  --comments-dock-scrim: rgb(5 24 48 / 45%);
+}
+
+/* The edge tab. Solid blue vertical side tab reading bottom-to-top, matching
+   the site's "Apply Now! / Enquire Now!" pattern and the applicant-side
+   drawer's own ribbon. `fixed` so it rides above the sticky topbars
+   (z-index 30) and stays put as the page scrolls. */
+.comments-dock-tab.comments-dock-tab {
+  position: fixed;
+  z-index: 31;
+  top: var(--comments-dock-top);
+  right: 0;
+  padding: 1rem 0.55rem;
+  border: 0;
+  border-radius: 0 0.4rem 0.4rem 0;
+  background: var(--apu-blue-600);
+  color: var(--apu-white);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  cursor: pointer;
+  box-shadow: 0.15rem -0.2rem 0.75rem rgb(5 24 48 / 15%);
+  transition: background var(--motion-control) var(--ease-standard);
+}
+
+.comments-dock-tab:hover,
+.comments-dock-tab:focus-visible {
+  background: var(--apu-blue-700);
+}
+
+/* A real <button>, not a decorative div: clicking anywhere off the surface is
+   the primary way to dismiss it, and that has to be reachable by keyboard. */
+.comments-dock-scrim.comments-dock-scrim {
+  position: fixed;
+  z-index: 89;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: var(--comments-dock-scrim);
+  cursor: pointer;
+  animation: comments-dock-fade var(--motion-control) var(--ease-standard);
+}
+
+/* Applied to the caller's own comments card, so the card keeps every one of
+   its own visuals (border, radius, padding, background, and its internal
+   header/scrolling-body grid) and only its position and size change.
+
+   The class is doubled on purpose. Angular appends component stylesheets to
+   <head> at runtime, after this global sheet's <link>, so a component rule of
+   equal specificity wins on source order alone — and the cards this is
+   applied to carry exactly such a rule (.prv-panel-card sets
+   `position: relative`). Doubling makes this 0-2-0 so the dock's position and
+   size land regardless, without reaching for !important. */
+.comments-dock-surface.comments-dock-surface {
+  position: fixed;
+  z-index: 90;
+  top: 50%;
+  right: 1rem;
+  width: min(var(--comments-dock-width), calc(100vw - 2rem));
+  height: min(var(--comments-dock-height), calc(100dvh - 2rem));
+  transform: translateY(-50%);
+  box-shadow: var(--shadow-overlay);
+  animation: comments-dock-in var(--motion-control) var(--ease-standard);
+}
+
+/* Sits at the end of the card's own header row. `margin-left: auto` rather
+   than a layout change on the header, so this drops into any of the four
+   card headers without touching them. */
+.comments-dock-close {
+  flex-shrink: 0;
+  display: flex;
+  width: 2rem;
+  height: 2rem;
+  margin-left: auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--apu-surface-muted);
+  color: var(--apu-text-muted);
+  line-height: 0;
+  cursor: pointer;
+  transition: background var(--motion-control) var(--ease-standard);
+}
+
+.comments-dock-close:hover,
+.comments-dock-close:focus-visible {
+  background: var(--apu-blue-200);
+  color: var(--apu-blue-700);
+}
+
+.comments-dock-close .material-symbols-rounded {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+@keyframes comments-dock-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Slides in from the edge it docks to, rather than appearing in place. */
+@keyframes comments-dock-in {
+  from { opacity: 0; transform: translate(1.25rem, -50%); }
+  to { opacity: 1; transform: translate(0, -50%); }
+}
+
+/* Phone: as wide as the screen allows, and a slightly smaller tab so the edge
+   tab never covers more of the page than a tab should. */
+/* Doubled here too - these have to beat the doubled base rules above, not
+   just the component styles. */
+@media (max-width: 30rem) {
+  .comments-dock-tab.comments-dock-tab {
+    padding: 0.8rem 0.45rem;
+    font-size: 0.74rem;
+  }
+
+  .comments-dock-surface.comments-dock-surface {
+    right: 0.75rem;
+    width: calc(100vw - 1.5rem);
+    height: min(var(--comments-dock-height), calc(100dvh - 7rem));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comments-dock-tab.comments-dock-tab { transition: none; }
+  .comments-dock-scrim.comments-dock-scrim,
+  .comments-dock-surface.comments-dock-surface { animation: none; }
+}

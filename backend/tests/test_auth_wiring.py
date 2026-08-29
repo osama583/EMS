@@ -7,10 +7,14 @@ run against a seeded database.
 """
 from __future__ import annotations
 
+from datetime import timedelta
+
 import pytest
+from flask import g
 
 from app import create_app
-from app.security.tokens import issue_access_token, issue_refresh_token
+from app.security import authenticate_optional
+from app.security.tokens import ACCESS, _issue, issue_access_token, issue_refresh_token
 
 
 @pytest.fixture()
@@ -77,3 +81,71 @@ def test_inbound_request_id_is_echoed_back(client):
     res = client.get("/api/v1/auth/me", headers={"X-Request-Id": "trace-me-123"})
     assert res.headers["X-Request-Id"] == "trace-me-123"
     assert res.get_json()["error"]["request_id"] == "trace-me-123"
+
+
+# --- Optional authentication on the public endpoints ---------------------------------------
+#
+# authenticate_optional() backs the endpoints that are public but personalise themselves for a
+# signed-in caller (/ai/ask, the event discovery routes). It used to swallow EVERY token failure
+# and carry on as a guest, which made an expired access token indistinguishable from having no
+# account at all: the answer came back 200, so auth.interceptor.ts never saw the 401 that triggers
+# its refresh-and-replay, and a signed-in student was silently answered as a signed-out visitor
+# for the rest of that tab's life. The chat then refused clubs - a topic their role does grant -
+# with the "an administrator has not granted your role" wording, because a guest genuinely is
+# granted nothing (see ai/topic_access.py's GUEST_OPEN_TOPICS, which leaves `events` as the one
+# topic a guest keeps, exactly matching the symptom: events offered, clubs refused).
+#
+# Presenting a credential that does not verify is now a 401, the same as on any protected route.
+# Presenting NO credential is still a guest, which is what keeps the public tier working.
+
+
+def _expired_access_token(user_id: int = 1) -> str:
+    token, _ = _issue(user_id, ACCESS, timedelta(minutes=-5))
+    return token
+
+
+def test_expired_token_on_a_public_endpoint_is_refused_not_downgraded_to_guest(client):
+    """The regression: 200-as-a-guest gave the interceptor nothing to refresh on."""
+    res = client.post(
+        "/api/v1/ai/ask",
+        json={"question": "suggest clubs for me"},
+        headers={"Authorization": f"Bearer {_expired_access_token()}"},
+    )
+    assert res.status_code == 401
+    assert res.get_json()["error"]["code"] == "token_expired"
+
+
+def test_garbage_token_on_a_public_endpoint_is_refused(client):
+    res = client.post(
+        "/api/v1/ai/ask",
+        json={"question": "suggest clubs for me"},
+        headers={"Authorization": "Bearer not-a-jwt"},
+    )
+    assert res.status_code == 401
+    assert res.get_json()["error"]["code"] == "token_invalid"
+
+
+def test_a_refresh_token_cannot_authenticate_a_public_endpoint(client):
+    refresh, _ = issue_refresh_token(1)
+    res = client.post(
+        "/api/v1/ai/ask",
+        json={"question": "suggest clubs for me"},
+        headers={"Authorization": f"Bearer {refresh}"},
+    )
+    assert res.status_code == 401
+
+
+def test_no_token_at_all_is_still_a_guest_not_a_401():
+    """The other half of the rule, and the reason this is not just authenticate(): a visitor who
+    offers no credential must keep reaching the public tier."""
+    app = create_app(validate_config=False)
+    with app.test_request_context("/api/v1/ai/ask"):
+        authenticate_optional()
+        assert getattr(g, "principal", None) is None
+
+
+def test_a_non_bearer_authorization_header_is_still_a_guest():
+    app = create_app(validate_config=False)
+    with app.test_request_context("/api/v1/ai/ask", headers={"Authorization": "Basic abc123"}):
+        authenticate_optional()
+        assert getattr(g, "principal", None) is None

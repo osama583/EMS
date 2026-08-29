@@ -22,14 +22,6 @@
   transform: translateY(-1px);
 }
 
-.prv-field--span2 {
-  grid-column: span 2;
-}
-
-.prv-field--full {
-  grid-column: 1 / -1;
-}
-
 .prv-field__label {
   color: var(--apu-text-muted);
   font-size: 0.67rem;
@@ -44,11 +36,4 @@
   font-weight: 600;
   line-height: 1.55;
   overflow-wrap: anywhere;
-}
-
-@media (max-width: 48rem) {
-  .prv-field--span2,
-  .prv-field--full {
-    grid-column: 1 / -1;
-  }
 }

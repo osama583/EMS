@@ -1,0 +1,11 @@
+// The wrapper is transparent so <app-proposal-section> remains a direct child of .prv-main's grid
+// and the page keeps its existing vertical rhythm.
+:host { display: contents; }
+
+.prv-event-image {
+  width: 100%;
+  max-width: 22rem;
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-card);
+  object-fit: cover;
+}

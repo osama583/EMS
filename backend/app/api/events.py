@@ -6,6 +6,9 @@
     GET  /events/search                published events, filtered/paginated (public, see search_events)
     GET  /events/schools               distinct schools/departments among published events (public)
     GET  /events/{id}                  one published event
+    GET  /events/master-calendar       master calendar grid feed for one range (tier 1)
+    GET  /events/master-calendar/day   one day's list rows (tier 2)
+    GET  /events/master-calendar/{id}  one event's detail dialog payload (tier 3)
     GET  /events/{id}/registrations    organiser-only attendee list
     POST /events/{id}/registrations    register
     GET  /events/{id}/registrations/mine     my registration for this event
@@ -1430,59 +1433,168 @@ def _sees_all_events(principal) -> bool:
     return principal.heads_unit(wf.constants.FMB_UNIT_CODE)
 
 
-def _master_calendar_rows(cur, start: str, end: str, principal) -> list[dict]:
-    """Every master-calendar event overlapping [start, end], before redaction."""
-    sees_all = _sees_all_events(principal)
+# ---------------------------------------------------------------------------
+# The master calendar is served in THREE tiers, deliberately. The grid asks for
+# the least it can paint a cell with; everything heavier is fetched only once a
+# viewer asks for it by clicking:
+#
+#   GET /master-calendar        tier 1 - one small row per OCCURRENCE (date,
+#                               start/end, title, category, provisional) plus
+#                               the per-date private count. This is what paints
+#                               the month/week grid, the mobile dots, the
+#                               in-view counts and the category legend.
+#   GET /master-calendar/day    tier 2 - one day's rows plus the two fields a
+#                               day-list row adds (venue, organiser). One day,
+#                               never a range, fetched when a day is opened.
+#   GET /master-calendar/{id}   tier 3 - the detail dialog's payload
+#                               (description, format, pax, cost, registration,
+#                               club audience, every session). One event,
+#                               fetched when the dialog opens.
+#
+# Tiers 1 and 2 are ONE statement each. Tier 1 used to ship the entire detail
+# payload for every event in the visible range - image, description, expected
+# pax, cost, club audience - and assembled it with three extra queries per event
+# (schedule, categories, clubs) on top of a correlated registration count. Over
+# a 42-day month grid that is hundreds of round trips and a payload measured in
+# fields nobody has asked to see, to draw chips that carry a title and a time.
+# ---------------------------------------------------------------------------
 
-    # is_club_member is computed per row so the redaction step below can tell a
-    # Club Only event the viewer belongs to from one they do not, without a
-    # second round trip. A viewer with full visibility short-circuits to true.
-    membership_expr = (
-        "true"
-        if sees_all
-        else """EXISTS (
-               SELECT 1 FROM request_clubs rc
-                 JOIN club_members cm ON cm.club_id = rc.club_id
-                WHERE rc.request_id = r.request_id AND cm.user_id = %(user_id)s
-           )"""
-    )
-    sql = (
-        """
-    SELECT r.request_id::text AS id,
-           r.event_title AS "eventTitle",
-           r.short_introduction AS "shortIntroduction",
-           r.event_visibility AS "eventVisibility",
-           r.event_format_snapshot AS "eventFormat",
-           r.applicant_department_or_school AS "schoolDepartment",
-           r.applicant_name AS organiser,
-           r.status AS "proposalStatus",
-           r.total_pax AS "totalExpectedPax",
-           r.max_pax AS "maxPax",
-           r.registration_approval AS "registrationMode",
-           r.cost_amount AS cost,
-           r.event_image AS "eventImageUrl",
-           (SELECT count(*) FROM event_registration er
-             WHERE er.request_id = r.request_id AND er.status = 'registered')
-             AS "confirmedRegistrationCount",
-           (SELECT min(s."date") FROM event_schedule s WHERE s.request_id = r.request_id)
-             AS "firstDate",
-           """
-        + membership_expr
-        + """ AS is_club_member
-      FROM request r
-     WHERE r.status = ANY(%(statuses)s)
-       AND EXISTS (
-             SELECT 1 FROM event_schedule s
-              WHERE s.request_id = r.request_id
-                AND s."date" BETWEEN %(start)s::date AND %(end)s::date
-           )
-     ORDER BY "firstDate" NULLS LAST, r.request_id
+# Appended to the range query for everyone except CFO/F&B. A Private event is
+# excluded in SQL rather than filtered out afterwards, so nothing about it ever
+# leaves the database for a viewer who is not entitled to it.
+_EXCLUDE_PRIVATE_SQL = """         AND r.event_visibility <> 'Private'
+"""
+
+
+def _membership_expr(sees_all: bool) -> str:
+    """SQL predicate for "the viewer belongs to this event's club(s)".
+
+    Evaluated per row so a Club Only event the viewer is in can be told from one
+    they are not without a second round trip. A full-visibility viewer
+    short-circuits to a literal, which lets Postgres drop the subquery entirely
+    rather than run it once per row for someone who bypasses the tier anyway.
     """
-    )
-    params = {"statuses": list(_MASTER_CALENDAR_STATUSES), "start": start, "end": end}
+    if sees_all:
+        return "true"
+    return """EXISTS (
+                        SELECT 1 FROM request_clubs rc
+                          JOIN club_members cm ON cm.club_id = rc.club_id
+                         WHERE rc.request_id = r.request_id AND cm.user_id = %(user_id)s
+                    )"""
+
+
+def _occurrence_rows(cur, start: str, end: str, principal, search: str = "") -> list[dict]:
+    """Every session in [start, end] the viewer may be shown, in one statement.
+
+    One row per (event, session) rather than per event: the grid draws a
+    multi-day event once on each of its dates, so that expansion belongs in SQL
+    beside the date filter rather than in the client after the payload has
+    already crossed the wire.
+
+    Every filter is server-side - the date window, the status gate, the Private
+    exclusion and the free-text search are all predicates here. Narrowing the
+    calendar therefore transfers a narrowed result set instead of a whole month
+    that the client then hides most of.
+
+    Only ONE category is resolved (the event's first, by category_id) because
+    that is all any calendar surface uses: the chip colour and the legend. The
+    full category list is tier 3's business.
+    """
+    sees_all = _sees_all_events(principal)
+    params = {
+        "statuses": list(_MASTER_CALENDAR_STATUSES),
+        "start": start,
+        "end": end,
+        "provisional_status": wf.constants.DEPARTMENT_REVIEW,
+        "q": search,
+        "like": f"%{search}%",
+    }
     if not sees_all:
         params["user_id"] = principal.user_id
+
+    sql = (
+        """
+    SELECT occ.* FROM (
+      SELECT s.event_schedule_id::text AS "occurrenceId",
+             r.request_id::text AS "eventId",
+             s."date"::text AS "date",
+             to_char(s.start_time, 'HH24:MI') AS "start",
+             to_char(s.end_time, 'HH24:MI') AS "end",
+             r.event_title AS title,
+             r.applicant_name AS organiser,
+             s.location AS venue,
+             r.event_visibility AS visibility,
+             (r.status = %(provisional_status)s) AS provisional,
+             coalesce(cat.category_name, '') AS category,
+             """
+        + _membership_expr(sees_all)
+        + """ AS "isClubMember"
+        FROM request r
+        JOIN event_schedule s ON s.request_id = r.request_id
+        LEFT JOIN LATERAL (
+               SELECT rc.category_name FROM request_categories rc
+                WHERE rc.request_id = r.request_id
+                ORDER BY rc.category_id LIMIT 1
+             ) cat ON true
+       WHERE r.status = ANY(%(statuses)s)
+         AND s."date" BETWEEN %(start)s::date AND %(end)s::date
+"""
+        + ("" if sees_all else _EXCLUDE_PRIVATE_SQL)
+        + """    ) occ
+     WHERE %(q)s = ''
+        OR (
+             -- A redacted row has nothing to match on. It survives an empty
+             -- search (the date really is occupied) but is dropped the moment
+             -- the viewer narrows, rather than sitting among the hits as an
+             -- unexplained placeholder.
+             (occ."isClubMember" OR occ.visibility <> 'Club Only')
+             AND (occ.title ILIKE %(like)s OR occ.organiser ILIKE %(like)s
+                  OR occ.venue ILIKE %(like)s OR occ.category ILIKE %(like)s)
+           )
+     ORDER BY occ."date", occ."start", occ.title
+    """
+    )
     return fetch_all(cur, sql, params)
+
+
+def _is_redacted(row: dict) -> bool:
+    """Club Only and the viewer is not a member: the date is occupied, full stop.
+
+    Public/Internal are open tiers, and a full-visibility viewer's isClubMember
+    is a literal true, so both fall through to the visible shape.
+    """
+    return row["visibility"] not in _MASTER_OPEN_TIERS and not row["isClubMember"]
+
+
+def _summary_occurrence(row: dict) -> dict:
+    """Tier 1 shape: exactly what a grid cell paints, and nothing else.
+
+    A redacted row carries neither a title nor an event id - only an
+    occurrenceId, which is a schedule row id that no endpoint accepts, so it
+    addresses nothing and identifies nobody. The client supplies the placeholder
+    label itself; it is a constant and there is no reason to send it 40 times.
+    """
+    if _is_redacted(row):
+        return {"occurrenceId": row["occurrenceId"], "date": row["date"], "restricted": True}
+    return {
+        "occurrenceId": row["occurrenceId"],
+        "eventId": row["eventId"],
+        "date": row["date"],
+        "start": row["start"],
+        "end": row["end"],
+        "title": row["title"],
+        "category": row["category"],
+        "provisional": bool(row["provisional"]),
+        "restricted": False,
+    }
+
+
+def _day_occurrence(row: dict) -> dict:
+    """Tier 2 shape: tier 1 plus the two extra fields a day-list row shows."""
+    occurrence = _summary_occurrence(row)
+    if occurrence["restricted"]:
+        return occurrence
+    return {**occurrence, "venue": row["venue"], "organiser": row["organiser"]}
 
 
 def _master_schedule_rows(cur, request_id: int) -> list[dict]:
@@ -1502,70 +1614,6 @@ def _master_schedule_rows(cur, request_id: int) -> list[dict]:
     ]
 
 
-def _decorate_master(cur, row: dict) -> dict:
-    """The visible-event shape: schedule + categories + club audience."""
-    request_id = int(row["id"])
-    row["schedule"] = _master_schedule_rows(cur, request_id)
-    row["categories"] = [
-        entry["category_name"]
-        for entry in fetch_all(
-            cur, "SELECT category_name FROM request_categories WHERE request_id = %s", (request_id,)
-        )
-    ]
-    # The frozen display snapshot (migration 029) - shown as the event's audience
-    # on a Club Only event the viewer is entitled to see.
-    row["clubs"] = [
-        entry["club_name"]
-        for entry in fetch_all(
-            cur, "SELECT club_name FROM request_clubs WHERE request_id = %s", (request_id,)
-        )
-    ]
-    url = row.pop("eventImageUrl", None)
-    row["eventImage"] = (
-        {"url": url, "fileName": "", "mimeType": "", "sizeBytes": 0, "status": "uploaded"}
-        if url
-        else None
-    )
-    cost = row.get("cost")
-    row["cost"] = float(cost) if cost is not None else None
-    row["isFree"] = not row["cost"]
-    row["restricted"] = False
-    return row
-
-
-def _redact_for_viewer(cur, row: dict, sees_all: bool) -> dict | None:
-    """Apply the visibility tier to one row.
-
-    Returns the decorated event, a redacted placeholder, or None when the row
-    must not be represented as a row at all (Private - counted instead).
-    """
-    visibility = row.get("eventVisibility")
-    is_member = bool(row.pop("is_club_member", False))
-
-    if sees_all or visibility in _MASTER_OPEN_TIERS:
-        return _decorate_master(cur, row)
-
-    if visibility == "Club Only":
-        if is_member:
-            return _decorate_master(cur, row)
-        # Non-member: the date is still occupied, but nothing about the event is
-        # disclosed. Schedule times/venue are dropped along with the title - only
-        # the dates survive, which is what makes the day render as busy.
-        return {
-            "id": row["id"],
-            "restricted": True,
-            "restrictedLabel": "Restricted Club Event",
-            "eventVisibility": visibility,
-            "schedule": [
-                {"date": entry["date"], "start": "", "end": "", "location": ""}
-                for entry in _master_schedule_rows(cur, int(row["id"]))
-            ],
-        }
-
-    # 'Private' - no row, ever. Counted by _private_counts instead.
-    return None
-
-
 def _private_counts(cur, start: str, end: str) -> dict[str, int]:
     """Per-date count of Private events, keyed 'YYYY-MM-DD'.
 
@@ -1573,6 +1621,9 @@ def _private_counts(cur, start: str, end: str) -> dict[str, int]:
     the same day counts once for that day, matching how a viewer would say "3
     private events are on today". No identifying column is selected at all, so
     there is nothing here that could leak even by accident.
+
+    Deliberately NOT narrowed by the search term: a count that responded to `q`
+    would be an oracle for the very titles it exists to withhold.
     """
     rows = fetch_all(
         cur,
@@ -1591,34 +1642,143 @@ def _private_counts(cur, start: str, end: str) -> dict[str, int]:
 @bp.get("/master-calendar")
 @require_auth
 def master_calendar():
-    """The university-wide master event calendar.
+    """Tier 1 - the university-wide master calendar's grid feed for one range.
+
+    ?start=YYYY-MM-DD&end=YYYY-MM-DD[&q=free text]
 
     Requires a token: this is an internal page (page-visibility gated), not a
     public discovery surface. Guests never reach it.
 
-    Returns {"events": [...], "privateCounts": {"YYYY-MM-DD": n}}. A Private
-    event contributes ONLY to privateCounts - it is never present in `events` in
-    any form, so no title, organiser, venue or id is transmitted for it.
+    Returns {"occurrences": [...], "privateCounts": {"YYYY-MM-DD": n}}, where an
+    occurrence is one session of one event on one date carrying only what a cell
+    draws. No description, image, expected pax, cost, registration count or club
+    audience is sent here - the dialog owns those and asks for them when it
+    opens (see master_calendar_event).
+
+    A Club Only event the viewer is not in comes back as
+    {occurrenceId, date, restricted: true}: the day still reads as occupied and
+    nothing else, not even the event id, is disclosed. A Private event
+    contributes ONLY to privateCounts and is excluded in SQL, so no title,
+    organiser, venue or id is transmitted for it in any form.
     """
     start = (request.args.get("start") or "").strip()
     end = (request.args.get("end") or "").strip()
     if not start or not end:
         raise BadRequest("start and end are required.")
+    search = (request.args.get("q") or "").strip()
 
     principal = current_principal()
     sees_all = _sees_all_events(principal)
 
     with transaction() as cur:
-        rows = _master_calendar_rows(cur, start, end, principal)
-        events = [
-            event
-            for event in (_redact_for_viewer(cur, row, sees_all) for row in rows)
-            if event is not None
-        ]
+        rows = _occurrence_rows(cur, start, end, principal, search)
         # CFO/F&B see private events as real rows (requirement 4), so surfacing a
         # count for them as well would double-count the same event on the grid.
         private_counts = {} if sees_all else _private_counts(cur, start, end)
-        return jsonify({"events": events, "privateCounts": private_counts})
+        occurrences = [_summary_occurrence(row) for row in rows]
+        return jsonify({"occurrences": occurrences, "privateCounts": private_counts})
+
+
+@bp.get("/master-calendar/day")
+@require_auth
+def master_calendar_day():
+    """Tier 2 - one day's list rows, fetched when the viewer opens that day.
+
+    ?date=YYYY-MM-DD[&q=free text] -> {"occurrences": [...], "privateCount": n}
+
+    The same rows tier 1 sent for that date plus venue and organiser, which a
+    day-list row shows and a month chip does not. Kept off tier 1 so that
+    opening one day does not mean having carried 42 days of venues to get there.
+    """
+    date_key = (request.args.get("date") or "").strip()
+    if not date_key:
+        raise BadRequest("date is required.")
+    search = (request.args.get("q") or "").strip()
+
+    principal = current_principal()
+    sees_all = _sees_all_events(principal)
+
+    with transaction() as cur:
+        rows = _occurrence_rows(cur, date_key, date_key, principal, search)
+        private_count = 0 if sees_all else _private_counts(cur, date_key, date_key).get(date_key, 0)
+        occurrences = [_day_occurrence(row) for row in rows]
+        return jsonify({"occurrences": occurrences, "privateCount": private_count})
+
+
+@bp.get("/master-calendar/<int:event_id>")
+@require_auth
+def master_calendar_event(event_id: int):
+    """Tier 3 - one event's full detail, fetched when its dialog opens.
+
+    The same population and the same visibility rules as tier 1, so an event
+    still at department_review resolves here - GET /events/{id} would not, since
+    that endpoint serves published events under discovery's rules instead.
+
+    An event the viewer may not see answers 404 rather than 403, so the status
+    code does not confirm that it exists. The three child queries below are per
+    event and bounded; they are exactly what tier 1 refuses to run per row.
+    """
+    principal = current_principal()
+    sees_all = _sees_all_events(principal)
+
+    params = {"statuses": list(_MASTER_CALENDAR_STATUSES), "event_id": event_id}
+    if not sees_all:
+        params["user_id"] = principal.user_id
+
+    sql = (
+        """
+    SELECT r.request_id::text AS id,
+           r.event_title AS "eventTitle",
+           r.short_introduction AS "shortIntroduction",
+           r.event_visibility AS "eventVisibility",
+           r.event_format_snapshot AS "eventFormat",
+           r.applicant_department_or_school AS "schoolDepartment",
+           r.applicant_name AS organiser,
+           r.status AS "proposalStatus",
+           r.total_pax AS "totalExpectedPax",
+           r.max_pax AS "maxPax",
+           r.registration_approval AS "registrationMode",
+           r.cost_amount AS cost,
+           (SELECT count(*) FROM event_registration er
+             WHERE er.request_id = r.request_id AND er.status = 'registered')
+             AS "confirmedRegistrationCount",
+           r.event_visibility AS visibility,
+           """
+        + _membership_expr(sees_all)
+        + """ AS "isClubMember"
+      FROM request r
+     WHERE r.request_id = %(event_id)s AND r.status = ANY(%(statuses)s)
+    """
+    )
+
+    with transaction() as cur:
+        row = fetch_one(cur, sql, params)
+        if row is None or _is_redacted(row):
+            raise NotFound("That event is not on your calendar.")
+        row.pop("isClubMember", None)
+        row.pop("visibility", None)
+        row["schedule"] = _master_schedule_rows(cur, event_id)
+        row["categories"] = [
+            entry["category_name"]
+            for entry in fetch_all(
+                cur,
+                "SELECT category_name FROM request_categories WHERE request_id = %s ORDER BY category_id",
+                (event_id,),
+            )
+        ]
+        # The frozen display snapshot (migration 029) - shown as the event's
+        # audience on a Club Only event the viewer is entitled to see.
+        row["clubs"] = [
+            entry["club_name"]
+            for entry in fetch_all(
+                cur, "SELECT club_name FROM request_clubs WHERE request_id = %s", (event_id,)
+            )
+        ]
+        cost = row.get("cost")
+        row["cost"] = float(cost) if cost is not None else None
+        row["isFree"] = not row["cost"]
+        row["confirmedRegistrationCount"] = int(row["confirmedRegistrationCount"] or 0)
+        return jsonify(row)
 
 
 @bp.get("/date-counts")

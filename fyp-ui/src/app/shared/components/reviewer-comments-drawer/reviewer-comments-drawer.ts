@@ -2,6 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, input, model, signal } from '@angular/core';
 import { ProposalConversation } from '../../../core/proposals/proposal-conversation.models';
 import { DEPARTMENT_LABELS, ReviewerCommentEntry, initialsFor } from '../../../core/proposals/proposal-status.models';
+import { COMMENTS_DOCK_QUERY, viewportMatches } from '../../viewport-query';
 import { ConversationThreadComponent } from '../conversation-thread/conversation-thread';
 
 // Two rendering shells over the same conversations/comments state:
@@ -21,23 +22,39 @@ import { ConversationThreadComponent } from '../conversation-thread/conversation
   selector: 'app-reviewer-comments-drawer',
   imports: [ConversationThreadComponent, NgTemplateOutlet],
   template: `
-    @if (variant() === 'drawer') {
-      @if (hasContent() && !open()) {
-        <button type="button" class="comments-ribbon" [attr.aria-expanded]="open()" aria-controls="reviewer-comments-drawer" (click)="toggle()">
-          Reviewer comment{{ comments().length === 1 ? '' : 's' }}
+    @if (hasContent()) {
+      @if (showTab()) {
+        <button type="button" class="comments-dock-tab" [attr.aria-expanded]="false" (click)="expand()">
+          Reviewer comments
         </button>
       }
-      @if (hasContent()) {
+
+      @if (compact()) {
+        <!-- Narrow: both variants collapse to the same dock the reviewer/department views use -
+             an edge tab, and this card as a right-docked overlay once that tab is clicked. -->
+        @if (compactOpen()) {
+          <button
+            type="button"
+            class="comments-dock-scrim"
+            aria-label="Close reviewer comments"
+            (click)="collapse()"
+            (document:keydown.escape)="collapse()"
+          ></button>
+          <aside class="comments-card comments-dock-surface" aria-label="Reviewer comments">
+            <ng-container [ngTemplateOutlet]="body" />
+          </aside>
+        }
+      } @else if (variant() === 'drawer') {
         <aside id="reviewer-comments-drawer" class="comments-drawer" [class.comments-drawer--open]="open()" aria-label="Reviewer comments" (click)="toggle()">
           <div class="comments-drawer__inner" (click)="$event.stopPropagation()">
             <ng-container [ngTemplateOutlet]="body" />
           </div>
         </aside>
+      } @else {
+        <aside class="comments-card comments-panel" aria-label="Reviewer comments">
+          <ng-container [ngTemplateOutlet]="body" />
+        </aside>
       }
-    } @else if (hasContent()) {
-      <aside class="comments-panel" aria-label="Reviewer comments">
-        <ng-container [ngTemplateOutlet]="body" />
-      </aside>
     }
 
     <ng-template #body>
@@ -51,8 +68,8 @@ import { ConversationThreadComponent } from '../conversation-thread/conversation
               <h3>{{ activeSummary()!.partnerName }}</h3>
               <p class="comments-drawer__subtitle">{{ activeSummary()!.partnerRoleLabel }}</p>
             </div>
-            @if (variant() === 'drawer') {
-              <button type="button" class="comments-drawer__close" (click)="toggle()" aria-label="Collapse reviewer comments panel">
+            @if (showClose()) {
+              <button type="button" class="comments-drawer__close" (click)="collapse()" aria-label="Close reviewer comments">
                 <span class="material-symbols-rounded" aria-hidden="true">close</span>
               </button>
             }
@@ -65,8 +82,8 @@ import { ConversationThreadComponent } from '../conversation-thread/conversation
               <h3>Conversations</h3>
               <p class="comments-drawer__subtitle">{{ subtitle() }}</p>
             </div>
-            @if (variant() === 'drawer') {
-              <button type="button" class="comments-drawer__close" (click)="toggle()" aria-label="Collapse reviewer comments panel">
+            @if (showClose()) {
+              <button type="button" class="comments-drawer__close" (click)="collapse()" aria-label="Close reviewer comments">
                 <span class="material-symbols-rounded" aria-hidden="true">close</span>
               </button>
             }
@@ -95,8 +112,8 @@ import { ConversationThreadComponent } from '../conversation-thread/conversation
             <h3>Reviewer Comments</h3>
             <p class="comments-drawer__subtitle">{{ subtitle() }}</p>
           </div>
-          @if (variant() === 'drawer') {
-            <button type="button" class="comments-drawer__close" (click)="toggle()" aria-label="Collapse reviewer comments panel">
+          @if (showClose()) {
+            <button type="button" class="comments-drawer__close" (click)="collapse()" aria-label="Close reviewer comments">
               <span class="material-symbols-rounded" aria-hidden="true">close</span>
             </button>
           }
@@ -133,14 +150,35 @@ export class ReviewerCommentsDrawerComponent {
   // drawer straight into that conversation instead of opening on the Conversations list, since
   // that is the one thread the applicant actually needs to read and reply to right now.
   readonly initialConversationId = input<string | null>(null);
-  // Two-way bindable ([( open )]) so a caller that needs to react to open/closed (e.g. shrinking
-  // its own main content column while the drawer is open, see event-proposal.scss's
-  // .proposal-page--drawer-open) can — defaults to open the moment there are comments to show.
+  // Two-way bindable ([( open )]) so a caller that needs to react to open/closed — or to open and
+  // close the drawer itself — can; defaults to open the moment there are comments to show. The
+  // caller does NOT have to resize its own main column in response: that column is `flex: 1 1 0`
+  // and absorbs whatever width the drawer gives up (see event-proposal.scss).
   // Unused in 'panel' mode: the panel is always visible, nothing to open/close.
   readonly open = model(true);
 
   readonly activeConversationId = signal<string | null>(null);
   private appliedInitialConversationId = false;
+
+  // Below the dock breakpoint neither shell has a column to live in: the drawer has no room left
+  // to push the form aside, and the panel would simply stack under the whole page. Both collapse
+  // to the shared dock (styles/_comments-dock.scss) - an edge tab plus a right-docked overlay -
+  // so every comments surface in the app behaves the same once the window gets narrow.
+  protected readonly compact = viewportMatches(COMMENTS_DOCK_QUERY);
+  // Starts closed, deliberately: docked, the tab is what you should see first, and only a click
+  // brings the conversation up over the page. `open` above stays the WIDE state, untouched by
+  // this, so resizing back restores whatever the caller had.
+  protected readonly compactOpen = signal(false);
+
+  // Which shell is showing, and what it should offer.
+  protected readonly expanded = computed(() =>
+    this.compact() ? this.compactOpen() : this.variant() === 'panel' || this.open(),
+  );
+  protected readonly showTab = computed(() =>
+    this.hasContent() && (this.compact() ? !this.compactOpen() : this.variant() === 'drawer' && !this.open()),
+  );
+  // The always-visible wide panel is the one shell with nothing to close.
+  protected readonly showClose = computed(() => this.compact() || this.variant() === 'drawer');
 
   constructor() {
     // Runs once conversations() actually has data (initialConversationId is computed from it by
@@ -184,7 +222,9 @@ export class ReviewerCommentsDrawerComponent {
     }),
   );
 
-  toggle(): void { this.open.update((value) => !value); }
+  expand(): void { if (this.compact()) this.compactOpen.set(true); else this.open.set(true); }
+  collapse(): void { if (this.compact()) this.compactOpen.set(false); else this.open.set(false); }
+  toggle(): void { if (this.expanded()) this.collapse(); else this.expand(); }
 
   // Short relative-ish stamp for a list row (e.g. "2:34 PM", or the date once it's not today) —
   // matches a standard chat-app inbox list, not the fuller "3 Aug, 2:34 PM" used inside a thread.

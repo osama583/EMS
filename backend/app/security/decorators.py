@@ -40,21 +40,36 @@ def authenticate() -> None:
 
 
 def authenticate_optional() -> None:
-    """Best-effort authenticate(): resolves a Principal onto `g` if a valid bearer
-    token is present, silently leaves it unset otherwise. For endpoints that are
-    public but personalise their response when the caller happens to be signed in
-    (e.g. excluding events the caller already registered for)."""
+    """authenticate() for endpoints that are public but personalise their response when the caller
+    happens to be signed in (/ai/ask, the event discovery routes).
+
+    NO credential offered -> guest, and the endpoint serves its public tier. That is the whole
+    reason this exists rather than authenticate().
+
+    A credential that does not VERIFY -> 401, exactly like any protected route. It used to be
+    swallowed and treated as a guest, on the reasoning that a public endpoint should never refuse
+    anyone. That was wrong in a way that was invisible from the server: an expired access token is
+    what a signed-in user sends, so their request came back 200 with the signed-out answer, and
+    because it was never a 401, auth.interceptor.ts never ran its refresh-and-replay - the one
+    mechanism that recovers an expired session. The user stayed silently downgraded to a guest for
+    the life of that tab while every other page in the app refreshed normally and worked.
+
+    On /ai/ask that surfaced as a wrong authorization answer, not just missing personalisation: a
+    guest holds no assignments, so ai/topic_access.py denied `clubs` (and kept `events`, its one
+    GUEST_OPEN_TOPIC) and the assistant told a signed-in student "an administrator has not granted
+    your role" about pages their role is in fact granted - see tests/test_auth_wiring.py.
+
+    Unauthorized from decode_token/load_principal therefore propagates: expired, malformed, wrong
+    token type, archived or deactivated account. Each one means "your session is over, refresh or
+    sign in again", which is a thing the client can act on, and none of them is a guest."""
     if getattr(g, "principal", None) is not None:
         return
     header = request.headers.get("Authorization", "")
     scheme, _, token = header.partition(" ")
     if scheme.lower() != "bearer" or not token.strip():
         return
-    try:
-        claims = decode_token(token.strip(), expected_type=ACCESS)
-        principal = load_principal(claims["user_id"])
-    except Exception:
-        return
+    claims = decode_token(token.strip(), expected_type=ACCESS)
+    principal = load_principal(claims["user_id"])
     g.principal = principal
     g.user_id = principal.user_id
 

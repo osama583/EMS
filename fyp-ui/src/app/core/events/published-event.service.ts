@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http'
 import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, map, of, shareReplay } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { MasterCalendarResponse } from './master-calendar.models';
+import { MasterCalendarDay, MasterCalendarEventDetail, MasterCalendarSummary } from './master-calendar.models';
 import { EventRegistration, EventSearchParams, EventSearchResponse, PendingEventRegistration, PendingEventRegistrationPage, PublishedEvent, RegistrationResult } from './published-event.models';
 import { EventRegistrationApi, RegisteredEventsResponse, RegistrationHistoryPage, RegistrationHistoryQuery, SavedEventsResponse } from './event-engagement.models';
 
@@ -84,9 +84,35 @@ export class PublishedEventService implements EventRegistrationApi {
   // The MASTER calendar's feed (/app/event-calendar) — a different population and a different
   // rule set from getEventsForRange() above, which serves the public landing calendar. This one
   // includes events still at department_review and returns visibility-redacted rows plus a
-  // per-date private-event count. See events.py's master_calendar().
-  getMasterCalendar(start: string, end: string): Observable<MasterCalendarResponse> {
-    return this.http.get<MasterCalendarResponse>(`${this.baseUrl}/master-calendar`, { params: { start, end } });
+  // per-date private-event count.
+  //
+  // It is three calls, not one, and the split is the point (see master-calendar.models.ts and
+  // events.py's master_calendar / master_calendar_day / master_calendar_event). Opening the page
+  // makes ONLY the first of them.
+
+  // Tier 1 — the visible range's grid rows: date, time, title, category, provisional, plus the
+  // per-date private count. `q` is applied server-side over title/organiser/venue/category, so
+  // narrowing the calendar narrows the response instead of downloading the month and hiding
+  // most of it client-side.
+  getMasterCalendarSummary(start: string, end: string, q = ''): Observable<MasterCalendarSummary> {
+    let params = new HttpParams().set('start', start).set('end', end);
+    if (q) params = params.set('q', q);
+    return this.http.get<MasterCalendarSummary>(`${this.baseUrl}/master-calendar`, { params });
+  }
+
+  // Tier 2 — one day's list rows, which add the venue and organiser a day row shows and a month
+  // chip does not. Called when a day is opened, never across the range.
+  getMasterCalendarDay(date: string, q = ''): Observable<MasterCalendarDay> {
+    let params = new HttpParams().set('date', date);
+    if (q) params = params.set('q', q);
+    return this.http.get<MasterCalendarDay>(`${this.baseUrl}/master-calendar/day`, { params });
+  }
+
+  // Tier 3 — one event's detail-dialog payload, called when the dialog opens. Deliberately not
+  // getEventDetails() above: that serves published events under discovery's rules and would not
+  // resolve an event still at department_review, which the master calendar does show.
+  getMasterCalendarEvent(id: string): Observable<MasterCalendarEventDetail> {
+    return this.http.get<MasterCalendarEventDetail>(`${this.baseUrl}/master-calendar/${encodeURIComponent(id)}`);
   }
 
   // Per-date counts of everything on the master calendar, for the proposal form's schedule

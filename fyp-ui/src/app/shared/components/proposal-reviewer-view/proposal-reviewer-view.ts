@@ -9,14 +9,17 @@ import { ProposalWorkflowService } from '../../../core/proposals/proposal-workfl
 import { ConversationThreadComponent } from '../conversation-thread/conversation-thread';
 import { EditableRow } from '../form-controls/form-controls.models';
 import { FormModalComponent } from '../form-modal/form-modal';
-import { ProposalFieldComponent } from '../proposal-field/proposal-field';
 import { ProposalKpiBarComponent } from '../proposal-kpi-bar/proposal-kpi-bar';
+import { ProposalOverviewComponent } from '../proposal-overview/proposal-overview';
+import { ProposalSummaryGridComponent } from '../proposal-overview/proposal-summary-grid';
+import { ProposalSummaryField } from '../proposal-overview/proposal-summary-layout';
 import { ProposalSectionComponent } from '../proposal-section/proposal-section';
 import { ProposalTableColumn, ProposalTableComponent } from '../proposal-table/proposal-table';
 
 import { AuthService } from '../../../core/auth/auth.service';
 import { SystemConfigService } from '../../../core/config/system-config.service';
 import { ToastService, apiErrorMessage } from '../toast/toast.service';
+import { COMMENTS_DOCK_QUERY, viewportMatches } from '../../viewport-query';
 
 interface RequirementTable {
   readonly key: DepartmentRequestKind;
@@ -73,7 +76,7 @@ function parseEventDate(rawStr: string): Date | null {
 
 @Component({
   selector: 'app-proposal-reviewer-view',
-  imports: [ProposalTableComponent, FormModalComponent, ProposalKpiBarComponent, ProposalSectionComponent, ProposalFieldComponent, ConversationThreadComponent],
+  imports: [ProposalTableComponent, FormModalComponent, ProposalKpiBarComponent, ProposalSectionComponent, ProposalOverviewComponent, ProposalSummaryGridComponent, ConversationThreadComponent],
   templateUrl: './proposal-reviewer-view.html',
   styleUrl: './proposal-reviewer-view.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -110,6 +113,18 @@ export class ProposalReviewerViewComponent {
   // rendering below, with no separate "am I the applicant" input needed.
   readonly conversations = signal<readonly ProposalConversation[]>([]);
   readonly activeConversationId = signal<string | null>(null);
+
+  // Below the dock breakpoint .prv-layout is a single column, so the whole .prv-panel — Workflow
+  // Actions AND the conversation — stacks under the full proposal detail. Workflow Actions is
+  // fine down there (it is the end of the read), but burying the conversation at the bottom of
+  // the page made it read as missing. Docked, it behaves the way the panel does on a wide screen:
+  // present on the right, opened when you want it. See shared/viewport-query.ts and
+  // styles/_comments-dock.scss.
+  protected readonly commentsDocked = viewportMatches(COMMENTS_DOCK_QUERY);
+  protected readonly commentsOpen = signal(false);
+  protected readonly hasComments = computed(() => this.conversations().length > 0 || this.reviewerComments().length > 0);
+  // Inline in its column on a wide screen; only while opened from the tab once docked.
+  protected readonly commentsVisible = computed(() => !this.commentsDocked() || this.commentsOpen());
 
   readonly conversationSummaries = computed(() =>
     this.conversations().map((conversation) => {
@@ -160,6 +175,21 @@ export class ProposalReviewerViewComponent {
       });
     });
   }
+
+  /**
+   * `applicant_department_or_school` is nullable in the schema (staff have a department, some
+   * accounts have neither), so this section used to render a third empty card whenever it was
+   * missing. Handed to the summary grid as data so the blank one is dropped and Full Name / Email
+   * close up into a two-column row instead of leaving the gap behind.
+   */
+  readonly applicantFields = computed<readonly ProposalSummaryField[]>(() => {
+    const item = this.proposal();
+    return [
+      { label: 'Full Name', value: item?.applicant },
+      { label: 'Email', value: item?.applicantEmail },
+      { label: 'Department / School', value: item?.applicantDepartment },
+    ];
+  });
 
   readonly stage = computed<ProposalStage | null>(() => this.proposal()?.workflow.stage ?? null);
   readonly stageLabel = computed(() => this.stage() ? stageLabel(this.stage()!) : '');

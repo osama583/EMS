@@ -10,28 +10,44 @@
   </header>
 
   <div class="mc-shell">
-    <!-- Toolbar: navigation, period title and view switch on one row so the grid itself keeps
-         as much vertical space as possible. -->
+    <!-- Toolbar: period controls on the left, the period itself on the right — the same two-part
+         split the landing calendar uses, so both calendars read the same way. -->
     <div class="mc-toolbar">
-      <div class="mc-toolbar__nav">
-        <button type="button" class="mc-nav-btn" aria-label="Previous period" (click)="navigate(-1)">
-          <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
-        </button>
-        <button type="button" class="mc-today" (click)="goToToday()">Today</button>
-        <button type="button" class="mc-nav-btn" aria-label="Next period" (click)="navigate(1)">
-          <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
-        </button>
-      </div>
+      <div class="mc-toolbar__controls">
+        <div class="mc-nav" aria-label="Calendar navigation">
+          <button type="button" class="mc-nav-btn" aria-label="Previous period" (click)="navigate(-1)">
+            <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+          </button>
+          <button type="button" class="mc-today" (click)="goToToday()">Today</button>
+          <button type="button" class="mc-nav-btn" aria-label="Next period" (click)="navigate(1)">
+            <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+          </button>
+        </div>
 
-      <h2 class="mc-toolbar__title" aria-live="polite">{{ displayTitle() }}</h2>
-
-      <div class="mc-toolbar__actions">
         <div class="mc-viewswitch" role="group" aria-label="Calendar view">
           <button type="button" [class.is-active]="viewMode() === 'month'" [attr.aria-pressed]="viewMode() === 'month'" (click)="setView('month')">Month</button>
           <button type="button" [class.is-active]="viewMode() === 'week'" [attr.aria-pressed]="viewMode() === 'week'" (click)="setView('week')">Week</button>
           <button type="button" [class.is-active]="viewMode() === 'day'" [attr.aria-pressed]="viewMode() === 'day'" (click)="setView('day')">Day</button>
         </div>
+      </div>
 
+      <!-- The landing calendar puts the range under the period title; here that line carries the
+           count as well, which is the one piece of state the marketing calendar has no use for. -->
+      <div class="mc-toolbar__title">
+        <h2 aria-live="polite">{{ displayTitle() }}</h2>
+        <p>
+          {{ totalVisibleCount() }} {{ totalVisibleCount() === 1 ? 'event' : 'events' }} in view
+          @if (totalPrivateCount() > 0) {
+            <span class="mc-toolbar__private">· {{ privateLabel(totalPrivateCount()) }}</span>
+          }
+        </p>
+      </div>
+    </div>
+
+    <!-- Discovery strip: how you narrow the calendar on the left, what the colours mean on the
+         right. Kept apart from the toolbar so neither row has to wrap. -->
+    <div class="mc-discovery">
+      <div class="mc-discovery__controls" role="search">
         <app-filter-button
           label="Filters"
           ariaLabel="Open calendar filters"
@@ -47,17 +63,6 @@
           (valueChange)="onSearch($event)"
         />
       </div>
-    </div>
-
-    <!-- Counts + legend share one compact strip rather than two stacked blocks. -->
-    <div class="mc-meta">
-      <p class="mc-meta__counts">
-        <strong>{{ totalVisibleCount() }}</strong>
-        {{ totalVisibleCount() === 1 ? 'event' : 'events' }} in view
-        @if (totalPrivateCount() > 0) {
-          <span class="mc-meta__private">+ {{ privateLabel(totalPrivateCount()) }}</span>
-        }
-      </p>
 
       @if (categoryOptions().length > 0) {
         <div class="mc-legend" aria-label="Event category legend">
@@ -95,9 +100,6 @@
             >
               <button type="button" class="mc-day__head" (click)="openDayView(day)">
                 <time class="mc-day__num" [attr.datetime]="day.key">{{ day.dayNumber }}</time>
-                @if (day.entries.length + day.privateCount > 0) {
-                  <span class="mc-day__count">{{ day.entries.length + day.privateCount }}</span>
-                }
               </button>
 
               <div class="mc-day__body">
@@ -115,8 +117,8 @@
                       [attr.title]="entry.title + ' · ' + entry.time"
                       (click)="openEntry(entry)"
                     >
-                      <span class="mc-chip__time">{{ entry.time.split(' – ')[0] }}</span>
                       <span class="mc-chip__title">{{ entry.title }}</span>
+                      <span class="mc-chip__time">{{ entry.startLabel }}</span>
                     </button>
                   }
                 }
@@ -187,26 +189,32 @@
               <h3>{{ formatFullDate(focusedDay().date) }}</h3>
             </div>
             <strong>
-              {{ focusedDay().entries.length }}
-              {{ focusedDay().entries.length === 1 ? 'event' : 'events' }}
+              {{ selectedDayEntries().length }}
+              {{ selectedDayEntries().length === 1 ? 'event' : 'events' }}
             </strong>
           </header>
 
-          <div class="mc-list">
-            @for (entry of selectedDayEntries(); track entry.occurrenceId) {
-              <ng-container [ngTemplateOutlet]="listRow" [ngTemplateOutletContext]="{ $implicit: entry }" />
-            } @empty {
-              @if (focusedDay().privateCount === 0) {
-                <p class="mc-empty mc-empty--inline">No events on this day.</p>
+          <!-- The month grid above is already painted; only this panel is waiting on the day's
+               own rows, so the spinner belongs here rather than over the whole month. -->
+          @if (dayLoading()) {
+            <app-loading-state variant="bars" label="Loading this day…" [count]="3" />
+          } @else {
+            <div class="mc-list">
+              @for (entry of selectedDayEntries(); track entry.occurrenceId) {
+                <ng-container [ngTemplateOutlet]="listRow" [ngTemplateOutletContext]="{ $implicit: entry }" />
+              } @empty {
+                @if (focusedDay().privateCount === 0) {
+                  <p class="mc-empty mc-empty--inline">No events on this day.</p>
+                }
               }
-            }
-            @if (focusedDay().privateCount > 0) {
-              <p class="mc-private-note">
-                <span class="material-symbols-rounded" aria-hidden="true">visibility_off</span>
-                {{ privateLabel(focusedDay().privateCount) }}
-              </p>
-            }
-          </div>
+              @if (focusedDay().privateCount > 0) {
+                <p class="mc-private-note">
+                  <span class="material-symbols-rounded" aria-hidden="true">visibility_off</span>
+                  {{ privateLabel(focusedDay().privateCount) }}
+                </p>
+              }
+            </div>
+          }
         </section>
       </div>
     } @else if (viewMode() === 'week') {
@@ -234,8 +242,8 @@
                     [class.mc-chip--provisional]="entry.provisional"
                     (click)="openEntry(entry)"
                   >
-                    <span class="mc-chip__time">{{ entry.time.split(' – ')[0] }}</span>
                     <span class="mc-chip__title">{{ entry.title }}</span>
+                    <span class="mc-chip__time">{{ entry.startLabel }}</span>
                   </button>
                 }
               } @empty {
@@ -340,7 +348,10 @@
   </div>
 </app-form-modal>
 
-<!-- ===================== Event details ===================== -->
+<!-- ===================== Event details =====================
+     Everything below arrives when this dialog OPENS, not when the calendar loads. The clicked
+     occurrence supplies the header and the accent immediately (the grid already knew them), and
+     the rest streams in from GET /events/master-calendar/{id}. -->
 <app-form-modal
   [open]="selectedEntry() !== null"
   [title]="selectedEntry()?.title ?? ''"
@@ -352,33 +363,49 @@
   @if (selectedEntry(); as entry) {
     <div [class]="'mc-dialog__accent mc-dialog__accent--' + entry.categoryClass"></div>
 
-    <div class="mc-dialog__tags">
-      <span class="mc-tag">{{ entry.category }}</span>
-      <span class="mc-tag mc-tag--soft">{{ entry.visibility }}</span>
-      @if (entry.provisional) {
-        <span class="mc-tag mc-tag--warn">Provisional · pending department confirmation</span>
-      }
-    </div>
+    @if (detailLoading()) {
+      <app-loading-state variant="bars" label="Loading event details…" [count]="5" />
+    } @else if (detailError()) {
+      <p class="mc-empty mc-empty--inline">{{ detailError() }}</p>
+    } @else if (selectedDetail(); as detail) {
+      <div class="mc-dialog__tags">
+        @for (category of detail.categories; track category) {
+          <span class="mc-tag">{{ category }}</span>
+        }
+        <span class="mc-tag mc-tag--soft">{{ detail.eventVisibility }}</span>
+        @if (entry.provisional) {
+          <span class="mc-tag mc-tag--warn">Provisional · pending department confirmation</span>
+        }
+      </div>
 
-    <p class="mc-dialog__date">{{ formatFullDate(entry.date) }}</p>
+      <p class="mc-dialog__date">{{ formatFullDate(entry.date) }}</p>
 
-    <dl class="mc-dialog__details">
-      <div><dt>Time</dt><dd>{{ entry.time }}</dd></div>
-      <div><dt>Venue</dt><dd>{{ entry.venue }}</dd></div>
-      <div><dt>Organiser</dt><dd>{{ entry.organiser }}</dd></div>
-      @if (entry.format) {
-        <div><dt>Format</dt><dd>{{ entry.format }}</dd></div>
-      }
-      <div><dt>Expected pax</dt><dd>{{ entry.totalExpectedPax }}</dd></div>
-      <div><dt>Cost</dt><dd>{{ costLabel(entry) }}</dd></div>
-      <div><dt>Registration</dt><dd>{{ registrationLabel(entry) }}</dd></div>
-      @if (entry.clubs.length > 0) {
-        <div><dt>Clubs</dt><dd>{{ entry.clubs.join(', ') }}</dd></div>
-      }
-    </dl>
+      <dl class="mc-dialog__details">
+        <div><dt>Time</dt><dd>{{ entry.time }}</dd></div>
+        <!-- The venue of the SESSION that was clicked, not the event's first — a multi-day event
+             can move rooms between dates. -->
+        <div><dt>Venue</dt><dd>{{ selectedSession()?.location || 'To be confirmed' }}</dd></div>
+        <div><dt>Organiser</dt><dd>{{ detail.organiser }}</dd></div>
+        @if (detail.schoolDepartment) {
+          <div><dt>School / department</dt><dd>{{ detail.schoolDepartment }}</dd></div>
+        }
+        @if (detail.eventFormat) {
+          <div><dt>Format</dt><dd>{{ detail.eventFormat }}</dd></div>
+        }
+        <div><dt>Expected pax</dt><dd>{{ detail.totalExpectedPax }}</dd></div>
+        <div><dt>Cost</dt><dd>{{ costLabel(detail) }}</dd></div>
+        <div><dt>Registration</dt><dd>{{ registrationLabel(detail) }}</dd></div>
+        @if (detail.clubs.length > 0) {
+          <div><dt>Clubs</dt><dd>{{ detail.clubs.join(', ') }}</dd></div>
+        }
+        @if (detail.schedule.length > 1) {
+          <div><dt>Sessions</dt><dd>{{ detail.schedule.length }} across this event</dd></div>
+        }
+      </dl>
 
-    @if (entry.description) {
-      <p class="mc-dialog__description">{{ entry.description }}</p>
+      @if (detail.shortIntroduction) {
+        <p class="mc-dialog__description">{{ detail.shortIntroduction }}</p>
+      }
     }
   }
 </app-form-modal>

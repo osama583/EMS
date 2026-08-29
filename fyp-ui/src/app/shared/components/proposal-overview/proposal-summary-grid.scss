@@ -1,0 +1,27 @@
+// Transparent host, so .prv-summary is the child .prv-section spaces at its own 1rem gap - the
+// same shape the hand-written .prv-grid had before this component replaced it.
+:host { display: contents; }
+
+.prv-summary {
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+// The whole layout rule. --prv-summary-cols is set per row to that row's own length, so the track
+// count can never exceed the number of fields and a hole cannot be produced. Three survivors read
+// as thirds, two as halves, one fills the width.
+.prv-summary-row {
+  display: grid;
+  grid-template-columns: repeat(var(--prv-summary-cols, 1), minmax(0, 1fr));
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+// Phones cannot carry two labelled cards side by side legibly, so every row collapses regardless
+// of how many fields survived.
+@media (max-width: 48rem) {
+  .prv-summary-row {
+    grid-template-columns: 1fr;
+  }
+}

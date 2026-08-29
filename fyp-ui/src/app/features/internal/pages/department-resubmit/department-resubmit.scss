@@ -17,7 +17,10 @@
   min-width: 0;
   gap: var(--space-4);
 }
-@media (max-width: 64rem) {
+// Matches COMMENTS_DOCK_QUERY (shared/viewport-query.ts): the second column disappears at
+// exactly the width where the comments panel stops rendering inline and becomes the docked
+// edge-tab overlay instead, so there is never a moment with an empty column reserved for it.
+@media (max-width: 72rem) {
   .department-resubmit { grid-template-columns: 1fr; }
 }
 

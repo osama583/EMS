@@ -1,13 +1,18 @@
 :host { display: block; }
 
 // The page is a flex row so app-reviewer-comments-drawer's drawer element is a real layout
-// sibling of .proposal-page__main (not an overlay) — opening it shrinks the main column via
-// flex-basis, which is what pushes the main content instead of covering it. The drawer's own
-// ribbon/panel styling now lives in shared/components/reviewer-comments-drawer/ — only the
-// layout-shrinking side of the relationship (owned by this page, not the shared component)
-// stays here.
-$comments-drawer-width: min(22rem, 85vw);
-
+// sibling of .proposal-page__main (not an overlay) — opening it shrinks the main column, which
+// is what pushes the main content instead of covering it. The drawer's own ribbon/panel styling
+// lives in shared/components/reviewer-comments-drawer/.
+//
+// `flex: 1 1 0` rather than a flex-basis keyed to the drawer's width: the main column simply
+// takes whatever is left over once the drawer has taken its share, so this page never has to
+// know (or duplicate, or fall out of sync with) how wide the drawer currently is. That
+// duplicated width was the layout bug — the drawer's width is fluid and it drops out of flow
+// entirely on narrower windows, but the hard `calc(100% - 22rem)` here kept subtracting a fixed
+// 22rem regardless, leaving the form and its step indicator squeezed into a column too narrow
+// to hold them. Nothing here needs a breakpoint now: when the drawer collapses to `width: 0`,
+// or becomes a fixed-position overlay, this column gets the full width back on its own.
 .proposal-page {
   position: relative;
   display: flex;
@@ -17,17 +22,10 @@ $comments-drawer-width: min(22rem, 85vw);
 }
 .proposal-page__main {
   display: grid;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   gap: var(--internal-page-gap);
   padding-left: var(--space-4);
-  transition: flex-basis var(--motion-control) var(--ease-standard);
-}
-.proposal-page--drawer-open .proposal-page__main { flex-basis: calc(100% - #{$comments-drawer-width}); }
-
-@media (max-width: 48rem) {
-  .proposal-page { flex-direction: column; }
-  .proposal-page--drawer-open .proposal-page__main { flex-basis: auto; }
 }
 .proposal-form,.proposal-step { display: grid; gap: var(--form-section-gap); }
 .proposal-step > header { display: flex; align-items: center; gap: var(--space-3); }

@@ -11,11 +11,7 @@
 
       <!-- Section: Applicant -->
       <app-proposal-section icon="person" title="Applicant" description="Submitter details and co-owners.">
-        <div class="prv-grid prv-grid--3">
-          <app-proposal-field label="Full Name" [value]="item.applicant" />
-          <app-proposal-field label="Email" [value]="item.applicantEmail" />
-          <app-proposal-field label="Department / School" [value]="item.applicantDepartment ?? ''" />
-        </div>
+        <app-proposal-summary-grid [fields]="applicantFields()" />
         @if (item.coOwners?.length) {
           <div class="prv-table-wrap">
             <h4 class="prv-table-wrap__label">Co-owners</h4>
@@ -25,60 +21,59 @@
       </app-proposal-section>
 
       <!-- Section: Event Overview -->
-      <app-proposal-section icon="description" title="Event Overview" description="General information, registration and publicity.">
-        <div class="prv-grid prv-grid--3">
-          <app-proposal-field label="Event Title" [value]="item.eventTitle" span="2" />
-          <app-proposal-field label="Visibility" [value]="item.eventVisibility ?? ''" />
-          <app-proposal-field label="Format" [value]="item.eventFormat ?? ''" />
-          <app-proposal-field label="Registration" [value]="item.registrationMode ?? ''" />
-          <app-proposal-field label="Total Pax" [value]="item.totalPax" />
-          <div class="prv-grid-row--2 prv-field--full">
-            <app-proposal-field label="External Pax" [value]="item.externalPax ?? ''" />
-            <app-proposal-field label="Categories" [value]="(item.eventCategories ?? []).join(', ')" />
-          </div>
-          <app-proposal-field label="Publicity" [value]="item.publicity ?? ''" span="full" />
-          <app-proposal-field label="Short Introduction" [value]="item.shortIntroduction" span="full" />
-          <app-proposal-field label="Goals &amp; Objectives" [value]="item.goals ?? ''" span="full" />
-          <app-proposal-field label="Expected Benefits" [value]="item.benefits ?? ''" span="full" />
-        </div>
-        @if (item.eventImage) {
-          <img class="prv-event-image" [src]="item.eventImage.url" [alt]="item.eventTitle + ' event image'" />
-        }
-      </app-proposal-section>
+      <app-proposal-overview [proposal]="item" />
 
-      <!-- Section: People -->
-      <app-proposal-section icon="supervised_user_circle" title="People" description="Organizers, important attendees and guest breakdown.">
-        <div class="prv-table-wrap">
-          <h4 class="prv-table-wrap__label">Organizers</h4>
-          <app-proposal-table tableId="prv-organizers" [columns]="organizerColumns" [rows]="item.organizers ?? []" [readOnly]="true" emptyIcon="group_add" emptyMessage="No organizers were added." />
-        </div>
-        <div class="prv-table-wrap">
-          <h4 class="prv-table-wrap__label">Important People</h4>
-          <app-proposal-table tableId="prv-important-people" [columns]="importantPeopleColumns" [rows]="item.importantPeople ?? []" [readOnly]="true" emptyIcon="group_add" emptyMessage="No important people were added." />
-        </div>
-        <div class="prv-table-wrap">
-          <h4 class="prv-table-wrap__label">Guest Breakdown</h4>
-          <app-proposal-table tableId="prv-guests" [columns]="guestColumns" [rows]="item.guests ?? []" [readOnly]="true" emptyIcon="group_add" emptyMessage="No guest breakdown was added." />
-        </div>
-      </app-proposal-section>
+      <!-- Section: People. Each table appears only when it has rows, and the section itself only
+           when at least one of them does - an applicant who added no important people and no guest
+           breakdown used to get a heading over three "nothing was added" placeholders, which is
+           three blocks of reading that tell a reviewer nothing. -->
+      @if (item.organizers?.length || item.importantPeople?.length || item.guests?.length) {
+        <app-proposal-section icon="supervised_user_circle" title="People" description="Organizers, important attendees and guest breakdown.">
+          @if (item.organizers?.length) {
+            <div class="prv-table-wrap">
+              <h4 class="prv-table-wrap__label">Organizers</h4>
+              <app-proposal-table tableId="prv-organizers" [columns]="organizerColumns" [rows]="item.organizers ?? []" [readOnly]="true" emptyIcon="group_add" emptyMessage="No organizers were added." />
+            </div>
+          }
+          @if (item.importantPeople?.length) {
+            <div class="prv-table-wrap">
+              <h4 class="prv-table-wrap__label">Important People</h4>
+              <app-proposal-table tableId="prv-important-people" [columns]="importantPeopleColumns" [rows]="item.importantPeople ?? []" [readOnly]="true" emptyIcon="group_add" emptyMessage="No important people were added." />
+            </div>
+          }
+          @if (item.guests?.length) {
+            <div class="prv-table-wrap">
+              <h4 class="prv-table-wrap__label">Guest Breakdown</h4>
+              <app-proposal-table tableId="prv-guests" [columns]="guestColumns" [rows]="item.guests ?? []" [readOnly]="true" emptyIcon="group_add" emptyMessage="No guest breakdown was added." />
+            </div>
+          }
+        </app-proposal-section>
+      }
 
-      <!-- Section: Schedule & Agenda -->
-      <app-proposal-section icon="calendar_month" title="Schedule &amp; Agenda" description="Event dates, times, locations and agenda flow.">
-        <div class="prv-table-wrap">
-          <h4 class="prv-table-wrap__label">Schedule</h4>
-          <app-proposal-table tableId="prv-schedule" [columns]="scheduleColumns" [rows]="item.scheduleRows ?? []" [readOnly]="true" emptyIcon="event" emptyMessage="No schedule rows were added." />
-        </div>
-        <div class="prv-table-wrap">
-          <h4 class="prv-table-wrap__label">Agenda</h4>
-          <app-proposal-table tableId="prv-agenda" [columns]="agendaColumns" [rows]="item.agenda ?? []" [readOnly]="true" emptyIcon="event_note" emptyMessage="No agenda rows were added." />
-        </div>
-        @if (item.discussions?.length) {
-          <div class="prv-table-wrap">
-            <h4 class="prv-table-wrap__label">Discussion Topics</h4>
-            <app-proposal-table tableId="prv-discussions" [columns]="discussionColumns" [rows]="item.discussions ?? []" [readOnly]="true" emptyIcon="forum" emptyMessage="No discussion topics were added." />
-          </div>
-        }
-      </app-proposal-section>
+      <!-- Section: Schedule & Agenda. Same rule as People above; Discussion Topics was already
+           guarded this way, so this only brings Schedule and Agenda in line with it. -->
+      @if (item.scheduleRows?.length || item.agenda?.length || item.discussions?.length) {
+        <app-proposal-section icon="calendar_month" title="Schedule &amp; Agenda" description="Event dates, times, locations and agenda flow.">
+          @if (item.scheduleRows?.length) {
+            <div class="prv-table-wrap">
+              <h4 class="prv-table-wrap__label">Schedule</h4>
+              <app-proposal-table tableId="prv-schedule" [columns]="scheduleColumns" [rows]="item.scheduleRows ?? []" [readOnly]="true" emptyIcon="event" emptyMessage="No schedule rows were added." />
+            </div>
+          }
+          @if (item.agenda?.length) {
+            <div class="prv-table-wrap">
+              <h4 class="prv-table-wrap__label">Agenda</h4>
+              <app-proposal-table tableId="prv-agenda" [columns]="agendaColumns" [rows]="item.agenda ?? []" [readOnly]="true" emptyIcon="event_note" emptyMessage="No agenda rows were added." />
+            </div>
+          }
+          @if (item.discussions?.length) {
+            <div class="prv-table-wrap">
+              <h4 class="prv-table-wrap__label">Discussion Topics</h4>
+              <app-proposal-table tableId="prv-discussions" [columns]="discussionColumns" [rows]="item.discussions ?? []" [readOnly]="true" emptyIcon="forum" emptyMessage="No discussion topics were added." />
+            </div>
+          }
+        </app-proposal-section>
+      }
 
       <!-- Section: Requested Services -->
       @if (requirementTables().length) {
@@ -190,9 +185,13 @@
         }
       </div>
 
-      <!-- Reviewer Comments / Conversations card -->
+      <!-- Reviewer Comments / Conversations card. Below the dock breakpoint this is collapsed to
+           an edge tab and only rendered once that tab is clicked, as the docked overlay at the
+           bottom of this file — on a wide screen commentsVisible() is always true and this is
+           simply the second card in the panel column. See styles/_comments-dock.scss. -->
+      @if (commentsVisible()) {
       @if (conversations().length) {
-        <div class="prv-panel-card prv-panel-card--comments">
+        <div class="prv-panel-card prv-panel-card--comments" [class.comments-dock-surface]="commentsDocked()">
           @if (activeConversation(); as active) {
             <div class="prv-panel-card__head">
               @if (conversations().length > 1) {
@@ -206,6 +205,11 @@
                 <h3 class="prv-panel-card__title">{{ activeSummary()!.partnerName }}</h3>
                 <p class="prv-panel-card__subtitle">{{ activeSummary()!.partnerRoleLabel }}</p>
               </div>
+              @if (commentsDocked()) {
+                <button type="button" class="comments-dock-close" (click)="commentsOpen.set(false)" aria-label="Close reviewer comments">
+                  <span class="material-symbols-rounded" aria-hidden="true">close</span>
+                </button>
+              }
             </div>
             <app-conversation-thread [messages]="active.messages" [title]="activeSummary()!.partnerName" />
           } @else {
@@ -215,6 +219,11 @@
                 <h3 class="prv-panel-card__title">Conversations</h3>
                 <p class="prv-panel-card__subtitle">Every reply thread on this application.</p>
               </div>
+              @if (commentsDocked()) {
+                <button type="button" class="comments-dock-close" (click)="commentsOpen.set(false)" aria-label="Close reviewer comments">
+                  <span class="material-symbols-rounded" aria-hidden="true">close</span>
+                </button>
+              }
             </div>
             <ul class="prv-comments-list">
               @for (conversation of conversationSummaries(); track conversation.conversationId) {
@@ -235,13 +244,18 @@
           }
         </div>
       } @else if (reviewerComments().length) {
-        <div class="prv-panel-card prv-panel-card--comments">
+        <div class="prv-panel-card prv-panel-card--comments" [class.comments-dock-surface]="commentsDocked()">
           <div class="prv-panel-card__head">
             <span class="prv-panel-card__icon material-symbols-rounded" aria-hidden="true">forum</span>
             <div>
               <h3 class="prv-panel-card__title">Reviewer Comments</h3>
               <p class="prv-panel-card__subtitle">Comments left by reviewers in this chain.</p>
             </div>
+            @if (commentsDocked()) {
+              <button type="button" class="comments-dock-close" (click)="commentsOpen.set(false)" aria-label="Close reviewer comments">
+                <span class="material-symbols-rounded" aria-hidden="true">close</span>
+              </button>
+            }
           </div>
           <ul class="prv-comments-list">
             @for (entry of reviewerComments(); track entry.stage) {
@@ -259,10 +273,30 @@
           </ul>
         </div>
       }
+      }<!-- /commentsVisible -->
 
     </aside><!-- /prv-panel -->
 
   </div><!-- /prv-layout -->
+
+  <!-- Docked comments: the edge tab when collapsed, the dismiss scrim when open. Rendered only
+       below the dock breakpoint; above it the card lives in the panel column and neither of
+       these exists. -->
+  @if (commentsDocked() && hasComments()) {
+    @if (commentsOpen()) {
+      <button
+        type="button"
+        class="comments-dock-scrim"
+        aria-label="Close reviewer comments"
+        (click)="commentsOpen.set(false)"
+        (document:keydown.escape)="commentsOpen.set(false)"
+      ></button>
+    } @else {
+      <button type="button" class="comments-dock-tab" [attr.aria-expanded]="false" (click)="commentsOpen.set(true)">
+        Reviewer comments
+      </button>
+    }
+  }
 }
 
 <!-- Approve confirmation modal popup -->

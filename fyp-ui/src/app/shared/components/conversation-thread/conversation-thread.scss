@@ -1,7 +1,13 @@
-// The host itself must participate in the caller's grid row (e.g.
-// .comments-drawer__inner's `grid-template-rows: auto 1fr`) and scroll internally,
-// not just the <ol> inside it.
-:host { display: grid; min-height: 0; }
+// The host participates in the caller's grid/flex row (e.g. .comments-drawer__inner's
+// `grid-template-rows: auto minmax(0, 1fr)`) but is NOT itself the scroller: its single
+// `minmax(0, 1fr)` row hands the <ol> below a height it is allowed to overflow, so the thread
+// has exactly one scroll container instead of a scrolling host wrapping a scrolling list.
+:host {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
 
 .convo-thread {
   display: grid;
@@ -10,8 +16,10 @@
   list-style: none;
   margin: 0;
   padding: 0 .1rem .1rem 0;
-  overflow-y: auto;
   min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .convo-thread__row {

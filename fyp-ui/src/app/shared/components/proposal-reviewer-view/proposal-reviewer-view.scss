@@ -190,71 +190,6 @@
 }
 
 /* ─────────────────────────────────────────────
-   Info grid (fields)
-   ───────────────────────────────────────────── */
-.prv-grid {
-  display: grid;
-  gap: 0.65rem;
-}
-
-.prv-grid--3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.prv-grid-row--2 {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.65rem;
-  grid-column: 1 / -1;
-}
-
-.prv-field {
-  display: grid;
-  gap: 0.25rem;
-  padding: 0.75rem 0.9rem;
-  border: 1px solid var(--apu-border);
-  border-radius: 0.65rem;
-  background: var(--apu-surface-muted);
-  transition:
-    border-color var(--internal-transition),
-    background var(--internal-transition),
-    box-shadow var(--internal-transition),
-    transform var(--internal-transition);
-  cursor: default;
-}
-
-.prv-field:hover {
-  background: var(--apu-surface);
-  border-color: rgb(42 131 255 / 25%);
-  box-shadow: 0 2px 8px rgb(42 131 255 / 7%);
-  transform: translateY(-1px);
-}
-
-.prv-field--span2 {
-  grid-column: span 2;
-}
-
-.prv-field--full {
-  grid-column: 1 / -1;
-}
-
-.prv-field__label {
-  color: var(--apu-text-muted);
-  font-size: 0.67rem;
-  font-weight: 700;
-  letter-spacing: 0.055em;
-  text-transform: uppercase;
-}
-
-.prv-field__value {
-  color: var(--apu-navy-900);
-  font-size: 0.87rem;
-  font-weight: 600;
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-}
-
-/* ─────────────────────────────────────────────
    Table wrappers
    ───────────────────────────────────────────── */
 .prv-table-wrap {
@@ -273,17 +208,6 @@
   font-weight: 700;
   letter-spacing: 0.01em;
   border-bottom: 2px solid var(--apu-blue-600);
-}
-
-/* ─────────────────────────────────────────────
-   Event image
-   ───────────────────────────────────────────── */
-.prv-event-image {
-  width: 100%;
-  max-width: 22rem;
-  border: 1px solid var(--apu-border);
-  border-radius: var(--radius-card);
-  object-fit: cover;
 }
 
 /* ─────────────────────────────────────────────
@@ -845,18 +769,11 @@
     overflow: visible;
   }
 
-  // The comments card's own internal scroll only makes sense while the panel itself is
-  // height-capped (desktop). Once the panel goes back to flowing with the page, let the card and
-  // its message list size to content and scroll with the page like everything else.
-  .prv-panel-card--comments {
-    display: grid;
-    grid-template-rows: none;
-    overflow: visible;
-  }
-  .prv-panel-card--comments .prv-comments-list,
-  .prv-panel-card--comments app-conversation-thread {
-    overflow: visible;
-  }
+  // The comments card keeps its desktop shape here — header row plus a body that scrolls
+  // internally — because below this breakpoint it is no longer in the flow at all: it is the
+  // docked overlay (.comments-dock-surface, styles/_comments-dock.scss), a fixed-size box on the
+  // right edge. The rules that used to sit here let it size to content and scroll with the page
+  // instead, which is what stranded the conversation at the bottom of the page.
 
   .prv-kpi-bar {
     grid-template-columns: repeat(3, 1fr);
@@ -864,19 +781,6 @@
 }
 
 @media (max-width: 48rem) {
-  .prv-grid--3 {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .prv-field--full {
-    grid-column: 1 / -1;
-    border-right: 0;
-  }
-
-  .prv-field:nth-child(2n) {
-    border-right: 0;
-  }
-
   .prv-kpi-bar {
     grid-template-columns: repeat(2, 1fr);
   }

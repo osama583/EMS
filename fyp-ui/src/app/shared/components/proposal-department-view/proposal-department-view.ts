@@ -19,12 +19,13 @@ import { ConversationThreadComponent } from '../conversation-thread/conversation
 import { EditableRow } from '../form-controls/form-controls.models';
 import { FormModalComponent } from '../form-modal/form-modal';
 import { PopoverComponent } from '../popover/popover';
-import { ProposalFieldComponent } from '../proposal-field/proposal-field';
+import { ProposalOverviewComponent } from '../proposal-overview/proposal-overview';
 import { ProposalKpiBarComponent } from '../proposal-kpi-bar/proposal-kpi-bar';
 import { ProposalSectionComponent } from '../proposal-section/proposal-section';
 import { ProposalTableColumn, ProposalTableComponent } from '../proposal-table/proposal-table';
 import { SearchableDropdownComponent } from '../searchable-dropdown/searchable-dropdown';
 import { ToastService, apiErrorMessage } from '../toast/toast.service';
+import { COMMENTS_DOCK_QUERY, viewportMatches } from '../../viewport-query';
 
 // A "Create Order" click that hasn't been sent to the server yet — same shape as
 // FmbSelectionDraft (what actually gets POSTed) plus a local id and the display text the modal
@@ -44,7 +45,7 @@ interface StagedFmbOrder extends FmbSelectionDraft {
     PopoverComponent,
     ProposalKpiBarComponent,
     ProposalSectionComponent,
-    ProposalFieldComponent,
+    ProposalOverviewComponent,
     ConversationThreadComponent,
   ],
   template: `
@@ -59,26 +60,7 @@ interface StagedFmbOrder extends FmbSelectionDraft {
         <div class="prv-main">
 
           <!-- Section: Event Overview -->
-          <app-proposal-section icon="description" title="Event Overview" description="General information, registration and publicity.">
-            <div class="prv-grid prv-grid--3">
-              <app-proposal-field label="Event Title" [value]="item.eventTitle" span="2" />
-              <app-proposal-field label="Visibility" [value]="item.eventVisibility ?? ''" />
-              <app-proposal-field label="Format" [value]="item.eventFormat ?? ''" />
-              <app-proposal-field label="Registration" [value]="item.registrationMode ?? ''" />
-              <app-proposal-field label="Total Pax" [value]="item.totalPax" />
-              <div class="prv-grid-row--2 prv-field--full">
-                <app-proposal-field label="External Pax" [value]="item.externalPax ?? ''" />
-                <app-proposal-field label="Categories" [value]="(item.eventCategories ?? []).join(', ')" />
-              </div>
-              <app-proposal-field label="Publicity" [value]="item.publicity ?? ''" span="full" />
-              <app-proposal-field label="Short Introduction" [value]="item.shortIntroduction" span="full" />
-              <app-proposal-field label="Goals &amp; Objectives" [value]="item.goals ?? ''" span="full" />
-              <app-proposal-field label="Expected Benefits" [value]="item.benefits ?? ''" span="full" />
-            </div>
-            @if (item.eventImage) {
-              <img class="prv-event-image" [src]="item.eventImage.url" [alt]="item.eventTitle + ' event image'" />
-            }
-          </app-proposal-section>
+          <app-proposal-overview [proposal]="item" />
 
           <!-- Section: Department Requests (not shown to the Cafeteria Manager — they only need
                to see the cafeteria orders routed to them, in the section below.) -->
@@ -344,21 +326,47 @@ interface StagedFmbOrder extends FmbSelectionDraft {
                applicant (conversations_for scopes a department caller to their own task's thread
                only, so this never shows another department's or reviewer stage's comments). -->
           @if (activeConversation(); as active) {
-            <div class="prv-panel-card prv-panel-card--comments">
-              <div class="prv-panel-card__head">
-                <span class="prv-panel-card__icon material-symbols-rounded" aria-hidden="true">forum</span>
-                <div>
-                  <h3 class="prv-panel-card__title">{{ activeSummary()!.partnerName }}</h3>
-                  <p class="prv-panel-card__subtitle">{{ activeSummary()!.partnerRoleLabel }}</p>
+            @if (commentsVisible()) {
+              <div class="prv-panel-card prv-panel-card--comments" [class.comments-dock-surface]="commentsDocked()">
+                <div class="prv-panel-card__head">
+                  <span class="prv-panel-card__icon material-symbols-rounded" aria-hidden="true">forum</span>
+                  <div>
+                    <h3 class="prv-panel-card__title">{{ activeSummary()!.partnerName }}</h3>
+                    <p class="prv-panel-card__subtitle">{{ activeSummary()!.partnerRoleLabel }}</p>
+                  </div>
+                  @if (commentsDocked()) {
+                    <button type="button" class="comments-dock-close" (click)="commentsOpen.set(false)" aria-label="Close reviewer comments">
+                      <span class="material-symbols-rounded" aria-hidden="true">close</span>
+                    </button>
+                  }
                 </div>
+                <app-conversation-thread [messages]="active.messages" [title]="activeSummary()!.partnerName" />
               </div>
-              <app-conversation-thread [messages]="active.messages" [title]="activeSummary()!.partnerName" />
-            </div>
+            }
           }
 
         </aside><!-- /prv-panel -->
 
       </div><!-- /prv-layout -->
+
+      <!-- Docked comments: the edge tab when collapsed, the dismiss scrim when open. Below the
+           dock breakpoint the panel column is gone and the conversation would otherwise sit at
+           the very bottom of the page — see styles/_comments-dock.scss. -->
+      @if (commentsDocked() && activeConversation()) {
+        @if (commentsOpen()) {
+          <button
+            type="button"
+            class="comments-dock-scrim"
+            aria-label="Close reviewer comments"
+            (click)="commentsOpen.set(false)"
+            (document:keydown.escape)="commentsOpen.set(false)"
+          ></button>
+        } @else {
+          <button type="button" class="comments-dock-tab" [attr.aria-expanded]="false" (click)="commentsOpen.set(true)">
+            Reviewer comments
+          </button>
+        }
+      }
     }
 
     <!-- Approve confirmation modal popup (whole-department flow). When this department requires
@@ -831,6 +839,13 @@ export class ProposalDepartmentViewComponent {
   // no list/Back UI needed, unlike the applicant-facing drawer.
   readonly conversations = signal<readonly ProposalConversation[]>([]);
   readonly activeConversation = computed(() => this.conversations()[0] ?? null);
+
+  // Same docked-comments treatment as proposal-reviewer-view: below the breakpoint .prv-layout
+  // collapses to one column and the conversation would land under the whole proposal detail, so
+  // it becomes an edge tab plus a right-docked overlay instead.
+  protected readonly commentsDocked = viewportMatches(COMMENTS_DOCK_QUERY);
+  protected readonly commentsOpen = signal(false);
+  protected readonly commentsVisible = computed(() => !this.commentsDocked() || this.commentsOpen());
   readonly activeSummary = computed(() => {
     const active = this.activeConversation();
     if (!active) return null;

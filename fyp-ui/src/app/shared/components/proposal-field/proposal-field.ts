@@ -3,11 +3,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 @Component({
   selector: 'app-proposal-field',
   template: `
-    <article
-      class="prv-field"
-      [class.prv-field--span2]="span() === '2'"
-      [class.prv-field--full]="span() === 'full'"
-    >
+    <article class="prv-field">
       <span class="prv-field__label">{{ label() }}</span>
       <strong class="prv-field__value">{{ value() }}</strong>
     </article>
@@ -18,5 +14,4 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 export class ProposalFieldComponent {
   readonly label = input.required<string>();
   readonly value = input.required<string | number>();
-  readonly span = input<'1' | '2' | 'full'>('1');
 }
