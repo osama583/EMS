@@ -19,13 +19,6 @@ const DEFAULT_CONFIG: SystemConfig = {
   slaOrderClaimHours: 4,
   staffShiftHours: 8,
   capacityWarnRatio: 0.85,
-  atRiskWindowDays: 7,
-  stallMultiplier: 2,
-  forecastHorizonDays: 60,
-  dashboardTrendWeeks: 12,
-  anomalySigma: 2,
-  minBucketSize: 5,
-  sendBackWarnRate: 15,
   venueTeardownMinutes: 60,
   startPointMaxTours: 2,
 };

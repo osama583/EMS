@@ -25,7 +25,6 @@ from .profiles import (
     ResolvedProfile,
     layout_for,
     resolve_dashboard_profiles,
-    school_signature,
 )
 from .scope import DashboardConfig, Scope, resolve_period
 from .widgets.base import build as build_widget
@@ -60,7 +59,6 @@ QUICK_ACTIONS: dict[str, dict[str, Any]] = {
         "route": "/app/inbox/proposals",
         "count": "gate",
     },
-    "school_history": {"label": "School history", "icon": "history", "route": "/app/history/proposals", "count": None},
     "menu_oversight": {
         "label": "Menu oversight",
         "icon": "restaurant_menu",
@@ -84,7 +82,7 @@ QUICK_ACTIONS: dict[str, dict[str, Any]] = {
     "menu": {"label": "My menu", "icon": "menu_book", "route": "/app/menu", "count": None},
 }
 
-_GATE_FOR_PROFILE = {"hos_school": "hos_hod_review", "hod_fmb": "fmb_review", "cfo": "cfo_review"}
+_GATE_FOR_PROFILE = {"hod_fmb": "fmb_review", "cfo": "cfo_review"}
 
 
 def _quick_action_counts(cur, scope: Scope, keys: list[str], widgets: dict[str, Any]) -> dict[str, int]:
@@ -278,11 +276,7 @@ def build_document(
 
         scope = _build_scope(cur, principal, active, period, outlet, today=today)
 
-        # The two school shapes resolve from the school's own trailing-term data
-        # rather than a hardcoded pairing, so a third school added later gets a
-        # signature panel deterministically.
-        variant = school_signature(cur, active.unit_code) if active.key == "hos_school" and active.unit_code else None
-        layout = layout_for(active.key, variant)
+        layout = layout_for(active.key)
 
         results: dict[str, Any] = {}
         ordered_ids = (
@@ -318,7 +312,6 @@ def build_document(
             "profile": {
                 "id": active.id,
                 "key": active.key,
-                "variant": variant,
                 "roleCode": active.role_code,
                 "unitCode": active.unit_code,
                 "unitLabel": active.unit_label,
@@ -405,8 +398,7 @@ def build_widget_only(
         profiles = resolve_dashboard_profiles(cur, principal, requested_profile)
         active = profiles[0]
         scope = _build_scope(cur, principal, active, period, outlet, today=today)
-        variant = school_signature(cur, active.unit_code) if active.key == "hos_school" and active.unit_code else None
-        layout = layout_for(active.key, variant)
+        layout = layout_for(active.key)
         allowed = {
             *([layout["hero"]] if layout.get("hero") else []),
             *([layout["signature"]] if layout.get("signature") else []),

@@ -42,7 +42,6 @@ class ResolvedProfile:
 # default profile; the rest become entries in the header's profile switcher.
 DASHBOARD_TIERS: tuple[tuple[str, Callable[[Principal], Any], ...], ...] = (
     ("cfo", lambda p: p.has_role("cfo")),
-    ("head-of-school", lambda p: p.units_for_role("head-of-school")),
     ("head-of-department", lambda p: p.units_for_role("head-of-department")),
     ("cafeteria-manager", lambda p: p.units_for_role("cafeteria-manager")),
 )
@@ -71,7 +70,6 @@ PROFILE_TITLES = {
     "hod_student_services": ("Student Services", "Guide demand & tour planning"),
     "hod_transport": ("Transport Services", "Fleet & driver operations"),
     "hod_generic": ("Department", "Service lane operations"),
-    "hos_school": ("School portfolio", "Proposal flow & outcomes"),
     "cfo": ("Institutional finance", "Commitment, coverage & collection"),
     "cafeteria_manager": ("Cafeteria operations", "The shift"),
 }
@@ -87,8 +85,6 @@ def _unit_labels(cur, codes: list[str]) -> dict[str, str]:
 def _profile_key(role_code: str, unit_code: str | None) -> str:
     if role_code == "cfo":
         return "cfo"
-    if role_code == "head-of-school":
-        return "hos_school"
     if role_code == "cafeteria-manager":
         return "cafeteria_manager"
     return DEPARTMENT_PROFILE.get(unit_code or "", GENERIC_DEPARTMENT_PROFILE)
@@ -145,65 +141,6 @@ def resolve_dashboard_profiles(cur, principal: Principal, requested: str | None 
             p for p in profiles if not (p.id == requested or p.key == requested)
         ]
     return profiles
-
-
-# --- The school profile-score rule ----------------------------------------
-
-
-def school_signature(cur, unit_code: str) -> str:
-    """Pick a school's signature panel from its own data, not a hardcoded pair.
-
-    Two scores over the trailing term:
-      service-intensity    mean requirements per proposal, weighted toward the
-                           three heaviest service lanes
-      commercial-intensity share of proposals carrying a cost or a funding line,
-                           weighted by external guest mix
-
-    Whichever is higher chooses the dashboard. Evaluated at request time so it
-    tracks the data: a third school added later gets a signature panel
-    deterministically instead of by hand, and a school whose behaviour changes
-    gets the dashboard that now fits it.
-    """
-    row = fetch_one(
-        cur,
-        """
-        SELECT
-            coalesce(avg(req.cnt), 0) AS mean_requirements,
-            coalesce(avg(CASE WHEN req.heavy > 0 THEN 1 ELSE 0 END), 0) AS heavy_share,
-            coalesce(avg(CASE WHEN r.cost_amount > 0 OR fund.n > 0 THEN 1 ELSE 0 END), 0) AS commercial_share,
-            coalesce(avg(CASE WHEN guests.external > 0 THEN 1 ELSE 0 END), 0) AS external_share,
-            count(*) AS proposals
-          FROM request r
-          JOIN user_unit_roles uur
-            ON uur.user_id = r.applicant_user_id AND uur.unit_code = %(unit)s AND uur.is_active
-          LEFT JOIN LATERAL (
-                SELECT count(*) AS cnt,
-                       count(*) FILTER (WHERE er.requirement_name IN ('soundLight', 'photoVideo', 'logistics')) AS heavy
-                  FROM application_requirements ar
-                  JOIN event_requirements er ON er.requirement_id = ar.requirement_id
-                 WHERE ar.request_id = r.request_id
-          ) req ON TRUE
-          LEFT JOIN LATERAL (
-                SELECT count(*) AS n FROM request_funding_purchase p WHERE p.request_id = r.request_id
-          ) fund ON TRUE
-          LEFT JOIN LATERAL (
-                SELECT count(*) AS external FROM general_guest g
-                 WHERE g.request_id = r.request_id
-                   AND g.guest_type IN ('External Guests', 'Industry Partners', 'Alumni')
-          ) guests ON TRUE
-         WHERE r.submitted_at IS NOT NULL
-           AND r.submitted_at >= now() - interval '120 days'
-        """,
-        {"unit": unit_code},
-    )
-    if not row or not int(row["proposals"] or 0):
-        # No data yet. Default to the service view: on a system with no history,
-        # the operational read is the more useful of the two, and it does not
-        # depend on prices that have not been entered.
-        return "service"
-    service = float(row["mean_requirements"] or 0) / 8.0 + float(row["heavy_share"] or 0)
-    commercial = float(row["commercial_share"] or 0) + float(row["external_share"] or 0) * 0.5
-    return "commercial" if commercial > service else "service"
 
 
 # --- The layouts ----------------------------------------------------------
@@ -313,53 +250,6 @@ PROFILES: dict[str, dict[str, Any]] = {
         "quickActions": ["review_inbox", "assign_work"],
         "mobileKpis": ["gen_open_backlog", "gen_first_pass_yield"],
     },
-    # ----------------------------------------------------------- School -- One profile, two shapes.
-    "hos_school": {
-        "hero": {"service": "hos_end_to_end", "commercial": "hos_cost_per_pax"},
-        "kpis": {
-            "service": [
-                "hos_gate_latency",
-                "hos_outcome_mix",
-                "hos_service_footprint",
-                "hos_forward_pipeline",
-            ],
-            "commercial": [
-                "hos_cost_recovery",
-                "hos_collection_rate",
-                "hos_gate_latency",
-                "hos_commercial_intensity",
-                "hos_external_engagement",
-            ],
-        },
-        "signature": {"service": "hos_dependency_map", "commercial": "hos_recovery_funnel"},
-        "panels": {
-            "service": [
-                "hos_requirement_mix",
-                "hos_stage_waterfall",
-                "hos_applicant_activity",
-                "hos_event_outcome",
-                "hos_rework_profile",
-                "hos_forward_commitment",
-            ],
-            "commercial": [
-                "hos_cost_by_category",
-                "hos_guest_mix",
-                "hos_cost_per_pax_trend",
-                "hos_stage_waterfall",
-                "hos_applicant_activity",
-                "hos_forward_financial",
-            ],
-        },
-        "alerts": "hos_at_risk",
-        "quickActions": ["review_gate", "school_history"],
-        "mobileKpis": {
-            "service": ["hos_gate_latency", "hos_service_footprint", "hos_end_to_end_kpi"],
-            "commercial": ["hos_gate_latency", "hos_collection_rate", "hos_cost_per_pax_kpi"],
-        },
-    },
-    # -------------------------------------------------------------- CFO -- Nearly blind outside their
-    # own gate under _VISIBLE_SQL: clause 5 fires only at cfo_review, and cfo_review is only reached
-    # above HIGH_PAX_THRESHOLD.
     "cfo": {
         # Reduced to the money question and the gate behind it.
         "counts": "cfo_request_counts",
@@ -402,20 +292,6 @@ PROFILES: dict[str, dict[str, Any]] = {
 }
 
 
-def layout_for(profile_key: str, variant: str | None = None) -> dict[str, Any]:
-    """Flatten a profile entry, resolving the school's two-shape fields.
-
-    Only `hos_school` carries variant-keyed values; every other profile's fields
-    pass through unchanged, so a widget author never has to know which kind of
-    entry they are reading.
-    """
-    layout = PROFILES.get(profile_key) or PROFILES[GENERIC_DEPARTMENT_PROFILE]
-    resolved: dict[str, Any] = {}
-    for field, value in layout.items():
-        if isinstance(value, dict) and variant and variant in value:
-            resolved[field] = value[variant]
-        elif isinstance(value, dict) and set(value) == {"service", "commercial"}:
-            resolved[field] = value["service"]
-        else:
-            resolved[field] = value
-    return resolved
+def layout_for(profile_key: str) -> dict[str, Any]:
+    """The widget layout for a profile, falling back to the generic department shape."""
+    return dict(PROFILES.get(profile_key) or PROFILES[GENERIC_DEPARTMENT_PROFILE])

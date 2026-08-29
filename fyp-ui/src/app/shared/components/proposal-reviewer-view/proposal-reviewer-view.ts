@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import { DepartmentRequestKind } from '../../../core/departments/department-workflow.config';
 import { ProposalConversation } from '../../../core/proposals/proposal-conversation.models';
+import { cancellationWindowFor, earliestScheduleDate, parseScheduleDate } from '../../../core/proposals/cancellation-window';
 import { ProposalReviewRecord } from '../../../core/proposals/proposal-review.models';
 import { DEPARTMENT_LABELS, ProposalStage, ReviewerCommentEntry, initialsFor, reviewerCommentEntry, stageLabel } from '../../../core/proposals/proposal-status.models';
 import { ProposalWorkflowService } from '../../../core/proposals/proposal-workflow.service';
@@ -263,6 +264,39 @@ export class ProposalReviewerViewComponent {
       return false;
     }
     return this.isSubmitterOrCoOwner() && this.isWithinCancellationWindow();
+  });
+
+  // What the applicant sees about their own cancellation deadline, quoted from the same rule the
+  // server enforces. Shown wherever the proposal is still cancellable in principle - so an
+  // applicant reading their Ongoing application knows how long they have, and knows once they no
+  // longer do. Reviewers see nothing: it is not their decision.
+  readonly cancellationWindow = computed(() => {
+    const proposal = this.proposal();
+    if (!proposal) return null;
+    const fromRows = earliestScheduleDate(proposal.scheduleRows);
+    const eventDate = fromRows ?? parseScheduleDate(proposal.schedule);
+    return cancellationWindowFor(eventDate, this.configService.cancellationDaysLimit());
+  });
+
+  readonly cancellationNotice = computed(() => {
+    if (!this.isSubmitterOrCoOwner()) return '';
+    const proposal = this.proposal();
+    if (!proposal) return '';
+    if (
+      proposal.workflow.stage === ProposalStage.Cancelled
+      || proposal.workflow.stage === ProposalStage.Rejected
+      || proposal.workflow.stage === ProposalStage.Approved
+    ) {
+      return '';
+    }
+    const window = this.cancellationWindow();
+    if (!window) return '';
+    if (window.passed) return 'You have passed the date to cancel this application.';
+    const days = Math.max(0, window.daysRemaining);
+    const until = window.lastDay.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    return days === 0
+      ? `Today is the last day to cancel this application (${until}).`
+      : `You have ${days} day${days === 1 ? '' : 's'} left to cancel this application, up to ${until}.`;
   });
 
   readonly commentRequired = computed(() =>

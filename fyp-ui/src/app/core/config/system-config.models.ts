@@ -14,13 +14,6 @@ export interface SystemConfig {
   readonly slaOrderClaimHours: number;
   readonly staffShiftHours: number;
   readonly capacityWarnRatio: number;
-  readonly atRiskWindowDays: number;
-  readonly stallMultiplier: number;
-  readonly forecastHorizonDays: number;
-  readonly dashboardTrendWeeks: number;
-  readonly anomalySigma: number;
-  readonly minBucketSize: number;
-  readonly sendBackWarnRate: number;
   readonly venueTeardownMinutes: number;
   readonly startPointMaxTours: number;
 }
@@ -30,9 +23,8 @@ export type SystemConfigDraft = Partial<SystemConfig>;
 /**
  * The dashboard thresholds, grouped for the policies form.
  *
- * Declared as data rather than as sixteen hand-written fields: the form walks
- * this list, so adding a threshold is one entry here plus a config row, not a
- * template edit somebody will forget to make.
+ * Declared as data rather than hand-written fields: the form walks this list, so adding a
+ * threshold is one entry here plus a config row, not a template edit somebody will forget.
  */
 export interface DashboardThreshold {
   readonly field: keyof SystemConfig;
@@ -115,62 +107,6 @@ export const DASHBOARD_THRESHOLD_GROUPS: readonly ThresholdGroup[] = [
         label: 'Tours per start point per day',
         min: 1,
         help: 'Meeting instructions assume one group at a time; more than this on one day is congestion.',
-      },
-    ],
-  },
-  {
-    title: 'Risk and forecast windows',
-    blurb: 'How far ahead the dashboards look, and how loudly they react.',
-    items: [
-      {
-        field: 'atRiskWindowDays',
-        label: 'At-risk window (days)',
-        min: 1,
-        help: 'Open work with a requirement date inside this window counts as at risk.',
-      },
-      {
-        field: 'stallMultiplier',
-        label: 'Stall multiplier',
-        min: 1,
-        step: 0.5,
-        help: 'Multiplied by a unit’s own median decision time. Relative, so a fast lane and a slow lane do not share a definition of stalled.',
-      },
-      {
-        field: 'forecastHorizonDays',
-        label: 'Forecast horizon (days)',
-        min: 7,
-        help: 'How far forward committed demand and capacity are projected.',
-      },
-      {
-        field: 'dashboardTrendWeeks',
-        label: 'Trend window (weeks)',
-        min: 4,
-        help: 'The default span of every weekly trend line.',
-      },
-      {
-        field: 'anomalySigma',
-        label: 'Anomaly sensitivity (sigma)',
-        min: 1,
-        step: 0.5,
-        help: 'A daily figure above the trailing mean plus this many standard deviations raises a spike alert.',
-      },
-    ],
-  },
-  {
-    title: 'Reporting rules',
-    blurb: 'What the dashboards will and will not say out loud.',
-    items: [
-      {
-        field: 'minBucketSize',
-        label: 'Minimum bucket size',
-        min: 1,
-        help: 'Aggregates crossing a scope boundary suppress buckets below this, so a count plus a calendar cannot identify a person.',
-      },
-      {
-        field: 'sendBackWarnRate',
-        label: 'Send-back amber rate (%)',
-        min: 1,
-        help: 'A whole percent. Above this a department send-back rate turns amber.',
       },
     ],
   },

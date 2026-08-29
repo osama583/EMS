@@ -179,7 +179,6 @@ _ROLE_CAPABILITIES: dict[str, list[tuple[str, str]]] = {
         ("review and decide proposals from your School at the Head of School/Department stage, "
          "from your Inbox", "inbox"),
         ("track proposals in progress and their outcomes", "my-requests"),
-        ("see an overview of activity for the unit you head", "dashboard"),
         ("browse and register for published events", "explore-events"),
         ("see the events you saved, registered for, or are awaiting approval on (My Events)",
          "my-events"),

@@ -35,12 +35,6 @@ CONFIG_FIELDS: dict[str, str] = {
     "paxReviewerThreshold": "HIGH_PAX_THRESHOLD",
     "cancellationDaysLimit": "CANCELLATION_DEADLINE_DAYS",
     "maxEventCategories": "MAX_EVENT_CATEGORIES",
-    # --- Dashboard thresholds still read by a live widget (migration 018) -- The rest of the sixteen
-    # dashboard-threshold codes this migration seeded were removed along with the metrics/widgets that
-    # existed only to read them.
-    "forecastHorizonDays": "FORECAST_HORIZON_DAYS",
-    "dashboardTrendWeeks": "DASHBOARD_TREND_WEEKS",
-    "minBucketSize": "MIN_BUCKET_SIZE",
 }
 
 _FRACTIONAL_FIELDS: frozenset[str] = frozenset()

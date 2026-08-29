@@ -174,13 +174,12 @@ PROFILE_SETUP = {
     "hod_photography": ("head-of-department", "photography_services", "Photography Services", ()),
     "hod_fmb": ("head-of-department", "food_beverage_services", "Food & Beverage Services", ()),
     "hod_generic": ("head-of-department", "greenhouse_services", "Greenhouse Services", ()),
-    "hos_school": ("head-of-school", "school_of_computing", "School of Computing", ()),
     "cfo": ("cfo", None, None, ()),
     "cafeteria_manager": ("cafeteria-manager", None, None, ("cafeteria__atrium_cafeteria", "cafeteria__level_3_food_court")),
 }
 
 
-def build_preview(profile_key: str, period: str = "30d", variant: str | None = None) -> dict:
+def build_preview(profile_key: str, period: str = "30d") -> dict:
     role_code, unit_code, unit_label, outlets = PROFILE_SETUP[profile_key]
     cur = SyntheticCursor()
     scope = Scope(
@@ -201,7 +200,7 @@ def build_preview(profile_key: str, period: str = "30d", variant: str | None = N
         config=SEEDED_CONFIG,
         today=TODAY,
     )
-    layout = layout_for(profile_key, variant)
+    layout = layout_for(profile_key)
     ids = [*([layout["hero"]] if layout.get("hero") else []), *layout["kpis"], *([layout["signature"]] if layout.get("signature") else []), *layout["panels"], *([layout["alerts"]] if layout.get("alerts") else []), *layout.get("mobileKpis", [])]
     results = {widget_id: build_widget(widget_id, cur, scope) for widget_id in dict.fromkeys(ids)}
     actions = _quick_actions(cur, scope, list(layout["quickActions"]), results)
@@ -211,7 +210,6 @@ def build_preview(profile_key: str, period: str = "30d", variant: str | None = N
         "profile": {
             "id": f"{profile_key}:{unit_code}" if unit_code else profile_key,
             "key": profile_key,
-            "variant": variant,
             "roleCode": role_code,
             "unitCode": unit_code,
             "unitLabel": unit_label,
@@ -267,11 +265,9 @@ def check() -> int:
     """Build every profile with populated data and report anything that broke."""
     failures: list[str] = []
     for profile_key in PROFILE_SETUP:
-        variants = ("service", "commercial") if profile_key == "hos_school" else (None,)
-        for variant in variants:
-            name = f"{profile_key}{'/' + variant if variant else ''}"
+        for name in (profile_key,):
             try:
-                document = build_preview(profile_key, variant=variant)
+                document = build_preview(profile_key)
             except Exception as error:  # noqa: BLE001 - the point is to report, not raise
                 failures.append(f"{name}: build failed — {error!r}")
                 continue
@@ -360,9 +356,8 @@ class PreviewHandler(BaseHTTPRequestHandler):
             key = (query.get("profile") or [self._cookie_profile()])[0].split(":")[0]
             if key not in PROFILE_SETUP:
                 key = self.profile_key
-            variant = "commercial" if query.get("variant") == ["commercial"] else None
             period = (query.get("period") or ["30d"])[0]
-            self._send(build_preview(key, period=period, variant=variant))
+            self._send(build_preview(key, period=period))
             return
         if path.endswith("/dashboard/profiles"):
             self._send({"profiles": [{"id": k, "key": k, "title": _eyebrow(k), "unitCode": None, "unitLabel": None} for k in PROFILE_SETUP]})

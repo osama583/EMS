@@ -30,6 +30,7 @@ import { ReviewerCommentEntry, allCommentEntries, reviewerCommentEntry } from '.
 
 import { InternalUserDirectoryService } from '../../../../core/users/internal-user-directory.service';
 import { SystemConfigService } from '../../../../core/config/system-config.service';
+import { cancellationWindowFor, earliestScheduleDate } from '../../../../core/proposals/cancellation-window';
 import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 import { EventCategoryService, EventFormatService } from '../../../../core/event-catalog/event-catalog.service';
 import { resolveDepartmentRowLabels } from '../../../../core/departments/department-request-columns';
@@ -210,6 +211,23 @@ export class EventProposalComponent implements OnDestroy {
   // Admin-settable (System Configuration -> Policies). The server enforces the same cap on
   // submit, so this only keeps the picker honest — it is never the authority.
   readonly maxEventCategories = computed(() => this.systemConfig.maxEventCategories());
+
+  // How long the applicant will have to cancel, quoted from the same rule the server enforces
+  // (CANCELLATION_DEADLINE_DAYS against the first scheduled day). Null until a date is entered —
+  // there is no deadline to promise before there is an event to measure it from.
+  readonly cancellationWindow = computed(() =>
+    cancellationWindowFor(earliestScheduleDate(this.schedule()), this.systemConfig.cancellationDaysLimit()),
+  );
+  readonly cancellationNotice = computed(() => {
+    const window = this.cancellationWindow();
+    if (!window) return '';
+    if (window.passed) return 'This date is already inside the cancellation deadline, so this application cannot be cancelled once submitted.';
+    const days = Math.max(0, window.daysRemaining);
+    return `You will have ${days} day${days === 1 ? '' : 's'} to cancel this application from the ongoing application page, up to ${this.formatNoticeDate(window.lastDay)}.`;
+  });
+  protected formatNoticeDate(value: Date): string {
+    return value.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  }
   // Club Only visibility is gated on being the President of at least one club — a data fact
   // (AuthUser.presidentOfClubIds, sourced from the clubs table), not a role check.
   private readonly isClubPresident = Boolean(this.applicant?.presidentOfClubIds?.length);

@@ -117,7 +117,6 @@ SCOPE_FOR_PROFILE = {
     "hod_photography": ("photography_services", ()),
     "hod_fmb": ("food_beverage_services", ()),
     "hod_generic": ("some_new_department", ()),
-    "hos_school": ("school_of_computing", ()),
     "cfo": (None, ()),
     "cafeteria_manager": (None, ("cafeteria__atrium_cafeteria",)),
 }
@@ -125,9 +124,7 @@ SCOPE_FOR_PROFILE = {
 
 def _layouts():
     for key in PROFILES:
-        variants = ("service", "commercial") if key == "hos_school" else (None,)
-        for variant in variants:
-            yield key, variant, layout_for(key, variant)
+        yield key, layout_for(key)
 
 
 # --- Layout integrity -----------------------------------------------------
@@ -136,7 +133,7 @@ def _layouts():
 def test_every_profile_names_registered_widgets():
     """The declarative-layout guarantee. A profile is data; if it can name a
     widget that does not exist, the data is not trustworthy."""
-    for key, variant, layout in _layouts():
+    for key, layout in _layouts():
         ids = [
             *([layout["hero"]] if layout.get("hero") else []),
             *([layout["signature"]] if layout.get("signature") else []),
@@ -146,13 +143,13 @@ def test_every_profile_names_registered_widgets():
             *layout.get("mobileKpis", []),
         ]
         for widget_id in ids:
-            assert widget_id in WIDGET_REGISTRY, f"{key}/{variant} names unknown widget {widget_id}"
+            assert widget_id in WIDGET_REGISTRY, f"{key} names unknown widget {widget_id}"
 
 
 def test_every_profile_names_registered_quick_actions():
-    for key, variant, layout in _layouts():
+    for key, layout in _layouts():
         for action in layout["quickActions"]:
-            assert action in QUICK_ACTIONS, f"{key}/{variant} names unknown action {action}"
+            assert action in QUICK_ACTIONS, f"{key} names unknown action {action}"
 
 
 def test_no_two_profiles_share_a_signature_panel():
@@ -168,8 +165,8 @@ def test_no_two_profiles_share_a_signature_panel():
     """
     _SHARED_BY_DESIGN = {"gen_backlog_age"}
     signatures = {}
-    for key, variant, layout in _layouts():
-        name = f"{key}:{variant}" if variant else key
+    for key, layout in _layouts():
+        name = key
         signature = layout.get("signature")
         # A profile may carry no signature panel at all - the five department
         # profiles dropped theirs rather than restating their own hero.
@@ -196,14 +193,14 @@ def test_mobile_kpi_order_is_three_tiles():
     no KPI tiles) have nothing for mobileKpis to reorder, so an empty list
     there is the correct answer, not a shortfall.
     """
-    for key, variant, layout in _layouts():
+    for key, layout in _layouts():
         kpi_count = len(layout.get("kpis") or [])
         if kpi_count == 0:
-            assert not layout.get("mobileKpis"), f"{key}/{variant} lists mobileKpis but has no kpis"
+            assert not layout.get("mobileKpis"), f"{key} lists mobileKpis but has no kpis"
             continue
         expected = min(3, kpi_count)
         order = layout.get("mobileKpis", [])
-        assert len(order) == expected, f"{key}/{variant} lists {len(order)} mobile KPIs, expected {expected}"
+        assert len(order) == expected, f"{key} lists {len(order)} mobile KPIs, expected {expected}"
 
 
 # --- Empty database -------------------------------------------------------
@@ -228,7 +225,7 @@ def test_widget_survives_an_empty_database(widget_id):
 
 
 def _profile_for_widget(widget_id: str) -> str:
-    for key, variant, layout in _layouts():
+    for key, layout in _layouts():
         ids = {
             *([layout["hero"]] if layout.get("hero") else []),
             *([layout["signature"]] if layout.get("signature") else []),
@@ -487,15 +484,11 @@ def _preview():
 
 
 @pytest.mark.parametrize(
-    "profile_key,variant",
-    [
-        (key, variant)
-        for key in sorted(_preview().PROFILE_SETUP)
-        for variant in (("service", "commercial") if key == "hos_school" else (None,))
-    ],
+    "profile_key",
+    sorted(_preview().PROFILE_SETUP),
 )
-def test_profile_builds_with_populated_data(profile_key, variant):
-    document = _preview().build_preview(profile_key, variant=variant)
+def test_profile_builds_with_populated_data(profile_key):
+    document = _preview().build_preview(profile_key)
     widgets = [
         *([document["hero"]] if document["hero"] else []),
         *document["kpis"],
@@ -504,7 +497,7 @@ def test_profile_builds_with_populated_data(profile_key, variant):
         *([document["alerts"]] if document["alerts"] else []),
     ]
     broken = [w["id"] for w in widgets if w.get("state") == "error"]
-    assert not broken, f"{profile_key}/{variant}: {broken} errored on populated data"
+    assert not broken, f"{profile_key}: {broken} errored on populated data"
     for widget in widgets:
         if widget["kind"] == "panel":
             assert widget["tableView"] is not None, f"{widget['id']} ships no table view"

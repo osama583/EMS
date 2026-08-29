@@ -789,3 +789,32 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Cancellation deadline note in the Workflow Actions card. Matches .prv-no-action's muted
+   information tone rather than introducing a new panel style. */
+.prv-cancellation-note {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-control);
+  background: var(--apu-surface-muted);
+  color: var(--apu-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.prv-cancellation-note .material-symbols-rounded {
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+/* Past the deadline the note is a statement of fact, not a countdown. */
+.prv-cancellation-note--closed {
+  border-color: #f0d59a;
+  background: #fff8e9;
+  color: #8a5b00;
+}

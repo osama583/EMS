@@ -14,7 +14,6 @@ another's panel.
     fmb               the F&B fan-out dashboard - not yet unified, see
                       department.py's module note
     cafeteria         the shift dashboard
-    school            one profile, two shapes, chosen from the school's own data
     cfo               the institutional finance dashboard, R7 aggregates throughout
 """
 from __future__ import annotations
@@ -24,7 +23,6 @@ from . import (  # noqa: F401  (imported for the side effect of registering)
     cfo,
     department,
     fmb,
-    school,
 )
 from .base import WIDGET_REGISTRY, build
 

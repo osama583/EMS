@@ -183,6 +183,16 @@
             <p>This application is read-only.</p>
           </div>
         }
+
+        <!-- The applicant's own cancellation deadline, computed from the configured
+             CANCELLATION_DEADLINE_DAYS and the first scheduled day. Sits under the actions it
+             describes; reviewers never see it. -->
+        @if (cancellationNotice(); as notice) {
+          <p class="prv-cancellation-note" [class.prv-cancellation-note--closed]="cancellationWindow()?.passed">
+            <span class="material-symbols-rounded" aria-hidden="true">event_busy</span>
+            {{ notice }}
+          </p>
+        }
       </div>
 
       <!-- Reviewer Comments / Conversations card. Below the dock breakpoint this is collapsed to
