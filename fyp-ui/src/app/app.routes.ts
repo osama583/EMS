@@ -294,6 +294,17 @@ export const routes: Routes = [
         },
       },
       {
+        // Top-level (not under /app/events) to match the specified /app/event-calendar path.
+        // The university-wide master calendar; access is governed by the nav page-visibility
+        // grants on the 'event-calendar' page_code, same as every other internal page.
+        path: 'event-calendar',
+        loadComponent: () =>
+          import('./features/internal/pages/event-calendar/event-calendar').then(
+            (module) => module.MasterEventCalendarComponent,
+          ),
+        title: 'Event Calendar | APU Events',
+      },
+      {
         path: 'events',
         children: [
           {

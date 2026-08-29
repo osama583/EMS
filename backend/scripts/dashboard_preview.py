@@ -158,22 +158,9 @@ class SyntheticCursor:
 
 SEEDED_CONFIG = DashboardConfig(
     [
-        {"code": "SLA_DECISION_HOURS", "number": 48},
-        {"code": "SLA_ASSIGNMENT_HOURS", "number": 24},
-        {"code": "SLA_FULFILMENT_LEAD_DAYS", "number": 3},
-        {"code": "SLA_ORDER_ACCEPT_HOURS", "number": 12},
-        {"code": "SLA_ORDER_CLAIM_HOURS", "number": 4},
-        {"code": "STAFF_SHIFT_HOURS", "number": 8},
-        {"code": "CAPACITY_WARN_RATIO", "number": 0.85},
-        {"code": "AT_RISK_WINDOW_DAYS", "number": 7},
-        {"code": "STALL_MULTIPLIER", "number": 2},
         {"code": "FORECAST_HORIZON_DAYS", "number": 60},
         {"code": "DASHBOARD_TREND_WEEKS", "number": 12},
-        {"code": "ANOMALY_SIGMA", "number": 2},
         {"code": "MIN_BUCKET_SIZE", "number": 5},
-        {"code": "SEND_BACK_WARN_RATE", "number": 15},
-        {"code": "VENUE_TEARDOWN_MINUTES", "number": 60},
-        {"code": "START_POINT_MAX_TOURS", "number": 2},
         {"code": "HIGH_PAX_THRESHOLD", "number": 50},
         {"code": "CANCELLATION_DEADLINE_DAYS", "number": 3},
     ]

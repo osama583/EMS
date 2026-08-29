@@ -2,6 +2,7 @@ import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http'
 import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, map, of, shareReplay } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { MasterCalendarResponse } from './master-calendar.models';
 import { EventRegistration, EventSearchParams, EventSearchResponse, PendingEventRegistration, PendingEventRegistrationPage, PublishedEvent, RegistrationResult } from './published-event.models';
 import { EventRegistrationApi, RegisteredEventsResponse, RegistrationHistoryPage, RegistrationHistoryQuery, SavedEventsResponse } from './event-engagement.models';
 
@@ -78,6 +79,23 @@ export class PublishedEventService implements EventRegistrationApi {
   // month/week rather than loading every published event up front.
   getEventsForRange(start: string, end: string): Observable<readonly PublishedEvent[]> {
     return this.http.get<readonly PublishedEvent[]>(`${this.baseUrl}/calendar`, { params: { start, end } });
+  }
+
+  // The MASTER calendar's feed (/app/event-calendar) — a different population and a different
+  // rule set from getEventsForRange() above, which serves the public landing calendar. This one
+  // includes events still at department_review and returns visibility-redacted rows plus a
+  // per-date private-event count. See events.py's master_calendar().
+  getMasterCalendar(start: string, end: string): Observable<MasterCalendarResponse> {
+    return this.http.get<MasterCalendarResponse>(`${this.baseUrl}/master-calendar`, { params: { start, end } });
+  }
+
+  // Per-date counts of everything on the master calendar, for the proposal form's schedule
+  // conflict warning. Counts only — no event data — so it can honestly report how busy a date is
+  // regardless of what the asking user is allowed to see. Returns 0 for a date with no events.
+  getEventDateCounts(dates: readonly string[]): Observable<Readonly<Record<string, number>>> {
+    let params = new HttpParams();
+    for (const date of dates) params = params.append('dates', date);
+    return this.http.get<Record<string, number>>(`${this.baseUrl}/date-counts`, { params });
   }
 
   getEventDetails(id: string): Observable<PublishedEvent | undefined> { return this.http.get<PublishedEvent>(`${this.baseUrl}/${encodeURIComponent(id)}`); }
@@ -168,11 +186,12 @@ export class PublishedEventService implements EventRegistrationApi {
     );
   }
 
+  // Ended means every schedule row is in the past, not just the first - a multi-day event is
+  // still upcoming as long as its last day hasn't happened yet. Mirrors the backend's _NOT_ENDED.
   isEventEnded(item: PublishedEvent): boolean {
-    const schedule = item.schedule[0];
-    if (!schedule) return false;
-    const end = new Date(`${schedule.date}T${schedule.end || '23:59'}:00`);
-    return end.getTime() < Date.now();
+    if (item.schedule.length === 0) return false;
+    const now = Date.now();
+    return item.schedule.every((row) => new Date(`${row.date}T${row.end || '23:59'}:00`).getTime() < now);
   }
 
   // page/pageSize are real server query params (events.py's my_registrations()) - the server

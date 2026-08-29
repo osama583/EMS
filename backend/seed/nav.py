@@ -116,6 +116,13 @@ def nav_catalogue() -> list[dict]:
          grants_for(ALL_INTERNAL_ROLES))
     page("my-events", "My Events", "favorite", "/app/events/my-events", "events", 1,
          grants_for(ALL_UNIT_ROLES))
+    # The university-wide master calendar. Route is top-level (/app/event-calendar) even though
+    # the nav entry sits under Events - route_path and the nav tree are independent.
+    # Granted to every internal role plus Cafeteria Managers: the calendar is a planning surface,
+    # and per-event visibility is enforced server-side (events.py's master_calendar), so a broad
+    # page grant never means broad access to event DETAIL.
+    page("event-calendar", "Event Calendar", "calendar_month", "/app/event-calendar", "events", 3,
+         grants_for(ALL_INTERNAL_ROLES) + [cafeteria_manager_grant()])
 
     # --- Forms ------------------------------------------------------------
     folder("forms", "Forms", "note_add", 6, grants_for(ALL_UNIT_ROLES))

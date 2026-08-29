@@ -381,6 +381,18 @@ def scenario_club_only_event(cur) -> int:
         "Members-Only Photowalk Briefing", [5],
     )
     cur.execute("UPDATE request SET event_visibility = 'Club Only' WHERE request_id = %s", (request_id,))
+    # "Club Only" is not just a label - it names the clubs whose members may see the
+    # event (request_clubs, migration 029), and the read path enforces it. Without
+    # this row the event would be visible to nobody at all, which is not what this
+    # scenario is demonstrating. Addressed to the same club the applicant presides
+    # over, matching what the proposal form would submit.
+    cur.execute(
+        """INSERT INTO request_clubs (request_id, club_id, club_name)
+           SELECT %s, c.club_id, c.club_name FROM clubs c
+            WHERE c.club_name = %s AND c.active
+            ON CONFLICT DO NOTHING""",
+        (request_id, "APU Photography Club"),
+    )
     return request_id
 
 

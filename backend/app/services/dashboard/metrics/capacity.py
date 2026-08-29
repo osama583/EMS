@@ -538,35 +538,6 @@ def service_hour_demand(cur, scope: Scope, spec: DepartmentSpec, horizon: int | 
     ]
 
 
-def staff_coverage(cur, scope: Scope, spec: DepartmentSpec, *, days: int = 14) -> dict[str, Any]:
-    """M35 - peak forward day's hour demand as a fraction of roster capacity.
-
-    Above 1.0 the day cannot be delivered by this roster no matter how well it
-    is scheduled. It is the only number that distinguishes "busy" from
-    "impossible", and it is the number that justifies a hire.
-
-    The denominator assumes a uniform shift length (`STAFF_SHIFT_HOURS`) because
-    the schema has no roster or availability model - gap G2. The assumption is
-    returned with the figure so the widget can state it inline rather than in a
-    footnote.
-    """
-    staff = active_staff_count(cur, scope)
-    shift = scope.config.shift_hours(scope.unit_code)
-    capacity = staff * shift
-    demand = service_hour_demand(cur, scope, spec, horizon=days)
-    peak = max(demand, key=lambda d: d["hours"], default=None)
-    return {
-        "ratio": ratio(peak["hours"], capacity) if peak and capacity else None,
-        "peakDate": peak["date"] if peak else None,
-        "peakHours": peak["hours"] if peak else None,
-        "staff": staff,
-        "shiftHours": shift,
-        "capacityHours": capacity,
-        "series": [{"x": d["date"], "y": ratio(d["hours"], capacity)} for d in demand],
-        "assumption": f"Assumes a uniform {shift:g}h shift for {staff} active staff",
-    }
-
-
 def peak_day_concentration(cur, scope: Scope, spec: DepartmentSpec) -> float | None:
     """M36 - share of the period's demand falling on its three busiest days.
 

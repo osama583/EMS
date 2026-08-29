@@ -1,6 +1,8 @@
 """Published events: discovery, registration, saved events, reminders.
 
-    GET  /events                       every published event, unfiltered (public)
+    GET  /events                       every published, not-yet-ended event, unfiltered (public)
+    GET  /events/happening-soon        published events in the next 10 days, capped at 5 (public)
+    GET  /events/calendar              published events in [start, end], ended included (public)
     GET  /events/search                published events, filtered/paginated (public, see search_events)
     GET  /events/schools               distinct schools/departments among published events (public)
     GET  /events/{id}                  one published event
@@ -46,32 +48,93 @@ bp = Blueprint("events", __name__, url_prefix="/events")
 # One definition of "published", used by every query below so the list and the
 # detail view can never disagree about what is visible.
 #
-# 'Public' and 'Club Only' are visible to anyone (guests included) - Club Only additionally
-# requires real club membership, enforced client-side today (see explore-events.ts's
-# canSeeClubOnlyFilter) since there is no server-side membership check on read yet.
+# 'Public' is visible to anyone, guests included.
 # 'Internal' is visible to any authenticated internal user, guests excluded - it exists for
 # events that should reach the whole APU community but not the public web.
+# 'Club Only' is visible ONLY to members of the clubs the event names (request_clubs) -
+# see _CLUB_MEMBER_VISIBLE below. This is enforced HERE, on the server. It previously was
+# not: the tier sat in both tuples below and the only gate was a client-side filter asking
+# "is this a student or lecturer?", so every Club Only event reached the whole university
+# and every guest.
 # 'Private' is never returned here at all - it has no discovery surface.
-_GUEST_VISIBLE = "('Public', 'Club Only')"
-_INTERNAL_VISIBLE = "('Public', 'Club Only', 'Internal')"
+_GUEST_VISIBLE = "('Public')"
+_INTERNAL_VISIBLE = "('Public', 'Internal')"
+
+# 'Club Only' is deliberately absent from BOTH tuples above. It is no longer a tier
+# anyone can read by virtue of being signed in - it is addressed to specific clubs
+# (request_clubs, migration 029) and only their members may see it. That check is
+# this predicate, spliced in alongside the tier list rather than into it:
+#
+# Bound by NAME (%(user_id)s), not position: the /me endpoints already pass
+# {"user_id": ...} dicts into queries built from this same clause, so a named
+# parameter drops straight into them. Call sites that build their own filters
+# merge _viewer_params() into their dict - see there.
+#
+# Membership is read LIVE from club_members (the club_name in request_clubs is a
+# display snapshot only), so joining a club grants access to its already-published
+# events and leaving revokes it, with no backfill needed.
+_CLUB_MEMBER_VISIBLE = """(
+        r.event_visibility = 'Club Only'
+        AND EXISTS (
+            SELECT 1
+              FROM request_clubs rc
+              JOIN club_members cm ON cm.club_id = rc.club_id
+             WHERE rc.request_id = r.request_id
+               AND cm.user_id = %(user_id)s
+        )
+    )"""
+
+
+def _viewer_params(include_internal: bool, principal) -> dict:
+    """The parameter(s) a query built with _event_select/_published_clause needs.
+
+    _CLUB_MEMBER_VISIBLE references %(user_id)s, but only when include_internal is
+    true - a guest query never contains the placeholder, and psycopg would reject an
+    unused key in some paramstyles, so this returns {} in that case. Call sites merge
+    it into their own parameter dict.
+    """
+    if not include_internal:
+        return {}
+    return {"user_id": principal.user_id}
 
 
 def _published_clause(include_internal: bool, owner_clause: str | None = None) -> str:
     visible = _INTERNAL_VISIBLE if include_internal else _GUEST_VISIBLE
-    status_and_visibility = f"r.status = 'completed_approved' AND r.event_visibility IN {visible}"
+    # Club Only is only ever reachable by an authenticated caller, and include_internal
+    # is precisely "authenticated and not external" - the same population that can hold
+    # a club membership (see isEligibleForClub: students and lecturers). A guest query
+    # therefore never carries the membership branch at all, and never binds :user_id.
+    tiers = f"r.event_visibility IN {visible}"
+    if include_internal:
+        tiers = f"({tiers} OR {_CLUB_MEMBER_VISIBLE})"
+    status_and_visibility = f"r.status = 'completed_approved' AND {tiers}"
     if not owner_clause:
         return status_and_visibility
-    # my_organized_events() is the one caller that passes owner_clause: the event's own
-    # creator/co-owner must see it on their organiser dashboard even when event_visibility is
-    # 'Private' (which has no discovery surface for anyone else - see the module comment above).
-    # Still requires completed_approved, same as every other viewer - an owner doesn't get to see
-    # their own event before/without it actually being published.
-    return f"r.status = 'completed_approved' AND (r.event_visibility IN {visible} OR ({owner_clause}))"
+    # my_organized_events() is the one caller that passes owner_clause: this is the
+    # caller's own organiser dashboard, so ownership is REQUIRED, not merely one way in
+    # among others - otherwise every other public/club/internal event in the system
+    # would show up on it too. Ownership also bypasses the visibility check (rather
+    # than being AND'ed with it) so a 'Private' event - which has no discovery surface
+    # for anyone else, see the module comment above - still reaches its own
+    # creator/co-owner. Still requires completed_approved, same as every other viewer -
+    # an owner doesn't get to see their own event before/without it actually being published.
+    return f"r.status = 'completed_approved' AND ({owner_clause})"
 
 
 # Column list matches the frontend's PublishedEvent model field for field, so
 # no client-side remapping is needed. Registration counts are computed here
 # rather than shipping the registration rows for the browser to count.
+# An event is "upcoming" while any of its schedule rows hasn't ended yet - once every row's
+# date is in the past, discovery hides it. Mirrors the "ended" convention used by
+# my_organized_events()'s ?status=upcoming|ended filter, just applied unconditionally here since
+# public discovery has no reason to ever surface an event nobody can still attend.
+_NOT_ENDED = """NOT EXISTS (
+        SELECT 1 FROM request r2
+         WHERE r2.request_id = r.request_id
+           AND (SELECT max(s."date") FROM event_schedule s WHERE s.request_id = r2.request_id) < current_date
+    )"""
+
+
 def _event_select(include_internal: bool, owner_clause: str | None = None) -> str:
     return f"""
     SELECT r.request_id::text AS id,
@@ -153,8 +216,11 @@ def _decorate(cur, event: dict) -> dict:
     return event
 
 
-def _load_published(cur, event_id: int, include_internal: bool = False) -> dict:
-    row = fetch_one(cur, _event_select(include_internal) + " AND r.request_id = %s", (event_id,))
+def _load_published(cur, event_id: int, include_internal: bool = False, principal=None) -> dict:
+    # principal is required whenever include_internal is true: the Club Only branch
+    # of the visibility clause binds the viewer's id (see _viewer_params).
+    params = {**_viewer_params(include_internal, principal), "event_id": event_id}
+    row = fetch_one(cur, _event_select(include_internal) + " AND r.request_id = %(event_id)s", params)
     if row is None:
         raise NotFound("Event not found.")
     return row
@@ -169,48 +235,54 @@ _TIME_PERIODS = {
 }
 
 
-def _list_events_filters(args) -> tuple[str, list]:
+def _list_events_filters(args) -> tuple[str, dict]:
     """Builds the WHERE-clause fragments + params for every Explore Events filter,
     mirroring explore-events.ts's getMatchingEvents()/matches()/matchesDate() exactly
-    so query params are a drop-in replacement for the old client-side filtering."""
+    so query params are a drop-in replacement for the old client-side filtering.
+
+    Named parameters (%(f0)s, %(f1)s, ...) rather than positional: the visibility
+    clause these filters are appended to now binds %(user_id)s by name, and psycopg
+    cannot mix the two styles in one query. `_p()` mints a fresh key per value so
+    the numbering stays correct however many filters are active.
+    """
     clauses: list[str] = []
-    params: list = []
+    params: dict = {}
+
+    def _p(value) -> str:
+        key = f"f{len(params)}"
+        params[key] = value
+        return f"%({key})s"
 
     search = (args.get("q") or "").strip()
     if search:
+        like = _p(f"%{search}%")
         clauses.append(
-            """(r.event_title ILIKE %s OR r.applicant_department_or_school ILIKE %s
-                 OR r.event_format_snapshot ILIKE %s
+            f"""(r.event_title ILIKE {like} OR r.applicant_department_or_school ILIKE {like}
+                 OR r.event_format_snapshot ILIKE {like}
                  OR EXISTS (SELECT 1 FROM request_categories rc
-                             WHERE rc.request_id = r.request_id AND rc.category_name ILIKE %s)
+                             WHERE rc.request_id = r.request_id AND rc.category_name ILIKE {like})
                  OR EXISTS (SELECT 1 FROM event_schedule es
-                             WHERE es.request_id = r.request_id AND es.location ILIKE %s))"""
+                             WHERE es.request_id = r.request_id AND es.location ILIKE {like}))"""
         )
-        like = f"%{search}%"
-        params += [like, like, like, like, like]
 
     visibility = args.getlist("visibility")
     if visibility:
-        clauses.append("r.event_visibility = ANY(%s)")
-        params.append(visibility)
+        clauses.append(f"r.event_visibility = ANY({_p(visibility)})")
 
     category = args.getlist("category")
     if category:
         clauses.append(
             "EXISTS (SELECT 1 FROM request_categories rc "
-            "WHERE rc.request_id = r.request_id AND rc.category_name = ANY(%s))"
+            f"WHERE rc.request_id = r.request_id AND rc.category_name = ANY({_p(category)}))"
         )
-        params.append(category)
 
     school = args.getlist("school")
     if school:
-        clauses.append("r.applicant_department_or_school = ANY(%s)")
-        params.append(school)
+        clauses.append(f"r.applicant_department_or_school = ANY({_p(school)})")
 
     event_format = args.getlist("format")
     if event_format:
-        clauses.append("r.event_format_snapshot = ANY(%s)")
-        params.append(event_format)
+        clauses.append(f"r.event_format_snapshot = ANY({_p(event_format)})")
 
     registration = args.getlist("registration")
     if registration:
@@ -271,14 +343,16 @@ def _list_events_filters(args) -> tuple[str, list]:
             elif option == "Custom Date Range":
                 range_clause = f"{first_date} IS NOT NULL"
                 if date_from:
-                    range_clause += f" AND {first_date} >= %s::date"
-                    params.append(date_from)
+                    range_clause += f" AND {first_date} >= {_p(date_from)}::date"
                 if date_to:
-                    range_clause += f" AND {first_date} <= %s::date"
-                    params.append(date_to)
+                    range_clause += f" AND {first_date} <= {_p(date_to)}::date"
                 date_clauses.append(f"({range_clause})")
         if date_clauses:
             clauses.append("(" + " OR ".join(date_clauses) + ")")
+
+    # Explore Events is discovery, not a records page - an event nobody can still attend has no
+    # business showing up here, so this is unconditional rather than another opt-in filter.
+    clauses.append(_NOT_ENDED)
 
     return (" AND " + " AND ".join(clauses) if clauses else ""), params
 
@@ -288,12 +362,77 @@ def _list_events_filters(args) -> tuple[str, list]:
 def list_events():
     """Public. No token required - this is the discovery page.
 
-    Unfiltered, unpaginated - used by callers that want every published event
-    (Happening Soon, the events calendar). Explore Events' filtered/paginated
-    view is GET /events/search instead.
+    Unfiltered, unpaginated - every published, not-yet-ended event. Happening Soon and the
+    events calendar have their own narrower/scoped endpoints below instead (GET
+    /events/happening-soon, GET /events/calendar). Explore Events' filtered/paginated view is
+    GET /events/search instead.
     """
     with transaction() as cur:
-        rows = fetch_all(cur, _EVENT_SELECT + ' ORDER BY "firstDate" NULLS LAST, r.request_id DESC')
+        rows = fetch_all(
+            cur, _EVENT_SELECT + f' AND {_NOT_ENDED} ORDER BY "firstDate" NULLS LAST, r.request_id DESC'
+        )
+        return jsonify([_decorate(cur, row) for row in rows])
+
+
+@bp.get("/happening-soon")
+@limiter.limit("120 per minute")
+def happening_soon():
+    """Public. No token required - the landing page's Happening Soon carousel.
+
+    Published events with a first schedule date in the next 10 days, capped at 5. Falls back to
+    the soonest not-yet-ended events overall when that window is empty, so the carousel is never
+    blank just because nothing happens to land in the next 10 days.
+    """
+    with transaction() as cur:
+        rows = fetch_all(
+            cur,
+            _EVENT_SELECT + f"""
+               AND {_NOT_ENDED}
+               AND (SELECT min(s."date") FROM event_schedule s WHERE s.request_id = r.request_id)
+                   BETWEEN current_date AND current_date + 10
+            ORDER BY "firstDate" NULLS LAST, r.request_id DESC
+            LIMIT 5""",
+        )
+        if not rows:
+            rows = fetch_all(
+                cur,
+                _EVENT_SELECT + f' AND {_NOT_ENDED} ORDER BY "firstDate" NULLS LAST, r.request_id DESC LIMIT 5',
+            )
+        return jsonify([_decorate(cur, row) for row in rows])
+
+
+@bp.get("/calendar")
+@limiter.limit("120 per minute")
+def calendar_events():
+    """Public. No token required - the landing page's events calendar.
+
+    Published events with at least one schedule date inside [start, end] (both required query
+    params, 'YYYY-MM-DD'). Unlike every other discovery endpoint this deliberately does NOT
+    exclude ended events - the calendar shows a full month/week including days already past, and
+    the caller must still be able to see what happened on them. Registration itself is what stays
+    blocked for an ended event (see register()), not visibility here.
+    """
+    start = (request.args.get("start") or "").strip()
+    end = (request.args.get("end") or "").strip()
+    if not start or not end:
+        raise BadRequest("start and end are required.")
+
+    authenticate_optional()
+    principal = getattr(g, "principal", None)
+    include_internal = principal is not None and not principal.is_external
+
+    with transaction() as cur:
+        rows = fetch_all(
+            cur,
+            _event_select(include_internal) + """
+               AND EXISTS (
+                     SELECT 1 FROM event_schedule s
+                      WHERE s.request_id = r.request_id
+                        AND s."date" BETWEEN %(start)s::date AND %(end)s::date
+                   )
+            ORDER BY "firstDate" NULLS LAST, r.request_id DESC""",
+            {**_viewer_params(include_internal, principal), "start": start, "end": end},
+        )
         return jsonify([_decorate(cur, row) for row in rows])
 
 
@@ -326,11 +465,11 @@ def search_events():
         where += (
             """ AND NOT EXISTS (
                     SELECT 1 FROM event_registration er
-                     WHERE er.request_id = r.request_id AND er.user_id = %s
+                     WHERE er.request_id = r.request_id AND er.user_id = %(excl_user_id)s
                        AND er.status IN ('registered', 'pending_approval')
                 )"""
         )
-        params.append(principal.user_id)
+        params["excl_user_id"] = principal.user_id
 
     try:
         page = max(1, int(request.args.get("page", 1)))
@@ -345,6 +484,9 @@ def search_events():
     count_only = str(request.args.get("countOnly", "")).lower() in ("1", "true", "yes")
 
     event_select = _event_select(include_internal)
+    # The visibility clause's parameter precedes every filter parameter, matching
+    # its position at the head of the WHERE clause.
+    params = {**_viewer_params(include_internal, principal), **params}
     with transaction() as cur:
         total = fetch_one(cur, f"SELECT count(*) AS n FROM ({event_select}{where}) AS matched", params)["n"]
         if count_only:
@@ -352,8 +494,9 @@ def search_events():
         else:
             rows = fetch_all(
                 cur,
-                f'{event_select}{where} ORDER BY "firstDate" NULLS LAST, r.request_id DESC LIMIT %s OFFSET %s',
-                [*params, page_size, offset],
+                f'{event_select}{where} ORDER BY "firstDate" NULLS LAST, r.request_id DESC '
+                f'LIMIT %(limit)s OFFSET %(offset)s',
+                {**params, "limit": page_size, "offset": offset},
             )
             items = [_decorate(cur, row) for row in rows]
 
@@ -380,7 +523,8 @@ def list_event_schools():
              WHERE {_published_clause(include_internal)}
                AND r.applicant_department_or_school IS NOT NULL
                AND r.applicant_department_or_school <> ''
-          ORDER BY 1"""
+          ORDER BY 1""",
+        _viewer_params(include_internal, principal),
     )
     return jsonify([row["school"] for row in rows])
 
@@ -460,6 +604,14 @@ def register(event_id: int):
     with transaction() as cur:
         include_internal = principal is not None and not principal.is_external
         event = _load_published(cur, event_id, include_internal)
+
+        ended = fetch_one(
+            cur,
+            'SELECT max(s."date") < current_date AS ended FROM event_schedule s WHERE s.request_id = %s',
+            (event_id,),
+        )
+        if ended and ended["ended"]:
+            raise WorkflowError("This event has already ended.", code="event_ended")
 
         if principal is None:
             user_id = _guest_user_id(cur, full_name, email)
@@ -992,13 +1144,16 @@ def my_organized_events():
     co-owner) so anyone who can see the attendee list also sees the event
     here.
 
-    Ownership is OR'd into event_visibility (via _event_select's owner_clause),
-    not AND'ed on afterwards: a 'Private' event has no discovery surface for
-    anyone else (see _GUEST_VISIBLE/_INTERNAL_VISIBLE above), but its own
-    creator/co-owner must still see it on their own organiser dashboard. AND'ing
-    the ownership check onto the visibility filter would still require
-    event_visibility IN (...) to hold too, which a Private event never
-    satisfies - that was the bug.
+    Ownership (via _event_select's owner_clause) REPLACES the visibility filter
+    here rather than being OR'd alongside it: this is the caller's own organiser
+    dashboard, so every row must be something they created or co-own, full stop.
+    OR'ing ownership in next to "event_visibility IN (...)" (as an earlier version
+    of this endpoint did) let every Public/Club Only/Internal event in the system
+    through regardless of who owned it, since that visibility check alone is
+    already true for most published events. Ownership still bypasses the
+    visibility check itself (rather than being AND'ed with it) so a 'Private'
+    event - which has no discovery surface for anyone else (see
+    _GUEST_VISIBLE/_INTERNAL_VISIBLE above) - still reaches its own creator/co-owner.
 
     ?q searches the event title. ?status=upcoming|ended splits on the event's
     LAST scheduled date vs today, the same "ended" rule my_registrations()'s
@@ -1214,3 +1369,289 @@ def set_reminders():
     return jsonify(
         {"registrationClosingReminder": closing, "eventStartingReminder": starting}
     )
+
+
+# ============================================================================
+# Master event calendar
+#
+# The university-wide calendar (/app/event-calendar). Deliberately SEPARATE from
+# the discovery endpoints above, which only ever expose completed_approved rows.
+# Two things differ here and neither could be folded into _published_clause
+# without changing what the public landing page shows:
+#
+#   1. WHEN an event appears. Not at submission - an event lands on the master
+#      calendar once it has cleared the last single-actor approval gate and
+#      reached department_review. Which gate that is depends on the pax routing
+#      the workflow already implements (services/workflow/stages.py):
+#        * normal flow   - HOS/HOD approved, then straight to department_review
+#        * high-pax flow - fmb_review then CFO approved, then department_review
+#      Both converge on department_review, so "has reached department_review" IS
+#      the rule for both, with no pax comparison needed here. Reading the status
+#      rather than re-deriving the threshold means this can never drift out of
+#      sync with the state machine that actually moves proposals.
+#      completed_approved is included too: a fully approved event obviously
+#      still belongs on the calendar.
+#
+#   2. Cancellation. cancel() sets status='cancelled', which is neither of the
+#      two statuses above, so a cancelled proposal drops off the calendar the
+#      moment it is cancelled with no extra bookkeeping. Same for a rejection.
+_MASTER_CALENDAR_STATUSES = ("department_review", "completed_approved")
+
+# Roles that see everything regardless of the event's visibility tier. The CFO
+# and the F&B head are the two higher-authority actors in the workflow (they are
+# the approval gates for high-pax events), and both need to see the true state
+# of the calendar to plan against it - an event they cannot see is one they
+# cannot resource. This is the ONLY bypass of the tiering below.
+_FULL_VISIBILITY_ROLES = ("cfo",)
+
+# How the four tiers resolve for an ordinary (non-CFO/F&B) viewer of the master
+# calendar. Note this is NOT the same rule as public discovery:
+#   Public / Internal - full details to anyone who can open the page at all. The
+#     page itself is gated by nav page-visibility, so "can see the page" already
+#     means "is an authenticated internal user".
+#   Club Only - full details to members of the named club(s) only (live
+#     membership via club_members, exactly as _CLUB_MEMBER_VISIBLE does);
+#     everyone else gets a redacted placeholder row, not a hidden one, so the
+#     date still reads as occupied.
+#   Private - never returned as a row at all. Only a per-date count is sent (see
+#     _private_counts), so no title/organiser/venue can leak client-side.
+_MASTER_OPEN_TIERS = ("Public", "Internal")
+
+
+def _sees_all_events(principal) -> bool:
+    """CFO and the F&B head bypass visibility tiering entirely (requirement 4)."""
+    if principal is None:
+        return False
+    if principal.has_role(*_FULL_VISIBILITY_ROLES):
+        return True
+    # F&B is identified the same way the workflow identifies it - heading the
+    # food_beverage_services unit - rather than by a bare role name, so it stays
+    # consistent with stage_after_hos_hod()/authorize_stage_action().
+    return principal.heads_unit(wf.constants.FMB_UNIT_CODE)
+
+
+def _master_calendar_rows(cur, start: str, end: str, principal) -> list[dict]:
+    """Every master-calendar event overlapping [start, end], before redaction."""
+    sees_all = _sees_all_events(principal)
+
+    # is_club_member is computed per row so the redaction step below can tell a
+    # Club Only event the viewer belongs to from one they do not, without a
+    # second round trip. A viewer with full visibility short-circuits to true.
+    membership_expr = (
+        "true"
+        if sees_all
+        else """EXISTS (
+               SELECT 1 FROM request_clubs rc
+                 JOIN club_members cm ON cm.club_id = rc.club_id
+                WHERE rc.request_id = r.request_id AND cm.user_id = %(user_id)s
+           )"""
+    )
+    sql = (
+        """
+    SELECT r.request_id::text AS id,
+           r.event_title AS "eventTitle",
+           r.short_introduction AS "shortIntroduction",
+           r.event_visibility AS "eventVisibility",
+           r.event_format_snapshot AS "eventFormat",
+           r.applicant_department_or_school AS "schoolDepartment",
+           r.applicant_name AS organiser,
+           r.status AS "proposalStatus",
+           r.total_pax AS "totalExpectedPax",
+           r.max_pax AS "maxPax",
+           r.registration_approval AS "registrationMode",
+           r.cost_amount AS cost,
+           r.event_image AS "eventImageUrl",
+           (SELECT count(*) FROM event_registration er
+             WHERE er.request_id = r.request_id AND er.status = 'registered')
+             AS "confirmedRegistrationCount",
+           (SELECT min(s."date") FROM event_schedule s WHERE s.request_id = r.request_id)
+             AS "firstDate",
+           """
+        + membership_expr
+        + """ AS is_club_member
+      FROM request r
+     WHERE r.status = ANY(%(statuses)s)
+       AND EXISTS (
+             SELECT 1 FROM event_schedule s
+              WHERE s.request_id = r.request_id
+                AND s."date" BETWEEN %(start)s::date AND %(end)s::date
+           )
+     ORDER BY "firstDate" NULLS LAST, r.request_id
+    """
+    )
+    params = {"statuses": list(_MASTER_CALENDAR_STATUSES), "start": start, "end": end}
+    if not sees_all:
+        params["user_id"] = principal.user_id
+    return fetch_all(cur, sql, params)
+
+
+def _master_schedule_rows(cur, request_id: int) -> list[dict]:
+    return [
+        {
+            "date": str(entry["date"]),
+            "start": str(entry["start_time"])[:5],
+            "end": str(entry["end_time"])[:5],
+            "location": entry["location"],
+        }
+        for entry in fetch_all(
+            cur,
+            'SELECT "date", start_time, end_time, location FROM event_schedule '
+            "WHERE request_id = %s ORDER BY event_schedule_id",
+            (request_id,),
+        )
+    ]
+
+
+def _decorate_master(cur, row: dict) -> dict:
+    """The visible-event shape: schedule + categories + club audience."""
+    request_id = int(row["id"])
+    row["schedule"] = _master_schedule_rows(cur, request_id)
+    row["categories"] = [
+        entry["category_name"]
+        for entry in fetch_all(
+            cur, "SELECT category_name FROM request_categories WHERE request_id = %s", (request_id,)
+        )
+    ]
+    # The frozen display snapshot (migration 029) - shown as the event's audience
+    # on a Club Only event the viewer is entitled to see.
+    row["clubs"] = [
+        entry["club_name"]
+        for entry in fetch_all(
+            cur, "SELECT club_name FROM request_clubs WHERE request_id = %s", (request_id,)
+        )
+    ]
+    url = row.pop("eventImageUrl", None)
+    row["eventImage"] = (
+        {"url": url, "fileName": "", "mimeType": "", "sizeBytes": 0, "status": "uploaded"}
+        if url
+        else None
+    )
+    cost = row.get("cost")
+    row["cost"] = float(cost) if cost is not None else None
+    row["isFree"] = not row["cost"]
+    row["restricted"] = False
+    return row
+
+
+def _redact_for_viewer(cur, row: dict, sees_all: bool) -> dict | None:
+    """Apply the visibility tier to one row.
+
+    Returns the decorated event, a redacted placeholder, or None when the row
+    must not be represented as a row at all (Private - counted instead).
+    """
+    visibility = row.get("eventVisibility")
+    is_member = bool(row.pop("is_club_member", False))
+
+    if sees_all or visibility in _MASTER_OPEN_TIERS:
+        return _decorate_master(cur, row)
+
+    if visibility == "Club Only":
+        if is_member:
+            return _decorate_master(cur, row)
+        # Non-member: the date is still occupied, but nothing about the event is
+        # disclosed. Schedule times/venue are dropped along with the title - only
+        # the dates survive, which is what makes the day render as busy.
+        return {
+            "id": row["id"],
+            "restricted": True,
+            "restrictedLabel": "Restricted Club Event",
+            "eventVisibility": visibility,
+            "schedule": [
+                {"date": entry["date"], "start": "", "end": "", "location": ""}
+                for entry in _master_schedule_rows(cur, int(row["id"]))
+            ],
+        }
+
+    # 'Private' - no row, ever. Counted by _private_counts instead.
+    return None
+
+
+def _private_counts(cur, start: str, end: str) -> dict[str, int]:
+    """Per-date count of Private events, keyed 'YYYY-MM-DD'.
+
+    Counted DISTINCT per (date, request) so a private event with two sessions on
+    the same day counts once for that day, matching how a viewer would say "3
+    private events are on today". No identifying column is selected at all, so
+    there is nothing here that could leak even by accident.
+    """
+    rows = fetch_all(
+        cur,
+        """SELECT s."date" AS on_date, count(DISTINCT r.request_id) AS total
+             FROM request r
+             JOIN event_schedule s ON s.request_id = r.request_id
+            WHERE r.status = ANY(%(statuses)s)
+              AND r.event_visibility = 'Private'
+              AND s."date" BETWEEN %(start)s::date AND %(end)s::date
+            GROUP BY s."date" """,
+        {"statuses": list(_MASTER_CALENDAR_STATUSES), "start": start, "end": end},
+    )
+    return {str(row["on_date"]): int(row["total"]) for row in rows}
+
+
+@bp.get("/master-calendar")
+@require_auth
+def master_calendar():
+    """The university-wide master event calendar.
+
+    Requires a token: this is an internal page (page-visibility gated), not a
+    public discovery surface. Guests never reach it.
+
+    Returns {"events": [...], "privateCounts": {"YYYY-MM-DD": n}}. A Private
+    event contributes ONLY to privateCounts - it is never present in `events` in
+    any form, so no title, organiser, venue or id is transmitted for it.
+    """
+    start = (request.args.get("start") or "").strip()
+    end = (request.args.get("end") or "").strip()
+    if not start or not end:
+        raise BadRequest("start and end are required.")
+
+    principal = current_principal()
+    sees_all = _sees_all_events(principal)
+
+    with transaction() as cur:
+        rows = _master_calendar_rows(cur, start, end, principal)
+        events = [
+            event
+            for event in (_redact_for_viewer(cur, row, sees_all) for row in rows)
+            if event is not None
+        ]
+        # CFO/F&B see private events as real rows (requirement 4), so surfacing a
+        # count for them as well would double-count the same event on the grid.
+        private_counts = {} if sees_all else _private_counts(cur, start, end)
+        return jsonify({"events": events, "privateCounts": private_counts})
+
+
+@bp.get("/date-counts")
+@require_auth
+def event_date_counts():
+    """Lightweight per-date event counts for the proposal form's conflict warning.
+
+    ?dates=YYYY-MM-DD&dates=... (repeatable) -> {"YYYY-MM-DD": n}. Returns counts
+    ONLY - no event data of any kind - which is what lets it count every event on
+    the master calendar regardless of the caller's visibility tier without
+    disclosing anything. A date the caller asks about that has no events comes
+    back as 0 rather than omitted, so the client needs no fallback.
+
+    Counts the same population the master calendar shows (department_review and
+    completed_approved, cancellations excluded), so the number the organiser is
+    warned about matches what they would actually see on that date.
+    """
+    dates = [value.strip() for value in request.args.getlist("dates") if value.strip()]
+    if not dates:
+        raise BadRequest("dates is required.")
+    if len(dates) > 31:
+        raise BadRequest("At most 31 dates may be counted at once.")
+
+    with transaction() as cur:
+        rows = fetch_all(
+            cur,
+            """SELECT s."date" AS on_date, count(DISTINCT r.request_id) AS total
+                 FROM request r
+                 JOIN event_schedule s ON s.request_id = r.request_id
+                WHERE r.status = ANY(%(statuses)s)
+                  AND s."date" = ANY(%(dates)s::date[])
+                GROUP BY s."date" """,
+            {"statuses": list(_MASTER_CALENDAR_STATUSES), "dates": dates},
+        )
+        counts = {str(row["on_date"]): int(row["total"]) for row in rows}
+        return jsonify({date: counts.get(date, 0) for date in dates})

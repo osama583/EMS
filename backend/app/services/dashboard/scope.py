@@ -105,10 +105,10 @@ def resolve_period(key: str | None, *, today: dt.date | None = None) -> Period:
 class DashboardConfig:
     """Every `config` row, read once per request, with per-unit override support.
 
-    `SLA_DECISION_HOURS__a_v_services` beats `SLA_DECISION_HOURS` for the A/V
-    head and nobody else. A missing code returns the caller's default instead of
-    raising: the dashboard degrades to a documented assumption rather than
-    500ing because migration 018 has not been applied yet.
+    `FORECAST_HORIZON_DAYS__a_v_services` beats `FORECAST_HORIZON_DAYS` for the
+    A/V head and nobody else. A missing code returns the caller's default
+    instead of raising: the dashboard degrades to a documented assumption
+    rather than 500ing because migration 018 has not been applied yet.
     """
 
     def __init__(self, rows: Iterable[dict[str, Any]]):
@@ -131,24 +131,6 @@ class DashboardConfig:
 
     # Named accessors for the codes read from more than one widget, so a typo
     # in a code string is a one-place fix rather than a silent default.
-    def decision_sla_hours(self, unit: str | None) -> float:
-        return self.number("SLA_DECISION_HOURS", 48, unit=unit)
-
-    def assignment_sla_hours(self, unit: str | None) -> float:
-        return self.number("SLA_ASSIGNMENT_HOURS", 24, unit=unit)
-
-    def lead_days(self, unit: str | None) -> float:
-        return self.number("SLA_FULFILMENT_LEAD_DAYS", 3, unit=unit)
-
-    def shift_hours(self, unit: str | None) -> float:
-        return self.number("STAFF_SHIFT_HOURS", 8, unit=unit)
-
-    def capacity_warn(self, unit: str | None) -> float:
-        return self.number("CAPACITY_WARN_RATIO", 0.85, unit=unit)
-
-    def risk_window_days(self, unit: str | None = None) -> int:
-        return self.integer("AT_RISK_WINDOW_DAYS", 7, unit=unit)
-
     def horizon_days(self, unit: str | None = None) -> int:
         return self.integer("FORECAST_HORIZON_DAYS", 60, unit=unit)
 
@@ -157,9 +139,6 @@ class DashboardConfig:
 
     def bucket_floor(self) -> int:
         return self.integer("MIN_BUCKET_SIZE", 5)
-
-    def send_back_warn_rate(self, unit: str | None = None) -> float:
-        return self.number("SEND_BACK_WARN_RATE", 15, unit=unit) / 100.0
 
 
 # --- Scope ----------------------------------------------------------------

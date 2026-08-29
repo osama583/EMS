@@ -447,6 +447,10 @@ class Ctx:
     staff_by_unit: dict[str, list[int]] = field(default_factory=dict)
     externals: list[int] = field(default_factory=list)
     club_presidents: list[tuple[int, str, str]] = field(default_factory=list)  # (user_id, club, school)
+    # club_name -> club_id. Specs carry a club NAME (that is what _choose_applicant
+    # returns), but a "Club Only" proposal has to submit club IDs so request_clubs
+    # can record the audience - this is the bridge between the two.
+    club_ids_by_name: dict[str, int] = field(default_factory=dict)
     # Both replaced from the database in seed_organisation - the clock that
     # matters is Postgres's, not this process's.
     txn_now: datetime = field(default_factory=lambda: datetime(1970, 1, 1))
@@ -632,6 +636,7 @@ def seed_clubs(cur, ctx: Ctx, rng: random.Random) -> None:
             (president[0], club_name, description, admin["user_id"], created_at, None),
         )
         club_id = cur.fetchone()["club_id"]
+        ctx.club_ids_by_name[club_name] = club_id
         for name in category_names:
             if name in categories:
                 cur.execute("INSERT INTO club_category_links (club_id, club_category_id) VALUES (%s, %s) "
@@ -692,6 +697,7 @@ def seed_clubs(cur, ctx: Ctx, rng: random.Random) -> None:
         if row["school"] and row["user_id"] not in dormant \
                 and not any(p[0] == row["user_id"] for p in ctx.club_presidents):
             ctx.club_presidents.append((row["user_id"], row["club_name"], row["school"]))
+        ctx.club_ids_by_name.setdefault(row["club_name"], row["club_id"])
 
 
 def seed_club_requests(cur, ctx: Ctx, rng: random.Random) -> int:
@@ -1083,12 +1089,22 @@ def make_payload(cat: Catalogue, rng: random.Random, ctx: Ctx, spec: Spec) -> di
         "benefits": benefits,
         "applicantDepartment": ctx.unit_label.get(spec.applicant_unit or "", ""),
         "eventVisibility": spec.visibility,
+        # The audience behind "Club Only". _pick_visibility only ever returns that
+        # tier when the applicant actually presides over a club (see there), so this
+        # resolves to exactly that club - the same one-club-per-proposal shape a real
+        # president submitting from the form would produce.
+        "eventClubs": (
+            [str(ctx.club_ids_by_name[spec.club])]
+            if spec.visibility == "Club Only" and spec.club in ctx.club_ids_by_name
+            else []
+        ),
         "registrationMode": spec.registration_mode,
         "eventFormat": rng.choices(["On Campus", "Hybrid", "Off Campus", "Online"], [78, 12, 7, 3])[0]
                        if kind != "offsite" else "Off Campus",
         "eventImage": "/assets/events/" + IMAGE_FOR_KIND.get(kind, "campus-after-dark.jpg"),
         "totalPax": pax,
-        "maxPax": int(pax * rng.uniform(1.0, 1.25)),
+        # Mirrors the proposal form: Max Registered Pax exists for every visibility except Internal.
+        "maxPax": int(pax * rng.uniform(1.0, 1.25)) if spec.visibility != "Internal" else None,
         "publicity": rng.choice([
             "Campus screens, the student portal banner and the organiser's Instagram.",
             "Email to all students, poster run in every block, and a push notification a day before.",

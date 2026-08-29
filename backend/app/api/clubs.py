@@ -472,6 +472,25 @@ def my_status(user_id: int):
     )
 
 
+@bp.get("/mine/presiding")
+@require_auth
+def my_presiding_clubs():
+    """The clubs the caller is President of, as {id, name} - the option list for the
+    proposal form's "Club Only" audience picker.
+
+    my_status() above returns bare ids, which is enough for a permission check but not
+    for a dropdown; rather than have the client fetch every club just to resolve two
+    names, this returns the pair directly. Always scoped to the caller (no user_id
+    argument), so it cannot be used to enumerate someone else's presidencies.
+    """
+    principal = current_principal()
+    rows = query(
+        "SELECT club_id, club_name FROM clubs WHERE user_id = %s AND active ORDER BY club_name",
+        (principal.user_id,),
+    )
+    return jsonify([{"id": str(r["club_id"]), "name": r["club_name"]} for r in rows])
+
+
 @bp.get("/<int:club_id>")
 @require_auth
 def get_club(club_id: int):

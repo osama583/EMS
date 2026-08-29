@@ -143,6 +143,10 @@
 .club-page__menu-panel button:hover,
 .club-page__menu-panel button:focus-visible { background: var(--apu-surface-muted); }
 .club-page__menu-panel button .material-symbols-rounded { font-size: 1.1rem; color: var(--apu-blue-600); }
+.club-page__menu-danger { color: var(--apu-red-600, #c0392b) !important; }
+.club-page__menu-danger .material-symbols-rounded { color: var(--apu-red-600, #c0392b) !important; }
+.club-page__menu-danger:hover,
+.club-page__menu-danger:focus-visible { background: var(--apu-red-50, #fdecea) !important; }
 
 .club-page__meta { display: flex; align-items: center; gap: .3rem; color: var(--apu-text-muted); font-size: .8rem; flex-wrap: wrap; }
 .club-page__meta .material-symbols-rounded { font-size: 1rem; }

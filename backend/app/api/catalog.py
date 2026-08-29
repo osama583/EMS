@@ -35,35 +35,20 @@ CONFIG_FIELDS: dict[str, str] = {
     "paxReviewerThreshold": "HIGH_PAX_THRESHOLD",
     "cancellationDaysLimit": "CANCELLATION_DEADLINE_DAYS",
     "maxEventCategories": "MAX_EVENT_CATEGORIES",
-    # --- Dashboard thresholds (migration 018) -----------------------------
-    # Every SLA target, capacity assumption, risk window and forecast horizon
-    # the dashboards read. They are here rather than in code so an
-    # administrator retunes a department's SLA without a deploy - the same rule
-    # HIGH_PAX_THRESHOLD has always followed. Per-unit overrides use a
-    # `__<unit_code>` suffix on the same code and are not editable from this
-    # form; the resolver falls back to these defaults.
-    "slaDecisionHours": "SLA_DECISION_HOURS",
-    "slaAssignmentHours": "SLA_ASSIGNMENT_HOURS",
-    "slaFulfilmentLeadDays": "SLA_FULFILMENT_LEAD_DAYS",
-    "slaOrderAcceptHours": "SLA_ORDER_ACCEPT_HOURS",
-    "slaOrderClaimHours": "SLA_ORDER_CLAIM_HOURS",
-    "staffShiftHours": "STAFF_SHIFT_HOURS",
-    "capacityWarnRatio": "CAPACITY_WARN_RATIO",
-    "atRiskWindowDays": "AT_RISK_WINDOW_DAYS",
-    "stallMultiplier": "STALL_MULTIPLIER",
+    # --- Dashboard thresholds still read by a live widget (migration 018) --
+    # The rest of the sixteen dashboard-threshold codes this migration seeded
+    # were removed along with the metrics/widgets that existed only to read
+    # them. These three remain because forward-looking capacity/demand panels,
+    # every weekly trend series, and the R8 bucket-suppression rule still read
+    # them. Per-unit overrides use a `__<unit_code>` suffix on the same code
+    # and are not editable from this form; the resolver falls back to these
+    # defaults.
     "forecastHorizonDays": "FORECAST_HORIZON_DAYS",
     "dashboardTrendWeeks": "DASHBOARD_TREND_WEEKS",
-    "anomalySigma": "ANOMALY_SIGMA",
     "minBucketSize": "MIN_BUCKET_SIZE",
-    "sendBackWarnRate": "SEND_BACK_WARN_RATE",
-    "venueTeardownMinutes": "VENUE_TEARDOWN_MINUTES",
-    "startPointMaxTours": "START_POINT_MAX_TOURS",
 }
 
-# CAPACITY_WARN_RATIO is 0.85, not 85. Rounding every value to an integer the
-# way the original three could be would silently turn it into 0 or 1 and move
-# every amber threshold in the system.
-_FRACTIONAL_FIELDS = frozenset({"capacityWarnRatio"})
+_FRACTIONAL_FIELDS: frozenset[str] = frozenset()
 
 
 def _config_payload(rows) -> dict[str, float]:

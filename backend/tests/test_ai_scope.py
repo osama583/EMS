@@ -346,11 +346,13 @@ def test_a_guest_can_count_registrations_but_not_name_them():
 # --- the scope predicates encode the app's own rules ----------------------------------------------
 
 def test_guest_visibility_matches_the_events_endpoint():
-    """Mirrors api/events.py's _GUEST_VISIBLE exactly: Public and Club Only, published only. A
-    guest must never reach Internal or Private."""
+    """Mirrors api/events.py's _GUEST_VISIBLE exactly: Public only, published only. A guest must
+    never reach Internal or Private - nor 'Club Only', which is addressed to specific clubs and
+    requires a membership a guest cannot have (migration 029)."""
     predicate = _guest_scope().predicates_for("request")[0]
     assert "completed_approved" in predicate
-    assert "'Public', 'Club Only'" in predicate
+    assert "'Public'" in predicate
+    assert "Club Only" not in predicate
     assert "Internal" not in predicate
     assert "Private" not in predicate
 
@@ -359,9 +361,20 @@ def test_signed_in_caller_gets_internal_plus_their_own_events():
     """Mirrors _INTERNAL_VISIBLE plus my_organized_events' owner clause: the shared tiers, or their
     OWN event at any visibility - which is the only way a Private event is ever reachable."""
     predicate = _student_scope(user_id=42).predicates_for("request")[0]
-    assert "'Public', 'Club Only', 'Internal'" in predicate
+    assert "'Public', 'Internal'" in predicate
     assert "request.applicant_user_id = 42" in predicate
     assert "co_owners" in predicate, "co-ownership is part of ownership (workflow.is_proposal_owner)"
+
+
+def test_club_only_events_need_membership_not_just_a_login():
+    """'Club Only' is not a tier every signed-in user can read. Being logged in is not enough:
+    the predicate must resolve the asker's membership against the clubs the event actually
+    names, or the assistant answers questions about events the asker cannot see in the UI."""
+    predicate = _student_scope(user_id=42).predicates_for("request")[0]
+    assert "'Club Only'" in predicate, "the tier is reachable - but only via membership"
+    assert "request_clubs" in predicate, "the event's named audience"
+    assert "club_members" in predicate, "the asker's actual membership"
+    assert "cm.user_id = 42" in predicate
 
 
 def test_a_non_admin_can_only_reach_their_own_club_rows():

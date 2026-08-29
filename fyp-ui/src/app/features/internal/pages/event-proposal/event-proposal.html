@@ -221,8 +221,14 @@
               <app-searchable-dropdown controlId="event-categories" label="Event Categories" placeholder="Select up to {{ maxEventCategories() }} categor{{ maxEventCategories() === 1 ? 'y' : 'ies' }}" [required]="true" [isMulti]="true" [maxSelections]="maxEventCategories()" [options]="categoryOptions()" [value]="eventCategories()" [error]="error('eventCategories')" (valueChange)="setEventCategories($event)" />
             }
             <app-searchable-dropdown controlId="event-visibility" label="Event Visibility" [required]="true" [searchable]="false" [options]="visibilityOptions" [value]="eventVisibility()" [error]="error('eventVisibility')" (valueChange)="setEventVisibility($event)" />
+            @if (showClubPicker()) {
+              <app-searchable-dropdown controlId="event-clubs" label="Clubs" placeholder="Select the clubs that can see this event" [required]="true" [isMulti]="true" [options]="presidingClubOptions()" [value]="eventClubs()" [error]="error('eventClubs')" (valueChange)="setEventClubs($event)" hint="Only members of the clubs you pick will see this event. You can only pick clubs you are President of." />
+            }
             <app-searchable-dropdown controlId="event-format" label="Event Format" [required]="true" [searchable]="false" [options]="formatOptions()" [value]="eventFormat()" (valueChange)="setEventFormat($event)" />
             <app-searchable-dropdown controlId="registration-mode" label="Registration Approval" [required]="true" [searchable]="false" [disabled]="requiresPayment()" [options]="registrationModeOptions" [value]="registrationMode()" (valueChange)="setRegistrationMode($event)" hint="{{ requiresPayment() ? 'Paid events require manual approval so the organiser can verify payments.' : '' }}" />
+            @if (showMaxPax()) {
+              <app-form-field controlId="max-pax" label="Max Registered Pax" type="number" min="1" placeholder="Leave blank for unlimited" [required]="false" [value]="maxPax() ?? ''" [error]="error('maxPax')" (valueChange)="setMaxPax($event)" hint="Registration closes automatically once this many people have registered." />
+            }
           </div>
         </section>
         @if (showCostFields()) {
@@ -331,6 +337,11 @@
     }
     @if (tableLongSessionWarning()) {
       <p class="request-field-context"><span class="material-symbols-rounded" aria-hidden="true">info</span>{{ tableLongSessionWarning() }}</p>
+    }
+    @if (tableDateConflictWarning()) {
+      <!-- Advisory only (aria-live so it is announced when it appears): a busy date never blocks
+           saving the row or submitting the proposal. -->
+      <p class="request-field-context request-field-context--warn" role="status" aria-live="polite"><span class="material-symbols-rounded" aria-hidden="true">event_busy</span>{{ tableDateConflictWarning() }}</p>
     }
   </div>
 </app-form-modal>

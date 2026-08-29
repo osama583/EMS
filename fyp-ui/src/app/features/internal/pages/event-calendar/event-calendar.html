@@ -1,0 +1,384 @@
+<section class="master-calendar" aria-labelledby="master-calendar-title">
+  <header class="master-calendar__intro">
+    <div>
+      <p class="master-calendar__eyebrow">Events</p>
+      <h1 id="master-calendar-title">Event Calendar</h1>
+    </div>
+    <p class="master-calendar__lead">
+      Every approved and scheduled event across the university, in one place.
+    </p>
+  </header>
+
+  <div class="mc-shell">
+    <!-- Toolbar: navigation, period title and view switch on one row so the grid itself keeps
+         as much vertical space as possible. -->
+    <div class="mc-toolbar">
+      <div class="mc-toolbar__nav">
+        <button type="button" class="mc-nav-btn" aria-label="Previous period" (click)="navigate(-1)">
+          <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+        </button>
+        <button type="button" class="mc-today" (click)="goToToday()">Today</button>
+        <button type="button" class="mc-nav-btn" aria-label="Next period" (click)="navigate(1)">
+          <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+        </button>
+      </div>
+
+      <h2 class="mc-toolbar__title" aria-live="polite">{{ displayTitle() }}</h2>
+
+      <div class="mc-toolbar__actions">
+        <div class="mc-viewswitch" role="group" aria-label="Calendar view">
+          <button type="button" [class.is-active]="viewMode() === 'month'" [attr.aria-pressed]="viewMode() === 'month'" (click)="setView('month')">Month</button>
+          <button type="button" [class.is-active]="viewMode() === 'week'" [attr.aria-pressed]="viewMode() === 'week'" (click)="setView('week')">Week</button>
+          <button type="button" [class.is-active]="viewMode() === 'day'" [attr.aria-pressed]="viewMode() === 'day'" (click)="setView('day')">Day</button>
+        </div>
+
+        <app-filter-button
+          label="Filters"
+          ariaLabel="Open calendar filters"
+          [count]="appliedFilterCount()"
+          [expanded]="filterOpen()"
+          (triggered)="openFilters()"
+        />
+
+        <app-expandable-search
+          ariaLabel="Search events"
+          placeholder="Search events"
+          [value]="searchTerm()"
+          (valueChange)="onSearch($event)"
+        />
+      </div>
+    </div>
+
+    <!-- Counts + legend share one compact strip rather than two stacked blocks. -->
+    <div class="mc-meta">
+      <p class="mc-meta__counts">
+        <strong>{{ totalVisibleCount() }}</strong>
+        {{ totalVisibleCount() === 1 ? 'event' : 'events' }} in view
+        @if (totalPrivateCount() > 0) {
+          <span class="mc-meta__private">+ {{ privateLabel(totalPrivateCount()) }}</span>
+        }
+      </p>
+
+      @if (categoryOptions().length > 0) {
+        <div class="mc-legend" aria-label="Event category legend">
+          @for (category of categoryOptions(); track category.name) {
+            <span class="mc-legend__item">
+              <i [class]="'legend-dot legend-dot--' + category.categoryClass" aria-hidden="true"></i>
+              {{ category.name }}
+            </span>
+          }
+        </div>
+      }
+    </div>
+
+    @if (loading()) {
+      <app-loading-state variant="grid" label="Loading calendar…" [count]="9" />
+    } @else if (loadError()) {
+      <p class="mc-empty">{{ loadError() }}</p>
+    } @else if (viewMode() === 'month') {
+      <!-- ===================== MONTH (desktop grid) ===================== -->
+      <div class="mc-month" role="grid" aria-label="Monthly event calendar">
+        <div class="mc-weekdays" role="row" aria-hidden="true">
+          @for (label of weekDayLabels; track label) {
+            <span role="columnheader">{{ label }}</span>
+          }
+        </div>
+
+        <div class="mc-grid">
+          @for (day of monthDays(); track day.key) {
+            <article
+              class="mc-day"
+              role="gridcell"
+              [class.mc-day--outside]="!day.isCurrentMonth"
+              [class.mc-day--today]="day.isToday"
+              [attr.aria-label]="formatFullDate(day.date)"
+            >
+              <button type="button" class="mc-day__head" (click)="openDayView(day)">
+                <time class="mc-day__num" [attr.datetime]="day.key">{{ day.dayNumber }}</time>
+                @if (day.entries.length + day.privateCount > 0) {
+                  <span class="mc-day__count">{{ day.entries.length + day.privateCount }}</span>
+                }
+              </button>
+
+              <div class="mc-day__body">
+                @for (entry of visibleEntries(day); track entry.occurrenceId) {
+                  @if (entry.restricted) {
+                    <span class="mc-chip mc-chip--restricted" [attr.title]="entry.title">
+                      <span class="material-symbols-rounded" aria-hidden="true">lock</span>
+                      <span class="mc-chip__title">{{ entry.title }}</span>
+                    </span>
+                  } @else {
+                    <button
+                      type="button"
+                      [class]="'mc-chip mc-chip--' + entry.categoryClass"
+                      [class.mc-chip--provisional]="entry.provisional"
+                      [attr.title]="entry.title + ' · ' + entry.time"
+                      (click)="openEntry(entry)"
+                    >
+                      <span class="mc-chip__time">{{ entry.time.split(' – ')[0] }}</span>
+                      <span class="mc-chip__title">{{ entry.title }}</span>
+                    </button>
+                  }
+                }
+
+                @if (remainingCount(day) > 0) {
+                  <button type="button" class="mc-more" (click)="openDayView(day)">
+                    +{{ remainingCount(day) }} more
+                  </button>
+                }
+
+                @if (day.privateCount > 0) {
+                  <span class="mc-chip mc-chip--private" aria-label="{{ privateLabel(day.privateCount) }}">
+                    <span class="material-symbols-rounded" aria-hidden="true">visibility_off</span>
+                    <span class="mc-chip__title">{{ privateLabel(day.privateCount) }}</span>
+                  </span>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      </div>
+
+      <!-- ===================== MONTH (mobile) =====================
+           The whole month stays visible as a compact tap grid; the panel below shows the
+           selected day in full. Built for touch rather than a shrunken desktop grid. -->
+      <div class="mc-mobile">
+        <div class="mc-mobile__weekdays" aria-hidden="true">
+          @for (label of weekDayLabels; track label) {
+            <span>{{ label.charAt(0) }}</span>
+          }
+        </div>
+
+        <div class="mc-mobile__grid" role="listbox" aria-label="Choose a date">
+          @for (day of monthDays(); track day.key) {
+            <button
+              type="button"
+              role="option"
+              class="mc-mobile__cell"
+              [class.mc-mobile__cell--outside]="!day.isCurrentMonth"
+              [class.mc-mobile__cell--today]="day.isToday"
+              [class.mc-mobile__cell--selected]="day.key === focusedDay().key"
+              [attr.aria-selected]="day.key === focusedDay().key"
+              [attr.aria-label]="
+                formatFullDate(day.date) + ', ' + day.entries.length +
+                (day.entries.length === 1 ? ' event' : ' events')
+              "
+              (click)="selectDate(day)"
+            >
+              <span class="mc-mobile__num">{{ day.dayNumber }}</span>
+              @if (day.entries.length + day.privateCount > 0) {
+                <span class="mc-mobile__dots" aria-hidden="true">
+                  @for (entry of visibleEntries(day); track entry.occurrenceId) {
+                    <i [class]="'mc-dot mc-dot--' + entry.categoryClass"></i>
+                  }
+                  @if (day.privateCount > 0) {
+                    <i class="mc-dot mc-dot--private"></i>
+                  }
+                </span>
+              }
+            </button>
+          }
+        </div>
+
+        <section class="mc-mobile__day" aria-live="polite">
+          <header class="mc-mobile__day-head">
+            <div>
+              <span>Selected day</span>
+              <h3>{{ formatFullDate(focusedDay().date) }}</h3>
+            </div>
+            <strong>
+              {{ focusedDay().entries.length }}
+              {{ focusedDay().entries.length === 1 ? 'event' : 'events' }}
+            </strong>
+          </header>
+
+          <div class="mc-list">
+            @for (entry of selectedDayEntries(); track entry.occurrenceId) {
+              <ng-container [ngTemplateOutlet]="listRow" [ngTemplateOutletContext]="{ $implicit: entry }" />
+            } @empty {
+              @if (focusedDay().privateCount === 0) {
+                <p class="mc-empty mc-empty--inline">No events on this day.</p>
+              }
+            }
+            @if (focusedDay().privateCount > 0) {
+              <p class="mc-private-note">
+                <span class="material-symbols-rounded" aria-hidden="true">visibility_off</span>
+                {{ privateLabel(focusedDay().privateCount) }}
+              </p>
+            }
+          </div>
+        </section>
+      </div>
+    } @else if (viewMode() === 'week') {
+      <!-- ===================== WEEK ===================== -->
+      <div class="mc-week" aria-label="Weekly event calendar">
+        @for (day of weekDays(); track day.key) {
+          <article class="mc-week__day" [class.mc-week__day--today]="day.isToday">
+            <header class="mc-week__head">
+              <button type="button" (click)="openDayView(day)">
+                <span>{{ day.date | date: 'EEE' }}</span>
+                <strong>{{ day.dayNumber }}</strong>
+              </button>
+            </header>
+            <div class="mc-week__body">
+              @for (entry of day.entries; track entry.occurrenceId) {
+                @if (entry.restricted) {
+                  <span class="mc-chip mc-chip--restricted">
+                    <span class="material-symbols-rounded" aria-hidden="true">lock</span>
+                    <span class="mc-chip__title">{{ entry.title }}</span>
+                  </span>
+                } @else {
+                  <button
+                    type="button"
+                    [class]="'mc-chip mc-chip--' + entry.categoryClass"
+                    [class.mc-chip--provisional]="entry.provisional"
+                    (click)="openEntry(entry)"
+                  >
+                    <span class="mc-chip__time">{{ entry.time.split(' – ')[0] }}</span>
+                    <span class="mc-chip__title">{{ entry.title }}</span>
+                  </button>
+                }
+              } @empty {
+                @if (day.privateCount === 0) {
+                  <span class="mc-week__empty">—</span>
+                }
+              }
+              @if (day.privateCount > 0) {
+                <span class="mc-chip mc-chip--private">
+                  <span class="material-symbols-rounded" aria-hidden="true">visibility_off</span>
+                  <span class="mc-chip__title">{{ privateLabel(day.privateCount) }}</span>
+                </span>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    } @else {
+      <!-- ===================== DAY ===================== -->
+      <div class="mc-dayview">
+        <div class="mc-list">
+          @for (entry of selectedDayEntries(); track entry.occurrenceId) {
+            <ng-container [ngTemplateOutlet]="listRow" [ngTemplateOutletContext]="{ $implicit: entry }" />
+          } @empty {
+            @if (focusedDay().privateCount === 0) {
+              <p class="mc-empty">No events scheduled on this day.</p>
+            }
+          }
+          @if (focusedDay().privateCount > 0) {
+            <p class="mc-private-note">
+              <span class="material-symbols-rounded" aria-hidden="true">visibility_off</span>
+              {{ privateLabel(focusedDay().privateCount) }}
+            </p>
+          }
+        </div>
+      </div>
+    }
+  </div>
+</section>
+
+<!-- One row shape shared by the day view and the mobile day panel. -->
+<ng-template #listRow let-entry>
+  @if (entry.restricted) {
+    <div class="mc-row mc-row--restricted">
+      <span class="mc-row__rail" aria-hidden="true"></span>
+      <div class="mc-row__body">
+        <strong class="mc-row__title">
+          <span class="material-symbols-rounded" aria-hidden="true">lock</span>
+          {{ entry.title }}
+        </strong>
+        <small>Details are limited to members of the organising club.</small>
+      </div>
+    </div>
+  } @else {
+    <button type="button" class="mc-row" (click)="openEntry(entry)">
+      <span [class]="'mc-row__rail mc-row__rail--' + entry.categoryClass" aria-hidden="true"></span>
+      <span class="mc-row__body">
+        <span class="mc-row__top">
+          <strong class="mc-row__title">{{ entry.title }}</strong>
+          @if (entry.provisional) {
+            <span class="mc-badge" title="Approved to schedule, pending department confirmation">Provisional</span>
+          }
+        </span>
+        <small class="mc-row__meta">{{ entry.time }} · {{ entry.venue }}</small>
+        <small class="mc-row__meta mc-row__meta--soft">{{ entry.organiser }} · {{ entry.category }}</small>
+      </span>
+      <span class="material-symbols-rounded mc-row__chevron" aria-hidden="true">chevron_right</span>
+    </button>
+  }
+</ng-template>
+
+<!-- ===================== Filters ===================== -->
+<app-form-modal
+  [open]="filterOpen()"
+  title="Filter events"
+  [primaryLabel]="'Show ' + draftResultCount() + (draftResultCount() === 1 ? ' Result' : ' Results')"
+  secondaryLabel="Reset Filters"
+  (close)="closeFilters()"
+  (cancel)="resetFilters()"
+  (submit)="applyFilters()"
+>
+  <div class="mc-filter">
+    <fieldset>
+      <legend>Event Category</legend>
+      <div class="mc-filter__options">
+        @for (category of categoryOptions(); track category.name) {
+          <button
+            type="button"
+            class="mc-filter__option"
+            [class.is-selected]="isDraftCategorySelected(category.name)"
+            [attr.aria-pressed]="isDraftCategorySelected(category.name)"
+            (click)="toggleDraftCategory(category.name)"
+          >
+            <i [class]="'legend-dot legend-dot--' + category.categoryClass" aria-hidden="true"></i>
+            {{ category.name }}
+          </button>
+        } @empty {
+          <p class="mc-empty mc-empty--inline">No categories in this period.</p>
+        }
+      </div>
+    </fieldset>
+  </div>
+</app-form-modal>
+
+<!-- ===================== Event details ===================== -->
+<app-form-modal
+  [open]="selectedEntry() !== null"
+  [title]="selectedEntry()?.title ?? ''"
+  [hidePrimary]="true"
+  secondaryLabel="Close"
+  (close)="closeDialog()"
+  (cancel)="closeDialog()"
+>
+  @if (selectedEntry(); as entry) {
+    <div [class]="'mc-dialog__accent mc-dialog__accent--' + entry.categoryClass"></div>
+
+    <div class="mc-dialog__tags">
+      <span class="mc-tag">{{ entry.category }}</span>
+      <span class="mc-tag mc-tag--soft">{{ entry.visibility }}</span>
+      @if (entry.provisional) {
+        <span class="mc-tag mc-tag--warn">Provisional · pending department confirmation</span>
+      }
+    </div>
+
+    <p class="mc-dialog__date">{{ formatFullDate(entry.date) }}</p>
+
+    <dl class="mc-dialog__details">
+      <div><dt>Time</dt><dd>{{ entry.time }}</dd></div>
+      <div><dt>Venue</dt><dd>{{ entry.venue }}</dd></div>
+      <div><dt>Organiser</dt><dd>{{ entry.organiser }}</dd></div>
+      @if (entry.format) {
+        <div><dt>Format</dt><dd>{{ entry.format }}</dd></div>
+      }
+      <div><dt>Expected pax</dt><dd>{{ entry.totalExpectedPax }}</dd></div>
+      <div><dt>Cost</dt><dd>{{ costLabel(entry) }}</dd></div>
+      <div><dt>Registration</dt><dd>{{ registrationLabel(entry) }}</dd></div>
+      @if (entry.clubs.length > 0) {
+        <div><dt>Clubs</dt><dd>{{ entry.clubs.join(', ') }}</dd></div>
+      }
+    </dl>
+
+    @if (entry.description) {
+      <p class="mc-dialog__description">{{ entry.description }}</p>
+    }
+  }
+</app-form-modal>

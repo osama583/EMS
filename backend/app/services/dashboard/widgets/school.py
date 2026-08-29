@@ -303,55 +303,6 @@ def service_footprint(cur, scope: Scope) -> dict[str, Any]:
     )
 
 
-@widget("hos_stall_rate")
-def stall_rate(cur, scope: Scope) -> dict[str, Any]:
-    """The head cannot act on another department's queue, but they can escalate
-    — and they need to know which proposals warrant it."""
-    multiplier = scope.config.number("STALL_MULTIPLIER", 2)
-    row = fetch_one(
-        cur,
-        f"""
-        SELECT count(*) FILTER (WHERE hours > baseline.median_hours * %(multiplier)s) AS stalled,
-               count(*) AS live
-          FROM (
-            SELECT r.request_id, r.status,
-                   EXTRACT(epoch FROM now() - coalesce(last_move.at, r.submitted_at)) / 3600.0 AS hours
-              FROM request r
-              LEFT JOIN LATERAL (
-                    SELECT max(created_at) AS at FROM workflow_history h WHERE h.request_id = r.request_id
-              ) last_move ON TRUE
-             WHERE r.status NOT IN ('draft', 'completed_approved', 'completed_rejected', 'cancelled')
-               {SCHOOL_FILTER}
-          ) live_rows
-          CROSS JOIN LATERAL (
-            SELECT coalesce(percentile_cont(0.5) WITHIN GROUP (
-                       ORDER BY EXTRACT(epoch FROM gap) / 3600.0), %(fallback)s) AS median_hours
-              FROM (
-                SELECT h.created_at - lag(h.created_at) OVER (PARTITION BY h.request_id ORDER BY h.created_at) AS gap
-                  FROM workflow_history h
-                 WHERE h.previous_status = live_rows.status
-                   AND h.created_at >= %(from)s
-              ) gaps
-             WHERE gap IS NOT NULL
-          ) baseline
-        """,
-        scope.params(multiplier=multiplier, fallback=48.0, **_extra(scope)),
-    )
-    stalled = int(row["stalled"]) if row else 0
-    live = int(row["live"]) if row else 0
-    return kpi(
-        label="Downstream stall rate",
-        value=ratio(stalled, live),
-        fmt=FMT_PERCENT,
-        secondary=f"{stalled} of {live} live proposals",
-        caption=f"sitting beyond {multiplier:g}× the institutional median for their stage",
-        target={"max": 0.05, "label": "target <= 5%"},
-        status=status_for(ratio(stalled, live), warn=0.05, critical=0.15),
-        definition="M72 applied at proposal level",
-        drill_to=drill("/app/ongoing/proposals", stalled="true"),
-    )
-
-
 @widget("hos_forward_pipeline")
 def forward_pipeline(cur, scope: Scope) -> dict[str, Any]:
     """What the school has committed to deliver, distinct from what it has

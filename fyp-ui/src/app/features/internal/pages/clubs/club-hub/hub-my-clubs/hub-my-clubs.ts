@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, HostListener, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { finalize } from 'rxjs';
 import { AuthService } from '../../../../../../core/auth/auth.service';
 import { ClubService } from '../../../../../../core/clubs/club.service';
 import { ClubRecord } from '../../../../../../core/clubs/club.models';
@@ -9,14 +10,16 @@ import { InternalPageHeaderComponent, InternalResetButtonComponent, InternalSear
 import { InternalDataPageConfig, InternalDataRecord, InternalFilterConfig, InternalPageHeaderConfig, InternalRowActionEvent } from '../../../../../../shared/components/internal-data-page/internal-data-page.models';
 import { ClubCategoryPickerComponent } from '../../../../../../shared/components/club-category-picker/club-category-picker';
 import { ClubRosterModalComponent } from '../../../../../../shared/components/club-roster-modal/club-roster-modal';
+import { ConfirmDialogComponent } from '../../../../../../shared/components/confirm-dialog/confirm-dialog';
 import { PresidentChangeRequestModalComponent } from '../../../../../../shared/components/president-change-request-modal/president-change-request-modal';
+import { ToastService, apiErrorMessage } from '../../../../../../shared/components/toast/toast.service';
 import { ViewToggleComponent, defaultListViewMode } from '../../../../../../shared/components/view-toggle/view-toggle';
 
 type ViewMode = 'table' | 'card';
 
 @Component({
   selector: 'app-hub-my-clubs',
-  imports: [ViewToggleComponent, FeedbackBannerComponent, InternalPageHeaderComponent, InternalDataPageComponent, ClubCategoryPickerComponent, ClubRosterModalComponent, PresidentChangeRequestModalComponent, InternalSearchFieldComponent, InternalResetButtonComponent],
+  imports: [ViewToggleComponent, FeedbackBannerComponent, InternalPageHeaderComponent, InternalDataPageComponent, ClubCategoryPickerComponent, ClubRosterModalComponent, ConfirmDialogComponent, PresidentChangeRequestModalComponent, InternalSearchFieldComponent, InternalResetButtonComponent],
   templateUrl: './hub-my-clubs.html',
   styleUrl: './hub-my-clubs.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -25,6 +28,7 @@ export class HubMyClubsComponent {
   private readonly auth = inject(AuthService);
   private readonly clubService = inject(ClubService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toast = inject(ToastService);
   protected readonly currentUserId = this.auth.user()?.id ?? '';
 
   readonly clubs = signal<readonly ClubRecord[]>([]);
@@ -33,6 +37,8 @@ export class HubMyClubsComponent {
   readonly categoryPickerClub = signal<ClubRecord | null>(null);
   readonly rosterClub = signal<ClubRecord | null>(null);
   readonly presidentChangeClub = signal<ClubRecord | null>(null);
+  readonly leaveTarget = signal<ClubRecord | null>(null);
+  readonly leaving = signal(false);
   // Which card's "⋯" action menu is open, by club id — a plain string rather than a per-card
   // component-local flag, since only one menu should ever be open across the whole grid at once.
   readonly menuOpenFor = signal<string | null>(null);
@@ -65,6 +71,7 @@ export class HubMyClubsComponent {
       { key: 'roster', label: 'View members', icon: 'group' },
       { key: 'categories', label: 'Edit categories', icon: 'tune' },
       { key: 'president-change', label: 'Request President change', icon: 'swap_horiz' },
+      { key: 'leave', label: 'Leave club', icon: 'logout' },
     ],
     emptyTitle: 'You haven\'t joined a club yet', emptyDescription: 'Head over to Discover Clubs to find one that fits your interests.',
   }));
@@ -81,7 +88,7 @@ export class HubMyClubsComponent {
       eyebrow: club.viewerIsPresident ? 'President' : 'Member', status: '', title: club.name,
       details: [{ icon: 'category', text: club.categories.map((category) => category.name).join(', ') || 'No categories set' }, { icon: 'group', text: `${club.memberCount} member${club.memberCount === 1 ? '' : 's'}` }],
     },
-    actionKeys: club.viewerIsPresident ? ['roster', 'categories', 'president-change'] : ['roster'],
+    actionKeys: club.viewerIsPresident ? ['roster', 'categories', 'president-change'] : ['roster', 'leave'],
   })));
   readonly filters: readonly InternalFilterConfig[] = [];
 
@@ -111,6 +118,7 @@ export class HubMyClubsComponent {
     if (event.action.key === 'roster') this.openRoster(club);
     else if (event.action.key === 'categories' && club.viewerIsPresident) this.openCategoryPicker(club);
     else if (event.action.key === 'president-change' && club.viewerIsPresident) this.openPresidentChange(club);
+    else if (event.action.key === 'leave' && !club.viewerIsPresident) this.openLeave(club);
   }
 
   openRoster(club: ClubRecord): void { this.rosterClub.set(club); }
@@ -133,6 +141,27 @@ export class HubMyClubsComponent {
   openPresidentChange(club: ClubRecord): void { this.presidentChangeClub.set(club); }
   closePresidentChange(): void { this.presidentChangeClub.set(null); }
   onPresidentChangeSubmitted(): void { this.presidentChangeClub.set(null); }
+
+  openLeave(club: ClubRecord): void { this.leaveTarget.set(club); }
+  closeLeave(): void { if (!this.leaving()) this.leaveTarget.set(null); }
+  confirmLeave(): void {
+    const club = this.leaveTarget();
+    if (!club) return;
+    this.leaving.set(true);
+    this.clubService.removeMember(club.id, this.currentUserId)
+      .pipe(finalize(() => this.leaving.set(false)), takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.leaveTarget.set(null);
+          this.toast.success('You left the club', `You are no longer a member of ${club.name}.`);
+          this.loadAll();
+        },
+        error: (err) => {
+          this.leaveTarget.set(null);
+          this.toast.error('Could not leave this club', apiErrorMessage(err, 'Please try again.'));
+        },
+      });
+  }
 
   toggleMenu(clubId: string, event: Event): void {
     event.stopPropagation();

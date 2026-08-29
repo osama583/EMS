@@ -28,6 +28,7 @@ from .workflow.constants import TABLE_FOR_REQUIREMENT, max_event_categories, sta
 # Cleared and rebuilt on every content save, children first.
 CHILD_TABLES = (
     "request_categories",
+    "request_clubs",
     "application_requirements",
     "event_schedule",
     "co_owners",
@@ -92,7 +93,57 @@ def _text(payload: dict, key: str) -> str:
     return str(payload.get(key) or "").strip()
 
 
-def validate(cur, payload: dict, *, draft: bool) -> None:
+def _club_id_list(payload: dict) -> list[int]:
+    """The selected club ids, de-duplicated, order preserved.
+
+    Tolerant of what the wire actually carries: the picker sends strings, older
+    drafts may send numbers, and a half-filled row can send an empty value.
+    Anything non-numeric is dropped here rather than blowing up on int().
+    """
+    seen: set[int] = set()
+    out: list[int] = []
+    for value in payload.get("eventClubs") or []:
+        text = str(value).strip()
+        if not text.isdigit():
+            continue
+        club_id = int(text)
+        if club_id not in seen:
+            seen.add(club_id)
+            out.append(club_id)
+    return out
+
+
+def _unpresided_clubs(cur, applicant_user_id: int | None, club_ids: list[int]) -> list[str]:
+    """Names of the requested clubs this user does NOT preside over.
+
+    Presidency is clubs.user_id (see SECTION 4 of the initial schema) - the same
+    fact that feeds AuthUser.presidentOfClubIds. Resolved server-side because the
+    dropdown is a convenience, not a permission: a crafted payload naming another
+    club's id must be refused here.
+
+    An id that matches no live club comes back as "#<id>" rather than being
+    ignored, so a stale or bogus selection surfaces as an error instead of
+    silently narrowing the audience.
+    """
+    if not club_ids:
+        return []
+    rows = fetch_all(
+        cur,
+        "SELECT club_id, club_name, user_id FROM clubs WHERE club_id = ANY(%s) AND active",
+        (club_ids,),
+    )
+    by_id = {row["club_id"]: row for row in rows}
+    bad: list[str] = []
+    for club_id in club_ids:
+        row = by_id.get(club_id)
+        if row is None:
+            bad.append(f"#{club_id}")
+        elif applicant_user_id is None or row["user_id"] != applicant_user_id:
+            bad.append(row["club_name"])
+    return bad
+
+
+def validate(cur, payload: dict, *, draft: bool, applicant: dict | None = None) -> None:
     """Collect every problem before raising, so the form can show them all at once.
 
     A draft is held to a much lower bar - it is work in progress. Only a real
@@ -132,14 +183,51 @@ def validate(cur, payload: dict, *, draft: bool) -> None:
     if mode and mode not in REGISTRATION_MODES:
         errors.append("Registration approval must be Automatic or Manual.")
 
+    # --- Club Only audience -----------------------------------------------
+    # "Club Only" used to be a bare string with no club behind it, which made it
+    # unenforceable: a president of two clubs produced a row that named neither,
+    # so both clubs' members saw the event (and, since no server-side check
+    # existed at all, so did everyone else). The audience is now explicit, and
+    # validated on two axes:
+    #
+    #   1. non-empty  - a Club Only event addressed to nobody is invisible under
+    #      the new read rule, so it is a mistake, not a valid state. Mirrors the
+    #      DB-level trigger in migration 029; checked here so the user gets a
+    #      field error instead of an IntegrityError.
+    #   2. authorised - the applicant must actually PRESIDE over each club named.
+    #      This is the real access-control check: without it a president of the
+    #      Photography Club could simply post into the Dancing Club's feed by
+    #      sending its id. The client only ever offers clubs it believes the user
+    #      presides over, but the client is not the authority.
+    applicant_user_id = (applicant or {}).get("user_id")
+    club_ids = _club_id_list(payload)
+    if visibility == "Club Only":
+        if not draft and not club_ids:
+            errors.append("A Club Only event must be addressed to at least one club.")
+        unauthorised = _unpresided_clubs(cur, applicant_user_id, club_ids)
+        if unauthorised:
+            errors.append(
+                "You can only address an event to a club you are the President of: "
+                + ", ".join(unauthorised)
+                + "."
+            )
+    elif club_ids:
+        # Selecting clubs then switching visibility away leaves stale ids in the
+        # payload; they are meaningless outside Club Only, so reject rather than
+        # silently storing an audience that nothing will ever read.
+        errors.append("Clubs can only be selected when Event Visibility is Club Only.")
+
     categories = payload.get("eventCategories") or []
     limit = max_event_categories(cur)
     if len(categories) > limit:
         errors.append(f"Choose at most {limit} event categor{'y' if limit == 1 else 'ies'}.")
 
     max_pax = payload.get("maxPax")
-    if max_pax not in (None, "") and _as_int(max_pax, default=-1) < 0:
-        errors.append("Registration capacity must be zero or more.")
+    if max_pax not in (None, ""):
+        if _as_int(max_pax, default=-1) <= 0:
+            errors.append("Max Registered Pax must be greater than zero.")
+        elif visibility == "Internal":
+            errors.append("Max Registered Pax is not available for Internal events.")
 
     cost = payload.get("costAmount")
     if cost not in (None, "") and _as_decimal(cost) > 0:
@@ -344,6 +432,24 @@ def write_children(cur, request_id: int, payload: dict) -> None:
             "VALUES (%s, %s, %s) ON CONFLICT (request_id, category_id) DO NOTHING",
             (request_id, row["event_category_id"], row["name"]),
         )
+
+    # --- Club Only audience: freeze the name, keep membership live -------
+    # Only written for Club Only (validate() rejects clubs on any other tier), so
+    # switching visibility away and re-saving drops the audience with the rest of
+    # the children. club_name is frozen exactly like category_name above; who can
+    # SEE the event is resolved live against club_members at read time.
+    if _text(payload, "eventVisibility") == "Club Only":
+        for club_id in _club_id_list(payload):
+            row = fetch_one(
+                cur, "SELECT club_id, club_name FROM clubs WHERE club_id = %s AND active", (club_id,)
+            )
+            if row is None:
+                continue
+            cur.execute(
+                "INSERT INTO request_clubs (request_id, club_id, club_name) "
+                "VALUES (%s, %s, %s) ON CONFLICT (request_id, club_id) DO NOTHING",
+                (request_id, row["club_id"], row["club_name"]),
+            )
 
     # --- Selected requirements: what routes into department review --------
     for requirement_name in payload.get("selectedRequirements") or []:
@@ -645,7 +751,7 @@ def create(cur, applicant: dict, payload: dict, *, draft: bool) -> int:
     Callers submit it separately (workflow.submit) so "save a draft" and
     "submit for review" share one code path up to the point they diverge.
     """
-    validate(cur, payload, draft=draft)
+    validate(cur, payload, draft=draft, applicant=applicant)
     cur.execute(
         """INSERT INTO request
                (request_code, applicant_user_id, applicant_name, applicant_email,
@@ -679,7 +785,7 @@ def create(cur, applicant: dict, payload: dict, *, draft: bool) -> int:
 
 def save_content(cur, request_id: int, applicant: dict, payload: dict, *, draft: bool) -> None:
     """Replace a proposal's content. Never touches status, resume_stage or reviewer_comment."""
-    validate(cur, payload, draft=draft)
+    validate(cur, payload, draft=draft, applicant=applicant)
     clear_children(cur, request_id)
     write_scalars(cur, request_id, payload, applicant)
     write_children(cur, request_id, payload)
@@ -798,6 +904,15 @@ def project(cur, request: dict, *, include_children: bool = True) -> dict[str, A
         "WHERE request_id = %s ORDER BY event_schedule_id",
         (request_id,),
     )
+    # The Club Only audience. Two shapes because two consumers: the proposal form
+    # re-populates its picker from ids (so reopening a Club Only proposal shows
+    # the clubs it was addressed to), while read-only views render the frozen
+    # names. Empty for every other visibility tier.
+    club_rows = fetch_all(
+        cur,
+        "SELECT club_id, club_name FROM request_clubs WHERE request_id = %s ORDER BY club_name",
+        (request_id,),
+    )
     initials = "".join(part[0] for part in (request["applicant_name"] or "").split()[:2]).upper()
 
     projected: dict[str, Any] = {
@@ -817,6 +932,8 @@ def project(cur, request: dict, *, include_children: bool = True) -> dict[str, A
         "category": categories[0] if categories else "",
         "eventCategories": categories,
         "eventVisibility": request["event_visibility"],
+        "eventClubs": [str(r["club_id"]) for r in club_rows],
+        "eventClubNames": [r["club_name"] for r in club_rows],
         "eventFormat": request["event_format_snapshot"],
         "registrationMode": request["registration_approval"],
         "publicity": request["promotion_publicity_method"] or "",

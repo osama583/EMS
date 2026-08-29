@@ -367,19 +367,3 @@ def backlog_age(cur, scope: Scope) -> dict[str, Any]:
         signature=True,
         drill_to=drill("/app/inbox/requests"),
     )
-
-
-@widget("gen_stalled")
-def stalled(cur, scope: Scope) -> dict[str, Any]:
-    latency = sla.decision_latency(cur, scope)
-    result = risk.stalled_tasks(cur, scope, median_decision_hours=latency["median"])
-    return panel(
-        title="Stalled work",
-        subtitle=f"Open beyond {result['thresholdHours']:.0f}h",
-        chart="alert-list",
-        data={"items": [], "stalled": result, "cancellationLocked": 0},
-        table_view=table([{"key": "count", "label": "Stalled tasks", "format": FMT_COUNT}], [result]),
-        caption="The threshold is twice this unit's own median decision time, not an absolute hour count.",
-        empty="Nothing is stalled.",
-        drill_to=drill("/app/inbox/requests"),
-    )

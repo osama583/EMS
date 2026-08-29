@@ -7,55 +7,11 @@ not a metric, and does not belong on a dashboard.
 from __future__ import annotations
 
 import datetime as dt
-import statistics
 from typing import Any
 
 from ....db import fetch_all, fetch_one
 from ..scope import Scope, num
 from .common import NON_COMMITTED_STATUSES, DepartmentSpec
-
-
-def at_risk_tasks(cur, scope: Scope, spec: DepartmentSpec) -> dict[str, Any]:
-    """M70 - open tasks whose requirement date falls inside the risk window."""
-    window = scope.config.risk_window_days(scope.unit_code)
-    rows = fetch_all(
-        cur,
-        f"""
-        SELECT t.request_task_id AS task_id,
-               t.request_id AS request_id,
-               t.status AS status,
-               min(d."date") AS soonest,
-               r.event_title AS event_title,
-               r.request_code AS request_code
-          FROM request_task t
-          JOIN request r ON r.request_id = t.request_id
-          JOIN {spec.table} d ON d.request_id = t.request_id
-         WHERE t.assigned_unit_code = %(unit)s
-           AND t.status NOT IN ('completed', 'cancelled')
-           AND r.status <> ALL(%(non_committed)s)
-           AND d."date" >= %(today)s
-           AND d."date" <= %(today)s::date + %(window)s
-      GROUP BY 1, 2, 3, 5, 6
-      ORDER BY 4
-         LIMIT 25
-        """,
-        scope.params(non_committed=list(NON_COMMITTED_STATUSES), window=window),
-    )
-    return {
-        "count": len(rows),
-        "windowDays": window,
-        "items": [
-            {
-                "taskId": r["task_id"],
-                "requestId": r["request_id"],
-                "requestCode": r["request_code"],
-                "status": r["status"],
-                "date": r["soonest"].isoformat(),
-                "eventTitle": r["event_title"],
-            }
-            for r in rows
-        ],
-    }
 
 
 # The Risk List's threshold, per department, in the unit its own deadline is
@@ -140,38 +96,6 @@ def risk_list(cur, scope: Scope, spec: DepartmentSpec) -> dict[str, Any]:
     }
 
 
-def stalled_tasks(cur, scope: Scope, *, median_decision_hours: float | None) -> dict[str, Any]:
-    """M72 - open tasks older than STALL_MULTIPLIER times the unit's own median
-    decision latency.
-
-    Relative to the unit rather than an absolute hour count: a lane whose normal
-    turnaround is four hours and one whose normal turnaround is two days do not
-    share a definition of stalled, and an absolute threshold would flag the
-    second lane's ordinary Tuesday.
-    """
-    multiplier = scope.config.number("STALL_MULTIPLIER", 2)
-    # No history yet means no median. Falling back to the configured SLA keeps
-    # the widget useful on day one instead of silently returning zero.
-    baseline = median_decision_hours or scope.config.decision_sla_hours(scope.unit_code)
-    threshold = baseline * multiplier
-    row = fetch_one(
-        cur,
-        """
-        SELECT count(*) AS n, max(EXTRACT(epoch FROM now() - t.created_at) / 3600.0) AS oldest
-          FROM request_task t
-         WHERE t.assigned_unit_code = %(unit)s
-           AND t.status NOT IN ('completed', 'cancelled')
-           AND EXTRACT(epoch FROM now() - t.created_at) / 3600.0 > %(threshold)s
-        """,
-        scope.params(threshold=threshold),
-    )
-    return {
-        "count": int(row["n"]) if row else 0,
-        "thresholdHours": round(threshold, 1),
-        "oldestHours": num(row["oldest"]) if row else None,
-    }
-
-
 def single_point_of_failure(cur, scope: Scope, *, unit: str | None = None) -> dict[str, Any]:
     """M73 - active staff in the lane, and what one absence costs.
 
@@ -225,82 +149,6 @@ def cancellation_window_exposure(cur, scope: Scope) -> int:
         scope.params(lock_days=lock_days),
     )
     return int(row["n"]) if row else 0
-
-
-def venue_conflicts(cur, scope: Scope, spec: DepartmentSpec) -> list[dict[str, Any]]:
-    """Two bookings at one normalised location with a gap under the teardown
-    window - or overlapping outright.
-
-    Only Logistics can detect this, because it is the only department holding
-    both the venue and the setup window. Locations are free text, so they are
-    normalised by lowercase and trim; a controlled place catalogue would do
-    better and is out of scope.
-    """
-    if not spec.has_window or not spec.location_column:
-        return []
-    gap_minutes = scope.config.integer("VENUE_TEARDOWN_MINUTES", 60)
-    rows = fetch_all(
-        cur,
-        f"""
-        SELECT a."date" AS day,
-               lower(trim(a.{spec.location_column})) AS location,
-               a.request_id AS a_request, a.{spec.label_column} AS a_label,
-               a.{spec.end_column} AS a_end,
-               b.request_id AS b_request, b.{spec.label_column} AS b_label,
-               b.{spec.start_column} AS b_start,
-               EXTRACT(epoch FROM (b.{spec.start_column} - a.{spec.end_column})) / 60.0 AS gap_minutes
-          FROM {spec.table} a
-          JOIN {spec.table} b
-            ON b."date" = a."date"
-           AND b.{spec.pk} <> a.{spec.pk}
-           AND lower(trim(b.{spec.location_column})) = lower(trim(a.{spec.location_column}))
-           AND b.{spec.start_column} >= a.{spec.start_column}
-           AND b.{spec.pk} > a.{spec.pk}
-          JOIN request ra ON ra.request_id = a.request_id
-          JOIN request rb ON rb.request_id = b.request_id
-         WHERE ra.status <> ALL(%(non_committed)s)
-           AND rb.status <> ALL(%(non_committed)s)
-           AND a."date" >= %(today)s
-           AND EXTRACT(epoch FROM (b.{spec.start_column} - a.{spec.end_column})) / 60.0 < %(gap)s
-      ORDER BY a."date", 9
-        """,
-        scope.params(non_committed=list(NON_COMMITTED_STATUSES), gap=gap_minutes),
-    )
-    return [
-        {
-            "date": r["day"].isoformat(),
-            "location": r["location"],
-            "gapMinutes": num(r["gap_minutes"]),
-            "teardownMinutes": gap_minutes,
-            "first": {"requestId": r["a_request"], "label": r["a_label"], "end": r["a_end"].isoformat() if r["a_end"] else None},
-            "second": {"requestId": r["b_request"], "label": r["b_label"], "start": r["b_start"].isoformat() if r["b_start"] else None},
-        }
-        for r in rows
-    ]
-
-
-def anomalous_spike(series: list[dict[str, Any]], *, sigma: float, key: str = "y") -> dict[str, Any] | None:
-    """M77 - the most recent point exceeding mean + n sigma of its own history.
-
-    Computed in Python over an already-aggregated series rather than in SQL: the
-    series is at most a few dozen points, and a window function version would be
-    a second definition of "the trailing mean" to keep in step with this one.
-    """
-    values = [float(p.get(key) or 0) for p in series]
-    if len(values) < 4:
-        return None
-    history, latest = values[:-1], values[-1]
-    mean = statistics.fmean(history)
-    deviation = statistics.pstdev(history)
-    if deviation == 0 or latest <= mean + sigma * deviation:
-        return None
-    return {
-        "point": series[-1],
-        "value": latest,
-        "mean": round(mean, 2),
-        "sigma": round(deviation, 2),
-        "threshold": round(mean + sigma * deviation, 2),
-    }
 
 
 def stranded_at_gate(cur, scope: Scope, *, unit: str | None = None) -> list[dict[str, Any]]:

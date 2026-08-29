@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { DeletionMetadata, DeletionPreview } from '../../shared/models/deletion.models';
-import { ClubCategoryName, ClubCategoryPage, ClubCategoryRecord, ClubDraft, ClubJoinRequestPage, ClubJoinRequestRecord, ClubMemberRecord, ClubMyStatus, ClubPage, ClubRecord, ClubSortKey, ClubUserSummary, PresidentChangeRequestPage, PresidentChangeRequestQuery } from './club.models';
+import { ClubCategoryName, ClubOption, ClubCategoryPage, ClubCategoryRecord, ClubDraft, ClubJoinRequestPage, ClubJoinRequestRecord, ClubMemberRecord, ClubMyStatus, ClubPage, ClubRecord, ClubSortKey, ClubUserSummary, PresidentChangeRequestPage, PresidentChangeRequestQuery } from './club.models';
 
 @Injectable({ providedIn: 'root' })
 export class ClubService {
@@ -152,6 +152,12 @@ export class ClubService {
   }
   rejectJoinRequest(id: string, resolvedByUserId: string, comment: string): Observable<ClubJoinRequestRecord> {
     return this.http.post<ClubJoinRequestRecord>(`${this.baseUrl}/clubs/join-requests/${encodeURIComponent(id)}/reject`, { resolvedByUserId, comment });
+  }
+
+  // Option list for the proposal form's "Club Only" audience picker: the clubs this
+  // user presides over, id + display name. Always scoped to the caller server-side.
+  getMyPresidingClubs(): Observable<readonly ClubOption[]> {
+    return this.http.get<readonly ClubOption[]>(`${this.baseUrl}/clubs/mine/presiding`);
   }
 
   getMyStatus(userId: string): Observable<ClubMyStatus> { return this.http.get<ClubMyStatus>(`${this.baseUrl}/clubs/my-status/${encodeURIComponent(userId)}`); }

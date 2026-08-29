@@ -92,6 +92,10 @@ $comments-drawer-width: min(22rem, 85vw);
 .option-picker-card__summary-chevron { flex: 0 0 auto; color: var(--apu-text-muted); }
 .option-picker-card__panel { padding: 0 .85rem .85rem; border-top: 1px solid var(--apu-border); }
 .request-field-context { display: flex; margin: calc(var(--space-3) * -1) 0 0; align-items: center; gap: .4rem; color: var(--apu-blue-700); font-size: .78rem; font-weight: 600; }
+// Advisory congestion warning on a heavily-booked schedule date. Amber, not red: it is a
+// suggestion to reconsider, never a validation error - the row saves and submits either way.
+.request-field-context--warn { align-items: flex-start; padding: .5rem .625rem; border: 1px solid #f0d59a; border-radius: .5rem; background: #fff8e9; color: #8a5b00; font-weight: 500; line-height: 1.45; }
+.request-field-context--warn .material-symbols-rounded { flex: 0 0 auto; font-size: 1rem; }
 .request-quantity-indicator { display: flex; flex-wrap: wrap; margin: calc(var(--space-3) * -1) 0 0; padding: .65rem .75rem; align-items: center; gap: .45rem; border: 1px solid var(--apu-border); border-radius: var(--radius-control); background: var(--apu-surface-muted); color: var(--apu-text-muted); font-size: .78rem; }
 .request-quantity-indicator strong { color: var(--apu-blue-700); font-size: .88rem; }
 .request-quantity-indicator span { flex: 1 1 auto; min-width: 0; }

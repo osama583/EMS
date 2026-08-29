@@ -4,7 +4,6 @@
 // department-resubmit.scss's equivalent), this component only owns the drawer's own visuals.
 :host { display: contents; }
 
-$shell-content-inline-padding: clamp(1.5rem, 4vw, 3rem);
 $comments-drawer-width: min(22rem, 85vw);
 $comments-drawer-width-mobile: min(20rem, 90vw);
 
@@ -48,29 +47,49 @@ $comments-drawer-width-mobile: min(20rem, 90vw);
   width: 0;
   overflow: hidden;
   position: sticky;
-  top: 1.25rem;
-  max-height: calc(100svh - 2.5rem);
-  margin-right: calc(-1 * #{$shell-content-inline-padding});
-  border-left: 0 solid var(--apu-border);
+  top: .75rem;
+  max-height: calc(100svh - 1.5rem);
+  border: 0 solid var(--apu-border);
+  border-radius: var(--radius-card);
   background: var(--apu-white);
-  transition: width var(--motion-control) var(--ease-standard);
+  transition: width var(--motion-control) var(--ease-standard), border-color var(--motion-control) var(--ease-standard);
 }
+// Full card frame (border all round + shadow), not just a left divider — the drawer reads as a
+// fixed-size boxed panel with its own top/bottom/right edges, matching .comments-panel's card
+// look, instead of bleeding to the page edge (the old margin-right: -$shell-content-inline-padding)
+// which left no room for a right-hand border to show.
 .comments-drawer--open {
-  width: calc(#{$comments-drawer-width} + #{$shell-content-inline-padding});
+  width: $comments-drawer-width;
   margin-left: 1.75rem;
-  border-left-width: 1px;
+  border-width: 1px;
+  box-shadow: var(--internal-card-shadow);
 }
 .comments-drawer__inner {
   display: grid;
   grid-template-rows: auto 1fr;
   gap: var(--space-3);
-  width: calc(#{$comments-drawer-width} + #{$shell-content-inline-padding});
+  width: $comments-drawer-width;
   height: 100%;
   min-height: 0;
-  padding: var(--space-4) $shell-content-inline-padding var(--space-4) var(--space-4);
+  padding: var(--space-4);
   background: var(--apu-white);
 }
-.comments-drawer__header { display: flex; align-items: flex-start; gap: .5rem; }
+// The header above already carries its own border-bottom, and the drawer itself now carries its
+// own full border/shadow (see .comments-drawer--open) — the scrollable message/list area (grid
+// row 2, 1fr) just needs to fill and scroll inside that fixed box, no border of its own.
+.comments-drawer__inner app-conversation-thread,
+.comments-drawer__inner > .comments-drawer__list {
+  min-height: 0;
+  overflow-y: auto;
+}
+.comments-drawer__header {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  flex-shrink: 0;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--apu-border);
+}
 .comments-drawer__header > .material-symbols-rounded { flex-shrink: 0; color: var(--apu-blue-600); }
 .comments-drawer__header > div { flex: 1 1 auto; min-width: 0; }
 .comments-drawer__header h3 { margin: 0; color: var(--apu-blue-600); font-size: 1.05rem; }
@@ -182,7 +201,6 @@ $comments-drawer-width-mobile: min(20rem, 90vw);
     display: grid;
     place-items: center;
     width: auto;
-    margin-right: 0;
     background: rgb(5 24 48 / 45%);
     opacity: 0;
     pointer-events: none;
@@ -190,7 +208,8 @@ $comments-drawer-width-mobile: min(20rem, 90vw);
   }
   .comments-drawer--open {
     width: auto;
-    border-left-width: 0;
+    border-width: 0;
+    box-shadow: none;
     opacity: 1;
     pointer-events: auto;
   }

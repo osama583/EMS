@@ -92,6 +92,12 @@ export interface ProposalReviewRecord {
   readonly scheduleRows?: readonly EditableRow[];
   readonly eventImage?: EventImageAsset | null;
   readonly eventVisibility?: EventVisibility;
+  // The clubs a 'Club Only' event is addressed to. Ids re-populate the proposal
+  // form's picker when a saved proposal is reopened; names are the frozen labels
+  // (request_clubs.club_name) that read-only views render. Both empty on every
+  // other visibility tier.
+  readonly eventClubs?: readonly string[];
+  readonly eventClubNames?: readonly string[];
   readonly eventCategories?: readonly string[];
   readonly eventFormat?: string;
   readonly registrationMode?: RegistrationMode;

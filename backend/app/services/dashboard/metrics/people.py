@@ -119,49 +119,6 @@ def workload_balance(staff: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def unassigned_approved_work(cur, scope: Scope, spec: DepartmentSpec) -> dict[str, Any]:
-    """M64 - approved rows with no assignee, weighted by days to the event date.
-
-    The most actionable single number on any service HOD's dashboard: an
-    approved item with nobody on it is work that has been promised and not
-    staffed. The weighting is what separates "three rigs, all next month" from
-    "three rigs, one tomorrow".
-    """
-    row = fetch_one(
-        cur,
-        f"""
-        SELECT count(*) AS n,
-               min(d."date") AS soonest,
-               count(*) FILTER (WHERE d."date" <= %(today)s::date + %(risk_days)s) AS urgent
-          FROM {spec.table} d
-          JOIN request_task t ON t.request_id = d.request_id
-          JOIN request r ON r.request_id = d.request_id
-         WHERE t.assigned_unit_code = %(unit)s
-           AND t.status IN ('approved', 'preparing')
-           AND r.status <> ALL(%(non_committed)s)
-           AND d."date" >= %(today)s
-           AND NOT EXISTS (
-                SELECT 1 FROM request_row_assignment ra
-                 WHERE ra.requirement_name = %(requirement)s AND ra.row_id = d.{spec.pk}
-           )
-           AND NOT EXISTS (
-                SELECT 1 FROM task_assignment ta
-                 WHERE ta.request_task_id = t.request_task_id
-           )
-        """,
-        scope.params(
-            non_committed=list(NON_COMMITTED_STATUSES),
-            requirement=spec.requirement,
-            risk_days=scope.config.risk_window_days(scope.unit_code),
-        ),
-    )
-    return {
-        "count": int(row["n"]) if row else 0,
-        "urgent": int(row["urgent"]) if row else 0,
-        "soonest": row["soonest"].isoformat() if row and row["soonest"] else None,
-    }
-
-
 def stale_unassigned(cur, scope: Scope, spec: DepartmentSpec) -> list[dict[str, Any]]:
     """Approved rows still unassigned past SLA_ASSIGNMENT_HOURS, oldest first."""
     rows = fetch_all(

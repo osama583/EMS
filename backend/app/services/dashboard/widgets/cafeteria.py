@@ -17,14 +17,13 @@ from collections import defaultdict
 from typing import Any
 
 from ....db import fetch_all
-from ..metrics import finance, people, quality, risk, sla
+from ..metrics import finance, people, quality, sla
 from ..scope import Scope, status_for
 from .base import (
     FMT_COUNT,
     FMT_CURRENCY,
     FMT_PERCENT,
     drill,
-    hero,
     kpi,
     panel,
     series,
@@ -74,25 +73,6 @@ def request_counts(cur, scope: Scope) -> dict[str, Any]:
             {"key": "late", "label": "Late", "value": late, "status": "critical", "drill": drill(_orders_route("ongoing"), requestKind="fmb", risk="true")},
         ],
     }
-
-
-@widget("caf_orders_at_risk")
-def orders_at_risk(cur, scope: Scope) -> dict[str, Any]:
-    result = risk.orders_at_risk(cur, scope)
-    return hero(
-        label="Orders at risk right now",
-        value=result["count"],
-        fmt=FMT_COUNT,
-        caption=(
-            f"{result['pending']} to accept · {result['approved']} unclaimed · {result['preparing']} in the kitchen"
-            + (f" · nearest {result['soonest']}" if result["soonest"] else "")
-        ),
-        target={"max": 0, "label": "0 pending, 0 unclaimed inside 4h of serve time"},
-        status="critical" if result["pending"] or result["approved"] else ("warning" if result["count"] else "good"),
-        definition="Live orders whose serve time falls inside the risk window, split by state",
-        empty="Nothing is due inside the risk window.",
-        drill_to=drill("/app/inbox/requests", requestKind="fmb", risk="true"),
-    )
 
 
 @widget("caf_on_time")

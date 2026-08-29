@@ -286,36 +286,6 @@ def stage_dwell(cur, scope: Scope, *, status: str | None = None, request_filter:
     ]
 
 
-def sla_compliance(cur, scope: Scope) -> dict[str, Any]:
-    """M15 - share of tasks decided inside the unit's target, with the breach
-    count beside it. The count is the actionable half; the rate is the trend."""
-    target = scope.config.decision_sla_hours(scope.unit_code)
-    row = fetch_one(
-        cur,
-        f"""
-        SELECT count(*) FILTER (WHERE hours <= %(target)s) AS within,
-               count(*) AS total
-          FROM (
-            SELECT EXTRACT(epoch FROM d.first_at - t.created_at) / 3600.0 AS hours
-              FROM request_task t
-              {_FIRST_DECISION}
-             WHERE t.assigned_unit_code = %(unit)s
-               AND t.created_at >= %(from)s AND t.created_at < %(to)s
-               AND d.first_at IS NOT NULL
-          ) s
-        """,
-        scope.params(target=target),
-    )
-    total = int(row["total"]) if row else 0
-    within = int(row["within"]) if row else 0
-    return {
-        "rate": ratio(within, total),
-        "breaches": total - within,
-        "sample": total,
-        "targetHours": target,
-    }
-
-
 def preparation_runway(cur, scope: Scope, spec: DepartmentSpec, *, previous: bool = False) -> dict[str, Any]:
     """M16 - task created to the earliest date in the requirement's own detail
     table, in days.

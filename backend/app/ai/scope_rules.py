@@ -114,14 +114,22 @@ def _event_visibility_predicates(user_id: int | None, email: str | None) -> tupl
     events to everyone."""
     if user_id is None:
         return (
-            "request.status = 'completed_approved' AND request.event_visibility IN ('Public', 'Club Only')",
+            "request.status = 'completed_approved' AND request.event_visibility = 'Public'",
         )
-    # A signed-in caller: the shared tiers, OR their own event at any visibility (including
-    # Private) - the my_organized_events owner_clause.
+    # A signed-in caller: the shared tiers, OR a 'Club Only' event addressed to a club they
+    # are a MEMBER of, OR their own event at any visibility (including Private) - the
+    # my_organized_events owner_clause. The Club Only branch is a membership test, not a
+    # tier: without it the assistant would answer questions about events the asker cannot
+    # see in the UI, which is the same leak _published_clause closes.
     owned = _owner_clause("request", "request.request_id", user_id, email or "")
+    club_member = (
+        "(request.event_visibility = 'Club Only' AND EXISTS ("
+        "SELECT 1 FROM request_clubs rc JOIN club_members cm ON cm.club_id = rc.club_id "
+        f"WHERE rc.request_id = request.request_id AND cm.user_id = {int(user_id)}))"
+    )
     return (
         "request.status = 'completed_approved' AND (request.event_visibility IN "
-        f"('Public', 'Club Only', 'Internal') OR ({owned}))",
+        f"('Public', 'Internal') OR {club_member} OR ({owned}))",
     )
 
 

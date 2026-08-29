@@ -144,3 +144,11 @@ export interface PresidentChangeRequestQuery {
   readonly page: number;
   readonly pageSize: number;
 }
+
+// One club as an option in the proposal form's "Club Only" audience picker.
+// Deliberately minimal - the picker needs an id to submit and a name to show,
+// nothing else about the club.
+export interface ClubOption {
+  readonly id: string;
+  readonly name: string;
+}

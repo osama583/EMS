@@ -16,39 +16,65 @@
   } @else if (members().length === 0) {
     <p class="club-roster__empty">This club has no members yet.</p>
   } @else {
-    <ul class="club-roster__list">
-      @for (member of members(); track member.user.id) {
-        <li class="club-roster__item">
-          <div class="club-roster__identity">
-            <strong>{{ member.user.displayName }}</strong>
-            <span>{{ member.user.email }}</span>
-          </div>
-          <div class="club-roster__meta">
-            <!-- Everyone on a club roster is a member, and the server never sent anything else:
-                 ClubUserSummary.role was dropped because it was always this literal string. The
-                 chip is kept so the row looks exactly as it did. -->
-            <span class="club-roster__role" data-role="Member">Member</span>
-            <span class="club-roster__joined">Joined {{ formatDate(member.dateJoined) }}</span>
-          </div>
-          @if (canAct(member)) {
-            <button type="button" class="club-roster__action" [attr.aria-label]="actionLabel(member) + ' ' + member.user.displayName" (click)="openRemove(member)">
-              <span class="material-symbols-rounded" aria-hidden="true">{{ isSelf(member) ? 'logout' : 'person_remove' }}</span>
-              {{ actionLabel(member) }}
-            </button>
+    <div class="club-roster__table-scroll">
+      <table class="shared-data-table club-roster__table">
+        <thead>
+          <tr>
+            <th scope="col">Member</th>
+            <th scope="col">Role</th>
+            <th scope="col">Joined</th>
+            @if (club()?.viewerIsPresident) {
+              <th scope="col" data-actions>Actions</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (member of members(); track member.user.id) {
+            <tr>
+              <td>
+                <div class="shared-data-cell">
+                  <span class="shared-data-cell__copy">
+                    <strong>{{ member.user.displayName }}</strong>
+                    <small>{{ member.user.email }}</small>
+                  </span>
+                </div>
+              </td>
+              <td>
+                <!-- Everyone on a club roster is a member, and the server never sent anything else:
+                     ClubUserSummary.role was dropped because it was always this literal string. The
+                     badge is kept so the row looks exactly as it did. -->
+                <span class="shared-data-cell__badge" data-tone="neutral">Member</span>
+              </td>
+              <td>{{ formatDate(member.dateJoined) }}</td>
+              @if (club()?.viewerIsPresident) {
+                <td data-actions>
+                  @if (canRemove(member)) {
+                    <div class="shared-table-actions">
+                      <button
+                        type="button"
+                        [attr.aria-label]="'Remove ' + member.user.displayName"
+                        title="Remove member"
+                        (click)="openRemove(member)"
+                      >
+                        <span class="material-symbols-rounded" aria-hidden="true">person_remove</span>
+                      </button>
+                    </div>
+                  }
+                </td>
+              }
+            </tr>
           }
-        </li>
-      }
-    </ul>
+        </tbody>
+      </table>
+    </div>
   }
 </app-form-modal>
 
 <app-confirm-dialog
   [open]="!!removeTarget()"
-  [title]="removeTarget() && isSelf(removeTarget()!) ? 'Leave club' : 'Remove member'"
-  [message]="removeTarget() ? (isSelf(removeTarget()!)
-      ? ('Leave ' + (club()?.name ?? 'this club') + '? You will need to request to join again to rejoin.')
-      : ('Remove ' + removeTarget()!.user.displayName + ' from ' + (club()?.name ?? 'this club') + '?')) : ''"
-  [confirmLabel]="removeTarget() && isSelf(removeTarget()!) ? 'Leave' : 'Remove'"
+  title="Remove member"
+  [message]="removeTarget() ? ('Remove ' + removeTarget()!.user.displayName + ' from ' + (club()?.name ?? 'this club') + '?') : ''"
+  confirmLabel="Remove"
   [danger]="true"
   [loading]="removing()"
   (confirm)="confirmRemove()"

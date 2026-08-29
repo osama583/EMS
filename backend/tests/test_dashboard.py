@@ -354,12 +354,12 @@ def test_outlet_scope_is_validated_against_the_callers_assignments():
 
 def test_config_prefers_a_per_unit_override():
     config = DashboardConfig(
-        [{"code": "SLA_DECISION_HOURS", "number": 48}, {"code": "SLA_DECISION_HOURS__a_v_services", "number": 12}]
+        [{"code": "FORECAST_HORIZON_DAYS", "number": 60}, {"code": "FORECAST_HORIZON_DAYS__a_v_services", "number": 30}]
     )
-    assert config.decision_sla_hours("a_v_services") == 12
-    assert config.decision_sla_hours("transport_services") == 48
+    assert config.horizon_days("a_v_services") == 30
+    assert config.horizon_days("transport_services") == 60
     # A missing code degrades to the documented default rather than raising.
-    assert DashboardConfig([]).decision_sla_hours("a_v_services") == 48
+    assert DashboardConfig([]).horizon_days("a_v_services") == 60
 
 
 # --- R7 / R8 --------------------------------------------------------------

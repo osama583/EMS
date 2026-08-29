@@ -66,6 +66,11 @@
                       <span class="material-symbols-rounded" aria-hidden="true">swap_horiz</span>
                       Request President change
                     </button>
+                  } @else {
+                    <button type="button" role="menuitem" class="club-page__menu-danger" (click)="closeMenu(); openLeave(club)">
+                      <span class="material-symbols-rounded" aria-hidden="true">logout</span>
+                      Leave club
+                    </button>
                   }
                 </div>
               }
@@ -129,4 +134,15 @@
 <app-president-change-request-modal
   [open]="presidentChangeClub() !== null" [club]="presidentChangeClub()"
   (close)="closePresidentChange()" (submitted)="onPresidentChangeSubmitted()"
+/>
+
+<app-confirm-dialog
+  [open]="!!leaveTarget()"
+  title="Leave club"
+  [message]="leaveTarget() ? ('Leave ' + leaveTarget()!.name + '? You will need to request to join again to rejoin.') : ''"
+  confirmLabel="Leave"
+  [danger]="true"
+  [loading]="leaving()"
+  (confirm)="confirmLeave()"
+  (cancel)="closeLeave()"
 />

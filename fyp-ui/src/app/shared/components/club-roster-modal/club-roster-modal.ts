@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
-import { AuthService } from '../../../core/auth/auth.service';
 import { ClubMemberRecord, ClubRecord } from '../../../core/clubs/club.models';
 import { ClubService } from '../../../core/clubs/club.service';
 import { FormModalComponent } from '../form-modal/form-modal';
@@ -9,10 +8,11 @@ import { ConfirmDialogComponent } from '../confirm-dialog/confirm-dialog';
 import { ToastService, apiErrorMessage } from '../toast/toast.service';
 
 // Roster popup opened from My Clubs — lets a member or President see who else belongs to a club
-// (name, email, role, date joined). The President may remove any other member here; a normal
-// member may leave (remove themselves). The President themselves has no action on their own row —
-// DELETE /clubs/{id}/members/{userId} always blocks removing the President, so the only way for
-// them to stop presiding is a President Change Request (see the Inbox tab), not this modal.
+// (name, email, role, date joined), read-only. Leaving a club is a page-level action (see
+// hub-my-clubs.ts), not handled here. The President may still remove another member from this
+// table — that capability has nowhere else to live. The President themselves has no action on
+// their own row: DELETE /clubs/{id}/members/{userId} always blocks removing the President, so the
+// only way for them to stop presiding is a President Change Request (see the Inbox tab).
 @Component({
   selector: 'app-club-roster-modal',
   imports: [FormModalComponent, ConfirmDialogComponent],
@@ -21,7 +21,6 @@ import { ToastService, apiErrorMessage } from '../toast/toast.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ClubRosterModalComponent {
-  private readonly auth = inject(AuthService);
   private readonly clubService = inject(ClubService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly toast = inject(ToastService);
@@ -29,8 +28,7 @@ export class ClubRosterModalComponent {
   readonly open = input(false);
   readonly club = input<ClubRecord | null>(null);
   readonly close = output<void>();
-  // Emitted after a member is removed/leaves, so the parent can refresh its own club list
-  // (memberCount, and — if the viewer just left — drop the club from "My Clubs" entirely).
+  // Emitted after a member is removed, so the parent can refresh its own club list (memberCount).
   readonly membershipChanged = output<void>();
 
   readonly members = signal<readonly ClubMemberRecord[]>([]);
@@ -38,8 +36,6 @@ export class ClubRosterModalComponent {
   readonly errorMessage = signal('');
   readonly removeTarget = signal<ClubMemberRecord | null>(null);
   readonly removing = signal(false);
-
-  private readonly currentUserId = this.auth.user()?.id ?? '';
 
   constructor() {
     effect(() => {
@@ -57,16 +53,12 @@ export class ClubRosterModalComponent {
     });
   }
 
-  isSelf(member: ClubMemberRecord): boolean { return member.user.id === this.currentUserId; }
   isPresident(member: ClubMemberRecord): boolean { return member.user.id === this.club()?.president?.id; }
 
-  // President: can remove anyone except themselves. Non-president: can only leave (remove self).
-  canAct(member: ClubMemberRecord): boolean {
-    if (this.isPresident(member)) return false;
-    return this.club()?.viewerIsPresident ? true : this.isSelf(member);
+  // Only the President can remove members here, and never themselves.
+  canRemove(member: ClubMemberRecord): boolean {
+    return !!this.club()?.viewerIsPresident && !this.isPresident(member);
   }
-
-  actionLabel(member: ClubMemberRecord): string { return this.isSelf(member) ? 'Leave' : 'Remove'; }
 
   openRemove(member: ClubMemberRecord): void { this.removeTarget.set(member); }
   closeRemove(): void { if (!this.removing()) this.removeTarget.set(null); }
@@ -81,15 +73,12 @@ export class ClubRosterModalComponent {
         next: () => {
           this.members.update((members) => members.filter((member) => member.user.id !== target.user.id));
           this.removeTarget.set(null);
-          this.toast.success(
-            this.isSelf(target) ? 'You left the club' : 'Member removed',
-            this.isSelf(target) ? `You are no longer a member of ${club.name}.` : `${target.user.displayName} was removed from ${club.name}.`,
-          );
+          this.toast.success('Member removed', `${target.user.displayName} was removed from ${club.name}.`);
           this.membershipChanged.emit();
         },
         error: (err) => {
           this.removeTarget.set(null);
-          this.toast.error('Could not complete this action', apiErrorMessage(err, 'Please try again.'));
+          this.toast.error('Could not remove member', apiErrorMessage(err, 'Please try again.'));
         },
       });
   }

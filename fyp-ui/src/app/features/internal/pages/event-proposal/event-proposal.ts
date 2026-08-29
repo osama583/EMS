@@ -14,12 +14,14 @@ import { EditableRow, EditableTableColumn, SelectOption, StaffOption, FormContro
 import { RequestOption, RequestOptionKind } from '../../../../core/request-options/request-option.models';
 import { RequestOptionService } from '../../../../core/request-options/request-option.service';
 import { LogisticsAvailabilityService } from '../../../../core/request-options/logistics-availability.service';
+import { PublishedEventService } from '../../../../core/events/published-event.service';
 import { LogisticsAvailability } from '../../../../core/request-options/logistics-availability.models';
 import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
 import { OptionPickerGridComponent } from '../../../../shared/components/option-picker-grid/option-picker-grid';
 import { OptionPickerItem } from '../../../../shared/components/option-picker-grid/option-picker-grid.models';
 import { ReviewerCommentsDrawerComponent } from '../../../../shared/components/reviewer-comments-drawer/reviewer-comments-drawer';
 import { AuthService } from '../../../../core/auth/auth.service';
+import { ClubService } from '../../../../core/clubs/club.service';
 import { EventImageAsset, EventVisibility, RegistrationMode } from '../../../../core/events/published-event.models';
 import { ProposalWorkflowService } from '../../../../core/proposals/proposal-workflow.service';
 import { ProposalConversation } from '../../../../core/proposals/proposal-conversation.models';
@@ -75,6 +77,7 @@ export class EventProposalComponent implements OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
   private readonly optionService = inject(RequestOptionService);
   private readonly availabilityService = inject(LogisticsAvailabilityService);
+  private readonly publishedEventService = inject(PublishedEventService);
   private readonly applicant = this.auth.user();
   private readonly requestOptionCatalog = signal<readonly RequestOption[]>([]);
   readonly requestCatalogLoading = signal(false);
@@ -88,6 +91,16 @@ export class EventProposalComponent implements OnDestroy {
   readonly logisticsAvailability = signal<LogisticsAvailability | null>(null);
   readonly logisticsAvailabilityLoading = signal(false);
   readonly logisticsAvailabilityError = signal(false);
+  // Schedule date-congestion check. Advisory only: it never blocks saving the row or submitting
+  // the proposal, it just tells the organiser how busy the date they picked already is. Same
+  // debounce-and-token shape as the logistics availability check above, so a fast typist never
+  // sees a stale answer land after a newer one.
+  private dateConflictTimer: ReturnType<typeof setTimeout> | undefined;
+  private dateConflictSubscription: Subscription | undefined;
+  private dateConflictRequestToken = 0;
+  /** Count of events already on the currently-drafted schedule date, or null when unknown. */
+  readonly dateConflictCount = signal<number | null>(null);
+  readonly dateConflictDate = signal('');
   private nextRowId = 100;
   readonly currentStep = signal(0);
   readonly status = signal<'Draft' | 'Draft saved' | 'Submitted'>('Draft');
@@ -159,6 +172,8 @@ export class EventProposalComponent implements OnDestroy {
   // formatOptions below, which source from the id-backed Event Categories/Formats catalog.
   readonly eventCategories = signal<readonly string[]>([]);
   readonly eventVisibility = signal<EventVisibility>('Private');
+  readonly maxPax = signal<number | null>(null);
+  readonly showMaxPax = computed(() => this.eventVisibility() !== 'Internal');
   readonly eventFormat = signal<string>('');
   readonly eventImage = signal<EventImageAsset | null>(null);
   readonly registrationMode = signal<RegistrationMode>('Automatic');
@@ -185,6 +200,7 @@ export class EventProposalComponent implements OnDestroy {
   private readonly toastService = inject(ToastService);
   private readonly systemConfig = inject(SystemConfigService);
   private readonly directory = inject(InternalUserDirectoryService);
+  private readonly clubService = inject(ClubService);
   private readonly eventCategoryService = inject(EventCategoryService);
   private readonly eventFormatService = inject(EventFormatService);
   // ACTIVE-only options — an archived category/format must not be offered on a new proposal, even
@@ -198,6 +214,18 @@ export class EventProposalComponent implements OnDestroy {
   // Club Only visibility is gated on being the President of at least one club — a data fact
   // (AuthUser.presidentOfClubIds, sourced from the clubs table), not a role check.
   private readonly isClubPresident = Boolean(this.applicant?.presidentOfClubIds?.length);
+  // The clubs a "Club Only" event is addressed to. Without this the tier was
+  // unenforceable: a president of two clubs produced an event that named neither,
+  // so it reached both clubs' members (and, before the server-side check, everyone
+  // else too). Options are the clubs THIS user presides over, fetched from
+  // /clubs/mine/presiding; the server re-checks presidency on save regardless.
+  readonly presidingClubOptions = signal<readonly SelectOption[]>([]);
+  readonly eventClubs = signal<readonly string[]>([]);
+  // Only meaningful for Club Only, and only worth showing if there is a choice to
+  // make - a president of exactly one club still needs the field rendered (so the
+  // audience is visible and explicit), but it will already be filled in.
+  readonly showClubPicker = computed(() => this.eventVisibility() === 'Club Only');
+
   readonly visibilityOptions: readonly SelectOption[] = (this.isClubPresident ? ['Public', 'Private', 'Internal', 'Club Only'] : ['Public', 'Private', 'Internal']).map((label) => ({ value: label, label }));
   readonly formatOptions = computed<readonly SelectOption[]>(() =>
     this.eventFormatService.activeEntries().map((entry) => ({ value: entry.id, label: entry.name }))
@@ -233,6 +261,19 @@ export class EventProposalComponent implements OnDestroy {
   private readonly pendingFormatName = signal<string | null>(null);
 
   constructor() {
+    // The "Club Only" audience options. Only fetched for a president - for anyone
+    // else the tier is not offered at all, so the request would be wasted.
+    if (this.isClubPresident) {
+      this.clubService.getMyPresidingClubs().pipe(takeUntilDestroyed(this.destroyRef)).subscribe((clubs) => {
+        this.presidingClubOptions.set(clubs.map((club) => ({ value: club.id, label: club.name })));
+        // A president of exactly one club has no choice to make: prefill it so the
+        // common case needs no interaction, while the field still shows the audience.
+        if (this.eventVisibility() === 'Club Only' && !this.eventClubs().length && clubs.length === 1) {
+          this.eventClubs.set([clubs[0].id]);
+        }
+      });
+    }
+
     // Co-owner/Organizer candidates: anyone who can plausibly BE an applicant themselves —
     // both roles can act in the applicant's place (a Co-owner can resubmit/continue exactly
     // like the applicant; an Organizer helps run the event) — server-scoped to whoever the
@@ -363,6 +404,10 @@ export class EventProposalComponent implements OnDestroy {
     this.pendingCategoryNames.set(record.eventCategories ?? null);
     this.pendingFormatName.set(record.eventFormat ?? null);
     this.eventVisibility.set(record.eventVisibility ?? 'Private');
+    // Re-populates the audience picker when a saved Club Only proposal is reopened,
+    // so History shows the clubs it was actually addressed to rather than a blank field.
+    this.eventClubs.set(record.eventClubs ?? []);
+    this.maxPax.set(record.maxPax ?? null);
     this.eventImage.set(record.eventImage ?? null);
     this.registrationMode.set(
       record.registrationMode === ('Manual' as RegistrationMode)
@@ -549,8 +594,10 @@ export class EventProposalComponent implements OnDestroy {
   setShortIntro(value: string): void { this.shortIntro.set(value); this.clearFieldError('shortIntro', Boolean(value.trim())); }
   setGoals(value: string): void { this.goals.set(value); this.clearFieldError('goals', Boolean(value.trim())); }
   setBenefits(value: string): void { this.benefits.set(value); this.clearFieldError('benefits', Boolean(value.trim())); }
+  setEventClubs(value: string | readonly string[]): void { const values = Array.isArray(value) ? value : [value]; this.eventClubs.set(values.filter((v) => !!v)); this.clearFieldError('eventClubs', values.length > 0); }
   setEventCategories(value: string | readonly string[]): void { const values = (Array.isArray(value) ? value : [value]).slice(0, 2); this.eventCategories.set(values); this.clearFieldError('eventCategories', values.length > 0); }
-  setEventVisibility(value: string | readonly string[]): void { const next = (Array.isArray(value) ? value[0] : value) as EventVisibility; if (next === 'Club Only' && !this.isClubPresident) return; this.eventVisibility.set(next); this.isPublic.set(next === 'Public'); if (next !== 'Public') { this.publicity.set(''); this.eventCategories.set([]); this.clearFieldError('eventCategories', true); } this.clearFieldError('eventVisibility', Boolean(next)); }
+  setEventVisibility(value: string | readonly string[]): void { const next = (Array.isArray(value) ? value[0] : value) as EventVisibility; if (next === 'Club Only' && !this.isClubPresident) return; this.eventVisibility.set(next); if (next !== 'Club Only') { this.eventClubs.set([]); this.clearFieldError('eventClubs', true); } else if (!this.eventClubs().length && this.presidingClubOptions().length === 1) { this.eventClubs.set([this.presidingClubOptions()[0].value]); } this.isPublic.set(next === 'Public'); if (next !== 'Public') { this.publicity.set(''); this.eventCategories.set([]); this.clearFieldError('eventCategories', true); } if (next === 'Internal') { this.maxPax.set(null); this.clearFieldError('maxPax', true); } this.clearFieldError('eventVisibility', Boolean(next)); }
+  setMaxPax(value: string): void { const trimmed = value.trim(); const next = trimmed === '' ? null : Number(trimmed); this.maxPax.set(next !== null && Number.isFinite(next) ? next : null); this.clearFieldError('maxPax', this.maxPax() === null || this.maxPax()! > 0); }
   setEventFormat(value: string | readonly string[]): void { this.eventFormat.set(Array.isArray(value) ? value[0] : value); }
   setRegistrationMode(value: string | readonly string[]): void { this.registrationMode.set((Array.isArray(value) ? value[0] : value) as RegistrationMode); }
   setPublicity(value: string): void { this.publicity.set(value); this.clearFieldError('publicity', Boolean(value.trim())); }
@@ -656,9 +703,9 @@ export class EventProposalComponent implements OnDestroy {
     return ({ schedule: 'Event Schedule', organizers: 'Organizer / PIC', importantPeople: 'Important People', guests: 'General Guest / Pax', agenda: 'Brief Agenda', discussions: 'Discussion Topics' })[collection];
   }
   isTableAtLimit(collection: TableEditorCollection): boolean { return this.tableRows(collection).length >= 20; }
-  openTableEditor(collection: TableEditorCollection): void { this.tableEditorCollection.set(collection); this.tableEditingIndex.set(null); this.tableDraft.set({}); this.tableModalOpen.set(true); }
-  editTableRow(collection: TableEditorCollection, index: number): void { this.tableEditorCollection.set(collection); this.tableEditingIndex.set(index); this.tableDraft.set({ ...this.tableRows(collection)[index] }); this.tableModalOpen.set(true); }
-  closeTableModal(): void { this.tableModalOpen.set(false); this.tableEditorCollection.set(null); this.tableEditingIndex.set(null); this.tableDraft.set({}); }
+  openTableEditor(collection: TableEditorCollection): void { this.tableEditorCollection.set(collection); this.tableEditingIndex.set(null); this.tableDraft.set({}); this.tableModalOpen.set(true); this.resetDateConflict(); }
+  editTableRow(collection: TableEditorCollection, index: number): void { this.tableEditorCollection.set(collection); this.tableEditingIndex.set(index); this.tableDraft.set({ ...this.tableRows(collection)[index] }); this.tableModalOpen.set(true); this.resetDateConflict(); if (collection === 'schedule') this.scheduleDateConflictCheck(); }
+  closeTableModal(): void { this.tableModalOpen.set(false); this.tableEditorCollection.set(null); this.tableEditingIndex.set(null); this.tableDraft.set({}); this.resetDateConflict(); }
   tableModalTitle(): string { const collection = this.tableEditorCollection(); return collection ? `Add ${this.tableTitle(collection)} row` : 'Add table row'; }
   tableDraftValue(key: string): string | number { return this.tableDraft()[key] ?? ''; }
   tableFieldType(column: EditableTableColumn): FormControlType { return column.type === 'select' || column.type === 'staff' || column.type === 'readonly' ? 'text' : column.type; }
@@ -672,6 +719,9 @@ export class EventProposalComponent implements OnDestroy {
       if (person) { draft['name'] = person.label; draft['email'] = person.email; draft['role'] = person.role; }
     }
     this.tableDraft.set(draft);
+    // Re-check congestion whenever the schedule row's date changes, so the warning appears
+    // immediately on selection and updates itself if the organiser picks a different date.
+    if (collection === 'schedule' && key === 'date') this.scheduleDateConflictCheck();
   }
   tableFieldMin(column: EditableTableColumn): string { return column.type === 'date' && this.tableEditorCollection() === 'schedule' ? this.todayIso() : String(column.min ?? ''); }
   // Staff options for a `staff`-type table column, excluding anyone already picked in another row
@@ -709,6 +759,66 @@ export class EventProposalComponent implements OnDestroy {
       ? 'This session is longer than two hours — a Brief Agenda will be required on step 4.'
       : '';
   }
+  // How many events must already sit on a date before the organiser is warned. Advisory
+  // threshold only - nothing about the proposal changes at or above it.
+  private static readonly BUSY_DATE_THRESHOLD = 5;
+
+  /**
+   * Non-blocking congestion warning for the schedule date currently being drafted (requirement:
+   * Event Schedule conflict awareness). Empty unless the count for THIS date is known and over
+   * the threshold, so it appears the moment a date is chosen and clears itself when the date
+   * changes to a quieter one.
+   */
+  tableDateConflictWarning(): string {
+    if (this.tableEditorCollection() !== 'schedule') return '';
+    const date = String(this.tableDraft()['date'] ?? '');
+    // Guard on the date the count was fetched FOR, so a count belonging to a previously drafted
+    // date can never be shown against the new one while the refetch is still in flight.
+    if (!date || date !== this.dateConflictDate()) return '';
+    const count = this.dateConflictCount();
+    if (count === null || count <= EventProposalComponent.BUSY_DATE_THRESHOLD) return '';
+    return `This date is already heavily utilized. There are currently ${count} events scheduled on this date. Consider selecting another date to avoid venue conflicts, resource shortages, or participant overlap.`;
+  }
+
+  private resetDateConflict(): void {
+    if (this.dateConflictTimer) clearTimeout(this.dateConflictTimer);
+    this.dateConflictSubscription?.unsubscribe();
+    this.dateConflictCount.set(null);
+    this.dateConflictDate.set('');
+  }
+
+  private scheduleDateConflictCheck(): void {
+    if (this.dateConflictTimer) clearTimeout(this.dateConflictTimer);
+    this.dateConflictTimer = setTimeout(() => this.runDateConflictCheck(), 300);
+  }
+
+  private runDateConflictCheck(): void {
+    const date = String(this.tableDraft()['date'] ?? '');
+    if (this.tableEditorCollection() !== 'schedule' || !date) {
+      this.dateConflictCount.set(null);
+      this.dateConflictDate.set('');
+      return;
+    }
+    const token = ++this.dateConflictRequestToken;
+    this.dateConflictSubscription?.unsubscribe();
+    // Counts only - the endpoint returns no event data at all, which is what lets it report the
+    // true total for the date regardless of what this user is allowed to see.
+    this.dateConflictSubscription = this.publishedEventService.getEventDateCounts([date]).subscribe({
+      next: (counts) => {
+        if (token !== this.dateConflictRequestToken) return;
+        this.dateConflictCount.set(counts[date] ?? 0);
+        this.dateConflictDate.set(date);
+      },
+      // Advisory feature: a failed count silently shows no warning rather than an error, since
+      // the organiser can still legitimately submit on this date either way.
+      error: () => {
+        if (token !== this.dateConflictRequestToken) return;
+        this.dateConflictCount.set(null);
+        this.dateConflictDate.set('');
+      },
+    });
+  }
+
   tableFormValid(): boolean {
     const collection = this.tableEditorCollection();
     return !!collection
@@ -1030,7 +1140,11 @@ export class EventProposalComponent implements OnDestroy {
       goals: this.goals(),
       benefits: this.benefits(),
       totalPax: this.totalPax(),
+      maxPax: this.showMaxPax() ? this.maxPax() : null,
       eventVisibility: this.eventVisibility(),
+      // Only sent for Club Only - the server rejects clubs on any other tier, so
+      // stale selections must not survive a visibility change.
+      eventClubs: this.eventVisibility() === 'Club Only' ? this.eventClubs() : [],
       eventFormat: this.eventFormat(),
       registrationMode: this.registrationMode() === 'Approval Required' ? 'Manual' : this.registrationMode(),
       publicity: this.publicity(),
@@ -1128,6 +1242,8 @@ export class EventProposalComponent implements OnDestroy {
       if (this.isPublic() && !this.eventCategories().length) add('eventCategories', 'Select at least one event category.');
       if (this.eventCategories().length > 2) add('eventCategories', 'Select no more than two event categories.');
       if (!this.eventVisibility()) add('eventVisibility', 'Event Visibility is required.');
+      if (this.eventVisibility() === 'Club Only' && !this.eventClubs().length) add('eventClubs', 'Select at least one club that can see this event.');
+      if (this.showMaxPax() && this.maxPax() !== null && this.maxPax()! <= 0) add('maxPax', 'Max Registered Pax must be greater than zero.');
       if (!this.shortIntro().trim()) add('shortIntro', 'Short Introduction is required.');
       if (!this.goals().trim()) add('goals', 'Goals & Objectives is required.');
       if (!this.benefits().trim()) add('benefits', 'Expected Benefits is required.');

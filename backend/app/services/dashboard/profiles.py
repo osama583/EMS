@@ -341,7 +341,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "kpis": ["gen_open_backlog", "gen_first_pass_yield"],
         "signature": "gen_backlog_age",
         "panels": ["dept_staff_balance"],
-        "alerts": "gen_stalled",
+        "alerts": None,
         "quickActions": ["review_inbox", "assign_work"],
         "mobileKpis": ["gen_open_backlog", "gen_first_pass_yield"],
     },
@@ -357,7 +357,6 @@ PROFILES: dict[str, dict[str, Any]] = {
                 "hos_gate_latency",
                 "hos_outcome_mix",
                 "hos_service_footprint",
-                "hos_stall_rate",
                 "hos_forward_pipeline",
             ],
             "commercial": [
@@ -390,7 +389,7 @@ PROFILES: dict[str, dict[str, Any]] = {
         "alerts": "hos_at_risk",
         "quickActions": ["review_gate", "school_history"],
         "mobileKpis": {
-            "service": ["hos_gate_latency", "hos_stall_rate", "hos_end_to_end_kpi"],
+            "service": ["hos_gate_latency", "hos_service_footprint", "hos_end_to_end_kpi"],
             "commercial": ["hos_gate_latency", "hos_collection_rate", "hos_cost_per_pax_kpi"],
         },
     },
@@ -429,13 +428,16 @@ PROFILES: dict[str, dict[str, Any]] = {
         "mobileKpis": ["cfo_total_spend", "cfo_cafeteria_cost", "cfo_cost_per_pax"],
     },
     "cafeteria_manager": {
-        # Orders at Risk / Risk List does not apply here (see caf_orders_at_risk
-        # and cafeteria.py's module docstring: assignment happens right before
-        # prep starts, not on approval, so the "unstarted work due soon" shape
-        # the HOD Risk List looks for is never a real signal for this role) -
-        # caf_orders_at_risk stays this profile's own hero.
+        # Orders at Risk / Risk List does not apply here (see cafeteria.py's
+        # module docstring: assignment happens right before prep starts, not on
+        # approval, so the "unstarted work due soon" shape the HOD Risk List
+        # looks for is never a real signal for this role). The live at-risk hero
+        # this profile used to carry (caf_orders_at_risk) existed only to read
+        # the now-removed AT_RISK_WINDOW_DAYS threshold and has been removed
+        # along with it; the counts strip's own Late tile covers the same
+        # signal at a coarser grain.
         "counts": "caf_request_counts",
-        "hero": "caf_orders_at_risk",
+        "hero": None,
         "kpis": ["caf_on_time", "caf_pushback_rate"],
         "signature": "caf_service_board",
         "panels": ["caf_staff_workload", "caf_menu_performance"],

@@ -62,10 +62,17 @@ def _names_in(answer: str, titles: dict[str, int]) -> list[int]:
 def event_cards(answer: str, *, user_id: int | None) -> list[dict]:
     """Card data for every published event the answer names, re-read live and re-checked against
     the same visibility rule the discovery endpoints apply."""
+    # 'Club Only' is a membership test, not a tier anyone signed-in can read - it resolves
+    # against request_clubs/club_members exactly as api/events.py _published_clause does.
     visibility = (
-        "r.event_visibility IN ('Public', 'Club Only')"
+        "r.event_visibility = 'Public'"
         if user_id is None
-        else "(r.event_visibility IN ('Public', 'Club Only', 'Internal') OR r.applicant_user_id = %(user_id)s)"
+        else """(r.event_visibility IN ('Public', 'Internal')
+                 OR (r.event_visibility = 'Club Only' AND EXISTS (
+                       SELECT 1 FROM request_clubs rc
+                         JOIN club_members cm ON cm.club_id = rc.club_id
+                        WHERE rc.request_id = r.request_id AND cm.user_id = %(user_id)s))
+                 OR r.applicant_user_id = %(user_id)s)"""
     )
     rows = query(
         f"""
