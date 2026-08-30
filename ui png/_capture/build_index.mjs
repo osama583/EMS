@@ -100,6 +100,14 @@ for (const [group, rows] of byGroup) {
   }
 }
 
+md += `\n\n## Known empty states\n\n`;
+md += `Verified against the live database: these pages have no rows to show for any\n`;
+md += `account, so the figure is the application's empty state. That is a real screen\n`;
+md += `rather than a capture failure, but caption it accordingly.\n\n`;
+md += `| # | Figure | Why it is empty |\n|---|---|---|\n`;
+md += `| 4.5.63 | Event Registrations Hub | No registration in the database is in "pending" status, so nothing awaits approval. |\n`;
+md += `| 4.5.64 | Ongoing Events | Same cause - the pending-registration queue is empty. |\n`;
+
 md += `\n\n## Note keys\n\n`;
 md += `- \`EMPTY-STATE\` - the page rendered its "nothing here yet" state; correct behaviour, but pick a different account if you want a populated figure.\n`;
 md += `- \`PREP-MISSED\` - the scripted interaction (open a modal, switch a tab) found no matching control, so the figure shows the page beneath it.\n`;

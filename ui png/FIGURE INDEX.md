@@ -167,6 +167,18 @@ Every implementation figure exists twice: `desktop.png` (1440x900 at 2x) and `mo
 | 4.5.81 | AI Access Log | System Admin - system.admin@demo.apu.edu.my | `/app/admin/ai-access-log` |
 
 
+## Known empty states
+
+Verified against the live database: these pages have no rows to show for any
+account, so the figure is the application's empty state. That is a real screen
+rather than a capture failure, but caption it accordingly.
+
+| # | Figure | Why it is empty |
+|---|---|---|
+| 4.5.63 | Event Registrations Hub | No registration in the database is in "pending" status, so nothing awaits approval. |
+| 4.5.64 | Ongoing Events | Same cause - the pending-registration queue is empty. |
+
+
 ## Note keys
 
 - `EMPTY-STATE` - the page rendered its "nothing here yet" state; correct behaviour, but pick a different account if you want a populated figure.
