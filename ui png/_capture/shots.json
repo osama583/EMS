@@ -1,0 +1,576 @@
+[
+  {
+    "id": "4.5.01",
+    "title": "Landing Page - Hero",
+    "group": "A - Public and Authentication",
+    "as": null,
+    "path": "/"
+  },
+  {
+    "id": "4.5.02",
+    "title": "Landing Page - Happening Soon Carousel",
+    "group": "A - Public and Authentication",
+    "as": null,
+    "path": "/"
+  },
+  {
+    "id": "4.5.03",
+    "title": "Landing Page - Explore Events with Filters",
+    "group": "A - Public and Authentication",
+    "as": null,
+    "path": "/"
+  },
+  {
+    "id": "4.5.04",
+    "title": "Landing Page - Campus Life",
+    "group": "A - Public and Authentication",
+    "as": null,
+    "path": "/"
+  },
+  {
+    "id": "4.5.05",
+    "title": "Landing Page - Public Event Calendar",
+    "group": "A - Public and Authentication",
+    "as": null,
+    "path": "/"
+  },
+  {
+    "id": "4.5.06",
+    "title": "Event Details Modal",
+    "group": "A - Public and Authentication",
+    "as": null,
+    "path": "/"
+  },
+  {
+    "id": "4.5.07",
+    "title": "Login Page",
+    "group": "A - Public and Authentication",
+    "as": null,
+    "path": "/login"
+  },
+  {
+    "id": "4.5.08",
+    "title": "Forgot Password Modal",
+    "group": "A - Public and Authentication",
+    "as": null,
+    "path": "/login"
+  },
+  {
+    "id": "4.5.09",
+    "title": "Guest Registration - Account Details",
+    "group": "A - Public and Authentication",
+    "as": null,
+    "path": "/login"
+  },
+  {
+    "id": "4.5.10",
+    "title": "Guest Registration - Completed Form",
+    "group": "A - Public and Authentication",
+    "as": null,
+    "path": "/login"
+  },
+  {
+    "id": "4.5.11",
+    "title": "Reset Password Page",
+    "group": "A - Public and Authentication",
+    "as": null,
+    "path": "/reset-password"
+  },
+  {
+    "id": "4.5.12",
+    "title": "My Events - Saved",
+    "group": "B - External and Student User",
+    "as": "student",
+    "path": "/app/events/my-events/saved"
+  },
+  {
+    "id": "4.5.13",
+    "title": "My Events - Registered",
+    "group": "B - External and Student User",
+    "as": "external",
+    "path": "/my-events/registered"
+  },
+  {
+    "id": "4.5.14",
+    "title": "My Events - Pending Approval",
+    "group": "B - External and Student User",
+    "as": "external",
+    "path": "/my-events/pending"
+  },
+  {
+    "id": "4.5.15",
+    "title": "My Events - History",
+    "group": "B - External and Student User",
+    "as": "external",
+    "path": "/my-events/history"
+  },
+  {
+    "id": "4.5.16",
+    "title": "User Profile",
+    "group": "B - External and Student User",
+    "as": "student",
+    "path": "/app/profile"
+  },
+  {
+    "id": "4.5.17",
+    "title": "Internal Layout and Sidebar Navigation",
+    "group": "C - Internal Shell and Onboarding",
+    "as": "logistics",
+    "path": "/app/dashboard"
+  },
+  {
+    "id": "4.5.18",
+    "title": "How It Works - Onboarding Guide",
+    "group": "C - Internal Shell and Onboarding",
+    "as": "student",
+    "path": "/app/how-it-works"
+  },
+  {
+    "id": "4.5.19",
+    "title": "Master Event Calendar",
+    "group": "C - Internal Shell and Onboarding",
+    "as": "hos",
+    "path": "/app/event-calendar"
+  },
+  {
+    "id": "4.5.20",
+    "title": "Internal Explore Events",
+    "group": "C - Internal Shell and Onboarding",
+    "as": "student",
+    "path": "/app/events/explore-events"
+  },
+  {
+    "id": "4.5.21",
+    "title": "Proposal Form - Step 1 Applicant Info",
+    "group": "D - Proposal Creation",
+    "as": "student",
+    "path": "/app/forms/event-proposal"
+  },
+  {
+    "id": "4.5.22",
+    "title": "Proposal Form - Step 2 General Event Info",
+    "group": "D - Proposal Creation",
+    "as": "student",
+    "path": "/app/forms/event-proposal"
+  },
+  {
+    "id": "4.5.23",
+    "title": "Proposal Form - Step 3 Required for Event",
+    "group": "D - Proposal Creation",
+    "as": "student",
+    "path": "/app/forms/event-proposal"
+  },
+  {
+    "id": "4.5.24",
+    "title": "Proposal Form - Step 4 Request Details",
+    "group": "D - Proposal Creation",
+    "as": "student",
+    "path": "/app/forms/event-proposal"
+  },
+  {
+    "id": "4.5.25",
+    "title": "Proposal Form - Step 5 Detailed Event Info",
+    "group": "D - Proposal Creation",
+    "as": "student",
+    "path": "/app/forms/event-proposal"
+  },
+  {
+    "id": "4.5.26",
+    "title": "Proposal Form - Step 6 Final Review",
+    "group": "D - Proposal Creation",
+    "as": "student",
+    "path": "/app/forms/event-proposal"
+  },
+  {
+    "id": "4.5.27",
+    "title": "Proposal Form - Validation Errors",
+    "group": "D - Proposal Creation",
+    "as": "student",
+    "path": "/app/forms/event-proposal"
+  },
+  {
+    "id": "4.5.28",
+    "title": "Draft Proposals",
+    "group": "E - Proposal Tracking and Review",
+    "as": "student",
+    "path": "/app/proposals/drafts"
+  },
+  {
+    "id": "4.5.29",
+    "title": "Created by Me - Status Tracking",
+    "group": "E - Proposal Tracking and Review",
+    "as": "student",
+    "path": "/app/created-by-me"
+  },
+  {
+    "id": "4.5.30",
+    "title": "Proposal Review - Reviewer View",
+    "group": "E - Proposal Tracking and Review",
+    "as": "hos",
+    "path": "/app/proposals/review/:hosProposal"
+  },
+  {
+    "id": "4.5.31",
+    "title": "Proposal Review - Department View",
+    "group": "E - Proposal Tracking and Review",
+    "as": "logistics",
+    "path": "/app/proposals/review/:deptProposal"
+  },
+  {
+    "id": "4.5.32",
+    "title": "Proposal Review - Summary KPI Bar",
+    "group": "E - Proposal Tracking and Review",
+    "as": "hos",
+    "path": "/app/proposals/review/:hosProposal"
+  },
+  {
+    "id": "4.5.33",
+    "title": "Approval Decision Dialog",
+    "group": "E - Proposal Tracking and Review",
+    "as": "hos",
+    "path": "/app/proposals/review/:hosProposal"
+  },
+  {
+    "id": "4.5.34",
+    "title": "Workflow Actions Panel",
+    "group": "E - Proposal Tracking and Review",
+    "as": "hos",
+    "path": "/app/proposals/review/:hosProposal"
+  },
+  {
+    "id": "4.5.35",
+    "title": "Inbox - Pending Proposals",
+    "group": "F - Department Task Handling",
+    "as": "hos",
+    "path": "/app/inbox/proposals"
+  },
+  {
+    "id": "4.5.36",
+    "title": "Inbox - Department Tasks",
+    "group": "F - Department Task Handling",
+    "as": "logstaff",
+    "path": "/app/inbox/tasks"
+  },
+  {
+    "id": "4.5.37",
+    "title": "Inbox - Incoming Requests",
+    "group": "F - Department Task Handling",
+    "as": "logistics",
+    "path": "/app/inbox/requests"
+  },
+  {
+    "id": "4.5.38",
+    "title": "Staff Task Assignment",
+    "group": "F - Department Task Handling",
+    "as": "logistics",
+    "path": "/app/inbox/tasks"
+  },
+  {
+    "id": "4.5.39",
+    "title": "Task Date Filter Calendar",
+    "group": "F - Department Task Handling",
+    "as": "logstaff",
+    "path": "/app/inbox/tasks"
+  },
+  {
+    "id": "4.5.40",
+    "title": "Ongoing Records Hub",
+    "group": "F - Department Task Handling",
+    "as": "hos",
+    "path": "/app/ongoing/proposals"
+  },
+  {
+    "id": "4.5.41",
+    "title": "History Records Hub",
+    "group": "F - Department Task Handling",
+    "as": "hos",
+    "path": "/app/history/proposals"
+  },
+  {
+    "id": "4.5.42",
+    "title": "Task History",
+    "group": "F - Department Task Handling",
+    "as": "logstaff",
+    "path": "/app/history/tasks"
+  },
+  {
+    "id": "4.5.43",
+    "title": "Cafeteria Staff Tasks",
+    "group": "G - Cafeteria Module",
+    "as": "cafstaff",
+    "path": "/app/inbox/cafeteria-tasks"
+  },
+  {
+    "id": "4.5.44",
+    "title": "My Menu Management",
+    "group": "G - Cafeteria Module",
+    "as": "cafmgr",
+    "path": "/app/menu"
+  },
+  {
+    "id": "4.5.45",
+    "title": "Manage Cafeterias",
+    "group": "G - Cafeteria Module",
+    "as": "cafadmin",
+    "path": "/app/cafeterias/manage"
+  },
+  {
+    "id": "4.5.46",
+    "title": "Cafeteria Staff Assignments",
+    "group": "G - Cafeteria Module",
+    "as": "cafadmin",
+    "path": "/app/cafeterias/staff-assignments"
+  },
+  {
+    "id": "4.5.47",
+    "title": "Menu Oversight",
+    "group": "G - Cafeteria Module",
+    "as": "cafadmin",
+    "path": "/app/cafeterias/menu-oversight"
+  },
+  {
+    "id": "4.5.48",
+    "title": "My Staff",
+    "group": "G - Cafeteria Module",
+    "as": "cafmgr",
+    "path": "/app/cafeterias/my-staff"
+  },
+  {
+    "id": "4.5.49",
+    "title": "Staff Action History",
+    "group": "G - Cafeteria Module",
+    "as": "cafadmin",
+    "path": "/app/cafeterias/staff-requests-history"
+  },
+  {
+    "id": "4.5.50",
+    "title": "Discover Clubs",
+    "group": "H - Clubs Module",
+    "as": "student",
+    "path": "/app/clubs/discover"
+  },
+  {
+    "id": "4.5.51",
+    "title": "My Clubs",
+    "group": "H - Clubs Module",
+    "as": "student",
+    "path": "/app/clubs/my-clubs"
+  },
+  {
+    "id": "4.5.52",
+    "title": "Club Roster Modal",
+    "group": "H - Clubs Module",
+    "as": "student",
+    "path": "/app/clubs/my-clubs"
+  },
+  {
+    "id": "4.5.53",
+    "title": "Club Join Requests",
+    "group": "H - Clubs Module",
+    "as": "student",
+    "path": "/app/inbox/club-requests"
+  },
+  {
+    "id": "4.5.54",
+    "title": "President Change Requests",
+    "group": "H - Clubs Module",
+    "as": "clubadmin",
+    "path": "/app/inbox/president-change-request"
+  },
+  {
+    "id": "4.5.55",
+    "title": "Manage Clubs",
+    "group": "H - Clubs Module",
+    "as": "clubadmin",
+    "path": "/app/clubs/manage"
+  },
+  {
+    "id": "4.5.56",
+    "title": "Club Categories",
+    "group": "H - Clubs Module",
+    "as": "clubadmin",
+    "path": "/app/club-category"
+  },
+  {
+    "id": "4.5.57",
+    "title": "Dashboard - HOD Logistics",
+    "group": "I - Dashboards",
+    "as": "logistics",
+    "path": "/app/dashboard"
+  },
+  {
+    "id": "4.5.58",
+    "title": "Dashboard - HOD Food and Beverage",
+    "group": "I - Dashboards",
+    "as": "fmb",
+    "path": "/app/dashboard"
+  },
+  {
+    "id": "4.5.59",
+    "title": "Dashboard - HOD Audio Visual",
+    "group": "I - Dashboards",
+    "as": "av",
+    "path": "/app/dashboard"
+  },
+  {
+    "id": "4.5.60",
+    "title": "Dashboard - HOD Transport",
+    "group": "I - Dashboards",
+    "as": "transport",
+    "path": "/app/dashboard"
+  },
+  {
+    "id": "4.5.61",
+    "title": "Dashboard - CFO Finance",
+    "group": "I - Dashboards",
+    "as": "cfo",
+    "path": "/app/dashboard"
+  },
+  {
+    "id": "4.5.62",
+    "title": "Dashboard - Cafeteria Manager",
+    "group": "I - Dashboards",
+    "as": "cafmgr",
+    "path": "/app/dashboard"
+  },
+  {
+    "id": "4.5.63",
+    "title": "Event Registrations Hub",
+    "group": "J - Events and Registrations",
+    "as": "hos",
+    "path": "/app/inbox/registrations"
+  },
+  {
+    "id": "4.5.64",
+    "title": "Ongoing Events",
+    "group": "J - Events and Registrations",
+    "as": "hos",
+    "path": "/app/ongoing/events"
+  },
+  {
+    "id": "4.5.65",
+    "title": "Event History",
+    "group": "J - Events and Registrations",
+    "as": "hos",
+    "path": "/app/history/events"
+  },
+  {
+    "id": "4.5.66",
+    "title": "Users Directory",
+    "group": "K - System Administration",
+    "as": "sysadmin",
+    "path": "/app/users"
+  },
+  {
+    "id": "4.5.67",
+    "title": "Units Directory",
+    "group": "K - System Administration",
+    "as": "sysadmin",
+    "path": "/app/units"
+  },
+  {
+    "id": "4.5.68",
+    "title": "Roles Management",
+    "group": "K - System Administration",
+    "as": "sysadmin",
+    "path": "/app/roles"
+  },
+  {
+    "id": "4.5.69",
+    "title": "Page Visibility",
+    "group": "K - System Administration",
+    "as": "sysadmin",
+    "path": "/app/admin/page-visibility"
+  },
+  {
+    "id": "4.5.70",
+    "title": "System Configuration - Approval Policies",
+    "group": "K - System Administration",
+    "as": "sysadmin",
+    "path": "/app/admin/settings/policies"
+  },
+  {
+    "id": "4.5.71",
+    "title": "System Configuration - Event Categories",
+    "group": "K - System Administration",
+    "as": "sysadmin",
+    "path": "/app/admin/settings/categories"
+  },
+  {
+    "id": "4.5.72",
+    "title": "System Configuration - Event Formats",
+    "group": "K - System Administration",
+    "as": "sysadmin",
+    "path": "/app/admin/settings/formats"
+  },
+  {
+    "id": "4.5.73",
+    "title": "Option Catalogue - Logistics Items",
+    "group": "K - System Administration",
+    "as": "logistics",
+    "path": "/app/dropdown-options/logistics"
+  },
+  {
+    "id": "4.5.74",
+    "title": "Option Catalogue - Transportation Types",
+    "group": "K - System Administration",
+    "as": "transport",
+    "path": "/app/dropdown-options/transportation"
+  },
+  {
+    "id": "4.5.75",
+    "title": "Option Catalogue - Sound and Light",
+    "group": "K - System Administration",
+    "as": "av",
+    "path": "/app/dropdown-options/soundLight"
+  },
+  {
+    "id": "4.5.76",
+    "title": "Option Catalogue - Dietary Information",
+    "group": "K - System Administration",
+    "as": "fmb",
+    "path": "/app/dropdown-options/dietaryInformation"
+  },
+  {
+    "id": "4.5.77",
+    "title": "Option Catalogue - Venue Management",
+    "group": "K - System Administration",
+    "as": "cfo",
+    "path": "/app/dropdown-options/venue"
+  },
+  {
+    "id": "4.5.78",
+    "title": "Option Catalogue - Funding Items",
+    "group": "K - System Administration",
+    "as": "cfo",
+    "path": "/app/dropdown-options/fundingMain"
+  },
+  {
+    "id": "4.5.79",
+    "title": "AI Assistant Dock",
+    "group": "L - AI Assistant",
+    "as": "logistics",
+    "path": "/app/dashboard"
+  },
+  {
+    "id": "4.5.80",
+    "title": "AI Assistant Full Page",
+    "group": "L - AI Assistant",
+    "as": "logistics",
+    "path": "/assistant"
+  },
+  {
+    "id": "4.5.81",
+    "title": "AI Access Log",
+    "group": "L - AI Assistant",
+    "as": "sysadmin",
+    "path": "/app/admin/ai-access-log"
+  },
+  {
+    "id": "4.4.06",
+    "title": "Shared Component Library",
+    "group": "_Interface Design",
+    "as": "sysadmin",
+    "path": "/shared"
+  }
+]

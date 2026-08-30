@@ -1,0 +1,83 @@
+[
+  {
+    "id": "4.5.17",
+    "title": "Internal Layout and Sidebar Navigation",
+    "as": "logistics",
+    "path": "/app/dashboard",
+    "empty": false,
+    "tableRows": 0,
+    "heading": ""
+  },
+  {
+    "id": "4.5.31",
+    "title": "Proposal Review - Department View",
+    "as": "logistics",
+    "path": "/app/proposals/review/4925",
+    "empty": false,
+    "tableRows": 1,
+    "heading": ""
+  },
+  {
+    "id": "4.5.38",
+    "title": "Staff Task Assignment",
+    "as": "logistics",
+    "path": "/app/inbox/tasks",
+    "empty": true,
+    "tableRows": 0,
+    "heading": "No active tasks found"
+  },
+  {
+    "id": "4.5.30",
+    "title": "Proposal Review - Reviewer View",
+    "as": "hos",
+    "path": "/app/proposals/review/1431",
+    "empty": false,
+    "tableRows": 0,
+    "heading": ""
+  },
+  {
+    "id": "4.5.32",
+    "title": "Reviewer Comments Panel",
+    "as": "hos",
+    "path": "/app/proposals/review/1431",
+    "empty": false,
+    "tableRows": 0,
+    "heading": ""
+  },
+  {
+    "id": "4.5.33",
+    "title": "Approval Decision Dialog",
+    "as": "hos",
+    "path": "/app/proposals/review/1431",
+    "empty": false,
+    "tableRows": 0,
+    "heading": ""
+  },
+  {
+    "id": "4.5.34",
+    "title": "Workflow Actions Panel",
+    "as": "hos",
+    "path": "/app/proposals/review/1431",
+    "empty": false,
+    "tableRows": 0,
+    "heading": ""
+  },
+  {
+    "id": "4.5.64",
+    "title": "Registration Approval Detail",
+    "as": "hos",
+    "path": "/app/inbox/registrations",
+    "empty": true,
+    "tableRows": 0,
+    "heading": "No registrations need your approval"
+  },
+  {
+    "id": "4.5.52",
+    "title": "Club Roster Modal",
+    "as": "student",
+    "path": "/app/clubs/my-clubs",
+    "empty": false,
+    "tableRows": 7,
+    "heading": ""
+  }
+]
