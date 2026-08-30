@@ -68,12 +68,18 @@ export class SavedEventsService implements SavedEventsApi {
     );
   }
 
-  getNotificationPreferences(userEmail: string): Observable<NotificationPreference> {
-    return this.http.get<NotificationPreference>(`${this.baseUrl}/notification-preferences`, { params: { email: userEmail.trim().toLowerCase() } });
+  // Event reminder toggles. The actor is resolved server-side from the bearer
+  // token, so no email is sent — an email in the body would let a caller read or
+  // rewrite somebody else's preferences.
+  getNotificationPreferences(): Observable<NotificationPreference> {
+    return this.http.get<NotificationPreference>(`${this.baseUrl}/reminders`);
   }
 
-  updateNotificationPreferences(userEmail: string, preferences: NotificationPreference): Observable<NotificationPreference> {
-    return this.http.put<NotificationPreference>(`${this.baseUrl}/notification-preferences`, { email: userEmail.trim().toLowerCase(), ...preferences });
+  // Partial by design: each My Events tab sends only the toggles it owns, and
+  // the server merges over the stored row (see events.py's set_reminders), so
+  // the Saved tab saving its two can never reset the Registered tab's one.
+  updateNotificationPreferences(preferences: Partial<NotificationPreference>): Observable<NotificationPreference> {
+    return this.http.put<NotificationPreference>(`${this.baseUrl}/reminders`, preferences);
   }
 
   refresh(): void {

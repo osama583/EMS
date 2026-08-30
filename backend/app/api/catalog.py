@@ -35,6 +35,13 @@ CONFIG_FIELDS: dict[str, str] = {
     "paxReviewerThreshold": "HIGH_PAX_THRESHOLD",
     "cancellationDaysLimit": "CANCELLATION_DEADLINE_DAYS",
     "maxEventCategories": "MAX_EVENT_CATEGORIES",
+    "minEventLeadDays": "MIN_EVENT_LEAD_DAYS",
+    # Approval escalation (migration 037). Thresholds are days-before-event;
+    # the *EmailDays pair is how often to re-chase, where 0 means never email.
+    "approvalWarningDays": "APPROVAL_WARNING_DAYS",
+    "approvalWarningEmailDays": "APPROVAL_WARNING_EMAIL_DAYS",
+    "approvalUrgentDays": "APPROVAL_URGENT_DAYS",
+    "approvalUrgentEmailDays": "APPROVAL_URGENT_EMAIL_DAYS",
 }
 
 _FRACTIONAL_FIELDS: frozenset[str] = frozenset()
@@ -78,6 +85,20 @@ def replace_config():
     for field, value in ((f, payload[f]) for f in CONFIG_FIELDS if f in payload):
         if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
             raise BadRequest(f"{field} must be a non-negative number.")
+
+    # The urgent threshold has to sit INSIDE the warning window. If it did not, a
+    # proposal would turn red before it ever turned amber, and the amber tier
+    # could never fire at all. Checked against the saved values for any field the
+    # payload leaves out, since this endpoint accepts a partial object.
+    with transaction() as cur:
+        saved = {row["code"]: row["number"] for row in fetch_all(cur, "SELECT code, number FROM config")}
+        warning = payload.get("approvalWarningDays", saved.get("APPROVAL_WARNING_DAYS"))
+        urgent = payload.get("approvalUrgentDays", saved.get("APPROVAL_URGENT_DAYS"))
+        if warning is not None and urgent is not None and urgent >= warning:
+            raise BadRequest(
+                "The urgent threshold must be fewer days than the warning threshold, "
+                "so a proposal turns amber before it turns red."
+            )
 
     with transaction() as cur:
         for code, value in updates.items():

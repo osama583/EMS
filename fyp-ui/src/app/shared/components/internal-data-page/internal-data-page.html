@@ -61,6 +61,9 @@
     <app-internal-page-state
       workspaceEmptyState
       [loading]="loading()"
+      [skeletonRows]="skeletonRows()"
+      [skeletonColumns]="config().columns.length"
+      [loadingLabel]="'Loading ' + config().ariaLabel + '…'"
       [title]="config().emptyTitle"
       [description]="config().emptyDescription"
       [showClear]="shouldShowClear()"
@@ -77,6 +80,9 @@
     @if (loading() || records().length === 0) {
       <app-internal-page-state
         [loading]="loading()"
+        [skeletonRows]="skeletonRows()"
+        [skeletonColumns]="1"
+        [loadingLabel]="'Loading ' + config().ariaLabel + '…'"
         [title]="config().emptyTitle"
         [description]="config().emptyDescription"
         [showClear]="shouldShowClear()"

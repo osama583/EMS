@@ -20,21 +20,27 @@ from ...security.principal import Principal
 
 # --- Period ---------------------------------------------------------------
 
-PERIOD_KEYS = ("7d", "30d", "90d", "term", "ytd")
+PERIOD_KEYS = ("7d", "30d", "90d", "ytd", "custom")
 DEFAULT_PERIOD = "30d"
+
+# The custom window arrives as `custom:<from>:<to>`, both ISO dates. Encoded in
+# the period key rather than as two more query parameters so that everything
+# already keyed by period - the cache key, the URL round-trip, the widget
+# refetch - keeps working without learning about a second dimension.
+CUSTOM_PERIOD = "custom"
+
+# A custom range is capped rather than unbounded: the widget queries are not
+# indexed for an arbitrary multi-year sweep, and a reader who asks for one gets
+# a slow page rather than an error they can act on. Five years is well past any
+# real reporting need and still bounds the scan.
+MAX_CUSTOM_DAYS = 366 * 5
 
 _PERIOD_LABEL = {
     "7d": "Last 7 days",
     "30d": "Last 30 days",
     "90d": "Last 90 days",
-    "term": "This term",
     "ytd": "Year to date",
 }
-
-# APU runs three intakes a year. A "term" filter that meant "the last 120 days"
-# would silently straddle two of them, so the boundaries are the intake months
-# rather than a rolling window: Jan-Apr, May-Aug, Sep-Dec.
-_TERM_STARTS = (1, 5, 9)
 
 
 @dataclass(frozen=True)
@@ -71,18 +77,69 @@ class Period:
         }
 
 
+def _day_label(value: dt.date) -> str:
+    """"1 Aug 2026" - built by hand because `%-d` is glibc-only and `%#d` is
+    MSVC-only, so neither is portable and this server runs on both."""
+    return f"{value.day} {value:%b} {value.year}"
+
+
+def _parse_custom(raw: str, today: dt.date) -> tuple[dt.date, dt.date] | None:
+    """Pull `[start, end)` out of a `custom:<from>:<to>` key.
+
+    Returns None for anything malformed, which the caller turns into the default
+    period. Every failure here is a client-supplied string being wrong, and a
+    stale bookmark or a hand-edited URL should degrade to the default window
+    rather than 400 - the same promise resolve_period() already made.
+
+    `to` is inclusive as the user picked it ("1 Aug to 12 Aug" includes the
+    12th) and exclusive in the returned window, because every widget query is
+    half-open. Converting here means no widget has to remember the difference.
+    """
+    parts = raw.split(":")
+    if len(parts) != 3:
+        return None
+    try:
+        start = dt.date.fromisoformat(parts[1])
+        end_inclusive = dt.date.fromisoformat(parts[2])
+    except ValueError:
+        return None
+
+    if end_inclusive < start:
+        start, end_inclusive = end_inclusive, start
+    # A range ending in the future is harmless but pointless - nothing is
+    # recorded there. Clamping keeps the "compared with" window meaningful.
+    end_inclusive = min(end_inclusive, today)
+    if end_inclusive < start:
+        return None
+
+    end = end_inclusive + dt.timedelta(days=1)
+    if (end - start).days > MAX_CUSTOM_DAYS:
+        return None
+    return start, end
+
+
 def resolve_period(key: str | None, *, today: dt.date | None = None) -> Period:
     """Map a period key to its window. An unrecognised key falls back to the
     default rather than erroring - a stale bookmark should not 400."""
     today = today or dt.date.today()
     end = today + dt.timedelta(days=1)  # include everything that happened today
-    key = (key or "").strip().lower()
+    raw = (key or "").strip().lower()
+    key = raw.split(":")[0] if raw.startswith(f"{CUSTOM_PERIOD}:") else raw
     if key not in PERIOD_KEYS:
         key = DEFAULT_PERIOD
 
-    if key == "term":
-        month = max(m for m in _TERM_STARTS if m <= today.month)
-        start = dt.date(today.year, month, 1)
+    label = _PERIOD_LABEL.get(key)
+    if key == CUSTOM_PERIOD:
+        window = _parse_custom(raw, today)
+        if window is None:
+            # A malformed custom range is not a custom range at all.
+            key = DEFAULT_PERIOD
+            label = _PERIOD_LABEL[key]
+            start = today - dt.timedelta(days=int(key.rstrip("d")) - 1)
+        else:
+            start, end = window
+            last = end - dt.timedelta(days=1)
+            label = f"{_day_label(start)} to {_day_label(last)}"
     elif key == "ytd":
         start = dt.date(today.year, 1, 1)
     else:
@@ -90,8 +147,11 @@ def resolve_period(key: str | None, *, today: dt.date | None = None) -> Period:
 
     span = max(1, (end - start).days)
     return Period(
-        key=key,
-        label=_PERIOD_LABEL[key],
+        # The full `custom:from:to` string, not the bare word: the key round-trips
+        # through the URL and the cache key, and "custom" alone would collide
+        # across every range the reader picks.
+        key=raw if key == CUSTOM_PERIOD else key,
+        label=label or _PERIOD_LABEL[DEFAULT_PERIOD],
         start=start,
         end=end,
         previous_start=start - dt.timedelta(days=span),

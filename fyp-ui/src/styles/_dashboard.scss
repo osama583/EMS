@@ -274,9 +274,71 @@
 .viz-reference { stroke: var(--viz-ink-muted); stroke-width: 1; stroke-dasharray: 3 3; }
 .viz-band { fill: var(--viz-seq-100); opacity: 0.45; }
 
-.viz-mark { transition: opacity 140ms var(--ease-standard); }
+// Marks animate on transform as well as opacity: a selected mark lifts, and a
+// lift that snaps is read as a glitch rather than as feedback.
+.viz-mark {
+  transition:
+    opacity 180ms var(--ease-standard),
+    transform 180ms var(--ease-standard);
+  transform-box: fill-box;
+  transform-origin: center;
+}
 .viz-mark--muted { opacity: 0.35; }
-.viz-mark:focus-visible { outline: none; stroke: var(--viz-ink); stroke-width: 2; }
+
+// Selection: lift + a ring in the mark's own colour.
+//
+// Never a dark box. The browser's default focus outline on a `tabindex="0"`
+// SVG path is an axis-aligned rectangle around the shape's bounding box, which
+// on a rotated donut wedge or a rounded bar is a black rectangle floating
+// around a curve — the single ugliest thing a chart here can do. `outline:
+// none` everywhere below is load-bearing, and the ring replaces it so keyboard
+// users keep an equally visible focus indicator.
+//
+// The ring is drawn with `stroke` in `currentColor`, which each chart sets to
+// the mark's own series colour, so identity survives selection: a green wedge
+// selects green, not blue.
+// `:focus` as well as `:focus-visible`. A mouse click leaves an SVG path
+// focused, and Chrome paints a dark rounded ring on `:focus` that
+// `:focus-visible` alone does not suppress — which is exactly the black box
+// this replaced. Both states are cleared here and the ring below is the only
+// focus indicator, so keyboard users lose nothing.
+.viz-mark:focus,
+.viz-mark:focus-visible { outline: none; }
+
+// Belt and braces: some engines paint the ring via the UA stylesheet on the
+// SVG element itself rather than through `outline`. Covers every chart SVG,
+// including the donut, whose ring carries its own class rather than .viz-svg.
+svg :focus,
+svg :focus-visible { outline: none; }
+
+.viz-mark--selected {
+  stroke: currentColor;
+  stroke-width: 2.5;
+  paint-order: stroke;
+  filter: drop-shadow(0 2px 6px rgb(0 0 0 / 18%));
+}
+
+// The lift, per form. A mark must grow from the edge it is anchored to, or it
+// detaches from its own axis: a column scaled about its centre sinks below the
+// baseline by half the growth, and a horizontal bar scaled about its centre
+// slides left of the category label it belongs to.
+.viz-mark--selected { transform: scale(1.04); }
+
+// Column: anchored at the baseline, so it grows upward only.
+.viz-mark--column.viz-mark--selected {
+  transform-origin: center bottom;
+  transform: scaleY(1.03);
+}
+
+// Horizontal bar: anchored at the axis, so it extends rightward only.
+.viz-mark--bar.viz-mark--selected {
+  transform-origin: left center;
+  transform: scaleX(1.02);
+}
+
+// A chart with a selection recedes everything else, so the eye lands on the
+// mark the reader chose rather than hunting for the one that changed.
+.viz-mark--dimmed { opacity: 0.4; }
 
 // A breach is never colour alone: it takes a ring and a glyph.
 .viz-breach-ring { fill: none; stroke: var(--viz-critical); stroke-width: 2; }
@@ -335,6 +397,8 @@
 @media (prefers-reduced-motion: reduce) {
   .dash-card,
   .viz-mark { transition: none; }
+  // The ring still identifies the selection; only the movement goes.
+  .viz-mark--selected { transform: none; }
 }
 
 // Forced colours drop every custom property, so identity has to survive on
@@ -342,6 +406,8 @@
 @media (forced-colors: active) {
   .dash-card { border: 1px solid CanvasText; }
   .viz-mark { forced-color-adjust: none; stroke: CanvasText; stroke-width: 1; }
+  .viz-mark--selected { stroke: Highlight; stroke-width: 3; }
+  .viz-mark--dimmed { opacity: 1; stroke-dasharray: 2 2; }
   .viz-breach-ring, .viz-warn-ring { stroke: Highlight; }
 }
 

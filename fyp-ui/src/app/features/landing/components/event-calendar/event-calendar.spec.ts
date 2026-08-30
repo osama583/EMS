@@ -44,6 +44,8 @@ const MOCK_PUBLISHED_EVENTS: readonly PublishedEvent[] = MOCK_EVENT_FIXTURES.map
   eventFormat: 'On Campus',
   eventImage: { url: '/assets/events/mock.jpg', fileName: 'mock.jpg', mimeType: 'image/jpeg', sizeBytes: 0, status: 'uploaded' },
   schoolDepartment: 'Student Affairs',
+  organiser: 'Mock Organiser',
+  clubs: [],
   audience: ['APU Community'],
   schedule: [{ date: isoDate(fixture.daysFromNow), start: fixture.start, end: fixture.end, location: fixture.venue }],
   totalExpectedPax: 100,

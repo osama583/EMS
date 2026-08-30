@@ -1558,16 +1558,20 @@ def seed_engagement(cur, ctx: Ctx, rng: random.Random, published: list[dict]) ->
         r["email"] for r in fetch_all(
             cur, "SELECT email FROM users WHERE email LIKE %s ORDER BY user_id", ("%@student.apu.edu.my",))
     ]
+    # One flag per reminder the system can actually send (migration 036). Most
+    # people leave them on, so the sample is weighted that way rather than 50/50
+    # - a seed where half the users had opted out would make the reminder job
+    # look broken.
     prefs = [
-        (email, rng.random() < 0.85, rng.random() < 0.9, None, None)
+        (email, rng.random() < 0.85, rng.random() < 0.85, rng.random() < 0.9)
         for email in rng.sample(emails, min(len(emails), 45))
     ]
     if prefs:
         psycopg2.extras.execute_values(
             cur,
             """INSERT INTO notification_preference
-                   (email, registration_closing_reminder, event_starting_reminder,
-                    registration_closing_status, event_starting_status)
+                   (email, saved_capacity_reminder, saved_starting_reminder,
+                    registered_starting_reminder)
                VALUES %s ON CONFLICT (email) DO NOTHING""",
             prefs,
         )

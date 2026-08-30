@@ -41,6 +41,13 @@ def request_counts(cur, scope: Scope) -> dict[str, Any]:
     """Compact Inbox / Ongoing / Completed / Late strip, cafeteria's own
     version of dept_request_counts (widgets/department.py) - orders rather
     than tasks, since a cafeteria manager's unit of work is an order.
+
+    **Only `completed` respects the reporting period**, for the reason set out
+    at flow.request_bucket_counts: the other tiles are backlog, and windowing a
+    backlog hides live work that happens to be old. A fulfilled order is
+    counted against its own service date rather than a row timestamp, because
+    `request_fmb_selection` carries no completion column and the date the food
+    was served is the date the work happened.
     """
     targets = list(scope.outlets)
     rows = fetch_all(
@@ -48,7 +55,10 @@ def request_counts(cur, scope: Scope) -> dict[str, Any]:
         """
         SELECT count(*) FILTER (WHERE sel.status = 'pending') AS inbox,
                count(*) FILTER (WHERE sel.status IN ('approved', 'preparing', 'resubmitted')) AS ongoing,
-               count(*) FILTER (WHERE sel.status = 'fulfilled') AS completed,
+               count(*) FILTER (
+                   WHERE sel.status = 'fulfilled'
+                     AND f."date" >= %(from)s AND f."date" < %(to)s
+               ) AS completed,
                count(*) FILTER (
                    WHERE sel.status IN ('approved', 'preparing')
                      AND (f."date" + f.serve_time) < now()

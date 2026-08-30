@@ -28,6 +28,12 @@ import { EVENT_IMAGE_PLACEHOLDER } from '../../event-image-placeholder';
           <div><dt>Time</dt><dd>{{ displayTime() }}</dd></div>
           <div><dt>Venue</dt><dd>{{ schedule()?.location || 'To be confirmed' }}</dd></div>
         </dl>
+        @if (event().clubs.length > 0) {
+          <p class="explore-card__clubs">
+            <span class="material-symbols-rounded" aria-hidden="true">groups</span>
+            {{ event().clubs.join(', ') }}
+          </p>
+        }
         <p class="explore-card__registered">{{ event().confirmedRegistrationCount }} registered</p>
         @if (registrationStatus(); as status) {
           <span class="explore-card__registration-status" [attr.data-status]="status">{{ statusLabel() }}</span>
@@ -67,6 +73,10 @@ import { EVENT_IMAGE_PLACEHOLDER } from '../../event-image-placeholder';
     .explore-card__registration-status[data-status='confirmed'] { border-color: rgb(83 219 158 / 55%); background: rgb(20 132 89 / 52%); }
     .explore-card__registration-status[data-status='pending'] { border-color: rgb(255 198 74 / 58%); background: rgb(138 92 0 / 52%); }
     .explore-card__registration-status[data-status='rejected'] { border-color: rgb(255 128 144 / 55%); background: rgb(152 37 54 / 55%); }
+    /* Which club runs the event, on the card itself - one line, clipped rather than
+       allowed to push the rest of the overlay taller. */
+    .explore-card__clubs { display: flex; align-items: center; margin: 0 0 .35rem; gap: .3rem; color: var(--apu-blue-200); font-size: .78rem; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .explore-card__clubs .material-symbols-rounded { flex: 0 0 auto; font-size: .95rem; }
     .explore-card__buttons { display: grid; gap: .5rem; margin-top: 1rem; }
     .explore-card__buttons .explore-card__action { margin-top: 0; }
   `,

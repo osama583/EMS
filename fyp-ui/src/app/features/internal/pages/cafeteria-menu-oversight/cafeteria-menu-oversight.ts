@@ -9,7 +9,7 @@ import { InternalPageHeaderConfig } from '../../../../shared/components/internal
 import { OptionCardGridComponent } from '../../../../shared/components/option-card-grid/option-card-grid';
 import { OptionCardViewModel } from '../../../../shared/components/option-card-grid/option-card-grid.models';
 import { OptionItemDetailsModalComponent } from '../../../../shared/components/option-item-details-modal/option-item-details-modal';
-import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
+import { SkeletonComponent } from '../../../../shared/components/skeleton/skeleton';
 
 // Read-only cross-cafeteria menu view, one cafeteria at a time via a left-hand list — /app/cafeteria-
 // menus (F&B's earlier dropdown-based version of this same idea) was removed 2026-08-17; this page is
@@ -17,7 +17,7 @@ import { LoadingStateComponent } from '../../../../shared/components/loading-sta
 // not a bespoke per-role page.
 @Component({
   selector: 'app-cafeteria-menu-oversight',
-  imports: [InternalPageHeaderComponent, InternalSearchFieldComponent, InternalResetButtonComponent, OptionCardGridComponent, OptionItemDetailsModalComponent, LoadingStateComponent],
+  imports: [SkeletonComponent, InternalPageHeaderComponent, InternalSearchFieldComponent, InternalResetButtonComponent, OptionCardGridComponent, OptionItemDetailsModalComponent],
   templateUrl: './cafeteria-menu-oversight.html',
   styleUrl: './cafeteria-menu-oversight.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -69,12 +69,30 @@ export interface RegistrationHistoryPage {
   readonly totalPages: number;
 }
 
+/**
+ * Which event reminder emails this reader wants, one flag per reminder the
+ * backend can actually send (see backend services/email/reminders.py).
+ *
+ * Grouped by the My Events tab that owns them, which is why they are three
+ * separate flags rather than one: the Saved tab controls the two saved-list
+ * reminders, the Registered tab controls its own. "Remind me about events I am
+ * attending, but do not nag me about bookmarks" is a real preference that a
+ * single global toggle could not express.
+ *
+ * All default to true. The server treats a missing row as "all on", so a reader
+ * who never opens these toggles still gets reminders.
+ */
 export interface NotificationPreference {
-  readonly registrationClosingReminder: boolean;
-  readonly eventStartingReminder: boolean;
-  readonly registrationClosingStatus: 'enabled' | 'disabled' | 'pending-api';
-  readonly eventStartingStatus: 'enabled' | 'disabled' | 'pending-api';
+  /** A saved event passes SAVED_CAPACITY_PERCENT full and you have not registered. */
+  readonly savedCapacityReminder: boolean;
+  /** A saved event is near and you still have not registered. */
+  readonly savedStartingReminder: boolean;
+  /** An event you ARE registered for is near. */
+  readonly registeredStartingReminder: boolean;
 }
+
+/** The subset of toggles one My Events tab owns. */
+export type ReminderKey = keyof NotificationPreference;
 
 export interface ExternalUserRegistrationRequest {
   readonly email: string;
@@ -117,8 +135,10 @@ export interface SavedEventsApi {
   getSavedEvents(userEmail: string): import('rxjs').Observable<SavedEventsResponse>;
   saveEvent(userEmail: string, eventId: string): import('rxjs').Observable<SavedEventMutationResponse>;
   removeSavedEvent(userEmail: string, eventId: string): import('rxjs').Observable<SavedEventMutationResponse>;
-  getNotificationPreferences(userEmail: string): import('rxjs').Observable<NotificationPreference>;
-  updateNotificationPreferences(userEmail: string, preferences: NotificationPreference): import('rxjs').Observable<NotificationPreference>;
+  // No email argument: the server identifies the reader from the bearer token,
+  // so one caller can never read or rewrite another's preferences.
+  getNotificationPreferences(): import('rxjs').Observable<NotificationPreference>;
+  updateNotificationPreferences(preferences: Partial<NotificationPreference>): import('rxjs').Observable<NotificationPreference>;
 }
 
 /** The acting user is resolved server-side from the bearer token. */

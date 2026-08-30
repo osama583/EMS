@@ -295,6 +295,10 @@ def build_document(
         # set it; every other profile is unaffected.
         if layout.get("counts"):
             ordered_ids = [layout["counts"]] + ordered_ids
+        # "totals" is optional in exactly the same way, and carried only by the
+        # two profiles that read proposals (CFO and F&B).
+        if layout.get("totals"):
+            ordered_ids = [layout["totals"]] + ordered_ids
         # Sequential, one cursor. See the module docstring.
         for widget_id in ordered_ids:
             results[widget_id] = build_widget(widget_id, cur, scope)
@@ -335,6 +339,7 @@ def build_document(
             },
             "period": scope.period.as_json(),
             "requestCounts": results.get(layout["counts"]) if layout.get("counts") else None,
+            "proposalTotals": results.get(layout["totals"]) if layout.get("totals") else None,
             "hero": results[layout["hero"]] if layout.get("hero") else None,
             "kpis": [results[widget_id] for widget_id in layout["kpis"]],
             "signature": results[layout["signature"]] if layout.get("signature") else None,
@@ -407,6 +412,7 @@ def build_widget_only(
             *layout["panels"],
             *layout.get("mobileKpis", []),
             *([layout["counts"]] if layout.get("counts") else []),
+            *([layout["totals"]] if layout.get("totals") else []),
         }
         if widget_id not in allowed:
             return {"id": widget_id, "kind": "panel", "state": "error", "message": "Unknown widget."}

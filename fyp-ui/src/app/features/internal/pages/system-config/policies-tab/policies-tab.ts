@@ -1,30 +1,16 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import { SystemConfigService } from '../../../../../core/config/system-config.service';
-import {
-  DASHBOARD_THRESHOLD_GROUPS,
-  DashboardThreshold,
-  SystemConfig,
-  SystemConfigDraft,
-} from '../../../../../core/config/system-config.models';
+import { SystemConfigDraft } from '../../../../../core/config/system-config.models';
 import { ToastService, apiErrorMessage } from '../../../../../shared/components/toast/toast.service';
 import { FormFieldComponent } from '../../../../../shared/components/form-controls/form-field';
-import { LoadingStateComponent } from '../../../../../shared/components/loading-state/loading-state';
+import { SkeletonComponent } from '../../../../../shared/components/skeleton/skeleton';
 
-/**
- * Workflow policies plus the dashboard thresholds.
- *
- * The sixteen dashboard values are rendered from `DASHBOARD_THRESHOLD_GROUPS`
- * rather than written out one control at a time, so adding a threshold is a
- * config row and one entry in that list. Writing them by hand here would mean
- * every new threshold needs a template edit that somebody will forget, and the
- * value would then be tunable only by editing the database directly — which is
- * exactly what rule R11 exists to avoid.
- */
+/** The workflow policies an administrator tunes without a deploy. */
 @Component({
   selector: 'app-policies-tab',
-  imports: [FormFieldComponent, LoadingStateComponent],
+  imports: [SkeletonComponent, FormFieldComponent],
   templateUrl: './policies-tab.html',
   styleUrl: './policies-tab.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -37,12 +23,25 @@ export class PoliciesTabComponent {
   readonly paxThreshold = signal(this.configService.paxReviewerThreshold());
   readonly cancellationDays = signal(this.configService.cancellationDaysLimit());
   readonly maxCategories = signal(this.configService.maxEventCategories());
+  readonly minLeadDays = signal(this.configService.minEventLeadDays());
+  readonly warningDays = signal(this.configService.approvalWarningDays());
+  readonly warningEmailDays = signal(this.configService.approvalWarningEmailDays());
+  readonly urgentDays = signal(this.configService.approvalUrgentDays());
+  readonly urgentEmailDays = signal(this.configService.approvalUrgentEmailDays());
   readonly policiesSaved = signal(false);
   readonly saving = signal(false);
 
-  readonly thresholdGroups = DASHBOARD_THRESHOLD_GROUPS;
-  /** One editable copy per dashboard threshold, keyed by its config field. */
-  readonly thresholds = signal<Record<string, number>>({});
+  /**
+   * The earliest start date a proposal created today could pick, shown so an
+   * administrator sees what the lead time means in practice rather than having
+   * to count days forward themselves.
+   */
+  readonly earliestEventDateLabel = computed(() => {
+    const earliest = new Date();
+    earliest.setHours(0, 0, 0, 0);
+    earliest.setDate(earliest.getDate() + this.minLeadDays());
+    return earliest.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+  });
 
   constructor() {
     // configService.paxReviewerThreshold()/etc.
@@ -52,28 +51,12 @@ export class PoliciesTabComponent {
       this.paxThreshold.set(config.paxReviewerThreshold);
       this.cancellationDays.set(config.cancellationDaysLimit);
       this.maxCategories.set(config.maxEventCategories);
-      this.thresholds.set(
-        Object.fromEntries(
-          this.thresholdGroups.flatMap((group) =>
-            group.items.map((item) => [item.field, Number(config[item.field] ?? 0)]),
-          ),
-        ),
-      );
+      this.minLeadDays.set(config.minEventLeadDays);
+      this.warningDays.set(config.approvalWarningDays);
+      this.warningEmailDays.set(config.approvalWarningEmailDays);
+      this.urgentDays.set(config.approvalUrgentDays);
+      this.urgentEmailDays.set(config.approvalUrgentEmailDays);
     });
-  }
-
-  thresholdValue(item: DashboardThreshold): number {
-    return this.thresholds()[item.field] ?? 0;
-  }
-
-  setThreshold(item: DashboardThreshold, value: string | number): void {
-    const parsed = Number(value);
-    // Below the floor is not a stricter policy, it is a broken one: a zero-hour
-    // SLA marks every task breached and a zero bucket floor disables the
-    // suppression rule entirely.
-    const clamped = Number.isFinite(parsed) ? Math.max(item.min, parsed) : item.min;
-    this.thresholds.update((current) => ({ ...current, [item.field]: clamped }));
-    this.policiesSaved.set(false);
   }
 
   setPaxThreshold(value: string | number): void {
@@ -91,13 +74,52 @@ export class PoliciesTabComponent {
     this.policiesSaved.set(false);
   }
 
+  setMinLeadDays(value: string | number): void {
+    this.minLeadDays.set(Math.max(0, Number(value) || 0));
+    this.policiesSaved.set(false);
+  }
+
+  setWarningDays(value: string | number): void {
+    this.warningDays.set(Math.max(1, Number(value) || 1));
+    this.policiesSaved.set(false);
+  }
+
+  setWarningEmailDays(value: string | number): void {
+    this.warningEmailDays.set(Math.max(0, Number(value) || 0));
+    this.policiesSaved.set(false);
+  }
+
+  setUrgentDays(value: string | number): void {
+    this.urgentDays.set(Math.max(0, Number(value) || 0));
+    this.policiesSaved.set(false);
+  }
+
+  setUrgentEmailDays(value: string | number): void {
+    this.urgentEmailDays.set(Math.max(0, Number(value) || 0));
+    this.policiesSaved.set(false);
+  }
+
+  /**
+   * Mirrors the server's own rule, so the administrator sees the problem while typing rather
+   * than as a rejected save. Red must fall INSIDE the amber window or amber never fires.
+   */
+  readonly thresholdError = computed(() =>
+    this.urgentDays() >= this.warningDays()
+      ? 'The urgent threshold must be fewer days than the warning threshold.'
+      : '',
+  );
+
   savePolicies(): void {
     this.saving.set(true);
     const draft: SystemConfigDraft = {
       paxReviewerThreshold: this.paxThreshold(),
       cancellationDaysLimit: this.cancellationDays(),
       maxEventCategories: this.maxCategories(),
-      ...(this.thresholds() as Partial<SystemConfig>),
+      minEventLeadDays: this.minLeadDays(),
+      approvalWarningDays: this.warningDays(),
+      approvalWarningEmailDays: this.warningEmailDays(),
+      approvalUrgentDays: this.urgentDays(),
+      approvalUrgentEmailDays: this.urgentEmailDays(),
     };
     this.configService
       .updateConfig(draft)

@@ -1,18 +1,22 @@
 <!--
-  Five bands. Bands 1, 3, 4 and 5 share a skeleton across all ten roles; band 2
-  is the role's own instrument and is the widest, tallest element on the page.
+  Four bands. Bands 1, 3 and 4 share a skeleton across all ten roles; band 2 is
+  the role's own instrument and is the widest, tallest element on the page.
 
   On a phone the order changes rather than the columns collapsing — alerts
-  first, then the hero, then three role-chosen KPI tiles, then the quick
-  actions, then the signature panel, then band 3 collapsed. That is the job a
-  head on a phone is actually doing.
+  first, then the hero, then three role-chosen KPI tiles, then the signature
+  panel, then band 3 collapsed. That is the job a head on a phone is actually
+  doing.
+
+  The quick-actions band that used to close the page is gone: every action on
+  it duplicated a destination already one click away in the sidebar, so it was
+  a second navigation surface to keep in step with the first.
 -->
 <section class="dash" [class.dash--refetching]="refetching()">
   <p class="dash__sr-live" role="status" aria-live="polite">{{ announcement() }}</p>
 
   @if (loading()) {
     <div class="dash__loading">
-      <app-loading-state variant="grid" [count]="6" label="Loading your dashboard…" />
+      <app-skeleton variant="stats" [count]="6" label="Loading your dashboard…" />
     </div>
   } @else if (noAccess()) {
     <!-- Fail closed (R1). Never a blank dashboard, and never a filter applied
@@ -82,7 +86,48 @@
             {{ option.short }}
           </button>
         }
+
+        <!-- Specific · the same segmented control, opening the app's own
+             calendar. Icon only: the four keys beside it are two or three
+             characters each, and a word here would dominate the row. The
+             title and aria-label carry the name for anyone who needs it. -->
+        <button
+          type="button"
+          class="dash__period dash__period--custom"
+          [class.dash__period--on]="isCustomPeriod()"
+          [attr.aria-pressed]="isCustomPeriod()"
+          [attr.aria-expanded]="pickerOpen()"
+          title="Pick a specific date range"
+          aria-label="Pick a specific date range"
+          (click)="togglePicker()"
+        >
+          <span class="material-symbols-rounded" aria-hidden="true">calendar_month</span>
+        </button>
       </div>
+
+      @if (pickerOpen()) {
+        <!-- The app's own calendar (shared/components/task-calendar), the same
+             control the cafeteria queue and My Tasks filter by. Locked to range
+             mode: a dashboard period is always a window, and a single day would
+             produce a one-day reporting range nobody asked for. -->
+        <div class="dash__picker" role="dialog" aria-label="Pick a date range">
+          <app-task-calendar
+            mode="range"
+            [lockMode]="true"
+            [selection]="draftSelection()"
+            (selectionChange)="setDraftSelection($event)"
+          />
+          <div class="dash__picker-foot">
+            <p class="dash__picker-hint">{{ draftHint() }}</p>
+            <div class="dash__picker-actions">
+              <button type="button" class="dash__picker-cancel" (click)="closePicker()">Cancel</button>
+              <button type="button" class="dash__picker-apply" [disabled]="!draftComplete()" (click)="applyCustom()">
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      }
       <p class="dash__period-note">
         {{ doc.period.label }} · compared with the {{ doc.period.comparedTo.label }}
       </p>
@@ -90,7 +135,7 @@
 
     <!-- Request counts · Inbox / Ongoing / Completed / Late, compact strip -->
     @if (requestCounts(); as counts) {
-      <app-counts-strip [counts]="counts" (drill)="navigate($event)" />
+      <app-counts-strip [counts]="counts" />
     }
 
     <!-- Alerts rail · first on a phone, band 4 on a desktop -->
@@ -105,33 +150,40 @@
     <!-- Band 1 · Signal. The hero takes four columns and full band height so
          it reads as the page's lead rather than a larger tile; the KPI tiles
          share the remaining eight and flow, because roles carry four, five or
-         six of them and a fixed span would strand one on its own row. -->
+         six of them and a fixed span would strand one on its own row.
+
+         A role with no hero (the CFO) gives its tiles all twelve columns
+         instead. Holding the eight-column span there left the last four
+         columns empty for no reason, which read as a layout fault rather than
+         as breathing room. -->
     <div class="dash__band dash__band--signal">
       @if (hero(); as heroStat) {
         <div class="dash-col-4 dash-col--hero">
-          <app-stat-tile [stat]="heroStat" (drill)="onStat($event)" />
+          <app-stat-tile [stat]="heroStat" />
         </div>
       }
-      <div class="dash-col-8 dash__kpis">
+
+      <!-- Proposal totals · the question next to the KPIs rather than above
+           them: not "where is work sitting relative to my gate" (the strip) but
+           "what happened to proposals this period". Sharing the row keeps it
+           beside the money figures it qualifies instead of pushing them down. -->
+      @if (proposalTotals(); as totals) {
+        <div class="dash-col-4">
+          <app-totals-card [totals]="totals" />
+        </div>
+      }
+
+      <div
+        class="dash__kpis"
+        [class.dash-col-4]="!!hero() && !!proposalTotals()"
+        [class.dash-col-8]="(!!hero()) !== (!!proposalTotals())"
+        [class.dash-col-12]="!hero() && !proposalTotals()"
+      >
         @for (kpi of kpis(); track kpi.id) {
-          <app-stat-tile [stat]="kpi" (drill)="onStat($event)" />
+          <app-stat-tile [stat]="kpi" />
         }
       </div>
     </div>
-
-    <!-- Quick actions · promoted above the charts on a phone, since acting is
-         the whole point of the visit -->
-    @if (isNarrow() && quickActions().length) {
-      <nav class="dash__actions dash__actions--mobile" aria-label="Quick actions">
-        @for (action of quickActions(); track action.key) {
-          <button type="button" class="dash__action" (click)="onQuickAction(action)">
-            <span class="material-symbols-rounded" aria-hidden="true">{{ action.icon }}</span>
-            {{ action.label }}
-            @if (action.badge) { <span class="dash__action-badge">{{ action.badge }}</span> }
-          </button>
-        }
-      </nav>
-    }
 
     <!-- Band 2 · Signature panel — the role's own instrument -->
     @if (signature(); as signaturePanel) {
@@ -191,19 +243,6 @@
           <app-chart-panel [panel]="rail" (drill)="navigate($event)" (retry)="retry()" />
         </div>
       </div>
-    }
-
-    <!-- Band 5 · Quick actions -->
-    @if (!isNarrow() && quickActions().length) {
-      <nav class="dash__actions" aria-label="Quick actions">
-        @for (action of quickActions(); track action.key) {
-          <button type="button" class="dash__action" (click)="onQuickAction(action)">
-            <span class="material-symbols-rounded" aria-hidden="true">{{ action.icon }}</span>
-            {{ action.label }}
-            @if (action.badge) { <span class="dash__action-badge">{{ action.badge }}</span> }
-          </button>
-        }
-      </nav>
     }
 
     <footer class="dash__footer">

@@ -13,9 +13,9 @@ import { PublishedEvent, ProposalEventSchedule, RegistrationResult } from '../..
 import { PublishedEventService } from '../../../../core/events/published-event.service';
 import { EventDetailsModalComponent } from '../../../../shared/components/event-details-modal/event-details-modal';
 import { CtaLinkComponent } from '../../../../shared/components/cta-link/cta-link';
-import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { EVENT_IMAGE_PLACEHOLDER } from '../../../../shared/event-image-placeholder';
+import { SkeletonComponent } from '../../../../shared/components/skeleton/skeleton';
 
 interface EventDate {
   readonly iso: string;
@@ -63,7 +63,7 @@ type QueueDirection = 'forward' | 'backward' | 'direct';
 
 @Component({
   selector: 'app-happening-soon',
-  imports: [EventDetailsModalComponent, CtaLinkComponent, LoadingStateComponent],
+  imports: [SkeletonComponent, EventDetailsModalComponent, CtaLinkComponent],
   templateUrl: './happening-soon.html',
   styleUrl: './happening-soon.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

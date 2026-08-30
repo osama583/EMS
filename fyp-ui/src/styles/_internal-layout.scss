@@ -46,7 +46,7 @@
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  min-height: 4.65rem;
+  min-height: 5.9rem;
   align-items: center;
   padding: 0.45rem;
   overflow: hidden;
@@ -90,9 +90,9 @@
 
 .internal-brand__globe {
   display: block;
-  flex: 0 0 2.65rem;
-  width: 2.65rem;
-  height: 2.65rem;
+  flex: 0 0 4.6rem;
+  width: 4.6rem;
+  height: 4.6rem;
   object-fit: contain;
   filter: drop-shadow(0 0.35rem 0.65rem rgb(0 10 28 / 35%));
   transition:
@@ -102,8 +102,11 @@
 }
 
 .internal-brand .brand__text-frame {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
   width: 0;
-  height: 2.2rem;
+  height: 4.6rem;
   opacity: 0;
   transform: translateX(-0.45rem);
   transition:
@@ -113,19 +116,22 @@
 }
 
 .internal-brand .brand__text {
-  top: -1.62rem;
-  left: 0;
-  width: 8.75rem;
+  position: static;
+  top: auto;
+  left: auto;
+  width: auto;
+  height: 100%;
+  flex-shrink: 0;
 }
 
 .internal-sidebar--expanded .internal-brand__globe {
-  flex-basis: 2.75rem;
-  width: 2.75rem;
-  height: 2.75rem;
+  flex-basis: 4.6rem;
+  width: 4.6rem;
+  height: 4.6rem;
 }
 
 .internal-sidebar--expanded .internal-brand .brand__text-frame {
-  width: 8.7rem;
+  width: 13rem;
   opacity: 1;
   transform: none;
 }

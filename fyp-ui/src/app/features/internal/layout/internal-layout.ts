@@ -16,6 +16,7 @@ import { AuthNavigationSection } from '../../../core/auth/auth.models';
 import { FALLBACK_NAVIGATION } from '../../../core/auth/role-navigation';
 import { isSystemAdmin } from '../../../core/auth/role-access';
 import { NavIconComponent } from '../../../shared/components/nav-icon/nav-icon';
+import { EventReminderSweepService } from '../../../core/admin-directory/event-reminder-sweep.service';
 import { PurgeSweepService } from '../../../core/admin-directory/purge-sweep.service';
 import { ToastService, apiErrorMessage } from '../../../shared/components/toast/toast.service';
 import { finalize } from 'rxjs';
@@ -33,6 +34,7 @@ export class InternalLayoutComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(AuthService);
   private readonly purgeSweep = inject(PurgeSweepService);
+  private readonly reminderSweep = inject(EventReminderSweepService);
   private readonly toast = inject(ToastService);
   private readonly expandedSectionKey = 'apu-internal-expanded-section';
   private readonly pinnedKey = 'apu-internal-sidebar-pinned';
@@ -63,6 +65,12 @@ export class InternalLayoutComponent {
     return !!user && isSystemAdmin(user);
   });
   readonly purgingDeleted = signal(false);
+  // Same story as the purge sweep above: the event reminders are meant to run
+  // from cron once a day (backend/scripts/send_event_reminders.py), but there is
+  // no always-on host to install that crontab on, so a System Admin can run the
+  // identical sweep on demand. Gated to system-admin exactly as the endpoint is.
+  readonly canSendReminders = this.canRunPurgeSweep;
+  readonly sendingReminders = signal(false);
 
   // No more UserRole to default to for a not-yet-resolved/unauthenticated session — the shared
   // FALLBACK_NAVIGATION stands in until the real one loads (same constant navigationFor() itself
@@ -207,6 +215,65 @@ export class InternalLayoutComponent {
         );
       },
       error: (err) => this.toast.error('The purge sweep could not run', apiErrorMessage(err, 'Please try again.')),
+    });
+  }
+
+  // Preview first, then confirm, then send. Reminder emails go to real people and
+  // cannot be recalled, so the admin is shown the actual count (and the
+  // thresholds it was computed with) before anything leaves the building - the
+  // same thing `--dry-run` prints on the command line.
+  sendEventReminders(): void {
+    if (this.sendingReminders()) return;
+    this.sendingReminders.set(true);
+
+    this.reminderSweep.preview().pipe(
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (preview) => {
+        if (preview.total === 0) {
+          this.sendingReminders.set(false);
+          this.toast.info('No reminders are due', 'Nothing has crossed a threshold or come into range yet.');
+          return;
+        }
+
+        const { savedCapacity, savedStarting, registeredStarting } = preview.byKind;
+        const breakdown = [
+          savedCapacity ? `${savedCapacity} "saved event filling up"` : '',
+          savedStarting ? `${savedStarting} "saved event starting soon"` : '',
+          registeredStarting ? `${registeredStarting} "registered event starting soon"` : '',
+        ].filter(Boolean).join(', ');
+
+        const confirmed = this.document.defaultView?.confirm(
+          `Send ${preview.total} reminder email(s) now?
+
+${breakdown}.
+
+`
+            + `Thresholds: ${preview.capacityPercent}% full, ${preview.leadDays} day(s) ahead.
+
+`
+            + 'Anyone already emailed about the same event is skipped automatically. This cannot be undone.',
+        );
+        if (!confirmed) {
+          this.sendingReminders.set(false);
+          return;
+        }
+
+        this.reminderSweep.run().pipe(
+          finalize(() => this.sendingReminders.set(false)),
+          takeUntilDestroyed(this.destroyRef),
+        ).subscribe({
+          next: (result) => this.toast.success(
+            'Reminders sent',
+            `${result.total} email(s) sent. Anyone already reminded about the same event was skipped.`,
+          ),
+          error: (err) => this.toast.error('The reminders could not be sent', apiErrorMessage(err, 'Please try again.')),
+        });
+      },
+      error: (err) => {
+        this.sendingReminders.set(false);
+        this.toast.error('Could not check which reminders are due', apiErrorMessage(err, 'Please try again.'));
+      },
     });
   }
 

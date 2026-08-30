@@ -36,9 +36,12 @@ import { categoriesOf, columnPath, linearScale, niceDomain, stackedTotals, thinL
         @for (column of columns(); track column.key) {
           @for (segment of column.segments; track segment.seriesKey) {
             <path
-              class="viz-mark"
+              class="viz-mark viz-mark--column"
+              [class.viz-mark--selected]="isSelected(segment.seriesKey, segment.point)"
+              [class.viz-mark--dimmed]="hasSelection() && !isSelected(segment.seriesKey, segment.point)"
               [attr.d]="segment.path"
               [attr.fill]="colorFor(segment.colorSlot)"
+              [style.color]="colorFor(segment.colorSlot)"
               [attr.opacity]="segment.dashed ? 0.55 : 1"
               [attr.stroke]="segment.dashed ? colorFor(segment.colorSlot) : null"
               [attr.stroke-dasharray]="segment.dashed ? '5 3' : null"

@@ -1,0 +1,53 @@
+<section class="reminder-settings" [class.reminder-settings--open]="open()">
+  <button
+    type="button"
+    class="reminder-settings__summary"
+    [attr.aria-expanded]="open()"
+    aria-controls="reminder-settings-panel"
+    (click)="toggleOpen()"
+  >
+    <span class="material-symbols-rounded" aria-hidden="true">notifications</span>
+    <span class="reminder-settings__summary-text">
+      <strong>Email reminders</strong>
+      <small>
+        @if (preferences(); as prefs) {
+          {{ enabledCount() }} of {{ toggles().length }} on
+        } @else {
+          Choose which emails this list sends you
+        }
+      </small>
+    </span>
+    <span class="material-symbols-rounded reminder-settings__chevron" aria-hidden="true">
+      {{ open() ? 'expand_less' : 'expand_more' }}
+    </span>
+  </button>
+
+  @if (open()) {
+    <div class="reminder-settings__panel" id="reminder-settings-panel">
+      @if (loading()) {
+        <p class="reminder-settings__loading">Loading your settings…</p>
+      } @else {
+        @for (toggle of toggles(); track toggle.key) {
+          <label class="reminder-toggle">
+            <input
+              type="checkbox"
+              class="reminder-toggle__input"
+              [checked]="isOn(toggle.key)"
+              [disabled]="saving() === toggle.key"
+              (change)="setToggle(toggle.key, $event)"
+            />
+            <span class="reminder-toggle__switch" aria-hidden="true"></span>
+            <span class="reminder-toggle__text">
+              <strong>{{ toggle.label }}</strong>
+              <small>{{ toggle.description }}</small>
+            </span>
+          </label>
+        }
+        <p class="reminder-settings__note">
+          These settings apply to this list only. Reminders are sent by email to the address on
+          your account.
+        </p>
+      }
+    </div>
+  }
+</section>

@@ -1,0 +1,114 @@
+@switch (variant()) {
+
+  @case ('table') {
+    <div class="skeleton skeleton--table" aria-hidden="true">
+      <div class="skeleton__row skeleton__row--head">
+        @for (col of cols(); track col) { <span class="skeleton__bone skeleton__bone--head"></span> }
+      </div>
+      @for (row of rows(); track row) {
+        <div class="skeleton__row">
+          @for (col of cols(); track col) {
+            <span class="skeleton__bone" [style.width]="width(row + col)"></span>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  @case ('cards') {
+    <div class="skeleton skeleton--cards" aria-hidden="true">
+      @for (card of rows(); track card) {
+        <article class="skeleton__card">
+          <span class="skeleton__bone skeleton__bone--media"></span>
+          <span class="skeleton__bone skeleton__bone--title"></span>
+          <span class="skeleton__bone" [style.width]="width(card)"></span>
+          <span class="skeleton__bone" [style.width]="width(card + 1)"></span>
+          <span class="skeleton__bone skeleton__bone--chip"></span>
+        </article>
+      }
+    </div>
+  }
+
+  @case ('fields') {
+    <div class="skeleton skeleton--fields" aria-hidden="true">
+      @for (field of rows(); track field) {
+        <div class="skeleton__field">
+          <span class="skeleton__bone skeleton__bone--label"></span>
+          <span class="skeleton__bone skeleton__bone--control"></span>
+        </div>
+      }
+    </div>
+  }
+
+  @case ('page') {
+    <div class="skeleton skeleton--page" aria-hidden="true">
+      <div class="skeleton__header">
+        <span class="skeleton__bone skeleton__bone--heading"></span>
+        <span class="skeleton__bone skeleton__bone--subheading"></span>
+      </div>
+      <div class="skeleton__controls">
+        <span class="skeleton__bone skeleton__bone--search"></span>
+        <span class="skeleton__bone skeleton__bone--pill"></span>
+        <span class="skeleton__bone skeleton__bone--pill"></span>
+      </div>
+      <div class="skeleton--table">
+        <div class="skeleton__row skeleton__row--head">
+          @for (col of cols(); track col) { <span class="skeleton__bone skeleton__bone--head"></span> }
+        </div>
+        @for (row of rows(); track row) {
+          <div class="skeleton__row">
+            @for (col of cols(); track col) {
+              <span class="skeleton__bone" [style.width]="width(row + col)"></span>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @case ('detail') {
+    <div class="skeleton skeleton--detail" aria-hidden="true">
+      <span class="skeleton__bone skeleton__bone--banner"></span>
+      @for (block of rows(); track block) {
+        <div class="skeleton__block">
+          <span class="skeleton__bone skeleton__bone--label"></span>
+          <span class="skeleton__bone" [style.width]="width(block)"></span>
+          <span class="skeleton__bone" [style.width]="width(block + 2)"></span>
+        </div>
+      }
+    </div>
+  }
+
+  @case ('list') {
+    <div class="skeleton skeleton--list" aria-hidden="true">
+      @for (item of rows(); track item) {
+        <div class="skeleton__item">
+          <span class="skeleton__bone skeleton__bone--avatar"></span>
+          <span class="skeleton__item-text">
+            <span class="skeleton__bone skeleton__bone--title"></span>
+            <span class="skeleton__bone" [style.width]="width(item)"></span>
+          </span>
+        </div>
+      }
+    </div>
+  }
+
+  @case ('stats') {
+    <div class="skeleton skeleton--stats" aria-hidden="true">
+      @for (tile of rows(); track tile) {
+        <div class="skeleton__tile">
+          <span class="skeleton__bone skeleton__bone--label"></span>
+          <span class="skeleton__bone skeleton__bone--metric"></span>
+        </div>
+      }
+    </div>
+  }
+
+  @default {
+    <div class="skeleton skeleton--text" aria-hidden="true">
+      @for (line of rows(); track line) {
+        <span class="skeleton__bone" [style.width]="width(line)"></span>
+      }
+    </div>
+  }
+}

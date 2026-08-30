@@ -446,3 +446,75 @@ def purge_expired(entities: Iterator[str] | None = None) -> dict[str, dict[str, 
             "failed": failed,
         }
     return summary
+
+
+# Cafeteria staff/manager postings (user_unit_roles) are soft-deletable
+# (migration 023) but deliberately NOT registered in DELETION_RULES: the "has
+# this ever been used" check is scoped to a specific unit_code (an order claimed
+# AT THIS OUTLET), which the generic used_by() helper above cannot express, so
+# cafeterias.py keeps its own bespoke _assignment_blockers().
+#
+# It still has to be swept, so it lives here as its own function rather than in
+# the cron script - both the script and POST /admin/purge-deleted call it, and a
+# sweep that ran from one trigger but not the other would leave postings in the
+# bin forever depending on how the sweep happened to be started.
+ASSIGNMENT_ENTITY = "cafeteria_assignment"
+
+
+def expired_assignments(cur) -> list[dict]:
+    """Postings past the retention window, oldest first."""
+    from ..api.cafeterias import STAFF_ROLES
+
+    cur.execute(
+        "SELECT user_unit_role_id AS key, user_id, unit_code "
+        "  FROM user_unit_roles "
+        " WHERE role_code = ANY(%s) AND archived_at IS NOT NULL "
+        "   AND archived_at < now() - make_interval(days => %s) "
+        " ORDER BY archived_at",
+        (list(STAFF_ROLES), RETENTION_DAYS),
+    )
+    return list(cur.fetchall())
+
+
+def purge_expired_assignments() -> dict[str, int]:
+    """Same contract as purge_expired()'s per-entity value: one transaction per
+    row, blockers re-checked immediately before deletion, one bad row never ends
+    the sweep."""
+    from ..api.cafeterias import _assignment_blockers
+
+    with transaction() as cur:
+        rows = expired_assignments(cur)
+
+    purged = blocked = failed = 0
+    for row in rows:
+        try:
+            with transaction() as cur:
+                blockers = _assignment_blockers(cur, row["key"], row["user_id"], row["unit_code"])
+                if blockers:
+                    blocked += 1
+                    log.info(
+                        "purge.skipped",
+                        extra={"entity": ASSIGNMENT_ENTITY, "key": row["key"], "reason": blockers[0]},
+                    )
+                else:
+                    cur.execute(
+                        "DELETE FROM user_unit_roles WHERE user_unit_role_id = %s", (row["key"],)
+                    )
+                    purged += 1
+                    log.info("purge.deleted", extra={"entity": ASSIGNMENT_ENTITY, "key": row["key"]})
+        except Exception:  # one bad row must not end the sweep
+            failed += 1
+            log.exception("purge.failed", extra={"entity": ASSIGNMENT_ENTITY, "key": row["key"]})
+    return {"eligible": len(rows), "purged": purged, "blocked": blocked, "failed": failed}
+
+
+def purge_everything() -> dict[str, dict[str, int]]:
+    """The whole sweep: every registered entity plus cafeteria postings.
+
+    This is what "Purge Deleted" means, and it is deliberately the ONLY
+    definition of it - scripts/purge_deleted.py and the admin endpoint both call
+    this, so the button and the cron job can never sweep different things.
+    """
+    summary = purge_expired()
+    summary[ASSIGNMENT_ENTITY] = purge_expired_assignments()
+    return summary

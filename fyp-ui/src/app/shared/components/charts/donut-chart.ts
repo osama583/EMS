@@ -29,9 +29,13 @@ interface DonutSegment {
       <svg class="viz-donut__ring" viewBox="0 0 120 120" role="img" [attr.aria-label]="ariaLabel()">
         @for (segment of segments(); track segment.key) {
           <path
-            class="viz-mark"
+            class="viz-mark viz-mark--wedge"
+            [class.viz-mark--selected]="isSelected(segment.key, segment.point)"
+            [class.viz-mark--dimmed]="hasSelection() && !isSelected(segment.key, segment.point)"
             [attr.d]="segment.path"
             [attr.fill]="segment.color"
+            [style.color]="segment.color"
+            [style.transform]="isSelected(segment.key, segment.point) ? segment.liftTransform : null"
             tabindex="0"
             [attr.aria-label]="segment.label + ' ' + segment.percentText"
             (mouseenter)="hover(segment.key, segment.point)"
@@ -52,7 +56,11 @@ interface DonutSegment {
 
     <ul class="viz-donut__legend">
       @for (segment of segments(); track segment.key) {
-        <li class="viz-donut__item">
+        <li
+          class="viz-donut__item"
+          [class.viz-donut__item--selected]="isSelected(segment.key, segment.point)"
+          [class.viz-donut__item--dimmed]="hasSelection() && !isSelected(segment.key, segment.point)"
+        >
           <span class="dash-swatch" [style.background]="segment.color"></span>
           <span class="viz-donut__percent">{{ segment.percentText }}</span>
           <span class="viz-donut__name">{{ segment.label }}</span>
@@ -117,12 +125,18 @@ export class DonutChartComponent extends VizChartBase {
       const end = cursor + sweep;
       cursor += share * 360;
 
+      // "Outward" is a different direction for every wedge, so the offset is
+      // computed from the wedge's own bisector rather than expressed in CSS.
+      const mid = ((start + end) / 2) * (Math.PI / 180);
+      const lift = 4;
+
       return {
         key: `${segment.label}-${index}`,
         label: segment.label,
         color: slotColor((index % 8) + 1),
         path: donutWedgePath(60, 60, radius, inner, start, end),
         percentText: formatValue(share, 'percent'),
+        liftTransform: `translate(${(Math.cos(mid) * lift).toFixed(2)}px, ${(Math.sin(mid) * lift).toFixed(2)}px)`,
         point: { x: index, y: value, label: segment.label, optionId: segment.optionId },
       };
     });

@@ -7,9 +7,15 @@ Callers just import the function for what happened and call it — they never
 touch HTML or SMTP directly. All calls are safe to fire after a commit
 succeeds; failures are logged, never raised (see client.send docstring).
 
-Functions marked "not wired up" build a complete, correct email but have no
-caller yet because the backend flow that would trigger them doesn't exist —
-see the docstring on each for what's missing.
+Every function here is called from a real trigger except two, which are
+marked "NOT WIRED UP" in their own docstring: they build a complete, correct
+email but the backend flow that would fire them does not exist yet (guest
+email-verification, and admin-driven email changes).
+
+Workflow/registration/club triggers do not call these directly - they go
+through `dispatch.py`, which resolves the audience and formats the details.
+Auth and account-creation callers call these directly, because the plaintext
+password only exists inside that one request.
 """
 from __future__ import annotations
 
@@ -250,21 +256,6 @@ def proposal_fully_approved(
     )
 
 
-def proposal_fully_approved_all(*, proposal: dict) -> None:
-    """1.7, fanned out to the applicant plus every co-owner in one call.
-    `proposal` is a services.proposals.project()-shaped dict (needs
-    applicant/applicantEmail/proposalId/eventTitle/schedule/coOwners)."""
-    recipients = [{"name": proposal["applicant"], "email": proposal["applicantEmail"]}]
-    recipients.extend({"name": co["name"], "email": co["email"]} for co in proposal.get("coOwners", []))
-    for recipient in recipients:
-        proposal_fully_approved(
-            recipient_email=recipient["email"],
-            recipient_name=recipient["name"],
-            proposal_id=proposal["proposalId"],
-            event_title=proposal["eventTitle"],
-            schedule=proposal["schedule"],
-        )
-
 
 def cafeteria_order_awaiting_review(
     *,
@@ -488,4 +479,578 @@ def email_changed_notice(*, old_email: str, full_name: str, new_email_masked: st
         to=old_email,
         subject=subject,
         html=render.render(subject=subject, preheader="Your login email is changing", body_paragraphs=body),
+    )
+
+
+# --------------------------------------------------------------------------
+# 3. Event registration (attendee side)
+#
+# The workflow section above is about getting an event APPROVED. This section
+# is about people attending it once it is published - a separate audience
+# (often guests with no account at all) who otherwise received nothing.
+# --------------------------------------------------------------------------
+
+def registration_confirmed(
+    *,
+    registrant_email: str,
+    registrant_name: str,
+    event_title: str,
+    schedule: str,
+    venue: str,
+    organiser: str,
+) -> bool:
+    """3.1 automatic-approval registration -> the registrant, immediately.
+
+    Sent to guests too: a guest registering with only a name and an email has
+    no account to check, so this email IS their record of attending.
+    """
+    subject = f'You are registered for "{event_title}"'
+    body = [
+        render.paragraph(f"Dear {render.escape_name(registrant_name)},"),
+        render.paragraph(
+            f'Your place at "{render.escape_name(event_title)}" is confirmed. '
+            "We look forward to seeing you there."
+        ),
+        render.detail_block([
+            ("Event", event_title),
+            ("When", schedule),
+            ("Where", venue),
+            ("Organiser", organiser),
+        ]),
+        render.paragraph(
+            "Please keep this email as your confirmation. If you can no longer attend, "
+            "cancel your registration so your place can be offered to someone else."
+        ),
+    ]
+    return send(
+        to=registrant_email,
+        subject=subject,
+        html=render.render(
+            subject=subject,
+            preheader=f'Your place at "{event_title}" is confirmed',
+            body_paragraphs=body,
+            cta_label="View event",
+            cta_link=f"{_APP_URL_PLACEHOLDER}/app/events/explore-events",
+        ),
+    )
+
+
+def registration_pending_approval(
+    *,
+    registrant_email: str,
+    registrant_name: str,
+    event_title: str,
+    schedule: str,
+    venue: str,
+) -> bool:
+    """3.2 manual-approval registration -> the registrant, immediately.
+
+    Distinct from 3.1 on purpose: the registrant is NOT yet attending, and
+    telling them "confirmed" here would be wrong. This sets the expectation
+    that a decision is still coming (3.4 / 3.5).
+    """
+    subject = f'Your registration for "{event_title}" is awaiting approval'
+    body = [
+        render.paragraph(f"Dear {render.escape_name(registrant_name)},"),
+        render.paragraph(
+            f'We have received your registration for "{render.escape_name(event_title)}". '
+            "This event is approval-based, so the organiser will review your request and decide shortly."
+        ),
+        render.detail_block([("Event", event_title), ("When", schedule), ("Where", venue)]),
+        render.paragraph(
+            "You are not yet registered for this event. We will email you as soon as the "
+            "organiser has made a decision."
+        ),
+    ]
+    return send(
+        to=registrant_email,
+        subject=subject,
+        html=render.render(
+            subject=subject,
+            preheader=f'Awaiting the organiser\'s decision on "{event_title}"',
+            body_paragraphs=body,
+        ),
+    )
+
+
+def registration_awaiting_decision(
+    *,
+    organiser_email: str,
+    organiser_name: str,
+    event_title: str,
+    registrant_name: str,
+    registrant_email: str,
+    reason: str,
+) -> bool:
+    """3.3 manual-approval registration -> the ORGANISER.
+
+    Without this the request sits in a queue nobody is told about, which is
+    exactly how a registrant ends up waiting on a decision that never comes.
+    """
+    subject = f'Action required: registration request for "{event_title}"'
+    body = [
+        render.paragraph(f"Dear {render.escape_name(organiser_name)},"),
+        render.paragraph(
+            f'{render.escape_name(registrant_name)} has asked to attend your event '
+            f'"{render.escape_name(event_title)}" and is waiting on your decision.'
+        ),
+        render.detail_block([
+            ("Registrant", f"{registrant_name} ({registrant_email})"),
+            ("Event", event_title),
+        ]),
+        *([render.paragraph("Their reason for attending:"), render.quote(reason)] if reason else []),
+        render.paragraph("Please approve or reject this request."),
+    ]
+    return send(
+        to=organiser_email,
+        subject=subject,
+        html=render.render(
+            subject=subject,
+            preheader=f"{registrant_name} wants to attend \"{event_title}\"",
+            body_paragraphs=body,
+            cta_label="Review registration",
+            cta_link=f"{_APP_URL_PLACEHOLDER}/app/inbox/registrations",
+        ),
+    )
+
+
+def registration_approved(
+    *,
+    registrant_email: str,
+    registrant_name: str,
+    event_title: str,
+    schedule: str,
+    venue: str,
+    organiser: str,
+) -> bool:
+    """3.4 organiser approves a pending registration -> the registrant."""
+    subject = f'Your registration for "{event_title}" was approved'
+    body = [
+        render.paragraph(f"Dear {render.escape_name(registrant_name)},"),
+        render.paragraph(
+            f'Good news - the organiser has approved your registration for '
+            f'"{render.escape_name(event_title)}". Your place is now confirmed.'
+        ),
+        render.detail_block([
+            ("Event", event_title),
+            ("When", schedule),
+            ("Where", venue),
+            ("Organiser", organiser),
+        ]),
+        render.paragraph(
+            "Please keep this email as your confirmation. If you can no longer attend, "
+            "cancel your registration so your place can be offered to someone else."
+        ),
+    ]
+    return send(
+        to=registrant_email,
+        subject=subject,
+        html=render.render(
+            subject=subject,
+            preheader=f'Your place at "{event_title}" is confirmed',
+            body_paragraphs=body,
+            cta_label="View event",
+            cta_link=f"{_APP_URL_PLACEHOLDER}/app/events/explore-events",
+        ),
+    )
+
+
+def registration_rejected(
+    *,
+    registrant_email: str,
+    registrant_name: str,
+    event_title: str,
+) -> bool:
+    """3.5 organiser rejects a pending registration -> the registrant.
+
+    Terminal, so no CTA. The organiser's queue carries no rejection-reason
+    field, so none is quoted here rather than inventing one.
+    """
+    subject = f'Your registration for "{event_title}" was not approved'
+    body = [
+        render.paragraph(f"Dear {render.escape_name(registrant_name)},"),
+        render.paragraph(
+            f'We are writing to let you know that the organiser was unable to approve your '
+            f'registration for "{render.escape_name(event_title)}".'
+        ),
+        render.paragraph(
+            "Places at approval-based events are limited and the organiser decides who attends. "
+            "You are welcome to browse other upcoming events."
+        ),
+    ]
+    return send(
+        to=registrant_email,
+        subject=subject,
+        html=render.render(
+            subject=subject,
+            preheader=f'Your registration for "{event_title}" was not approved',
+            body_paragraphs=body,
+        ),
+    )
+
+
+# --------------------------------------------------------------------------
+# 4. Clubs
+# --------------------------------------------------------------------------
+
+def club_join_request_received(
+    *,
+    president_email: str,
+    president_name: str,
+    club_name: str,
+    requester_name: str,
+    requester_email: str,
+    reason: str,
+) -> bool:
+    """4.1 student asks to join a club -> that club's President.
+
+    The President is the only person who can decide, so without this the
+    request waits in an inbox they have no reason to open.
+    """
+    subject = f'Action required: join request for {club_name}'
+    body = [
+        render.paragraph(f"Dear {render.escape_name(president_name)},"),
+        render.paragraph(
+            f'{render.escape_name(requester_name)} has asked to join '
+            f"{render.escape_name(club_name)} and is waiting on your decision."
+        ),
+        render.detail_block([
+            ("Applicant", f"{requester_name} ({requester_email})"),
+            ("Club", club_name),
+        ]),
+        *([render.paragraph("Their reason for joining:"), render.quote(reason)] if reason else []),
+        render.paragraph("Please approve or reject this request."),
+    ]
+    return send(
+        to=president_email,
+        subject=subject,
+        html=render.render(
+            subject=subject,
+            preheader=f"{requester_name} wants to join {club_name}",
+            body_paragraphs=body,
+            cta_label="Review request",
+            cta_link=f"{_APP_URL_PLACEHOLDER}/app/inbox/club-requests",
+        ),
+    )
+
+
+def club_join_request_approved(
+    *,
+    requester_email: str,
+    requester_name: str,
+    club_name: str,
+) -> bool:
+    """4.2 President approves -> the applicant. They are now a member, which
+    also grants them visibility of that club's Club Only events."""
+    subject = f"You are now a member of {club_name}"
+    body = [
+        render.paragraph(f"Dear {render.escape_name(requester_name)},"),
+        render.paragraph(
+            f"Your request to join {render.escape_name(club_name)} has been approved - "
+            "welcome to the club."
+        ),
+        render.paragraph(
+            "You can now see the club's members-only events on the event calendar and take part "
+            "in its activities."
+        ),
+    ]
+    return send(
+        to=requester_email,
+        subject=subject,
+        html=render.render(
+            subject=subject,
+            preheader=f"Welcome to {club_name}",
+            body_paragraphs=body,
+            cta_label="View my clubs",
+            cta_link=f"{_APP_URL_PLACEHOLDER}/app/clubs/my-clubs",
+        ),
+    )
+
+
+def club_join_request_rejected(
+    *,
+    requester_email: str,
+    requester_name: str,
+    club_name: str,
+    comment: str,
+) -> bool:
+    """4.3 President rejects -> the applicant. A rejection always carries a
+    comment (the API enforces a minimum length), so it is always quoted."""
+    subject = f"Your request to join {club_name}"
+    body = [
+        render.paragraph(f"Dear {render.escape_name(requester_name)},"),
+        render.paragraph(
+            f"We are writing to let you know that your request to join "
+            f"{render.escape_name(club_name)} was not approved on this occasion."
+        ),
+        *([render.paragraph("The President's comments:"), render.quote(comment)] if comment else []),
+        render.paragraph("You are welcome to explore other clubs open for membership."),
+    ]
+    return send(
+        to=requester_email,
+        subject=subject,
+        html=render.render(
+            subject=subject,
+            preheader=f"Your request to join {club_name}",
+            body_paragraphs=body,
+            cta_label="Browse clubs",
+            cta_link=f"{_APP_URL_PLACEHOLDER}/app/clubs",
+        ),
+    )
+
+
+# --------------------------------------------------------------------------
+# 5. Event reminders (time- and capacity-driven)
+#
+# Unlike every notification above, these are not triggered by someone clicking
+# something - they are sent by scripts/send_event_reminders.py when a date gets
+# close or a counter crosses a threshold. Each one is opt-out per reader, per
+# list, via notification_preference (see the My Events > Saved / Registered
+# tabs), so each template says which list it came from and how to stop it.
+# --------------------------------------------------------------------------
+
+def saved_event_filling_up(
+    *,
+    email: str,
+    full_name: str,
+    event_title: str,
+    schedule: str,
+    venue: str,
+    percent_full: int,
+    places_left: int,
+) -> bool:
+    """5.1 a SAVED event passes SAVED_CAPACITY_PERCENT of its capacity.
+
+    Sent only to people who saved it and have NOT registered - telling someone
+    who already holds a place that the event is filling up is noise.
+    """
+    subject = f'"{event_title}" is {percent_full}% full'
+    body = [
+        render.paragraph(f"Dear {render.escape_name(full_name)},"),
+        render.paragraph(
+            f'You saved "{render.escape_name(event_title)}" but have not registered yet, and it '
+            f"is now {percent_full}% full."
+        ),
+        render.detail_block([
+            ("When", schedule),
+            ("Where", venue),
+            ("Places left", str(places_left)),
+        ]),
+        render.paragraph(
+            "Register now if you would like to attend - once it is full, no further places can "
+            "be given out."
+        ),
+    ]
+    return send(
+        to=email,
+        subject=subject,
+        html=render.render(
+            subject=subject,
+            preheader=f"Only {places_left} place(s) left",
+            body_paragraphs=body,
+            cta_label="Register now",
+            cta_link=f"{_APP_URL_PLACEHOLDER}/app/events/explore-events",
+        ),
+    )
+
+
+def saved_event_starting_soon(
+    *,
+    email: str,
+    full_name: str,
+    event_title: str,
+    schedule: str,
+    venue: str,
+    days_away: int,
+) -> bool:
+    """5.2 a SAVED event is near and the reader still has not registered.
+
+    The distinction from 5.3 is the whole point: this person is NOT attending
+    yet, so the message is "act or miss it", not "see you there".
+    """
+    when = "tomorrow" if days_away == 1 else f"in {days_away} days"
+    subject = f'"{event_title}" is {when} - you have not registered'
+    body = [
+        render.paragraph(f"Dear {render.escape_name(full_name)},"),
+        render.paragraph(
+            f'"{render.escape_name(event_title)}" is happening {when}, and you saved it but have '
+            "not registered."
+        ),
+        render.detail_block([("When", schedule), ("Where", venue)]),
+        render.paragraph(
+            "If you still want to attend, register now. If you no longer plan to, you can remove "
+            "it from your saved events."
+        ),
+    ]
+    return send(
+        to=email,
+        subject=subject,
+        html=render.render(
+            subject=subject,
+            preheader=f'"{event_title}" is {when} and you have not registered',
+            body_paragraphs=body,
+            cta_label="Register now",
+            cta_link=f"{_APP_URL_PLACEHOLDER}/app/events/my-events/saved",
+        ),
+    )
+
+
+def registered_event_starting_soon(
+    *,
+    email: str,
+    full_name: str,
+    event_title: str,
+    schedule: str,
+    venue: str,
+    organiser: str,
+    days_away: int,
+) -> bool:
+    """5.3 an event the reader IS registered for is near.
+
+    A confirmation, not a call to action: they already hold a place, so this
+    exists so the date does not pass them by.
+    """
+    when = "tomorrow" if days_away == 1 else f"in {days_away} days"
+    subject = f'Reminder: "{event_title}" is {when}'
+    body = [
+        render.paragraph(f"Dear {render.escape_name(full_name)},"),
+        render.paragraph(
+            f'This is a reminder that "{render.escape_name(event_title)}", which you are '
+            f"registered for, takes place {when}."
+        ),
+        render.detail_block([
+            ("When", schedule),
+            ("Where", venue),
+            ("Organiser", organiser),
+        ]),
+        render.paragraph(
+            "If you can no longer attend, please cancel your registration so your place can be "
+            "offered to someone else."
+        ),
+    ]
+    return send(
+        to=email,
+        subject=subject,
+        html=render.render(
+            subject=subject,
+            preheader=f'"{event_title}" is {when}',
+            body_paragraphs=body,
+            cta_label="View my events",
+            cta_link=f"{_APP_URL_PLACEHOLDER}/app/events/my-events/registered",
+        ),
+    )
+
+
+# --------------------------------------------------------------------------
+# 9. Approval escalation (migration 037)
+#
+# These three are TIME-triggered, not action-triggered: nobody clicks anything
+# to cause them. They are sent by scripts/process_escalations.py, which is also
+# what keeps them from repeating - see proposal_escalation_sent.
+# --------------------------------------------------------------------------
+
+def proposal_decision_due(
+    *,
+    approver_email: str,
+    approver_name: str,
+    proposal_id: str,
+    event_title: str,
+    stage_label: str,
+    days_until_event: int,
+    schedule_line: str,
+    urgent: bool,
+    also_notify: list[str] | None = None,
+) -> bool:
+    """9.1 a proposal is still undecided and its event is close -> the approver.
+
+    One function for both tiers: the copy differs only in urgency, and two
+    near-identical templates would drift apart the first time either is edited.
+    """
+    when = (
+        "today" if days_until_event == 0
+        else "tomorrow" if days_until_event == 1
+        else f"in {days_until_event} days"
+    )
+    prefix = "Action needed today" if urgent else "Reminder"
+    subject = f'{prefix}: "{event_title}" is waiting for your decision'
+
+    body = [
+        render.paragraph(f"Dear {render.escape_name(approver_name)},"),
+        render.paragraph(
+            f'The event proposal "{render.escape_name(event_title)}" '
+            f"(reference {render.escape_name(proposal_id)}) is still awaiting your decision at "
+            f"{render.escape_name(stage_label)}, and the event starts {when}."
+        ),
+        render.detail_block([("Event", event_title), ("When", schedule_line), ("Reference", proposal_id)]),
+    ]
+    if urgent:
+        body.append(
+            render.paragraph(
+                "If no decision is recorded before the event date, the proposal will be marked "
+                "overdue against this stage and the applicant will be told it could not proceed."
+            )
+        )
+    else:
+        body.append(render.paragraph("Please review it so the applicant can plan with confidence."))
+
+    # client.send() takes no cc argument - it accepts a list of recipients and
+    # applies config.email_cc itself, so extra people go in `to`.
+    return send(
+        to=[approver_email, *(also_notify or [])],
+        subject=subject,
+        html=render.render(
+            subject=subject,
+            preheader=f'"{event_title}" starts {when} and is awaiting your decision',
+            body_paragraphs=body,
+            cta_label="Review proposal",
+            cta_link=f"{_APP_URL_PLACEHOLDER}/app/inbox/proposals",
+        ),
+    )
+
+
+def proposal_overdue_applicant(
+    *,
+    applicant_email: str,
+    applicant_name: str,
+    proposal_id: str,
+    event_title: str,
+    stage_label: str,
+    event_date_label: str,
+    contact_line: str,
+    also_notify: list[str] | None = None,
+) -> bool:
+    """9.2 the event date passed with no decision -> the applicant, F&B copied.
+
+    THE TONE IS AN APOLOGY, deliberately. The applicant did nothing wrong: they
+    submitted in time and the system failed to give them an answer. Copy that
+    read like a rejection, or that asked them to "resubmit", would put the cost
+    of someone else's delay back on them. It says what happened, names the
+    stage, and points them at a person who can help.
+    """
+    subject = f'We are sorry - "{event_title}" did not receive a decision in time'
+    body = [
+        render.paragraph(f"Dear {render.escape_name(applicant_name)},"),
+        render.paragraph(
+            f'We are sorry. Your event proposal "{render.escape_name(event_title)}" '
+            f"(reference {render.escape_name(proposal_id)}) was still awaiting a decision at "
+            f"{render.escape_name(stage_label)} when its event date "
+            f"({render.escape_name(event_date_label)}) passed."
+        ),
+        render.paragraph(
+            "Your proposal was <strong>not rejected</strong>, and nothing was wrong with it. "
+            "No decision was recorded in time, and we apologise for that."
+        ),
+        render.detail_block([("Event", event_title), ("Event date", event_date_label), ("Reference", proposal_id)]),
+        render.paragraph(contact_line),
+    ]
+    return send(
+        to=[applicant_email, *(also_notify or [])],
+        subject=subject,
+        html=render.render(
+            subject=subject,
+            preheader=f'"{event_title}" did not receive a decision before its event date',
+            body_paragraphs=body,
+            cta_label="View proposal",
+            cta_link=f"{_APP_URL_PLACEHOLDER}/app/history/proposals",
+        ),
     )

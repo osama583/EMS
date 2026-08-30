@@ -130,6 +130,7 @@ CONFIG_VALUES = [
     ("HIGH_PAX_THRESHOLD", 50),
     ("CANCELLATION_DEADLINE_DAYS", 3),
     ("MAX_EVENT_CATEGORIES", 2),
+    ("MIN_EVENT_LEAD_DAYS", 0),
 ]
 
 # --- Dropdown option catalogues ------------------------------------------

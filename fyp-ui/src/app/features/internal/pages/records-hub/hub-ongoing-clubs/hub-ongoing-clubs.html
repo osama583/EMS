@@ -76,17 +76,6 @@
   (close)="closeDetails()" (cancel)="closeDetails()" (submit)="closeDetails()"
 >
   @if (detailsTarget(); as request) {
-    <article class="club-request-history__details">
-      <section>
-        <h3>Why you want to join</h3>
-        <p>{{ request.reason || 'No reason provided.' }}</p>
-      </section>
-      <dl>
-        <div>
-          <dt>Requested</dt>
-          <dd>{{ formatDate(request.createdAt) }}</dd>
-        </div>
-      </dl>
-    </article>
+    <app-detail-view [tags]="detailTags(request)" [fields]="detailFields(request)" [sections]="detailSections(request)" />
   }
 </app-form-modal>

@@ -26,6 +26,19 @@ export abstract class VizChartBase {
   protected readonly hostWidth = useHostWidth();
   protected readonly hovered = signal<MarkEvent | null>(null);
 
+  /**
+   * The mark the reader last clicked, or null.
+   *
+   * Held here rather than in each chart because "clicked" is the same state in
+   * every form, and the styling that expresses it (lift + ring, siblings dimmed)
+   * is shared. A chart that tracked its own selection would drift from the rest
+   * the first time one of them gained a second way to clear it.
+   *
+   * Selecting the same mark twice clears it, so a click is a toggle and the
+   * reader is never stuck with a dimmed chart and no way back.
+   */
+  protected readonly selected = signal<MarkEvent | null>(null);
+
   /** Below this the desktop form is replaced by the panel's declared fallback:
    *  a 30-column heatmap is unreadable at any cell size on a 390px screen. */
   readonly isNarrow = computed(() => this.hostWidth() < MOBILE_BREAKPOINT);
@@ -63,8 +76,20 @@ export abstract class VizChartBase {
   }
 
   select(seriesKey: string, point: Point): void {
+    const active = this.selected();
+    const same = !!active && active.seriesKey === seriesKey && active.point === point;
+    this.selected.set(same ? null : { seriesKey, point });
     this.markSelect.emit({ seriesKey, point });
   }
+
+  isSelected(seriesKey: string, point: Point): boolean {
+    const active = this.selected();
+    return !!active && active.seriesKey === seriesKey && active.point === point;
+  }
+
+  /** True once something is selected, so the other marks can recede. A chart
+   *  with nothing selected must not dim anything. */
+  readonly hasSelection = computed(() => this.selected() !== null);
 
   hover(seriesKey: string, point: Point): void {
     this.hovered.set({ seriesKey, point });

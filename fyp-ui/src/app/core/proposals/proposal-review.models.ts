@@ -42,6 +42,9 @@ export interface FmbSelection {
 // Fields on this interface fall into two groups: - ALWAYS present: sent by both GET /proposals (list
 // rows) and GET /proposals/{id} (full detail) — see proposals.py service's project_list_item() vs
 // project().
+/** Inbox urgency band. The server pins 'urgent' above 'warning' above everything else. */
+export type ProposalUrgency = 'normal' | 'warning' | 'urgent' | 'overdue';
+
 export interface ProposalReviewRecord {
   readonly id: number;
   readonly proposalId: string;
@@ -56,6 +59,11 @@ export interface ProposalReviewRecord {
   // label those pages show as the status badge.
   readonly bucket?: 'inbox' | 'ongoing' | 'history' | 'drafts';
   readonly statusLabel?: string;
+  // How close the event is, for a proposal still awaiting a decision (server-computed against the
+  // APPROVAL_WARNING_DAYS / APPROVAL_URGENT_DAYS policy values). Absent once a proposal is decided —
+  // a settled proposal has no urgency. 'overdue' means the event date passed before anyone decided.
+  readonly urgency?: ProposalUrgency | null;
+  readonly daysUntilEvent?: number | null;
   // List rows DO include these two: records-page.ts's Drafts table reads shortIntroduction (the
   // 'introduction' cell) and category (its filter dropdown + search), same as full detail.
   readonly shortIntroduction: string;

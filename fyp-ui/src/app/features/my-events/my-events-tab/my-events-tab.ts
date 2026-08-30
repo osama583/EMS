@@ -10,6 +10,7 @@ import { EventDetailsModalComponent } from '../../../shared/components/event-det
 import { InternalPageHeaderComponent, InternalPageStateComponent, InternalPaginationComponent } from '../../../shared/components/internal-data-page/internal-data-page-parts';
 import { PAGE_SIZE_OPTIONS, InternalPageHeaderConfig } from '../../../shared/components/internal-data-page/internal-data-page.models';
 import { ToastService } from '../../../shared/components/toast/toast.service';
+import { ReminderScope, ReminderSettingsComponent } from '../reminder-settings/reminder-settings';
 
 export type MyEventsTabMode = 'saved' | 'pending' | 'registered' | 'history';
 
@@ -28,7 +29,7 @@ const DEFAULT_PAGE_SIZE = 10;
 // show, not the whole list sliced client-side.
 @Component({
   selector: 'app-my-events-tab',
-  imports: [EventCardComponent, EventDetailsModalComponent, InternalPageHeaderComponent, InternalPageStateComponent, InternalPaginationComponent],
+  imports: [EventCardComponent, EventDetailsModalComponent, InternalPageHeaderComponent, InternalPageStateComponent, InternalPaginationComponent, ReminderSettingsComponent],
   templateUrl: './my-events-tab.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -61,6 +62,14 @@ export class MyEventsTabComponent {
   readonly page = signal(1);
   readonly selectedEvent = signal<PublishedEvent | null>(null);
   readonly registeringEventId = signal<string | null>(null);
+
+  // Only the Saved and Registered tabs own reminder settings - pending/history
+  // are views of events whose reminders belong to one of those two lists, so
+  // showing the panel there would offer the same switch in three places.
+  readonly reminderScope = computed<ReminderScope | null>(() => {
+    const mode = this.mode();
+    return mode === 'saved' || mode === 'registered' ? mode : null;
+  });
 
   private readonly reloadTick = signal(0);
 

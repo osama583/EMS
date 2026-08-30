@@ -42,9 +42,12 @@ from app.config import config  # noqa: E402
 from app.db import init_pool, query, transaction  # noqa: E402
 from app.logging_setup import configure_logging  # noqa: E402
 from app.services.soft_delete import (  # noqa: E402
+    ASSIGNMENT_ENTITY as _ASSIGNMENT_ENTITY,
     DELETION_RULES,
     RETENTION_DAYS,
+    expired_assignments,
     purge_expired,
+    purge_expired_assignments,
     rule_for,
 )
 
@@ -56,46 +59,6 @@ log = logging.getLogger("scripts.purge_deleted")
 # THIS OUTLET), which app/services/soft_delete.py's generic used_by() helper
 # does not express - so cafeterias.py keeps its own bespoke _assignment_blockers()
 # instead. Swept here by the same name, alongside every registered entity.
-_ASSIGNMENT_ENTITY = "cafeteria_assignment"
-
-
-def _purge_expired_assignments(*, dry_run: bool) -> dict[str, int]:
-    from app.api.cafeterias import STAFF_ROLES, _assignment_blockers
-
-    with transaction() as cur:
-        cur.execute(
-            "SELECT user_unit_role_id AS key, user_id, unit_code "
-            "  FROM user_unit_roles "
-            " WHERE role_code = ANY(%s) AND archived_at IS NOT NULL "
-            "   AND archived_at < now() - make_interval(days => %s) "
-            " ORDER BY archived_at",
-            (list(STAFF_ROLES), RETENTION_DAYS),
-        )
-        rows = cur.fetchall()
-
-    if dry_run:
-        return {"eligible": len(rows)}
-
-    purged = blocked = failed = 0
-    for row in rows:
-        try:
-            with transaction() as cur:
-                blockers = _assignment_blockers(cur, row["key"], row["user_id"], row["unit_code"])
-                if blockers:
-                    blocked += 1
-                    log.info("purge.skipped", extra={
-                        "entity": _ASSIGNMENT_ENTITY, "key": row["key"], "reason": blockers[0],
-                    })
-                else:
-                    cur.execute(
-                        "DELETE FROM user_unit_roles WHERE user_unit_role_id = %s", (row["key"],)
-                    )
-                    purged += 1
-                    log.info("purge.deleted", extra={"entity": _ASSIGNMENT_ENTITY, "key": row["key"]})
-        except Exception:
-            failed += 1
-            log.exception("purge.failed", extra={"entity": _ASSIGNMENT_ENTITY, "key": row["key"]})
-    return {"eligible": len(rows), "purged": purged, "blocked": blocked, "failed": failed}
 
 
 def _pending(entity: str) -> list[dict]:
@@ -147,7 +110,8 @@ def main() -> int:
             for row in rows:
                 print(f"    #{row['key']} {row['label']}  archived {row['archived_at']:%Y-%m-%d}")
         if include_assignments:
-            counts = _purge_expired_assignments(dry_run=True)
+            with transaction() as _cur:
+                counts = {'eligible': len(expired_assignments(_cur))}
             total += counts["eligible"]
             print(f"{_ASSIGNMENT_ENTITY}: {counts['eligible']} row(s) past the {RETENTION_DAYS}-day window")
         print(f"\nDry run - nothing deleted. {total} row(s) would be considered.")
@@ -155,7 +119,7 @@ def main() -> int:
 
     summary = purge_expired(iter(entities))
     if include_assignments:
-        summary[_ASSIGNMENT_ENTITY] = _purge_expired_assignments(dry_run=False)
+        summary[_ASSIGNMENT_ENTITY] = purge_expired_assignments()
 
     failed = 0
     for entity, counts in summary.items():

@@ -82,6 +82,13 @@ def request_counts(cur, scope: Scope) -> dict[str, Any]:
     on that; by the time an order runs late the outlet has either delivered it
     or has not. A cancelled order is F&B's own fan-out coming back undone, which
     is what this page is about.
+
+    **Only `completed` respects the reporting period**, for the reason set out
+    at flow.request_bucket_counts: the other tiles are backlog, and windowing a
+    backlog hides live work that happens to be old. A fulfilled order is
+    counted against its own service date rather than a row timestamp, because
+    `request_fmb_selection` carries no completion column and the date the food
+    was served is the date the work happened.
     """
     from ....db import fetch_all
 
@@ -90,7 +97,10 @@ def request_counts(cur, scope: Scope) -> dict[str, Any]:
         """
         SELECT count(*) FILTER (WHERE sel.status = 'pending') AS inbox,
                count(*) FILTER (WHERE sel.status IN ('approved', 'preparing', 'resubmitted')) AS ongoing,
-               count(*) FILTER (WHERE sel.status = 'fulfilled') AS completed,
+               count(*) FILTER (
+                   WHERE sel.status = 'fulfilled'
+                     AND f."date" >= %(from)s AND f."date" < %(to)s
+               ) AS completed,
                count(*) FILTER (WHERE sel.status = 'cancelled') AS cancelled
           FROM request_fmb_selection sel
           JOIN request_fmb f ON f.request_fmb_id = sel.request_fmb_id

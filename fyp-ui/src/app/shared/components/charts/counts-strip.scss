@@ -16,13 +16,10 @@
   background: var(--viz-surface);
   border: 1px solid var(--apu-border);
   border-radius: var(--radius-control);
-  cursor: pointer;
-  transition: box-shadow var(--internal-transition), transform var(--internal-transition);
   min-height: var(--viz-hit-target);
-
-  &:hover { box-shadow: var(--shadow-card-hover); transform: translateY(-1px); }
-  &:focus-visible { outline: none; box-shadow: var(--internal-focus-ring); }
-  &:disabled { cursor: default; }
+  // No pointer cursor, no hover lift, no focus ring: these are figures to read,
+  // not controls. Affordances on something that does not respond to a click are
+  // worse than none - they invite the click and then do nothing.
 }
 
 .dash-counts__value {

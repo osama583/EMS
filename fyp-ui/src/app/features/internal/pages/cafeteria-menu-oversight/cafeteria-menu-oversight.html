@@ -18,7 +18,7 @@
   <div class="cafeteria-menu-oversight__layout">
     <nav class="cafeteria-menu-oversight__list" aria-label="Cafeterias">
       @if (cafeteriasLoading()) {
-        <app-loading-state variant="bars" label="Loading cafeterias…" />
+        <app-skeleton variant="list" label="Loading cafeterias…" [count]="5" />
       } @else {
         @for (cafeteria of cafeterias(); track cafeteria.id) {
           <button
@@ -37,7 +37,7 @@
 
     <div class="cafeteria-menu-oversight__content">
       @if (menuLoading()) {
-        <app-loading-state variant="grid" label="Loading menu…" [count]="6" />
+        <app-skeleton variant="cards" label="Loading menu…" [count]="6" />
       } @else {
         <app-option-card-grid
           [items]="cardData()"

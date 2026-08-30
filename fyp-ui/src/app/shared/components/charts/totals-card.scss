@@ -1,0 +1,56 @@
+:host { display: block; height: 100%; }
+
+.dash-totals { height: 100%; gap: var(--space-2); }
+
+.dash-totals__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+// Same segmented control as the period filter above it: the two do the same
+// kind of job (choose one of a small set) and should not look like two
+// different mechanisms on one page.
+.dash-totals__toggle {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.15rem;
+  padding: 0.15rem;
+  border-radius: var(--radius-control);
+  background: var(--viz-plane);
+}
+
+.dash-totals__option {
+  border: 0;
+  border-radius: calc(var(--radius-control) - 0.15rem);
+  padding: 0.25rem 0.6rem;
+  background: transparent;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--viz-ink-secondary);
+  cursor: pointer;
+  transition: background 140ms var(--ease-standard), color 140ms var(--ease-standard);
+
+  &:hover { color: var(--viz-ink); }
+  &:focus-visible { outline: none; box-shadow: var(--internal-focus-ring); }
+}
+
+.dash-totals__option--on { background: var(--apu-blue-700); color: var(--apu-white); }
+
+// A figure to read, not a control - see the component docstring.
+.dash-totals__figure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  margin-top: auto;
+}
+
+p { margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-totals__option { transition: none; }
+}

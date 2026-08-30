@@ -27,8 +27,8 @@ import { FormModalComponent } from '../../../../shared/components/form-modal/for
 import { InternalPaginationComponent } from '../../../../shared/components/internal-data-page/internal-data-page-parts';
 import { ExpandableSearchComponent } from '../../../../shared/components/expandable-search/expandable-search';
 import { FilterButtonComponent } from '../../../../shared/components/filter-button/filter-button';
-import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
+import { SkeletonComponent } from '../../../../shared/components/skeleton/skeleton';
 
 type FilterKey =
   | 'visibility'
@@ -38,7 +38,8 @@ type FilterKey =
   | 'date'
   | 'time'
   | 'registration'
-  | 'cost';
+  | 'cost'
+  | 'club';
 
 type FilterSelection = Record<FilterKey, readonly string[]>;
 
@@ -59,13 +60,12 @@ const INTERNAL_PAGE_SIZE = 9;
 
 @Component({
   selector: 'app-explore-events',
-  imports: [FormModalComponent,
+  imports: [SkeletonComponent, FormModalComponent,
     EventDetailsModalComponent,
     EventCardComponent,
     InternalPaginationComponent,
     ExpandableSearchComponent,
     FilterButtonComponent,
-    LoadingStateComponent,
   ],
   templateUrl: './explore-events.html',
   styleUrl: './explore-events.scss',
@@ -215,7 +215,23 @@ export class ExploreEventsComponent {
       label: 'Cost',
       options: ['Free', 'Paid'],
     },
+    // Only shown to someone who is actually in a club - for everyone else the filter could
+    // only ever return nothing, which reads as a broken filter rather than an empty result.
+    ...(this.canFilterByMyClubs()
+      ? [{ key: 'club' as const, label: 'Club', options: ['My Clubs'] }]
+      : []),
   ]);
+
+  /**
+   * True when the viewer could have club-run events to narrow to: a club President
+   * (presidentOfClubIds, a data fact) or any student/lecturer, who are the only roles
+   * that can hold a club membership - the same population canSeeClubOnlyFilter uses.
+   */
+  private readonly canFilterByMyClubs = computed(() => {
+    const user = this.auth.user();
+    if (!user) return false;
+    return isSchoolStudentOrLecturer(user) || (user.presidentOfClubIds?.length ?? 0) > 0;
+  });
 
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.resultCount() / this.pageSize())));
   // draftResultCount shows the live, debounced preview while the filter dialog is open (internal
@@ -352,6 +368,7 @@ export class ExploreEventsComponent {
       time: filters.time as EventSearchParams['time'],
       registration: filters.registration as EventSearchParams['registration'],
       cost: filters.cost as EventSearchParams['cost'],
+      club: filters.club,
       date: filters.date,
       dateFrom: filters.date.includes('Custom Date Range') ? customFrom || undefined : undefined,
       dateTo: filters.date.includes('Custom Date Range') ? customTo || undefined : undefined,
@@ -533,6 +550,7 @@ export class ExploreEventsComponent {
       time: [],
       registration: [],
       cost: [],
+      club: [],
     };
   }
 
@@ -546,6 +564,7 @@ export class ExploreEventsComponent {
       time: [...filters.time],
       registration: [...filters.registration],
       cost: [...filters.cost],
+      club: [...filters.club],
     };
   }
 

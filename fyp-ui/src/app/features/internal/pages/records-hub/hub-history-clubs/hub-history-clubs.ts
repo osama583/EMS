@@ -10,6 +10,7 @@ import { InternalDataPageComponent } from '../../../../../shared/components/inte
 import { FeedbackBannerComponent } from '../../../../../shared/components/feedback-banner/feedback-banner';
 import { FormModalComponent } from '../../../../../shared/components/form-modal/form-modal';
 import { ViewToggleComponent, defaultListViewMode } from '../../../../../shared/components/view-toggle/view-toggle';
+import { DetailField, DetailViewComponent } from '../../../../../shared/components/detail-view/detail-view';
 
 type ViewMode = 'table' | 'card';
 type Requester = 'me' | 'other';
@@ -27,7 +28,7 @@ interface RequestHistoryEntry {
 // President-role for the viewer only ever contributes 'me' rows.
 @Component({
   selector: 'app-hub-history-clubs',
-  imports: [ViewToggleComponent, FeedbackBannerComponent, InternalPageHeaderComponent, InternalDataPageComponent, FormModalComponent, InternalSearchFieldComponent, InternalFilterControlsComponent, InternalResetButtonComponent],
+  imports: [ViewToggleComponent, FeedbackBannerComponent, InternalPageHeaderComponent, InternalDataPageComponent, FormModalComponent, DetailViewComponent, InternalSearchFieldComponent, InternalFilterControlsComponent, InternalResetButtonComponent],
   templateUrl: './hub-history-clubs.html',
   styleUrl: './hub-history-clubs.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -109,6 +110,45 @@ export class HubHistoryClubsComponent {
       details: [{ icon: 'schedule', text: entry.request.resolvedAt ? `Resolved ${this.formatDate(entry.request.resolvedAt)}` : 'Resolved' }],
     },
   })));
+
+  detailTags(entry: RequestHistoryEntry): readonly DetailField[] {
+    const approved = entry.request.status === 'approved';
+    return [
+      { label: 'Direction', value: this.requesterLabel(entry), tone: entry.requester === 'me' ? 'blue' : 'neutral' },
+      {
+        label: 'Status',
+        value: approved ? 'Approved' : 'Rejected',
+        icon: approved ? 'check_circle' : 'cancel',
+        tone: approved ? 'success' : 'danger',
+      },
+    ];
+  }
+
+  detailFields(entry: RequestHistoryEntry): readonly DetailField[] {
+    const fields: DetailField[] = [
+      { label: 'Club', value: entry.request.clubName, icon: 'groups' },
+      { label: 'Requested', value: this.formatDate(entry.request.createdAt), icon: 'event' },
+    ];
+    if (entry.request.resolvedAt) {
+      fields.push({
+        label: entry.request.status === 'approved' ? 'Approved on' : 'Rejected on',
+        value: this.formatDate(entry.request.resolvedAt),
+        icon: 'event_available',
+      });
+    }
+    return fields;
+  }
+
+  detailSections(entry: RequestHistoryEntry): readonly { title: string; body: string }[] {
+    const sections = [{
+      title: entry.requester === 'me' ? 'Why you wanted to join' : 'Their reason for joining',
+      body: entry.request.reason || 'No reason provided.',
+    }];
+    if (entry.request.status === 'rejected') {
+      sections.push({ title: 'Reason for rejection', body: entry.request.comment || 'No reason provided.' });
+    }
+    return sections;
+  }
 
   requesterLabel(entry: RequestHistoryEntry): string {
     const name = entry.request.requester?.displayName || entry.request.requester?.email || (entry.requester === 'me' ? 'You' : 'Someone else');

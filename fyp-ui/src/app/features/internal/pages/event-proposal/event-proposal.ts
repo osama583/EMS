@@ -34,6 +34,7 @@ import { cancellationWindowFor, earliestScheduleDate } from '../../../../core/pr
 import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 import { EventCategoryService, EventFormatService } from '../../../../core/event-catalog/event-catalog.service';
 import { resolveDepartmentRowLabels } from '../../../../core/departments/department-request-columns';
+import { SkeletonComponent } from '../../../../shared/components/skeleton/skeleton';
 
 type RequirementKey = 'logistics' | 'transportation' | 'photoVideo' | 'soundLight' | 'fmb' | 'campusTour' | 'waterNormal' | 'fundingPurchase';
 type RowCollection = 'coOwners' | 'schedule' | 'organizers' | 'importantPeople' | 'guests' | 'agenda' | 'discussions';
@@ -69,7 +70,7 @@ const OUTSIDE_UNIVERSITY = 'outside';
 
 @Component({
   selector: 'app-event-proposal',
-  imports: [FormFieldComponent, SearchableDropdownComponent, ProposalTableComponent, ValidationMessageComponent, StepIndicatorComponent, FormModalComponent, EventImageUploadComponent, LoadingStateComponent, OptionPickerGridComponent, ReviewerCommentsDrawerComponent],
+  imports: [SkeletonComponent, FormFieldComponent, SearchableDropdownComponent, ProposalTableComponent, ValidationMessageComponent, StepIndicatorComponent, FormModalComponent, EventImageUploadComponent, LoadingStateComponent, OptionPickerGridComponent, ReviewerCommentsDrawerComponent],
   templateUrl: './event-proposal.html',
   styleUrl: './event-proposal.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -796,7 +797,7 @@ export class EventProposalComponent implements OnDestroy {
     // immediately on selection and updates itself if the organiser picks a different date.
     if (collection === 'schedule' && key === 'date') this.scheduleDateConflictCheck();
   }
-  tableFieldMin(column: EditableTableColumn): string { return column.type === 'date' && this.tableEditorCollection() === 'schedule' ? this.todayIso() : String(column.min ?? ''); }
+  tableFieldMin(column: EditableTableColumn): string { return column.type === 'date' && this.tableEditorCollection() === 'schedule' ? this.earliestEventIso() : String(column.min ?? ''); }
   // Staff options for a `staff`-type table column, excluding anyone already picked in another row
   // of the same collection (e.g. Organizer / PIC) — the row currently being edited is exempted so
   // its own existing selection still appears. Mirrors coOwnerStaffOptions' dedupe logic.
@@ -817,6 +818,10 @@ export class EventProposalComponent implements OnDestroy {
     const raw = this.tableDraft()[column.key];
     if (raw === '' || raw === undefined || raw === null) return '';
     if (collection === 'schedule') {
+      if (column.key === 'date' && this.tableEditorCollection() === 'schedule') {
+        const leadError = this.leadTimeError(String(raw));
+        if (leadError) return leadError;
+      }
       if (column.key === 'date' && this.isPastDate(String(raw))) return 'Date cannot be in the past.';
       if (column.key === 'end' && !this.isTimeAfter(String(this.tableDraft()['start'] ?? ''), String(raw))) return 'End Time must be after Start Time.';
       if (column.key === 'location' && String(raw).trim().length < 2) return 'Location must be at least 2 characters.';
@@ -1418,6 +1423,32 @@ export class EventProposalComponent implements OnDestroy {
   private completedRows(rows: readonly EditableRow[], keys: readonly string[]): readonly EditableRow[] { return rows.filter((row) => keys.every((key) => String(row[key] ?? '').trim())); }
   private durationMinutes(start: string, end: string): number { if (!start || !end) return 0; const toMinutes = (time: string) => { const [hour, minute] = time.split(':').map(Number); return hour * 60 + minute; }; let result = toMinutes(end) - toMinutes(start); if (result < 0) result += 1440; return result; }
   private todayIso(): string { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; }
+  /**
+   * The earliest start date MIN_EVENT_LEAD_DAYS allows, as `yyyy-mm-dd`.
+   *
+   * Both the schedule date picker's `min` and its validation read this, so the
+   * calendar cannot offer a date the validator would then reject.
+   */
+  private earliestEventIso(): string {
+    const earliest = new Date();
+    earliest.setHours(0, 0, 0, 0);
+    earliest.setDate(earliest.getDate() + Math.max(0, this.systemConfig.minEventLeadDays()));
+    return `${earliest.getFullYear()}-${String(earliest.getMonth() + 1).padStart(2, '0')}-${String(earliest.getDate()).padStart(2, '0')}`;
+  }
+  /** Human-readable form of earliestEventIso(), for the message that explains the block. */
+  private earliestEventLabel(): string {
+    const [y, m, d] = this.earliestEventIso().split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  /** Before the lead-time floor — too soon to schedule, not merely in the past. */
+  private isBeforeLeadTime(date: string): boolean { return !!date && date < this.earliestEventIso(); }
+  /** The message for a date the lead time forbids; '' when the date is fine. */
+  private leadTimeError(date: string): string {
+    if (!this.isBeforeLeadTime(date)) return '';
+    return this.systemConfig.minEventLeadDays() > 0
+      ? `Events need at least ${this.systemConfig.minEventLeadDays()} day${this.systemConfig.minEventLeadDays() === 1 ? '' : 's'} notice. The earliest available date is ${this.earliestEventLabel()}.`
+      : 'Date cannot be in the past.';
+  }
   private isPastDate(date: string): boolean { return !!date && date < this.todayIso(); }
   private isTimeAfter(start: string, end: string): boolean { return !start || !end || end > start; }
   // Earliest/latest dates across the Event Schedule rows — request items (logistics, food,

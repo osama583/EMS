@@ -39,6 +39,8 @@ from ..services import proposals as svc
 from ..services import workflow as wf
 from ..services.workflow.constants import (
     FMB_UNIT_CODE,
+    approval_urgent_days,
+    approval_warning_days,
     ROW_ASSIGNABLE_REQUIREMENTS,
     SEL_TERMINAL,
     TASK_TERMINAL,
@@ -173,7 +175,46 @@ _STATUS_LABEL_SQL = f"""
         WHEN r.status = 'completed_rejected' THEN 'Rejected'
         WHEN r.status = 'cancelled' THEN 'Cancelled'
         WHEN r.status = 'draft' THEN 'Draft'
+        -- Overdue names the stage that was holding the proposal when its event
+        -- date passed, so the list itself carries the accountability.
+        WHEN r.status = 'overdue_hos_hod' THEN 'Overdue - HOS/HOD'
+        WHEN r.status = 'overdue_fmb' THEN 'Overdue - F&B'
+        WHEN r.status = 'overdue_cfo' THEN 'Overdue - CFO'
+        WHEN r.status = 'overdue_department' THEN 'Overdue - Departments'
         ELSE r.status
+    END
+"""
+
+# How close the event is, for a proposal still awaiting a decision. NULL for
+# anything already decided or with no schedule - a settled proposal has no
+# urgency, and showing one would put dead rows at the top of the list.
+_URGENCY_DAYS_SQL = """
+    (SELECT min(s."date") FROM event_schedule s WHERE s.request_id = r.request_id)
+    - current_date
+"""
+
+# The band the inbox colours on. Mirrors escalation.tier_for() exactly - the
+# same order of tests, so a row can never be amber here and red in the job.
+_URGENCY_SQL = f"""
+    CASE
+        WHEN r.status NOT IN ('hos_hod_review','fmb_review','cfo_review','department_review')
+            THEN NULL
+        WHEN ({_URGENCY_DAYS_SQL}) IS NULL THEN NULL
+        WHEN ({_URGENCY_DAYS_SQL}) < 0 THEN 'overdue'
+        WHEN ({_URGENCY_DAYS_SQL}) <= %(urgent_days)s THEN 'urgent'
+        WHEN ({_URGENCY_DAYS_SQL}) <= %(warning_days)s THEN 'warning'
+        ELSE 'normal'
+    END
+"""
+
+# Sort weight for the band above. Urgent rows sort ABOVE warning rows, which
+# sort above everything else, and this is applied BEFORE the caller's own sort
+# so an approver cannot accidentally sort the most urgent item out of sight.
+_URGENCY_RANK_SQL = f"""
+    CASE ({_URGENCY_SQL})
+        WHEN 'urgent'  THEN 0
+        WHEN 'warning' THEN 1
+        ELSE 2
     END
 """
 
@@ -355,15 +396,22 @@ def list_proposals():
         )
     """.format(where=where)
     with transaction() as cur:
+        # Read once per request: the urgency CASE binds them by name, and the
+        # count query below shares this dict.
+        params["warning_days"] = approval_warning_days(cur)
+        params["urgent_days"] = approval_urgent_days(cur)
         total = fetch_one(cur, base + "SELECT count(*) AS c FROM scoped r", params)["c"]
         rows = fetch_all(
             cur,
             base + f"""
                 SELECT r.*,
                        (CASE WHEN r.status = 'draft' THEN 'drafts' ELSE ({_BUCKET_SQL}) END) AS bucket,
-                       ({_STATUS_LABEL_SQL}) AS "statusLabel"
+                       ({_STATUS_LABEL_SQL}) AS "statusLabel",
+                       ({_URGENCY_SQL}) AS urgency,
+                       ({_URGENCY_DAYS_SQL}) AS "daysUntilEvent"
                   FROM scoped r
-              ORDER BY {sort_column} {order} {nulls}, r.request_id DESC
+              ORDER BY ({_URGENCY_RANK_SQL}) ASC,
+                       {sort_column} {order} {nulls}, r.request_id DESC
                  LIMIT {limit} OFFSET {offset}
             """,
             params,
@@ -373,6 +421,8 @@ def list_proposals():
             item = svc.project_list_item(cur, row)
             item["bucket"] = row["bucket"]
             item["statusLabel"] = row["statusLabel"]
+            item["urgency"] = row["urgency"]
+            item["daysUntilEvent"] = row["daysUntilEvent"]
             items.append(item)
 
     return jsonify(

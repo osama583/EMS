@@ -1,0 +1,174 @@
+// Collapsed by default so it never competes with the event grid it sits above -
+// it is a setting, not the content of the page.
+:host {
+  display: block;
+  margin-bottom: var(--space-3, 1rem);
+}
+
+.reminder-settings {
+  border: 1px solid var(--apu-border);
+  border-radius: 0.75rem;
+  background: var(--apu-surface);
+  overflow: hidden;
+}
+
+.reminder-settings__summary {
+  display: flex;
+  gap: 0.625rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.75rem 0.875rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+
+  &:hover {
+    background: var(--apu-surface-muted);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--apu-blue-600);
+    outline-offset: -2px;
+  }
+
+  > .material-symbols-rounded:first-child {
+    color: var(--apu-blue-700);
+    font-size: 1.25rem;
+  }
+}
+
+.reminder-settings__summary-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.0625rem;
+  min-width: 0;
+
+  strong {
+    font-size: 0.875rem;
+    color: var(--apu-navy-950);
+  }
+
+  small {
+    font-size: 0.75rem;
+    color: var(--apu-text-muted);
+  }
+}
+
+.reminder-settings__chevron {
+  flex: 0 0 auto;
+  color: var(--apu-text-soft);
+}
+
+.reminder-settings__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.25rem 0.875rem 0.875rem;
+  border-top: 1px solid var(--apu-border);
+}
+
+.reminder-settings__loading,
+.reminder-settings__note {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--apu-text-muted);
+}
+
+.reminder-settings__note {
+  padding-top: 0.25rem;
+  border-top: 1px dashed var(--apu-border);
+}
+
+// --- one toggle row ---------------------------------------------------------
+.reminder-toggle {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding-top: 0.75rem;
+  cursor: pointer;
+
+  &:first-of-type {
+    padding-top: 0.5rem;
+  }
+}
+
+// The native checkbox stays in the DOM (it carries the accessible role, the
+// label association and keyboard behaviour) but is visually replaced by the
+// switch below - never removed with display:none, which would take it out of
+// the tab order.
+.reminder-toggle__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.reminder-toggle__switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 2.25rem;
+  height: 1.25rem;
+  margin-top: 0.125rem;
+  border-radius: 999px;
+  background: #cbd5e1;
+  transition: background 0.15s ease;
+
+  &::after {
+    position: absolute;
+    top: 0.1875rem;
+    left: 0.1875rem;
+    width: 0.875rem;
+    height: 0.875rem;
+    border-radius: 50%;
+    background: #fff;
+    content: '';
+    transition: transform 0.15s ease;
+  }
+}
+
+.reminder-toggle__input:checked + .reminder-toggle__switch {
+  background: var(--apu-blue-600);
+
+  &::after {
+    transform: translateX(1rem);
+  }
+}
+
+.reminder-toggle__input:disabled + .reminder-toggle__switch {
+  opacity: 0.55;
+}
+
+.reminder-toggle__input:focus-visible + .reminder-toggle__switch {
+  outline: 2px solid var(--apu-blue-600);
+  outline-offset: 2px;
+}
+
+.reminder-toggle__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  min-width: 0;
+
+  strong {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--apu-navy-900);
+  }
+
+  small {
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: var(--apu-text-muted);
+  }
+}
+
+@media (width <= 48rem) {
+  .reminder-toggle {
+    // 44px min touch target for the switch row.
+    padding-top: 0.875rem;
+  }
+}

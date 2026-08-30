@@ -11,7 +11,7 @@
 <section class="department-resubmit">
   <div class="department-resubmit__main">
     @if (loading()) {
-      <app-loading-state variant="spinner" label="Loading request…" />
+      <app-skeleton variant="detail" label="Loading request…" [count]="3" />
     } @else if (!proposal() || !definition()) {
       <div class="department-resubmit__state" role="status">
         <span class="material-symbols-rounded" aria-hidden="true">search_off</span>

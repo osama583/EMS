@@ -168,14 +168,36 @@ body.filters-open {
 
 .explore-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /*
+   * Wrap on the CARD's minimum comfortable width rather than pinning 4 columns.
+   * A hard repeat(4) kept four columns no matter how little room there was - inside
+   * the internal layout, where the sidebar eats ~19rem, that squeezed each card to
+   * roughly 12rem and the title (the overlay's top line) was clipped by the card's
+   * own overflow: hidden. auto-fit lets the row drop to 3 or 2 cards instead, so a
+   * card is never narrower than it can legibly be.
+   */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15.5rem), 1fr));
   gap: clamp(1rem, 2vw, 1.5rem);
   margin-top: 2rem;
 }
 
 .explore-card {
   position: relative;
-  aspect-ratio: 2 / 3;
+  /*
+   * A fixed aspect-ratio made the card a rigid box that the overlay had to fit
+   * inside. The overlay is anchored to bottom: 0 and grows upward, so whenever the
+   * text needed more room than the ratio allowed (a long title, a two-line category,
+   * a narrow column) the top of the stack - the title - was pushed past the top edge
+   * and cut off by overflow: hidden.
+   *
+   * min-height keeps the tall poster proportions as a FLOOR while letting a card that
+   * genuinely needs more vertical room take it, so the title can never be clipped.
+   * Cards in a row still align because the grid stretches them to the tallest.
+   */
+  min-height: clamp(22rem, 34vw, 27rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   overflow: hidden;
   border: 1px solid var(--apu-border);
   border-radius: var(--radius-card);
@@ -270,11 +292,14 @@ body.filters-open {
 }
 
 .explore-card__content {
-  position: absolute;
+  /*
+   * In normal flow (not absolute) the overlay contributes its height to the card, so
+   * a long title makes the card taller instead of overflowing it. margin-top: auto
+   * keeps it pinned to the bottom of the card exactly as bottom: 0 used to.
+   */
+  position: relative;
   z-index: 1;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  margin-top: auto;
   padding: 3.5rem var(--space-3) var(--space-3);
   border-radius: 0 0 var(--radius-card) var(--radius-card);
   background: linear-gradient(
@@ -298,14 +323,26 @@ body.filters-open {
 }
 
 .explore-card h3 {
-  max-width: 13ch;
+  /*
+   * 13ch is a typographic ideal for a WIDE card; on a narrow one it forces the title
+   * to wrap early, and since .explore-card__content is anchored to bottom: 0 and grows
+   * upward, the extra lines push the title off the top of the card, where overflow:
+   * hidden cuts it. Cap by line count instead of character width so a long name stays
+   * readable at any card width and the block can never grow unbounded.
+   */
+  max-width: 22ch;
   margin: 0 0 var(--space-3);
   font-family: var(--apu-font-family);
   font-size: var(--type-card);
   font-weight: var(--weight-card);
   letter-spacing: -0.025em;
-  line-height: 0.98;
+  line-height: 1.05;
   text-transform: uppercase;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .explore-card__details {
@@ -717,6 +754,53 @@ body.filters-open {
   }
 }
 
+/*
+ * Tablet band (48-64rem): the card is already narrowed to clamp(16.5rem, 36vw, 19rem) by the
+ * rule above, but until 48rem it still used the DESKTOP content rules - a 2/3 box with a
+ * 13ch title, 3.5rem of top padding and no line clamp. The content block is absolutely
+ * positioned against bottom: 0 and grows upward, so once the title wrapped to three or four
+ * lines the stack outgrew the card and the title - the top-most thing in it - was clipped off
+ * by the card's own overflow: hidden. The event's name is the one thing a browsing user needs
+ * in order to decide whether to open it, so here the title is guaranteed the room it needs and
+ * the secondary rows (date/time/venue) yield instead; they are all repeated in the Explore
+ * Event popup anyway.
+ */
+@media (min-width: 48.0625rem) and (max-width: 64rem) {
+  .explore-card {
+    /* A floor, not a cap - the card may still grow for a long title. */
+    min-height: 24rem;
+  }
+
+  .explore-card__content {
+    /* The old 3.5rem top padding was reserving space the narrow card no longer has. */
+    padding-top: 2.5rem;
+  }
+
+  .explore-card h3 {
+    /* 13ch forced early wrapping at this width; let the title use the full card. */
+    max-width: none;
+    /* Room for a long name without letting one title swallow the whole card. */
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.12;
+    text-overflow: ellipsis;
+  }
+
+  /* Secondary info is the part that gives way when space runs short. Venue is the
+     longest and least decisive of the three, so it drops first. */
+  .explore-card__details dd {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .explore-card__details div:last-child {
+    display: none;
+  }
+}
+
 @media (max-width: 48rem) {
   .explore-events__header {
     grid-template-columns: 1fr;
@@ -749,7 +833,7 @@ body.filters-open {
   }
 
   .explore-card {
-    aspect-ratio: 3 / 4;
+    min-height: 19rem;
     scroll-snap-align: none;
     border-radius: 0.85rem;
   }
@@ -915,7 +999,7 @@ body.filters-open {
   }
 
   .explore-card {
-    aspect-ratio: 16 / 10;
+    min-height: 15rem;
   }
 }
 

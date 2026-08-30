@@ -33,10 +33,13 @@ import { barPath, formatValue, linearScale, niceDomain } from './viz';
 
         @for (segment of row.segments; track segment.seriesKey) {
           <path
-            class="viz-mark"
+            class="viz-mark viz-mark--bar"
             [class.viz-mark--muted]="segment.muted"
+            [class.viz-mark--selected]="isSelected(segment.seriesKey, segment.point)"
+            [class.viz-mark--dimmed]="hasSelection() && !isSelected(segment.seriesKey, segment.point)"
             [attr.d]="segment.path"
             [attr.fill]="colorFor(segment.colorSlot)"
+            [style.color]="colorFor(segment.colorSlot)"
             tabindex="0"
             [attr.aria-label]="row.label + ' ' + segment.label + ' ' + valueLabel(segment.value)"
             (mouseenter)="hover(segment.seriesKey, segment.point)"

@@ -24,10 +24,24 @@ COMPLETED_APPROVED = "completed_approved"
 COMPLETED_REJECTED = "completed_rejected"
 CANCELLED = "cancelled"
 
+# Set by the escalation job (migration 037) when an event date passed with no
+# decision. The stage is part of the value because it is the accountability
+# record: "overdue_cfo" answers "who was this waiting on" in every list, filter
+# and export without a join.
+OVERDUE_HOS_HOD = "overdue_hos_hod"
+OVERDUE_FMB = "overdue_fmb"
+OVERDUE_CFO = "overdue_cfo"
+OVERDUE_DEPARTMENT = "overdue_department"
+OVERDUE_STATUSES = (OVERDUE_HOS_HOD, OVERDUE_FMB, OVERDUE_CFO, OVERDUE_DEPARTMENT)
+
 # The three single-actor stages. One named person acts; they may approve,
 # reject outright, or send it back. Departments can do none of those three.
 REVIEWER_STAGES = (HOS_HOD_REVIEW, FMB_REVIEW, CFO_REVIEW)
-TERMINAL_STATUSES = (COMPLETED_APPROVED, COMPLETED_REJECTED, CANCELLED)
+# Overdue counts as terminal: the event date has gone, so the proposal is a
+# record rather than live work. This is what routes it OUT of every approver's
+# inbox and INTO History - for the applicant and for the stage that held it -
+# through _BUCKET_SQL, with no new query or page.
+TERMINAL_STATUSES = (COMPLETED_APPROVED, COMPLETED_REJECTED, CANCELLED, *OVERDUE_STATUSES)
 
 # --- request_task.status --------------------------------------------------
 TASK_PENDING = "pending"
@@ -146,3 +160,52 @@ def cancellation_deadline_days(cur) -> int:
 
 def max_event_categories(cur) -> int:
     return int(config_number(cur, "MAX_EVENT_CATEGORIES"))
+
+
+def min_event_lead_days(cur) -> int:
+    """Days of notice required between today and the event start date.
+
+    Missing rather than fatal: an installation that has not run migration 034
+    should keep accepting proposals under the old no-notice rule, not reject
+    every one of them.
+    """
+    row = fetch_one(cur, "SELECT number FROM config WHERE code = %s", ("MIN_EVENT_LEAD_DAYS",))
+    return int(row["number"]) if row else 0
+
+
+# --- Escalation policy (migration 037) --------------------------------------
+# All five are "missing rather than fatal", for the same reason
+# min_event_lead_days() is: an installation that has not run migration 037 must
+# keep working under the old no-escalation behaviour, not fail every read. The
+# defaults below therefore match the values the migration seeds.
+
+def _config_int(cur, code: str, default: int) -> int:
+    row = fetch_one(cur, "SELECT number FROM config WHERE code = %s", (code,))
+    if not row or row["number"] is None:
+        return default
+    return int(row["number"])
+
+
+def approval_warning_days(cur) -> int:
+    """Days before the event at which an undecided proposal turns amber."""
+    return _config_int(cur, "APPROVAL_WARNING_DAYS", 7)
+
+
+def approval_urgent_days(cur) -> int:
+    """Days before the event at which an undecided proposal turns red."""
+    return _config_int(cur, "APPROVAL_URGENT_DAYS", 2)
+
+
+def approval_warning_email_days(cur) -> int:
+    """How often to re-chase the approver while amber. 0 = do not email."""
+    return _config_int(cur, "APPROVAL_WARNING_EMAIL_DAYS", 2)
+
+
+def approval_urgent_email_days(cur) -> int:
+    """How often to re-chase the approver while red. 0 = do not email."""
+    return _config_int(cur, "APPROVAL_URGENT_EMAIL_DAYS", 1)
+
+
+def task_grace_minutes(cur) -> int:
+    """Minutes past a task's own deadline before it counts as late."""
+    return _config_int(cur, "TASK_GRACE_MINUTES", 5)

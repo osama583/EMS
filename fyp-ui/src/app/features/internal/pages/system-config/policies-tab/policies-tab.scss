@@ -37,3 +37,28 @@
 
 .policies-tab__threshold { display: flex; flex-direction: column; gap: var(--space-1); }
 .policies-tab__note--tight { margin: 0; font-size: 0.6875rem; line-height: 1.45; }
+
+/* The escalation card pairs a threshold with its email cadence on one row, so the
+   relationship between the two values is visible rather than implied by order. */
+.policies-tab__card-title {
+  margin: 0 0 var(--space-1);
+  color: var(--apu-navy-950);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.policies-tab__field-pair {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+}
+
+.policies-tab__error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--form-error-soft);
+  color: var(--form-error);
+  font-size: 0.85rem;
+  font-weight: 600;
+}

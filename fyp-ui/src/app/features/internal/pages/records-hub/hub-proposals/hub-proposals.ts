@@ -13,6 +13,7 @@ import { DepartmentRequestKind } from '../../../../../core/departments/departmen
 import { InternalDataPageComponent } from '../../../../../shared/components/internal-data-page/internal-data-page';
 import {
   InternalCellTone,
+  InternalDataCell,
   InternalDataPageConfig,
   InternalDataRecord,
   InternalFilterChange,
@@ -148,16 +149,16 @@ export class HubProposalsComponent {
       { key: 'actions', label: 'Actions', actions: true, width: '9rem' },
     ] : [
       { key: 'proposalId', label: 'Proposal ID', width: '9rem' },
-      { key: 'eventTitle', label: 'Event Title', width: '17rem' },
-      { key: 'applicant', label: 'Applicant', width: '13rem' },
-      { key: 'schedule', label: 'Event Schedule', width: '18rem', sortKey: 'schedule' },
-      { key: 'pax', label: 'Total Pax', width: '7rem' },
+      { key: 'eventTitle', label: 'Event Title', width: '15rem' },
+      { key: 'applicant', label: 'Applicant', width: '12rem' },
+      { key: 'schedule', label: 'Event Schedule', width: '16rem', sortKey: 'schedule' },
+      { key: 'urgency', label: 'Urgency', width: '9rem' },
+      { key: 'pax', label: 'Total Pax', width: '6rem' },
       { key: 'status', label: 'Status', width: '11rem' },
       { key: 'actions', label: 'Actions', actions: true, width: '9rem' },
     ],
     actions: [
       { key: 'view', label: 'View proposal', icon: 'visibility' },
-      { key: 'print', label: 'Print form', icon: 'print' },
     ],
     emptyTitle: this.copy.empty,
     emptyDescription: 'Try changing your search or status filter.',
@@ -198,7 +199,10 @@ export class HubProposalsComponent {
     const requesterLabel = isMine ? `${item.applicant} (You)` : item.applicant;
     return {
       id,
-      emphasized: status === 'Revision required' || status === 'Changes requested',
+      emphasized:
+        status === 'Revision required' ||
+        status === 'Changes requested' ||
+        item.urgency === 'urgent',
       cells: {
         proposalId: { primary: item.proposalId },
         eventTitle: { primary: item.eventTitle },
@@ -207,6 +211,7 @@ export class HubProposalsComponent {
         schedule: { primary: item.schedule },
         pax: { primary: String(item.totalPax) },
         status: { primary: statusLabel, badge: true, tone: this.statusTone(status) },
+        urgency: this.urgencyCell(item),
       },
       mobile: {
         eyebrow: item.proposalId,
@@ -220,7 +225,7 @@ export class HubProposalsComponent {
           { icon: 'groups', text: `${item.totalPax} expected pax` },
         ],
       },
-      actionKeys: ['view', 'print'],
+      actionKeys: ['view'],
     };
   }
 
@@ -272,6 +277,30 @@ export class HubProposalsComponent {
     void this.router.navigate(['/app/proposals/review', id], {
       queryParams: { returnTo: this.router.url, readOnly: this.bucket !== 'inbox' },
     });
+  }
+
+  /**
+   * The urgency badge. Reads the days-until-event the server already computed rather than
+   * recomputing here, so a row can never disagree with the band the server sorted it into.
+   *
+   * The text is the FACT ("Event in 2 days"), not the band name — "Urgent" tells an approver
+   * nothing they can act on, whereas the number does.
+   */
+  private urgencyCell(item: ProposalReviewRecord): InternalDataCell {
+    const days = item.daysUntilEvent;
+    if (item.urgency == null || item.urgency === 'normal' || days == null) {
+      return { primary: '—' };
+    }
+    if (item.urgency === 'overdue') {
+      const late = Math.abs(days);
+      return {
+        primary: late === 1 ? 'Event was yesterday' : `Event was ${late} days ago`,
+        badge: true,
+        tone: 'neutral',
+      };
+    }
+    const label = days === 0 ? 'Event today' : days === 1 ? 'Event tomorrow' : `Event in ${days} days`;
+    return { primary: label, badge: true, tone: item.urgency === 'urgent' ? 'danger' : 'warning' };
   }
 
   private statusTone(status: string): InternalCellTone {

@@ -203,9 +203,9 @@ def nav_catalogue() -> list[dict]:
          "manage-clubs", 0, grants_for(["club-admin"]))
     # Granted the hub's BASE path, not /app/clubs/my-clubs: the hub's three tabs
     # are one page, so granting a single tab's path would refuse the others.
-    page("clubs-my", "My Clubs", "groups", "/app/clubs", "manage-clubs", 1,
+    page("clubs-discover", "Discover Clubs", "explore", "/app/clubs/discover", "manage-clubs", 1,
          grants_for(["club-admin", "student", "lecturer"]))
-    page("clubs-discover", "Discover Clubs", "explore", "/app/clubs/discover", "manage-clubs", 2,
+    page("clubs-my", "My Clubs", "groups", "/app/clubs", "manage-clubs", 2,
          grants_for(["club-admin", "student", "lecturer"]))
     page("club-category", "Club Category", "category", "/app/club-category",
          "manage-clubs", 3, grants_for(["club-admin"]))

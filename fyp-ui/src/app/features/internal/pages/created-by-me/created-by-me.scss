@@ -179,3 +179,18 @@
   .created-by-me-info__table th,
   .created-by-me-info__table td { white-space: normal; }
 }
+
+/* Club attribution on the card — an event can belong to one or more clubs (request_clubs),
+   and the organiser should see that without opening the info modal. */
+.created-by-me__clubs {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  gap: 0.3rem;
+  color: var(--apu-blue-600);
+  font-size: 0.82rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.created-by-me__clubs .material-symbols-rounded { font-size: 1rem; }

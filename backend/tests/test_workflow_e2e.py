@@ -468,6 +468,12 @@ def test_cancellation_closes_near_the_event_date(cur):
     """CANCELLATION_DEADLINE_DAYS is 3, so an event tomorrow is already locked."""
     from app.errors import WorkflowError
 
+    # This test needs to schedule an event tomorrow, which MIN_EVENT_LEAD_DAYS
+    # forbids for any non-zero value. Pin it to 0 inside this transaction rather
+    # than inherit whatever the database happens to carry - the cancellation
+    # deadline is what is under test here, not the lead time.
+    cur.execute("UPDATE config SET number = 0 WHERE code = 'MIN_EVENT_LEAD_DAYS'")
+
     tomorrow = (date.today() + timedelta(days=1)).isoformat()
     request_id = create_proposal(
         cur,

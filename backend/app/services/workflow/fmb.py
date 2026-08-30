@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from ...db import fetch_all, fetch_one
 from ...errors import Forbidden, NotFound, WorkflowError
+from ..email import dispatch
 from . import history
 from .authorization import heads_unit, is_cafeteria_manager_of, is_cafeteria_staff_of
 from .constants import (
@@ -182,6 +183,14 @@ def create_selection(
         actor_role=history.primary_role_code(cur, actor_user_id),
         new_status=SEL_PENDING,
         comment="Order placed with " + cafeteria_unit_code + ".",
+    )
+    # The cafeteria's manager(s) are the only ones who can accept this order.
+    dispatch.cafeteria_order_created(
+        cur,
+        request_id,
+        cafeteria_unit_code,
+        f"{selection['quantity']} x {selection['menu_item_label']}"
+        + (f" - {notes}" if notes else ""),
     )
     return _project_selection(selection)
 

@@ -23,6 +23,7 @@ import {
   InternalTableColumn,
   PAGE_SIZE_OPTIONS,
 } from './internal-data-page.models';
+import { SkeletonComponent } from '../skeleton/skeleton';
 
 @Component({
   selector: 'app-internal-page-header',
@@ -267,13 +268,10 @@ export class InternalDataTableComponent {
 
 @Component({
   selector: 'app-internal-page-state',
+  imports: [SkeletonComponent],
   template: `
     @if (loading()) {
-      <div class="shared-page-state__loading" role="status" aria-label="Loading results">
-        @for (line of loadingLines; track line) {
-          <span></span>
-        }
-      </div>
+      <app-skeleton variant="table" [count]="skeletonRows()" [columns]="skeletonColumns()" [label]="loadingLabel()" />
     } @else {
       <div class="shared-page-state__empty" role="status">
         <span class="material-symbols-rounded" aria-hidden="true">{{ icon() }}</span>
@@ -293,7 +291,12 @@ export class InternalPageStateComponent {
   readonly description = input('Try changing your search or filters.');
   readonly showClear = input(true);
   readonly clear = output<void>();
-  readonly loadingLines = [1, 2, 3, 4];
+  // Shape of the skeleton drawn while loading. Defaults suit a typical list; the
+  // data page passes its real column count so the bones line up with the table
+  // that replaces them.
+  readonly skeletonRows = input(5);
+  readonly skeletonColumns = input(4);
+  readonly loadingLabel = input('Loading results…');
 }
 
 @Component({

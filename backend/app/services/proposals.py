@@ -16,6 +16,7 @@ later must not silently rewrite what a submitted proposal said.
 """
 from __future__ import annotations
 
+import datetime as dt
 import json
 import re
 from decimal import Decimal, InvalidOperation
@@ -23,7 +24,12 @@ from typing import Any
 
 from ..db import fetch_all, fetch_one
 from ..errors import NotFound, ValidationError
-from .workflow.constants import TABLE_FOR_REQUIREMENT, max_event_categories, stage_for_client
+from .workflow.constants import (
+    TABLE_FOR_REQUIREMENT,
+    max_event_categories,
+    min_event_lead_days,
+    stage_for_client,
+)
 
 # Cleared and rebuilt on every content save, children first.
 CHILD_TABLES = (
@@ -217,6 +223,23 @@ def validate(cur, payload: dict, *, draft: bool, applicant: dict | None = None) 
             elif str(row["end"]) <= str(row["start"]):
                 errors.append(f"Schedule row {index} ends before it starts.")
 
+        # MIN_EVENT_LEAD_DAYS. The picker disables these dates client-side; this
+        # is the same rule where it cannot be bypassed. Checked against the
+        # earliest row only - that is the day the notice is measured from.
+        lead_days = min_event_lead_days(cur)
+        earliest_allowed = dt.date.today() + dt.timedelta(days=max(0, lead_days))
+        for index, row in enumerate(schedule, start=1):
+            event_day = _as_date(row.get("date"))
+            if event_day is None or event_day >= earliest_allowed:
+                continue
+            if lead_days > 0:
+                errors.append(
+                    f"Schedule row {index} starts sooner than the {lead_days}-day minimum notice. "
+                    f"The earliest available date is {earliest_allowed:%d %b %Y}."
+                )
+            else:
+                errors.append(f"Schedule row {index} cannot be in the past.")
+
         # The four university-delivered requests are venue-only by requirement (migration 032): there
         # is nowhere to deliver a stage or a tray of food but a university venue, and free text there
         # is what used to send Logistics to a place they could not find.
@@ -296,6 +319,20 @@ def validate(cur, payload: dict, *, draft: bool, applicant: dict | None = None) 
 
     if errors:
         raise ValidationError(errors[0], details={"errors": errors})
+
+
+def _as_date(raw: Any) -> dt.date | None:
+    """A schedule row's `date` as a date, or None when it is absent or unparseable.
+
+    Unparseable is left to the "needs a date" check above rather than reported
+    twice as two different problems.
+    """
+    if isinstance(raw, dt.date):
+        return raw
+    try:
+        return dt.date.fromisoformat(str(raw).strip()[:10])
+    except (ValueError, TypeError):
+        return None
 
 
 def _as_int(value: Any, *, default: int = 0) -> int:

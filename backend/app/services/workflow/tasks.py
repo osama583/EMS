@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from ...db import fetch_all, fetch_one
 from ...errors import NotFound, WorkflowError
+from ..email import dispatch
 from . import history
 from .authorization import authorize_department_task, heads_unit
 from .constants import (
@@ -128,6 +129,8 @@ def _complete_request(cur, request_id: int, comment: str | None = None) -> None:
         previous_status=row["status"],
         new_status=COMPLETED_APPROVED,
     )
+    # Every department has signed off - tell the applicant and every co-owner.
+    dispatch.proposal_fully_approved(cur, request_id)
 
 
 def check_all_tasks_resolved(cur, request_id: int) -> None:
@@ -252,6 +255,7 @@ def send_task_back(cur, request_id: int, requirement_name: str, actor_user_id: i
         previous_status=previous,
         new_status="resubmitted",
     )
+    dispatch.department_task_sent_back(cur, request_id, task, comment)
     return load_task(cur, task["request_task_id"])
 
 

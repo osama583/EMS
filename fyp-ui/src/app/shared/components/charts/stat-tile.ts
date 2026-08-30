@@ -1,36 +1,38 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { StatWidget } from '../../../core/dashboard/dashboard.models';
-import { STATUS_ICON, STATUS_WORD, formatValue, linePath, linearScale, niceDomain } from './viz';
+import { formatValue, linePath, linearScale, niceDomain } from './viz';
 
 /**
  * KPI tile and hero figure — one component, two sizes.
  *
- * They are the same object with different weight: label, value, sparkline,
- * delta, status. Splitting them into two components would mean two places to
- * keep the caveat rendering, the delta direction logic and the drill target in
- * step, and they would drift.
+ * They are the same object with different weight: label, value, sparkline.
+ * Splitting them into two components would mean two places to keep the caveat
+ * rendering and the drill target in step, and they would drift.
+ *
+ * The tile deliberately carries **no target chip and no period-on-period
+ * delta**. Both were removed as noise: a "target: none" chip states an absence,
+ * and "40% vs previous" competes with the number it qualifies for the reader's
+ * attention while being the less important of the two. The server still sends
+ * `target` and `delta`; this component simply does not render them.
  *
  * **Exactly one hero per view.** It occupies four grid columns and full band
  * height so it reads as the page's lead rather than a larger tile. Same
  * typeface as everything else — a display face here reads as off-brand
  * decoration.
  *
- * The whole tile is the hit target, not just the value.
+ * **A tile does not navigate.** It is a figure to read, not a link. Clicking
+ * one used to throw away whatever the reader had on screen, usually by accident
+ * while trying to read the number. This is the rule the chart marks already
+ * follow (chart-panel.ts's `onMark`): the dashboard is somewhere you look, and
+ * leaving it is a deliberate act through the sidebar, not a stray click.
+ *
+ * The server still sends a `drill` on most tiles; this component ignores it.
  */
 @Component({
   selector: 'app-stat-tile',
   imports: [],
   template: `
-    <div
-      class="dash-card dash-stat"
-      [class.dash-stat--hero]="isHero()"
-      [class.dash-card--interactive]="!!stat().drill"
-      [attr.role]="stat().drill ? 'button' : null"
-      [attr.tabindex]="stat().drill ? 0 : null"
-      (click)="activate()"
-      (keydown.enter)="activate()"
-      (keydown.space)="activate($event)"
-    >
+    <div class="dash-card dash-stat" [class.dash-stat--hero]="isHero()">
       <p class="dash-label">
         {{ stat().label }}
         @if (stat().definition) {
@@ -65,18 +67,6 @@ import { STATUS_ICON, STATUS_WORD, formatValue, linePath, linearScale, niceDomai
           <p class="dash-caption">{{ stat().caption }}</p>
         }
 
-        <div class="dash-stat__foot">
-          @if (stat().delta; as delta) {
-            <span class="dash-delta" [class]="'dash-delta--' + deltaTone(delta.direction, delta.isGood)">
-              <span class="material-symbols-rounded" aria-hidden="true">{{ deltaIcon(delta.direction) }}</span>
-              {{ deltaText(delta) }}
-            </span>
-          }
-          <span class="dash-status" [class]="'dash-status--' + stat().status">
-            <span class="material-symbols-rounded" aria-hidden="true">{{ statusIcon() }}</span>
-            {{ statusLabel() }}
-          </span>
-        </div>
       }
 
       @if (stat().caveat) {
@@ -89,7 +79,6 @@ import { STATUS_ICON, STATUS_WORD, formatValue, linePath, linearScale, niceDomai
 })
 export class StatTileComponent {
   readonly stat = input.required<StatWidget>();
-  readonly drill = output<StatWidget>();
 
   protected readonly SPARK_W = 120;
   protected readonly SPARK_H = 28;
@@ -112,36 +101,4 @@ export class StatTileComponent {
   readonly sparkPath = computed(() => linePath(this.sparkPoints()));
   readonly lastPoint = computed(() => this.sparkPoints().at(-1) ?? null);
 
-  readonly statusIcon = computed(() => STATUS_ICON[this.stat().status] ?? 'help');
-  readonly statusLabel = computed(() => {
-    const target = this.stat().target?.label;
-    if (target) return target;
-    return STATUS_WORD[this.stat().status] ?? 'No data';
-  });
-
-  activate(event?: Event): void {
-    if (!this.stat().drill) return;
-    event?.preventDefault();
-    this.drill.emit(this.stat());
-  }
-
-  /** Direction and goodness are separate: latency falling is 'down' and good,
-   *  coverage falling is 'down' and bad. */
-  deltaTone(direction: string, isGood: boolean): string {
-    if (direction === 'flat') return 'flat';
-    return isGood ? 'good' : 'bad';
-  }
-
-  deltaIcon(direction: string): string {
-    return direction === 'up' ? 'trending_up' : direction === 'down' ? 'trending_down' : 'trending_flat';
-  }
-
-  deltaText(delta: { percent: number | null; value: number; direction: string }): string {
-    if (delta.direction === 'flat') return 'No change';
-    const suffix = ` vs ${this.stat().kind === 'hero' ? 'the previous period' : 'previous'}`;
-    if (delta.percent !== null && Number.isFinite(delta.percent)) {
-      return `${Math.abs(delta.percent * 100).toFixed(0)}%${suffix}`;
-    }
-    return `${formatValue(Math.abs(delta.value), this.stat().format)}${suffix}`;
-  }
 }

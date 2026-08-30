@@ -34,6 +34,7 @@ from ..errors import BadRequest, Conflict, Forbidden, NotFound
 from ..logging_setup import audit
 from ..security import require_auth, require_internal
 from ..security.principal import current_principal
+from ..services.email import dispatch
 from ._helpers import body, date_order, flag, paged, pagination, required
 
 bp = Blueprint("clubs", __name__, url_prefix="/clubs")
@@ -760,6 +761,15 @@ def request_to_join(club_id: int):
             (club_id, principal.user_id, reason),
         )
         request_id = cur.fetchone()["club_join_request_id"]
+        # The President is the only person who can decide this, so without an
+        # email it waits in an inbox they have no reason to open.
+        dispatch.club_join_requested(
+            cur,
+            club_id,
+            requester_name=principal.full_name,
+            requester_email=principal.email,
+            reason=reason,
+        )
     return jsonify({"id": request_id, "status": "pending"}), 201
 
 
@@ -949,6 +959,9 @@ def _decide_join_request(join_request_id: int, decision: str, comment: str) -> d
             )
         audit("clubs.join_request.decided", club_id=join_request["club_id"],
               decision=decision, actor_user_id=principal.user_id)
+        dispatch.club_join_decided(
+            cur, join_request_id, approved=decision == "approve", comment=comment
+        )
     return _join_request_response(join_request_id)
 
 

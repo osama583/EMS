@@ -23,12 +23,18 @@ Placeholders: {{subject}} {{preheader}} {{body_html}} {{cta_label}} {{cta_link}}
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background-color:#ffffff; border-radius:12px; overflow:hidden; border:1px solid rgba(15,35,60,0.10);">
 
           <!-- header -->
-          <!-- TODO: confirm hosted icon URL before go-live; must be a public https URL, not a local asset path -->
+          <!-- The logo is EMBEDDED in the message (a MIME "related" part), not
+               fetched from a URL. It used to point at an unfilled
+               hosted-domain placeholder that no mail client could resolve, which
+               is what made it render as a broken image. An embedded part needs no public
+               host, so it also works while the app is only on localhost, and it
+               survives the image-proxying that Gmail/Outlook apply to remote
+               images. See client.py's _LOGO_CID / attach_logo(). -->
           <tr>
             <td style="background-color:#ffffff; padding:20px 32px; border-bottom:1px solid rgba(15,35,60,0.10);">
               <table role="presentation" cellpadding="0" cellspacing="0"><tr>
                 <td width="26" style="padding-right:10px;">
-                  <img src="https://YOUR-DOMAIN/assets/media/apu-logo-only.png" alt="" width="26" height="26" style="display:block; border:0;">
+                  <img src="cid:apu-logo" alt="APU" width="26" height="26" style="display:block; border:0;">
                 </td>
                 <td align="left" style="font-size:15px; font-weight:800; color:#07182c; letter-spacing:0.2px; font-family:Roboto,Arial,Helvetica,sans-serif;">
                   APU Event Management System

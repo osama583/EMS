@@ -32,6 +32,12 @@ export class TaskCalendarComponent {
   // Days (YYYY-MM-DD) that should render the primary-color dot indicator.
   readonly taskDates = input<readonly string[]>([]);
   readonly mode = model<TaskCalendarMode>('single');
+  /** Hides the Single day / Date range switch and pins the calendar to whatever
+   *  `mode` was given. The dashboard's period filter is always a window, so
+   *  offering "Single day" there would let the reader pick a one-day reporting
+   *  range by accident — and the switch would sit above a calendar whose owner
+   *  cannot honour half of it. */
+  readonly lockMode = input(false);
   readonly selection = model<TaskDateSelection>({ start: this.dateKey(this.today), end: null });
 
   readonly currentMonth = signal(this.startOfMonth(this.today));

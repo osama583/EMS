@@ -3,6 +3,10 @@
     <app-internal-page-header [config]="headerConfig()" />
   }
 
+  @if (reminderScope(); as scope) {
+    <app-reminder-settings [scope]="scope" />
+  }
+
   @if (loading()) {
     <app-internal-page-state [loading]="true" [showClear]="false" />
   } @else if (error()) {

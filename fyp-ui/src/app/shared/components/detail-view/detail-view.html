@@ -1,0 +1,54 @@
+<article class="detail-view">
+  @if (accentClass()) {
+    <div class="detail-view__accent" [class]="accentClass()" aria-hidden="true"></div>
+  }
+
+  @if (tags().length) {
+    <div class="detail-view__tags">
+      @for (tag of tags(); track tag.label + tag.value) {
+        <span class="detail-view__tag" [attr.data-tone]="tag.tone ?? 'neutral'">
+          @if (tag.icon) {
+            <span class="material-symbols-rounded" aria-hidden="true">{{ tag.icon }}</span>
+          }
+          {{ tag.value }}
+        </span>
+      }
+    </div>
+  }
+
+  @if (fields().length) {
+    <dl class="detail-view__grid">
+      @for (field of fields(); track field.label) {
+        <div class="detail-view__item" [class.detail-view__item--wide]="field.wide">
+          <dt>{{ field.label }}</dt>
+          <dd>
+            @if (field.badge) {
+              <span class="detail-view__badge" [attr.data-tone]="field.tone ?? 'neutral'">
+                @if (field.icon) {
+                  <span class="material-symbols-rounded" aria-hidden="true">{{ field.icon }}</span>
+                }
+                {{ field.value }}
+              </span>
+            } @else {
+              @if (field.icon) {
+                <span class="material-symbols-rounded detail-view__icon" aria-hidden="true">{{ field.icon }}</span>
+              }
+              {{ field.value }}
+            }
+          </dd>
+        </div>
+      }
+    </dl>
+  }
+
+  @for (section of sections(); track section.title) {
+    <section class="detail-view__section">
+      <h3>{{ section.title }}</h3>
+      <p>{{ section.body }}</p>
+    </section>
+  }
+
+  <!-- Anything a single record needs that the generic shapes above cannot express
+       (a payment block, an image, a registration form) is projected here. -->
+  <ng-content />
+</article>

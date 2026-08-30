@@ -49,6 +49,10 @@ import { EVENT_IMAGE_PLACEHOLDER } from '../../event-image-placeholder';
               <span>Registration</span>
               <strong>{{ item.confirmedRegistrationCount }} registered</strong>
             </article>
+            <article class="event-details__summary-card">
+              <span>Visibility</span>
+              <strong>{{ item.eventVisibility }}</strong>
+            </article>
           </div>
 
           <section class="event-details__introduction" aria-labelledby="event-introduction-title">
@@ -56,13 +60,31 @@ import { EVENT_IMAGE_PLACEHOLDER } from '../../event-image-placeholder';
             <p>{{ item.shortIntroduction }}</p>
           </section>
 
+          <!-- Field set matched to the master-calendar dialog (event-calendar.html), which
+               was the richer of the two: organiser, school/department, visibility, cost,
+               clubs and a multi-session note were all missing here. -->
           <dl>
             <div><dt>Date</dt><dd>{{ item.schedule[0]?.date }}</dd></div>
             <div><dt>Time</dt><dd>{{ item.schedule[0]?.start }} - {{ item.schedule[0]?.end }}</dd></div>
-            <div><dt>Venue</dt><dd>{{ item.schedule[0]?.location }}</dd></div>
-            <div><dt>Format</dt><dd>{{ item.eventFormat }}</dd></div>
+            <div><dt>Venue</dt><dd>{{ item.schedule[0]?.location || 'To be confirmed' }}</dd></div>
+            @if (item.organiser) {
+              <div><dt>Organiser</dt><dd>{{ item.organiser }}</dd></div>
+            }
+            @if (item.schoolDepartment) {
+              <div><dt>School / department</dt><dd>{{ item.schoolDepartment }}</dd></div>
+            }
+            @if (item.eventFormat) {
+              <div><dt>Format</dt><dd>{{ item.eventFormat }}</dd></div>
+            }
             <div><dt>Expected attendance</dt><dd>{{ item.totalExpectedPax }}</dd></div>
-            <div><dt>Registration</dt><dd>{{ item.registrationMode }}</dd></div>
+            <div><dt>Cost</dt><dd>{{ costLabel(item) }}</dd></div>
+            <div><dt>Registration</dt><dd>{{ registrationLabel(item) }}</dd></div>
+            @if (item.clubs.length > 0) {
+              <div><dt>{{ item.clubs.length === 1 ? 'Club' : 'Clubs' }}</dt><dd>{{ item.clubs.join(', ') }}</dd></div>
+            }
+            @if (item.schedule.length > 1) {
+              <div><dt>Sessions</dt><dd>{{ item.schedule.length }} across this event</dd></div>
+            }
           </dl>
 
           @if (alreadyRegistered(); as status) {
@@ -201,6 +223,17 @@ import { EVENT_IMAGE_PLACEHOLDER } from '../../event-image-placeholder';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EventDetailsModalComponent {
+  /** Same wording as the master-calendar dialog, so an event reads identically in both places. */
+  costLabel(item: PublishedEvent): string {
+    return item.isFree || !item.cost ? 'Free' : `RM ${item.cost.toFixed(2)}`;
+  }
+
+  registrationLabel(item: PublishedEvent): string {
+    const mode = item.registrationMode === 'Automatic' ? 'Open to all' : 'Approval required';
+    if (item.maxPax === null) return mode;
+    return `${mode} · ${item.confirmedRegistrationCount}/${item.maxPax} places filled`;
+  }
+
   readonly placeholder = EVENT_IMAGE_PLACEHOLDER;
   private readonly auth = inject(AuthService);
   private readonly service = inject(PublishedEventService);

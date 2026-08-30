@@ -220,6 +220,7 @@ PROFILES: dict[str, dict[str, Any]] = {
     "hod_fmb": {
         # Four bands, no hero.
         "counts": "fmb_request_counts",
+        "totals": "proposal_totals",
         "hero": None,
         "kpis": [
             "fmb_total_cost",
@@ -227,10 +228,17 @@ PROFILES: dict[str, dict[str, Any]] = {
             "fmb_cost_per_pax",
             "fmb_change_rate",
         ],
-        "signature": "fmb_gate_outcomes",
+        # No signature panel: with three supporting panels a signature left an
+        # odd count behind it, so one chart always ran full width while its
+        # siblings sat at half - the same kind of chart rendered at two sizes on
+        # one page. Folding the gate board into the panel list makes four, which
+        # pairs evenly two to a row.
+        "signature": None,
         "panels": [
+            "fmb_gate_outcomes",
             "fmb_order_distribution",
             "fmb_water_usage",
+            "proposal_status_breakdown",
         ],
         "alerts": None,
         "quickActions": [],
@@ -253,6 +261,7 @@ PROFILES: dict[str, dict[str, Any]] = {
     "cfo": {
         # Reduced to the money question and the gate behind it.
         "counts": "cfo_request_counts",
+        "totals": "proposal_totals",
         "hero": None,
         "kpis": [
             "cfo_total_spend",
@@ -270,6 +279,7 @@ PROFILES: dict[str, dict[str, Any]] = {
             "cfo_funding_main_usage",
             "cfo_funding_sub_usage",
             "cfo_gate_decisions",
+            "proposal_status_breakdown",
         ],
         "alerts": None,
         "quickActions": [],

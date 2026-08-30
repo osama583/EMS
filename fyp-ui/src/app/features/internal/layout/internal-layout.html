@@ -245,6 +245,20 @@
           <span class="internal-nav__label">{{ purgingDeleted() ? 'Purging…' : 'Purge Deleted' }}</span>
         </button>
       }
+      @if (canSendReminders()) {
+        <button
+          type="button"
+          class="internal-nav__item"
+          [disabled]="sendingReminders()"
+          title="Send the event reminder emails that are due (normally run daily by cron)"
+          (click)="sendEventReminders()"
+        >
+          <span class="internal-nav__icon material-symbols-rounded" aria-hidden="true">
+            {{ sendingReminders() ? 'hourglass_top' : 'notifications_active' }}
+          </span>
+          <span class="internal-nav__label">{{ sendingReminders() ? 'Sending…' : 'Send Reminders' }}</span>
+        </button>
+      }
       <a
         class="internal-nav__item"
         routerLink="/app/profile"

@@ -580,6 +580,18 @@ def proposal_bucket_counts(cur, scope: Scope) -> dict[str, int]:
     overdue task; a cancelled event is money that was committed and released,
     and it is the only one of the four that changes what the spend figures
     above it mean.
+
+    **Only `completed` respects the reporting period**, for the reason set out
+    at flow.request_bucket_counts: inbox, ongoing and cancelled are the state
+    of the pipeline right now, and windowing them would hide live work that
+    happens to be old. Completed is a flow, so it is counted over the window.
+
+    `updated_at` stands in for a completion timestamp, which the request table
+    does not carry. A terminal status is the last thing that happens to a
+    request, so for a completed row the two coincide - but an edit to an
+    already-completed proposal would move it into a later window, and if this
+    number ever needs to be exact the fix is a real `completed_at` column
+    rather than a cleverer query here.
     """
     row = fetch_one(
         cur,
@@ -589,12 +601,15 @@ def proposal_bucket_counts(cur, scope: Scope) -> dict[str, int]:
                    WHERE r.status IN ('submitted', 'hos_hod_review', 'fmb_review',
                                       'department_review', 'resubmission_required')
                ) AS ongoing,
-               count(*) FILTER (WHERE r.status = 'completed_approved') AS completed,
+               count(*) FILTER (
+                   WHERE r.status = 'completed_approved'
+                     AND r.updated_at >= %(from)s AND r.updated_at < %(to)s
+               ) AS completed,
                count(*) FILTER (WHERE r.status = 'cancelled') AS cancelled
           FROM request r
          WHERE r.submitted_at IS NOT NULL
         """,
-        (),
+        scope.base_params,
     )
     return {
         "inbox": int(row["inbox"]) if row else 0,
@@ -622,3 +637,116 @@ def funding_off_catalogue(cur, scope: Scope) -> dict[str, Any]:
         "count": int(row["off_catalogue"]) if row else 0,
         "sample": int(row["total"]) if row else 0,
     }
+
+
+def proposal_totals(cur, scope: Scope) -> dict[str, int]:
+    """The four proposal totals behind the toggle card: created, needs action,
+    completed, cancelled.
+
+    A different question from proposal_bucket_counts() above, which asks "where
+    is the work sitting relative to *my* gate". This one asks "what happened to
+    proposals in this period" and is the same four numbers for every reader, so
+    it takes no unit and no gate.
+
+    All four respect the period, because all four are flows: unlike the status
+    strip there is no backlog reading here to protect. `created` counts by
+    submission, the rest by their own terminal or current state.
+    """
+    row = fetch_one(
+        cur,
+        """
+        SELECT count(*) AS created,
+               count(*) FILTER (
+                   WHERE r.status IN ('submitted', 'hos_hod_review', 'fmb_review',
+                                      'cfo_review', 'department_review',
+                                      'resubmission_required')
+               ) AS action,
+               count(*) FILTER (WHERE r.status = 'completed_approved') AS completed,
+               count(*) FILTER (WHERE r.status = 'cancelled') AS cancelled
+          FROM request r
+         WHERE r.submitted_at IS NOT NULL
+           AND r.submitted_at >= %(from)s AND r.submitted_at < %(to)s
+        """,
+        scope.base_params,
+    )
+    return {
+        "created": int(row["created"]) if row else 0,
+        "action": int(row["action"]) if row else 0,
+        "completed": int(row["completed"]) if row else 0,
+        "cancelled": int(row["cancelled"]) if row else 0,
+    }
+
+
+# How each status is labelled on the status breakdown, in workflow order rather
+# than alphabetically: a reader scanning it is following a proposal's path.
+# `draft` is deliberately absent - see proposal_status_breakdown().
+_STATUS_LABELS: tuple[tuple[str, str], ...] = (
+    ("submitted", "Submitted"),
+    ("hos_hod_review", "HOS/HOD review"),
+    ("fmb_review", "F&B review"),
+    ("cfo_review", "CFO review"),
+    ("department_review", "Department review"),
+    ("completed_approved", "Approved"),
+    ("completed_rejected", "Rejected"),
+    ("cancelled", "Cancelled"),
+)
+
+# A send-back is labelled by the gate that issued it, read from `resume_stage`.
+_RESUME_LABELS: dict[str, str] = {
+    "hos_hod_review": "Sent back · HOS/HOD",
+    "fmb_review": "Sent back · F&B",
+    "cfo_review": "Sent back · CFO",
+    "department_review": "Sent back · Department",
+}
+
+
+def proposal_status_breakdown(cur, scope: Scope) -> list[dict[str, Any]]:
+    """How many proposals sit under each status right now, ranked.
+
+    `resubmission_required` is **split by the gate that sent it back**, which is
+    the whole reason this is more useful than a status pie. That status is flat
+    on the request - one bucket regardless of who bounced it - but the stage
+    that issued the send-back is stamped into `resume_stage` when it happens
+    (workflow/stages.py). Splitting on it turns "11 awaiting resubmission" into
+    "6 of them came back from the CFO", which names a gate somebody can go and
+    look at.
+
+    `draft` is excluded. A draft has never been submitted, so no reviewer can
+    act on it and it is not yet a proposal in any sense this chart is about;
+    including it would put the largest bar on the chart under the one status
+    nobody on this dashboard can do anything with.
+    """
+    rows = fetch_all(
+        cur,
+        """
+        SELECT r.status AS status,
+               r.resume_stage AS resume_stage,
+               count(*) AS n
+          FROM request r
+         WHERE r.status <> 'draft'
+           AND r.submitted_at IS NOT NULL
+         GROUP BY r.status, r.resume_stage
+        """,
+        (),
+    )
+
+    counts: dict[str, int] = {}
+    for row in rows:
+        status = row.get("status")
+        if not status:
+            continue
+        n = int(row.get("n") or 0)
+        if status == "resubmission_required":
+            stage = row.get("resume_stage") or ""
+            label = _RESUME_LABELS.get(stage, "Sent back · unrecorded")
+        else:
+            label = dict(_STATUS_LABELS).get(status)
+            if label is None:
+                continue  # A status the chart has no name for is not invented here.
+        counts[label] = counts.get(label, 0) + n
+
+    return [
+        {"label": label, "value": value}
+        for label, value in sorted(counts.items(), key=lambda item: -item[1])
+        if value > 0
+    ]

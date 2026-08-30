@@ -26,6 +26,7 @@ _CONFIG_LABEL: dict[str, str] = {
     "HIGH_PAX_THRESHOLD": "High Pax Threshold (attendee count above which an event also needs F&B and CFO approval)",
     "CANCELLATION_DEADLINE_DAYS": "Application Cancellation Deadline (days before the event date after which a proposal/event can no longer be cancelled)",
     "MAX_EVENT_CATEGORIES": "Maximum Event Categories (how many categories a single event can be tagged with)",
+    "MIN_EVENT_LEAD_DAYS": "Minimum Event Lead Time (days of notice required between today and the event start date)",
 }
 
 

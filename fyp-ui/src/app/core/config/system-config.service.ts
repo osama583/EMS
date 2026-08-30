@@ -5,22 +5,18 @@ import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { SystemConfig, SystemConfigDraft } from './system-config.models';
 
-// Mirrors the values seeded by migration 018. Only rendered while the real GET
-// is in flight — `loading` guards every reader, so these are never mistaken for
-// the saved configuration.
+// Mirrors the values seeded by migration 001/034. Only rendered while the real
+// GET is in flight — `loading` guards every reader, so these are never mistaken
+// for the saved configuration.
 const DEFAULT_CONFIG: SystemConfig = {
   paxReviewerThreshold: 50,
   cancellationDaysLimit: 3,
   maxEventCategories: 2,
-  slaDecisionHours: 48,
-  slaAssignmentHours: 24,
-  slaFulfilmentLeadDays: 3,
-  slaOrderAcceptHours: 12,
-  slaOrderClaimHours: 4,
-  staffShiftHours: 8,
-  capacityWarnRatio: 0.85,
-  venueTeardownMinutes: 60,
-  startPointMaxTours: 2,
+  minEventLeadDays: 0,
+  approvalWarningDays: 7,
+  approvalWarningEmailDays: 2,
+  approvalUrgentDays: 2,
+  approvalUrgentEmailDays: 1,
 };
 
 @Injectable({ providedIn: 'root' })
@@ -34,6 +30,11 @@ export class SystemConfigService {
   readonly paxReviewerThreshold = computed(() => this.state().paxReviewerThreshold);
   readonly cancellationDaysLimit = computed(() => this.state().cancellationDaysLimit);
   readonly maxEventCategories = computed(() => this.state().maxEventCategories);
+  readonly minEventLeadDays = computed(() => this.state().minEventLeadDays);
+  readonly approvalWarningDays = computed(() => this.state().approvalWarningDays);
+  readonly approvalWarningEmailDays = computed(() => this.state().approvalWarningEmailDays);
+  readonly approvalUrgentDays = computed(() => this.state().approvalUrgentDays);
+  readonly approvalUrgentEmailDays = computed(() => this.state().approvalUrgentEmailDays);
   // True until the real GET resolves — components reading paxReviewerThreshold/etc. at
   // construction time (a plain signal snapshot, not a live subscription) should show a loading
   // state rather than briefly rendering DEFAULT_CONFIG as if it were the real saved config.

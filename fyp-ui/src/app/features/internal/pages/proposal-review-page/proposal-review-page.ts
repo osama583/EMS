@@ -13,14 +13,14 @@ import { proposalSectionForUser, userIsApplicantForProposal, userOwnsCurrentProp
 import { ProposalWorkflowService } from '../../../../core/proposals/proposal-workflow.service';
 import { ProposalDepartmentViewComponent } from '../../../../shared/components/proposal-department-view/proposal-department-view';
 import { ProposalReviewerViewComponent } from '../../../../shared/components/proposal-reviewer-view/proposal-reviewer-view';
-import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
+import { SkeletonComponent } from '../../../../shared/components/skeleton/skeleton';
 
 type ViewKind = 'applicant' | 'reviewer' | 'department' | null;
 
 // Full-page proposal detail (replaces the old popup modal).
 @Component({
   selector: 'app-proposal-review-page',
-  imports: [ProposalReviewerViewComponent, ProposalDepartmentViewComponent, LoadingStateComponent],
+  imports: [SkeletonComponent, ProposalReviewerViewComponent, ProposalDepartmentViewComponent],
   templateUrl: './proposal-review-page.html',
   styleUrl: './proposal-review-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

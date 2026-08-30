@@ -12,11 +12,11 @@ import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { switchMap } from 'rxjs';
 import { ExpandableSearchComponent } from '../../../../shared/components/expandable-search/expandable-search';
 import { FilterButtonComponent } from '../../../../shared/components/filter-button/filter-button';
-import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
 import { ProposalEventSchedule, PublishedEvent } from '../../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../../core/events/published-event.service';
 import { EventCategoryService } from '../../../../core/event-catalog/event-catalog.service';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
+import { SkeletonComponent } from '../../../../shared/components/skeleton/skeleton';
 
 type CalendarView = 'month' | 'week' | 'agenda';
 
@@ -52,7 +52,7 @@ interface AgendaDay {
 
 @Component({
   selector: 'app-event-calendar',
-  imports: [FormModalComponent, DatePipe, ExpandableSearchComponent, FilterButtonComponent, LoadingStateComponent],
+  imports: [SkeletonComponent, FormModalComponent, DatePipe, ExpandableSearchComponent, FilterButtonComponent],
   templateUrl: './event-calendar.html',
   styleUrl: './event-calendar.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

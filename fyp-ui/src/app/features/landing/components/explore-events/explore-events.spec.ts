@@ -35,6 +35,8 @@ export const MOCK_PUBLISHED_EVENTS: readonly PublishedEvent[] = MOCK_EVENT_FIXTU
   eventFormat: 'On Campus',
   eventImage: { url: '/assets/events/mock.jpg', fileName: 'mock.jpg', mimeType: 'image/jpeg', sizeBytes: 0, status: 'uploaded' },
   schoolDepartment: fixture.school,
+  organiser: 'Mock Organiser',
+  clubs: [],
   audience: ['APU Community'],
   schedule: [{ date: '2026-12-01', start: '10:00', end: '12:00', location: 'APU Atrium' }],
   totalExpectedPax: 100,

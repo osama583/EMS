@@ -15,7 +15,7 @@
         <span>Happening soon</span>
         <span>Next 10 days</span>
       </p>
-      <app-loading-state variant="bars" label="Loading events…" [count]="4" />
+      <app-skeleton variant="list" label="Loading events…" [count]="4" />
     </div>
   } @else if (loadError()) {
     <div class="happening__shade happening__shade--static" aria-hidden="true"></div>

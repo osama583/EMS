@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, HostListener, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DashboardService } from '../../../../core/dashboard/dashboard.service';
 import {
@@ -8,11 +8,16 @@ import {
   PERIOD_OPTIONS,
   PanelWidget,
   StatWidget,
+  customPeriodKey,
+  customRangeOf,
+  isCustomPeriod,
 } from '../../../../core/dashboard/dashboard.models';
 import { ChartPanelComponent } from '../../../../shared/components/charts/chart-panel';
 import { CountsStripComponent } from '../../../../shared/components/charts/counts-strip';
+import { TotalsCardComponent } from '../../../../shared/components/charts/totals-card';
+import { TaskCalendarComponent, TaskDateSelection } from '../../../../shared/components/task-calendar/task-calendar';
 import { StatTileComponent } from '../../../../shared/components/charts/stat-tile';
-import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
+import { SkeletonComponent } from '../../../../shared/components/skeleton/skeleton';
 
 /**
  * `/app/dashboard` — ten role-specific dashboards, one component.
@@ -22,19 +27,26 @@ import { LoadingStateComponent } from '../../../../shared/components/loading-sta
  * adding a Cafeteria Admin dashboard later is a server-side `PROFILES` entry,
  * with no change here, to the route, or to the response contract.
  *
- * The layout is five bands. Bands 1, 3, 4 and 5 share a skeleton across all ten
+ * The layout is four bands. Bands 1, 3 and 4 share a skeleton across all ten
  * roles; **band 2 — the signature panel — is the role's own instrument** and is
  * the widest, tallest element on the page. That is what makes these ten
  * dashboards rather than one with ten titles.
  *
  * On a phone the order changes rather than the columns collapsing. A department
  * head on a phone is not doing analysis; they are between meetings checking
- * whether anything is on fire, so the alerts rail comes first, the quick actions
- * are promoted above the charts, and band 3 arrives collapsed.
+ * whether anything is on fire, so the alerts rail comes first and band 3
+ * arrives collapsed.
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [ChartPanelComponent, CountsStripComponent, StatTileComponent, LoadingStateComponent],
+  imports: [
+    SkeletonComponent,
+    ChartPanelComponent,
+    CountsStripComponent,
+    StatTileComponent,
+    TotalsCardComponent,
+    TaskCalendarComponent,
+  ],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -43,6 +55,7 @@ export class DashboardComponent {
   private readonly service = inject(DashboardService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly host = inject(ElementRef<HTMLElement>);
 
   readonly periods = PERIOD_OPTIONS;
   readonly document = this.service.document;
@@ -64,7 +77,12 @@ export class DashboardComponent {
     const profile = params.get('profile');
     if (profile) this.service.profileId.set(profile);
     const period = params.get('period');
-    if (period && PERIOD_OPTIONS.some((option) => option.key === period)) this.service.period.set(period);
+    // A custom range is `custom:<from>:<to>`, so it is not in PERIOD_OPTIONS —
+    // without this a shared link to a specific range silently reverted to the
+    // default on load. The server re-validates the dates either way.
+    if (period && (isCustomPeriod(period) || PERIOD_OPTIONS.some((option) => option.key === period))) {
+      this.service.period.set(period);
+    }
     const outlet = params.get('outlet');
     if (outlet && outlet !== 'all') this.service.outlet.set(outlet);
 
@@ -96,10 +114,10 @@ export class DashboardComponent {
   readonly isNarrow = computed(() => this.narrow());
 
   readonly requestCounts = computed(() => this.document()?.requestCounts ?? null);
+  readonly proposalTotals = computed(() => this.document()?.proposalTotals ?? null);
   readonly hero = computed(() => this.document()?.hero ?? null);
   readonly signature = computed(() => this.document()?.signature ?? null);
   readonly alerts = computed(() => this.document()?.alerts ?? null);
-  readonly quickActions = computed(() => this.document()?.quickActions ?? []);
   readonly meta = computed(() => this.document()?.meta ?? null);
 
   /**
@@ -205,10 +223,27 @@ export class DashboardComponent {
     return meta.cached || this.stale() ? `Cached ${clock}` : clock;
   });
 
-  /** Grid span for a supporting panel. Band 3 is 6+6, then 4+4+4 — the first
-   *  two get the width because they are the ones the role docs put there. */
+  /**
+   * Grid span for a supporting panel: **two panels per row**, half the width
+   * each, with a lone trailing panel taking the full width.
+   *
+   * Pairs rather than the old 6+6-then-4+4+4 because that shape only packed
+   * evenly at exactly two or exactly five panels. At three it produced 6+6 then
+   * a single 4, leaving two thirds of the last row empty beside a chart that
+   * had been squeezed into a third of the width for no reason; at four it put
+   * two full-width-ish panels above two narrow ones, so the same kind of chart
+   * rendered at two different sizes on one page.
+   *
+   * Pairing makes every panel the same width and every row full, which is both
+   * the layout asked for and the one that keeps two charts of the same kind
+   * comparable — a bar chart at half width beside the same bar chart at a third
+   * invites reading the difference as data.
+   */
   spanFor(index: number): string {
-    return index < 2 ? 'dash-col-6' : 'dash-col-4';
+    const total = this.panels().length;
+    // The last panel of an odd-numbered set has no partner, so it takes the row.
+    const isLonelyLast = index === total - 1 && total % 2 === 1;
+    return isLonelyLast ? 'dash-col-12' : 'dash-col-6';
   }
 
   isExpanded(panel: PanelWidget): boolean {
@@ -225,8 +260,84 @@ export class DashboardComponent {
   }
 
   setPeriod(key: string): void {
+    this.pickerOpen.set(false);
     this.service.setPeriod(key);
     this.syncUrl();
+  }
+
+  // --- Custom range -------------------------------------------------------
+  //
+  // The picker holds a *draft* rather than writing straight through to the
+  // service. Two dates make one window, and applying on each field's change
+  // would fire a request against a half-chosen range - and, worse, briefly show
+  // the reader numbers for a window they did not ask for.
+
+  readonly pickerOpen = signal(false);
+
+  private readonly todayIso = toIsoDay(new Date());
+
+  /** The calendar's own selection shape. Held as a draft rather than written
+   *  through, because a range is only meaningful once both ends are picked —
+   *  applying on the first click would fetch a one-day window nobody asked for. */
+  readonly draftSelection = signal<TaskDateSelection>({ start: this.todayIso, end: null });
+
+  readonly isCustomPeriod = computed(() => isCustomPeriod(this.period()));
+
+  /** A range needs both ends. The calendar reports the first click as
+   *  `{ start, end: null }`, which is a half-made choice, not a one-day range. */
+  readonly draftComplete = computed(() => !!this.draftSelection().end);
+
+  readonly draftHint = computed(() => {
+    const { start, end } = this.draftSelection();
+    if (!end) return 'Pick the second date to close the range.';
+    return `${formatDay(start)} to ${formatDay(end)}`;
+  });
+
+  togglePicker(): void {
+    if (this.pickerOpen()) {
+      this.closePicker();
+      return;
+    }
+    // Reopening on an active custom range shows that range, so the reader is
+    // adjusting what they picked rather than starting from a blank calendar.
+    const current = customRangeOf(this.period());
+    this.draftSelection.set(
+      current ? { start: current.from, end: current.to } : { start: this.todayIso, end: null },
+    );
+    this.pickerOpen.set(true);
+  }
+
+  closePicker(): void {
+    this.pickerOpen.set(false);
+  }
+
+  setDraftSelection(value: TaskDateSelection): void {
+    this.draftSelection.set(value);
+  }
+
+  applyCustom(): void {
+    const { start, end } = this.draftSelection();
+    if (!end) return;
+    // The calendar already orders the two ends, so no swap is needed here — but
+    // the server re-checks anyway, since the key can also arrive from a URL.
+    this.pickerOpen.set(false);
+    this.service.setPeriod(customPeriodKey(start, end));
+    this.syncUrl();
+  }
+
+  /** Click-outside and Escape, matching the calendar's behaviour on the
+   *  cafeteria queue — a popover that only closes via its own Cancel button is
+   *  a popover people leave open by accident. */
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (this.pickerOpen() && !this.host.nativeElement.contains(event.target as Node)) {
+      this.pickerOpen.set(false);
+    }
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    this.pickerOpen.set(false);
   }
 
   setProfile(event: Event): void {
@@ -280,16 +391,28 @@ export class DashboardComponent {
     void this.router.navigate([drill.route], { queryParams: drill.params });
   }
 
-  onStat(stat: StatWidget): void {
-    this.navigate(stat.drill);
-  }
-
-  onQuickAction(action: { route: string | null; params: Record<string, string | number | boolean> }): void {
-    if (!action.route) return;
-    this.navigate({ route: action.route, params: action.params });
-  }
-
   protected widgetId(_index: number, widget: DashboardWidget): string {
     return widget.id;
   }
+}
+
+/** `YYYY-MM-DD` in the *local* calendar. `toISOString()` converts to UTC first,
+ *  which in Malaysia (UTC+8) rolls the date back a day for most of the evening —
+ *  so "today" would have been yesterday from 8am onward. */
+function toIsoDay(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/** "1 Aug 2026" from an ISO day, parsed as local rather than UTC for the same
+ *  reason as above. */
+function formatDay(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString('en-MY', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 }

@@ -86,6 +86,7 @@ function inventedDocument(): DashboardDocument {
       comparedTo: { from: '2026-06-29', to: '2026-07-29', label: 'previous 30 days' },
     },
     requestCounts: null,
+    proposalTotals: null,
     hero: stat('hyd_nutrient_balance', { kind: 'hero', label: 'Nutrient balance', value: 0.94, format: 'ratio' }),
     kpis: [stat('hyd_ph_drift'), stat('hyd_light_hours'), stat('hyd_yield')],
     signature: panel('hyd_bed_occupancy', { signature: true, title: 'Bed occupancy', chart: 'heatmap', data: { rows: ['Bed 1'], columns: ['2026-08-27'], cells: [{ label: 'Bed 1', date: '2026-08-27', ratio: 0.4 }], threshold: 1 } }),

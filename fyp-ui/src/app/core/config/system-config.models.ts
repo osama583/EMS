@@ -4,110 +4,19 @@ export interface SystemConfig {
   // Ceiling on how many categories an applicant may tag a public event with (config table's
   // MAX_EVENT_CATEGORIES). Enforced server-side on submit; the picker mirrors it.
   readonly maxEventCategories: number;
-
-  // --- Dashboard thresholds (migration 018) --------------------------------
-  // Every SLA target, capacity assumption, risk window and forecast horizon the role dashboards read.
-  readonly slaDecisionHours: number;
-  readonly slaAssignmentHours: number;
-  readonly slaFulfilmentLeadDays: number;
-  readonly slaOrderAcceptHours: number;
-  readonly slaOrderClaimHours: number;
-  readonly staffShiftHours: number;
-  readonly capacityWarnRatio: number;
-  readonly venueTeardownMinutes: number;
-  readonly startPointMaxTours: number;
+  // Minimum notice between today and the event start date (config table's
+  // MIN_EVENT_LEAD_DAYS). The proposal date picker disables anything earlier;
+  // submit re-checks it server-side.
+  readonly minEventLeadDays: number;
+  // Approval escalation (config table's APPROVAL_* codes). The thresholds are days before the
+  // event at which an undecided proposal turns amber / red in every approver's inbox; the
+  // *EmailDays pair is how often to re-chase the approver, where 0 sends no email but keeps
+  // the colour. The urgent threshold must be smaller than the warning one — the server rejects
+  // a save that would make a proposal turn red before it ever turned amber.
+  readonly approvalWarningDays: number;
+  readonly approvalWarningEmailDays: number;
+  readonly approvalUrgentDays: number;
+  readonly approvalUrgentEmailDays: number;
 }
 
 export type SystemConfigDraft = Partial<SystemConfig>;
-
-/**
- * The dashboard thresholds, grouped for the policies form.
- *
- * Declared as data rather than hand-written fields: the form walks this list, so adding a
- * threshold is one entry here plus a config row, not a template edit somebody will forget.
- */
-export interface DashboardThreshold {
-  readonly field: keyof SystemConfig;
-  readonly label: string;
-  readonly help: string;
-  readonly min: number;
-  readonly step?: number;
-}
-
-export interface ThresholdGroup {
-  readonly title: string;
-  readonly blurb: string;
-  readonly items: readonly DashboardThreshold[];
-}
-
-export const DASHBOARD_THRESHOLD_GROUPS: readonly ThresholdGroup[] = [
-  {
-    title: 'Service level targets',
-    blurb:
-      'What a department is measured against. Each accepts a per-unit override in the config table using a "__<unit_code>" suffix; these are the defaults every unit inherits.',
-    items: [
-      {
-        field: 'slaDecisionHours',
-        label: 'Decision latency target (hours)',
-        min: 1,
-        help: 'A department task should get its first approve or send-back inside this window.',
-      },
-      {
-        field: 'slaAssignmentHours',
-        label: 'Assignment target (hours)',
-        min: 1,
-        help: 'How long an approved item may wait before somebody is put on it.',
-      },
-      {
-        field: 'slaFulfilmentLeadDays',
-        label: 'Minimum preparation runway (days)',
-        min: 0,
-        help: 'The notice a department needs. Falling below this predicts every other SLA breach.',
-      },
-      {
-        field: 'slaOrderAcceptHours',
-        label: 'Cafeteria order acceptance (hours)',
-        min: 1,
-        help: 'How long a manager may take to accept an order F&B has placed with them.',
-      },
-      {
-        field: 'slaOrderClaimHours',
-        label: 'Cafeteria order claim (hours)',
-        min: 1,
-        help: 'How long an accepted order may sit unclaimed in the outlet shared pool.',
-      },
-    ],
-  },
-  {
-    title: 'Capacity assumptions',
-    blurb:
-      'The arithmetic behind every coverage ratio. The schema carries no roster or availability model, so shift length is an assumption the dashboards state on the tile rather than hide.',
-    items: [
-      {
-        field: 'staffShiftHours',
-        label: 'Assumed shift length (hours)',
-        min: 1,
-        help: 'Multiplied by active headcount to give a unit its daily capacity.',
-      },
-      {
-        field: 'capacityWarnRatio',
-        label: 'Capacity amber threshold',
-        min: 0,
-        step: 0.05,
-        help: 'A fraction, not a percentage. Above this a forward day turns amber; above 1.0 it is critical.',
-      },
-      {
-        field: 'venueTeardownMinutes',
-        label: 'Venue teardown window (minutes)',
-        min: 0,
-        help: 'Two Logistics bookings at one location closer together than this are flagged as a conflict.',
-      },
-      {
-        field: 'startPointMaxTours',
-        label: 'Tours per start point per day',
-        min: 1,
-        help: 'Meeting instructions assume one group at a time; more than this on one day is congestion.',
-      },
-    ],
-  },
-];

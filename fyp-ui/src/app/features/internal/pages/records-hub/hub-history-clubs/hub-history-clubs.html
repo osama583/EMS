@@ -78,37 +78,6 @@
   (close)="closeDetails()" (cancel)="closeDetails()" (submit)="closeDetails()"
 >
   @if (detailsTarget(); as entry) {
-    <article class="club-request-history__details">
-      <span class="club-page__direction-chip">{{ requesterLabel(entry) }}</span>
-      <span class="club-request-history__status club-request-history__status--large" [attr.data-status]="entry.request.status">
-        <span class="material-symbols-rounded" aria-hidden="true">{{ entry.request.status === 'approved' ? 'check_circle' : 'cancel' }}</span>
-        {{ entry.request.status === 'approved' ? 'Approved' : 'Rejected' }}
-      </span>
-
-      <section>
-        <h3>{{ entry.requester === 'me' ? 'Why you wanted to join' : 'Their reason for joining' }}</h3>
-        <p>{{ entry.request.reason || 'No reason provided.' }}</p>
-      </section>
-
-      @if (entry.request.status === 'rejected') {
-        <section>
-          <h3>Reason for rejection</h3>
-          <p>{{ entry.request.comment || 'No reason provided.' }}</p>
-        </section>
-      }
-
-      <dl>
-        <div>
-          <dt>Requested</dt>
-          <dd>{{ formatDate(entry.request.createdAt) }}</dd>
-        </div>
-        @if (entry.request.resolvedAt) {
-          <div>
-            <dt>{{ entry.request.status === 'approved' ? 'Approved' : 'Rejected' }}</dt>
-            <dd>{{ formatDate(entry.request.resolvedAt) }}</dd>
-          </div>
-        }
-      </dl>
-    </article>
+    <app-detail-view [tags]="detailTags(entry)" [fields]="detailFields(entry)" [sections]="detailSections(entry)" />
   }
 </app-form-modal>

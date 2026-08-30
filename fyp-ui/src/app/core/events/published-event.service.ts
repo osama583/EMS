@@ -48,6 +48,7 @@ export class PublishedEventService implements EventRegistrationApi {
     setList('time', params.time);
     setList('registration', params.registration);
     setList('cost', params.cost);
+    setList('club', params.club);
     setList('date', params.date);
     if (params.dateFrom) httpParams = httpParams.set('dateFrom', params.dateFrom);
     if (params.dateTo) httpParams = httpParams.set('dateTo', params.dateTo);

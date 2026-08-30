@@ -37,6 +37,12 @@ export interface PublishedEvent {
   readonly eventFormat: string;
   readonly eventImage: EventImageAsset | null;
   readonly schoolDepartment: string;
+  // Already selected by events.py's _event_select; the model simply never declared it, so
+  // the details modal could not show who is running the event.
+  readonly organiser: string;
+  // Clubs the event belongs to (request_clubs, migration 029). Empty for an event that is
+  // not run by any club.
+  readonly clubs: readonly string[];
   readonly audience: readonly string[];
   readonly schedule: readonly ProposalEventSchedule[];
   readonly totalExpectedPax: number;
@@ -116,6 +122,9 @@ export interface EventSearchParams {
   readonly time?: readonly ('Morning' | 'Afternoon' | 'Evening')[];
   readonly registration?: readonly ('No Registration Required' | 'Registration Required')[];
   readonly cost?: readonly ('Free' | 'Paid')[];
+  // 'My Clubs' narrows results to events run by a club the viewer belongs to or presides
+  // over; resolved server-side against live membership (events.py's _list_events_filters).
+  readonly club?: readonly string[];
   readonly date?: readonly string[];
   readonly dateFrom?: string;
   readonly dateTo?: string;

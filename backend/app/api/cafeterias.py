@@ -32,6 +32,7 @@ from ..errors import BadRequest, Conflict, Forbidden, NotFound
 from ..logging_setup import audit
 from ..security import require_auth, require_internal
 from ..security.passwords import MAX_PASSWORD_BYTES, hash_password
+from ..services.email import notifications
 from ..security.principal import current_principal
 from ._helpers import body, flag, paged, pagination, required
 
@@ -550,6 +551,7 @@ def create_assignment():
     user_id = payload.get("userId")
 
     with transaction() as cur:
+        created_now = not user_id
         if not user_id:
             user_id = _create_staff_account(cur, payload)
         _assert_assignable(cur, int(user_id), str(cafeteria_code), str(role_code))
@@ -560,6 +562,20 @@ def create_assignment():
         )
         assignment_id = cur.fetchone()["user_unit_role_id"]
         target = fetch_one(cur, "SELECT full_name, email FROM users WHERE user_id = %s", (int(user_id),))
+        # Only for an account created HERE: an existing user being reassigned
+        # already has a password and must not be sent a new-account email. The
+        # plaintext exists only inside this request (see _create_staff_account).
+        if created_now and payload.get("password"):
+            cafeteria = fetch_one(
+                cur, "SELECT description FROM unit WHERE code = %s", (cafeteria_code,)
+            )
+            notifications.cafeteria_staff_account_created(
+                email=target["email"],
+                full_name=target["full_name"],
+                password=str(payload["password"]),
+                cafeteria_name=(cafeteria and cafeteria["description"]) or cafeteria_code,
+                role_code=role_code,
+            )
         _record_staff_audit(
             cur, cafeteria_code=cafeteria_code, action="create", target_user_id=int(user_id),
             target_display_name=target["full_name"], target_email=target["email"], role_code=role_code,

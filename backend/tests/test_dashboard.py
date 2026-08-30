@@ -219,7 +219,7 @@ def test_widget_survives_an_empty_database(widget_id):
     scope = make_scope(profile_key, unit_code, outlets)
     result = build_widget(widget_id, FakeCursor(), scope)
     assert result["state"] != "error", f"{widget_id} errored on an empty database"
-    assert result["kind"] in ("hero", "kpi", "panel", "counts")
+    assert result["kind"] in ("hero", "kpi", "panel", "counts", "totals")
     if result["kind"] == "panel":
         assert result["tableView"] is not None, f"{widget_id} ships no table view"
 
@@ -236,6 +236,8 @@ def _profile_for_widget(widget_id: str) -> str:
         }
         if layout.get("counts"):
             ids.add(layout["counts"])
+        if layout.get("totals"):
+            ids.add(layout["totals"])
         if widget_id in ids:
             return key
     raise AssertionError(f"{widget_id} is registered but no profile uses it")
@@ -307,10 +309,46 @@ def test_period_keys_resolve_and_unknown_falls_back():
     assert resolve_period("7d", today=TODAY).start == dt.date(2026, 8, 21)
     assert resolve_period("90d", today=TODAY).days == 90
     assert resolve_period("ytd", today=TODAY).start == dt.date(2026, 1, 1)
-    # Sep-Dec intake has not started on 27 August, so "term" is the May intake.
-    assert resolve_period("term", today=TODAY).start == dt.date(2026, 5, 1)
     assert resolve_period("nonsense", today=TODAY).key == "30d"
     assert resolve_period(None, today=TODAY).key == "30d"
+    # "term" was removed in favour of the custom range; an old bookmark holding
+    # it must degrade to the default rather than 500.
+    assert resolve_period("term", today=TODAY).key == "30d"
+
+
+def test_custom_period_resolves_to_the_picked_range():
+    period = resolve_period("custom:2026-08-01:2026-08-12", today=TODAY)
+    assert period.start == dt.date(2026, 8, 1)
+    # The picked end date is inclusive to the reader and exclusive in the
+    # window, so every widget's half-open query counts the 12th.
+    assert period.end == dt.date(2026, 8, 13)
+    # The full key round-trips: "custom" alone would collide across ranges in
+    # the URL and in the client's per-period cache key.
+    assert period.key == "custom:2026-08-01:2026-08-12"
+    # Same comparison rule as every fixed period.
+    assert period.previous_end == period.start
+    assert (period.start - period.previous_start).days == period.days
+
+
+def test_a_malformed_custom_range_falls_back_rather_than_erroring():
+    """Each of these is a client-supplied string being wrong - a hand-edited
+    URL or a stale bookmark - and none of them should 400."""
+    for raw in (
+        "custom:not-a-date:2026-08-12",
+        "custom:2026-08-01",
+        "custom:",
+        "custom:2026-02-30:2026-08-12",   # a date that does not exist
+        "custom:1900-01-01:2026-08-27",   # past the span cap
+    ):
+        assert resolve_period(raw, today=TODAY).key == "30d", raw
+
+
+def test_a_reversed_custom_range_is_read_in_the_order_meant():
+    """Picking the later date first is a slip, not a request for an empty
+    window - so the two ends are swapped rather than yielding nothing."""
+    period = resolve_period("custom:2026-08-12:2026-08-01", today=TODAY)
+    assert period.start == dt.date(2026, 8, 1)
+    assert period.end == dt.date(2026, 8, 13)
 
 
 def test_period_comparison_window_is_the_same_length_and_adjacent():

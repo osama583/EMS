@@ -18,7 +18,7 @@
   </div>
 
   @if (loading()) {
-    <app-loading-state variant="spinner" label="Loading proposal…" />
+    <app-skeleton variant="detail" label="Loading proposal…" [count]="4" />
   } @else if (!proposal()) {
     <div class="proposal-review-page__state" role="status">
       <span class="material-symbols-rounded" aria-hidden="true">search_off</span>

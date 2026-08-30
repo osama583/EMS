@@ -208,6 +208,30 @@ export interface CountsWidget {
   items: CountItem[];
 }
 
+/** One option behind the proposal totals card's toggle. */
+export interface TotalsOption {
+  key: string;
+  label: string;
+  value: number;
+  /** Sentence under the number, naming what was counted. */
+  caption: string;
+  drill?: Drill | null;
+}
+
+/**
+ * The proposal totals card: one number at a time, with a toggle choosing which.
+ *
+ * Deliberately not four more tiles. These four counts answer one question
+ * ("what happened to proposals this period") and only one of them is being
+ * asked at a time, so they share a card and a toggle rather than each claiming
+ * permanent space beside numbers that answer a different question.
+ */
+export interface TotalsWidget {
+  kind: 'totals';
+  title: string;
+  options: TotalsOption[];
+}
+
 export type DashboardWidget = StatWidget | PanelWidget;
 
 export interface QuickAction {
@@ -262,6 +286,8 @@ export interface DashboardDocument {
   message?: string;
   period: DashboardPeriod;
   requestCounts: CountsWidget | null;
+  /** Null for a profile that carries no proposal totals card. */
+  proposalTotals: TotalsWidget | null;
   hero: StatWidget;
   kpis: StatWidget[];
   /** Null for a profile that carries no signature panel. The template guards
@@ -281,9 +307,30 @@ export const PERIOD_OPTIONS: { key: string; label: string; short: string }[] = [
   { key: '7d', label: 'Last 7 days', short: '7d' },
   { key: '30d', label: 'Last 30 days', short: '30d' },
   { key: '90d', label: 'Last 90 days', short: '90d' },
-  { key: 'term', label: 'This term', short: 'Term' },
   { key: 'ytd', label: 'Year to date', short: 'YTD' },
 ];
+
+/** The custom range's key prefix. The full key is `custom:<from>:<to>`, both
+ *  ISO dates — encoded in the period key rather than carried as two more
+ *  parameters so everything already keyed by period (the URL, the cache key,
+ *  the widget refetch) keeps working unchanged. */
+export const CUSTOM_PERIOD = 'custom';
+
+export function isCustomPeriod(key: string): boolean {
+  return key.startsWith(`${CUSTOM_PERIOD}:`);
+}
+
+/** The two ISO dates inside a custom key, or null for any other period. The
+ *  `to` returned is the date the reader picked — inclusive, as they meant it. */
+export function customRangeOf(key: string): { from: string; to: string } | null {
+  if (!isCustomPeriod(key)) return null;
+  const [, from, to] = key.split(':');
+  return from && to ? { from, to } : null;
+}
+
+export function customPeriodKey(from: string, to: string): string {
+  return `${CUSTOM_PERIOD}:${from}:${to}`;
+}
 
 export function isPanel(widget: DashboardWidget): widget is PanelWidget {
   return widget.kind === 'panel';

@@ -22,7 +22,7 @@ import { PublishedEventService } from '../../../../core/events/published-event.s
 import { ExpandableSearchComponent } from '../../../../shared/components/expandable-search/expandable-search';
 import { FilterButtonComponent } from '../../../../shared/components/filter-button/filter-button';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
-import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
+import { SkeletonComponent } from '../../../../shared/components/skeleton/skeleton';
 
 type CalendarView = 'month' | 'week' | 'day';
 
@@ -94,13 +94,12 @@ interface CalendarDay {
 
 @Component({
   selector: 'app-master-event-calendar',
-  imports: [
+  imports: [SkeletonComponent, 
     DatePipe,
     NgTemplateOutlet,
     ExpandableSearchComponent,
     FilterButtonComponent,
     FormModalComponent,
-    LoadingStateComponent,
   ],
   templateUrl: './event-calendar.html',
   styleUrl: './event-calendar.scss',

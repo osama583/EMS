@@ -44,6 +44,7 @@ from ..security import authenticate_optional, require_auth
 from ..security.passwords import hash_password
 from ..security.principal import current_principal
 from ..services import workflow as wf
+from ..services.email import dispatch
 from ._helpers import body, date_order, paged, pagination, required
 
 bp = Blueprint("events", __name__, url_prefix="/events")
@@ -76,6 +77,16 @@ def _viewer_params(include_internal: bool, principal) -> dict:
     """
     if not include_internal:
         return {}
+    if principal is None:
+        # Stated rather than left to an AttributeError deep in psycopg. Every
+        # internal query splices in the Club Only membership test, which binds
+        # the viewer's id - so "internal, but no viewer" is a caller bug, and it
+        # used to surface as a 500 from four different endpoints (event detail,
+        # register, saved, organiser view) that all forgot to pass one.
+        raise RuntimeError(
+            "_viewer_params(include_internal=True) needs a principal: the Club Only "
+            "visibility clause binds the viewer's id."
+        )
     return {"user_id": principal.user_id}
 
 
@@ -508,7 +519,7 @@ def get_event(event_id: int):
     principal = getattr(g, "principal", None)
     include_internal = principal is not None and not principal.is_external
     with transaction() as cur:
-        event = _decorate(cur, _load_published(cur, event_id, include_internal))
+        event = _decorate(cur, _load_published(cur, event_id, include_internal, principal))
     return jsonify(event)
 
 
@@ -573,7 +584,7 @@ def register(event_id: int):
 
     with transaction() as cur:
         include_internal = principal is not None and not principal.is_external
-        event = _load_published(cur, event_id, include_internal)
+        event = _load_published(cur, event_id, include_internal, principal)
 
         ended = fetch_one(
             cur,
@@ -632,6 +643,18 @@ def register(event_id: int):
             ),
         )
         row = dict(cur.fetchone())
+        # The registrant always hears what happened - including a guest, whose
+        # only record of attending is this email. A manual-approval event also
+        # puts the request on the organiser's desk, which nothing told them
+        # about before.
+        dispatch.registration_created(
+            cur,
+            event_id,
+            registrant_name=full_name,
+            registrant_email=email,
+            pending=row["status"] == "pending_approval",
+            reason=reason or "",
+        )
     return jsonify(
         {
             "status": "pending" if row["status"] == "pending_approval" else "confirmed",
@@ -729,7 +752,7 @@ def list_registrations(event_id: int):
     """
     principal = current_principal()
     with transaction() as cur:
-        _load_published(cur, event_id, include_internal=True)
+        _load_published(cur, event_id, include_internal=True, principal=principal)
         if not wf.is_proposal_owner(cur, event_id, principal.user_id) and not principal.is_admin:
             raise Forbidden("Only the event's organiser can see who has registered.")
         rows = fetch_all(
@@ -779,6 +802,20 @@ def decide_registration(event_id: int, registration_id: int):
         row = cur.fetchone()
         if row is None:
             raise NotFound("No pending registration with that id for this event.")
+        registrant = fetch_one(
+            cur,
+            "SELECT registrant_name, registrant_email FROM event_registration "
+            "WHERE event_registration_id = %s",
+            (registration_id,),
+        )
+        if registrant:
+            dispatch.registration_decided(
+                cur,
+                event_id,
+                registrant_name=registrant["registrant_name"],
+                registrant_email=registrant["registrant_email"],
+                approved=approve,
+            )
     return jsonify(dict(row))
 
 
@@ -1259,7 +1296,7 @@ def search_saved():
 def save_event(event_id: int):
     principal = current_principal()
     with transaction() as cur:
-        _load_published(cur, event_id, include_internal=not principal.is_external)
+        _load_published(cur, event_id, include_internal=not principal.is_external, principal=principal)
         cur.execute(
             "INSERT INTO saved_event (user_id, request_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
             (principal.user_id, event_id),
@@ -1279,7 +1316,26 @@ def unsave_event(event_id: int):
     return "", 204
 
 
-DEFAULT_REMINDERS = {"registrationClosingReminder": True, "eventStartingReminder": True}
+# One toggle per reminder the system can actually send (see
+# services/email/reminders.py), grouped by the My Events tab that owns them: the
+# Saved tab controls the two saved-list reminders, the Registered tab controls
+# its own. A reader who wants "tell me about things I am attending" but not
+# "nag me about bookmarks" can now say exactly that, which one global flag
+# could not express.
+#
+# Absence of a row means all-on, so a reader who never opened the toggles still
+# gets reminders and the client never has to create a row first.
+DEFAULT_REMINDERS = {
+    "savedCapacityReminder": True,
+    "savedStartingReminder": True,
+    "registeredStartingReminder": True,
+}
+
+_REMINDER_COLUMNS = {
+    "savedCapacityReminder": "saved_capacity_reminder",
+    "savedStartingReminder": "saved_starting_reminder",
+    "registeredStartingReminder": "registered_starting_reminder",
+}
 
 
 @bp.get("/me/reminders")
@@ -1288,8 +1344,9 @@ def get_reminders():
     """Absence of a row is a valid state meaning "defaults", so this never 404s."""
     principal = current_principal()
     row = query(
-        """SELECT registration_closing_reminder AS "registrationClosingReminder",
-                  event_starting_reminder AS "eventStartingReminder"
+        """SELECT saved_capacity_reminder      AS "savedCapacityReminder",
+                  saved_starting_reminder      AS "savedStartingReminder",
+                  registered_starting_reminder AS "registeredStartingReminder"
              FROM notification_preference WHERE lower(email) = lower(%s)""",
         (principal.email,),
     )
@@ -1299,43 +1356,49 @@ def get_reminders():
 @bp.put("/me/reminders")
 @require_auth
 def set_reminders():
-    """Merges over the existing row, so saving one toggle never resets the other."""
+    """Merges over the existing row, so saving one toggle never resets another.
+
+    The client sends only the keys it changed (the Saved tab sends its two, the
+    Registered tab sends its one), which is why every field is optional and
+    falls back to the stored value - or to the default when no row exists yet.
+    """
     principal = current_principal()
     payload = body()
     with transaction() as cur:
         existing = fetch_one(
-            cur, "SELECT * FROM notification_preference WHERE lower(email) = lower(%s)",
+            cur,
+            "SELECT * FROM notification_preference WHERE lower(email) = lower(%s)",
             (principal.email,),
         )
-        closing = bool(
-            payload.get(
-                "registrationClosingReminder",
-                existing["registration_closing_reminder"] if existing else True,
-            )
-        )
-        starting = bool(
-            payload.get(
-                "eventStartingReminder",
-                existing["event_starting_reminder"] if existing else True,
-            )
-        )
+        values = {}
+        for key, column in _REMINDER_COLUMNS.items():
+            if key in payload:
+                values[column] = bool(payload[key])
+            elif existing is not None:
+                values[column] = bool(existing[column])
+            else:
+                values[column] = DEFAULT_REMINDERS[key]
+
         if existing:
             cur.execute(
                 """UPDATE notification_preference
-                      SET registration_closing_reminder = %s, event_starting_reminder = %s
+                      SET saved_capacity_reminder = %s,
+                          saved_starting_reminder = %s,
+                          registered_starting_reminder = %s
                     WHERE lower(email) = lower(%s)""",
-                (closing, starting, principal.email),
+                (values["saved_capacity_reminder"], values["saved_starting_reminder"],
+                 values["registered_starting_reminder"], principal.email),
             )
         else:
             cur.execute(
                 """INSERT INTO notification_preference
-                       (email, registration_closing_reminder, event_starting_reminder)
-                   VALUES (%s, %s, %s)""",
-                (principal.email, closing, starting),
+                       (email, saved_capacity_reminder, saved_starting_reminder,
+                        registered_starting_reminder)
+                   VALUES (%s, %s, %s, %s)""",
+                (principal.email, values["saved_capacity_reminder"],
+                 values["saved_starting_reminder"], values["registered_starting_reminder"]),
             )
-    return jsonify(
-        {"registrationClosingReminder": closing, "eventStartingReminder": starting}
-    )
+    return jsonify({key: values[column] for key, column in _REMINDER_COLUMNS.items()})
 
 
 # ============================================================================

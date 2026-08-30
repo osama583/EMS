@@ -10,7 +10,8 @@
 .viz-bar__note { fill: var(--viz-ink-muted); font-weight: 400; }
 
 .viz-mark { cursor: pointer; }
-.viz-mark:focus-visible { outline: none; stroke: var(--apu-blue-700); stroke-width: 2; }
+// Selection styling is shared — see `.viz-mark--selected` in _dashboard.scss.
+.viz-mark:focus-visible { outline: none; }
 
 .viz-tooltip {
   margin: var(--space-1) 0 0;

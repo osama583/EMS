@@ -4,14 +4,14 @@
       <h2>Approval Workflows & Policies</h2>
       <p>Configure threshold values and cancellation policies for event applications.</p>
     </div>
-    <button type="button" class="policies-tab__save-btn" [class.policies-tab__save-btn--saved]="policiesSaved()" [disabled]="saving()" (click)="savePolicies()">
+    <button type="button" class="policies-tab__save-btn" [class.policies-tab__save-btn--saved]="policiesSaved()" [disabled]="saving() || !!thresholdError()" (click)="savePolicies()">
       <span class="material-symbols-rounded" aria-hidden="true">{{ policiesSaved() ? 'check' : 'save' }}</span>
       {{ policiesSaved() ? 'Saved' : 'Save Changes' }}
     </button>
   </header>
 
   @if (configLoading()) {
-    <app-loading-state variant="bars" label="Loading configuration…" [count]="2" />
+    <app-skeleton variant="fields" label="Loading configuration…" [count]="3" />
   } @else {
     <div class="policies-tab__card">
       <app-form-field
@@ -39,6 +39,18 @@
       </p>
 
       <app-form-field
+        controlId="config-min-lead-days"
+        label="Minimum Event Lead Time (Days)"
+        type="number"
+        min="0"
+        [value]="minLeadDays()"
+        (valueChange)="setMinLeadDays($event)"
+      />
+      <p class="policies-tab__note">
+        An event must start at least <strong>{{ minLeadDays() }} day{{ minLeadDays() === 1 ? '' : 's' }}</strong> after the day it is proposed. Earlier dates are disabled in the proposal date picker, so the earliest date a proposal created today may use is <strong>{{ earliestEventDateLabel() }}</strong>. Applicants therefore have {{ cancellationDays() }} day{{ cancellationDays() === 1 ? '' : 's' }} of cancellation notice only when this lead time is at least as long as the cancellation deadline above.
+      </p>
+
+      <app-form-field
         controlId="config-max-categories"
         label="Maximum Event Categories (Per public event)"
         type="number"
@@ -51,36 +63,83 @@
       </p>
     </div>
 
-    <!--
-      Dashboard thresholds. Every SLA target, capacity assumption and risk
-      window the role dashboards read lives here rather than in code, so an
-      administrator retunes a department without a deploy. Rendered from
-      DASHBOARD_THRESHOLD_GROUPS so a new threshold is one entry plus a config
-      row, not a template edit.
-    -->
-    @for (group of thresholdGroups; track group.title) {
-      <section class="policies-tab__card policies-tab__group">
-        <header class="policies-tab__group-head">
-          <h3>{{ group.title }}</h3>
-          <p class="policies-tab__note">{{ group.blurb }}</p>
-        </header>
-        <div class="policies-tab__grid">
-          @for (item of group.items; track item.field) {
-            <div class="policies-tab__threshold">
-              <app-form-field
-                [controlId]="'config-' + item.field"
-                [label]="item.label"
-                type="number"
-                [min]="item.min"
-                [step]="item.step ?? 1"
-                [value]="thresholdValue(item)"
-                (valueChange)="setThreshold(item, $event)"
-              />
-              <p class="policies-tab__note policies-tab__note--tight">{{ item.help }}</p>
-            </div>
-          }
-        </div>
-      </section>
-    }
+    <!-- Approval escalation. One card, because the four values are a single
+         policy: when a late proposal is flagged, and how often its approver is
+         chased. Splitting them would hide that the pairs belong together. -->
+    <div class="policies-tab__card">
+      <h3 class="policies-tab__card-title">Approval Escalation</h3>
+      <p class="policies-tab__note">
+        A proposal still awaiting a decision is flagged in every approver's inbox as its event date
+        approaches, and its approver is reminded by email. Urgency is measured against the event
+        date, not how long the proposal has been waiting.
+      </p>
+
+      <div class="policies-tab__field-pair">
+        <app-form-field
+          controlId="config-approval-warning-days"
+          label="Warning Threshold (Days before event)"
+          type="number"
+          min="1"
+          [value]="warningDays()"
+          (valueChange)="setWarningDays($event)"
+        />
+        <app-form-field
+          controlId="config-approval-warning-email-days"
+          label="Warning Email Every (Days)"
+          type="number"
+          min="0"
+          [value]="warningEmailDays()"
+          (valueChange)="setWarningEmailDays($event)"
+        />
+      </div>
+      <p class="policies-tab__note">
+        An undecided proposal turns <strong>amber</strong> when its event is
+        <strong>{{ warningDays() }} day{{ warningDays() === 1 ? '' : 's' }}</strong> away.
+        @if (warningEmailDays() > 0) {
+          Its approver is reminded every <strong>{{ warningEmailDays() }} day{{ warningEmailDays() === 1 ? '' : 's' }}</strong>.
+        } @else {
+          No reminder email is sent at this level — the row is still flagged in the inbox.
+        }
+      </p>
+
+      <div class="policies-tab__field-pair">
+        <app-form-field
+          controlId="config-approval-urgent-days"
+          label="Urgent Threshold (Days before event)"
+          type="number"
+          min="0"
+          [value]="urgentDays()"
+          (valueChange)="setUrgentDays($event)"
+        />
+        <app-form-field
+          controlId="config-approval-urgent-email-days"
+          label="Urgent Email Every (Days)"
+          type="number"
+          min="0"
+          [value]="urgentEmailDays()"
+          (valueChange)="setUrgentEmailDays($event)"
+        />
+      </div>
+      <p class="policies-tab__note">
+        It turns <strong>red</strong> and is pinned to the top of the inbox when its event is
+        <strong>{{ urgentDays() }} day{{ urgentDays() === 1 ? '' : 's' }}</strong> away.
+        @if (urgentEmailDays() > 0) {
+          Its approver is reminded every <strong>{{ urgentEmailDays() }} day{{ urgentEmailDays() === 1 ? '' : 's' }}</strong>, with the applicant copied.
+        } @else {
+          No reminder email is sent at this level — the row is still pinned in the inbox.
+        }
+      </p>
+
+      @if (thresholdError()) {
+        <p class="policies-tab__error" role="alert">{{ thresholdError() }}</p>
+      }
+
+      <p class="policies-tab__note">
+        If the event date passes with no decision, the proposal is marked overdue against the stage
+        that was holding it, moves to History, and the applicant is emailed an apology with the F&amp;B
+        office copied in.
+      </p>
+    </div>
+
   }
 </div>

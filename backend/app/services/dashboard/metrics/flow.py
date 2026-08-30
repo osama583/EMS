@@ -190,13 +190,28 @@ def request_bucket_counts(cur, scope: Scope) -> dict[str, int]:
     `late` reuses the same "no assignee yet, past its own start-time deadline"
     definition as risk_list() below, so a request that's overdue shows up
     consistently whether the head is reading the Risk List or this count.
+
+    **Only `completed` respects the reporting period.** Inbox, ongoing and late
+    are backlog: they describe what is on the head's desk right now, and a
+    window applied to them would hide a three-week-old item still sitting in
+    the inbox the moment the reader picked "last 7 days" - the opposite of what
+    a backlog count is for. Completed is the one genuinely cumulative number of
+    the four, and "68 completed" is only meaningful against a stated window.
+
+    The consequence is that the four tiles no longer describe a single cohort
+    and will not sum to one. That is the honest reading: three of them are a
+    snapshot and one is a flow, and pretending otherwise would mean either
+    windowing a backlog or leaving a total unbounded.
     """
     row = fetch_one(
         cur,
         """
         SELECT count(*) FILTER (WHERE t.status = 'pending') AS inbox,
                count(*) FILTER (WHERE t.status IN ('approved', 'preparing', 'resubmitted')) AS ongoing,
-               count(*) FILTER (WHERE t.status = 'completed') AS completed
+               count(*) FILTER (
+                   WHERE t.status = 'completed'
+                     AND t.resolved_at >= %(from)s AND t.resolved_at < %(to)s
+               ) AS completed
           FROM request_task t
          WHERE t.assigned_unit_code = %(unit)s
         """,

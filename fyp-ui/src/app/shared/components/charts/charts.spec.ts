@@ -227,12 +227,24 @@ describe('stat-tile', () => {
     fixture = TestBed.createComponent(TileHost);
   });
 
-  it('separates the direction of a change from whether it is good', () => {
-    const component = fixture.debugElement.children[0].componentInstance as StatTileComponent;
-    // Latency falling is 'down' and good; coverage falling is 'down' and bad.
-    expect(component.deltaTone('down', true)).toBe('good');
-    expect(component.deltaTone('down', false)).toBe('bad');
-    expect(component.deltaTone('flat', false)).toBe('flat');
+  it('renders neither the period-on-period delta nor the target chip', () => {
+    // Both were removed as noise: a "target: none" chip states an absence, and
+    // "40% vs previous" competes with the number it qualifies. The server still
+    // sends `delta` and `target` — this asserts the tile ignores them, so a
+    // future change that re-renders either has to be deliberate.
+    fixture.componentInstance.current.set(
+      stat({
+        value: 42,
+        delta: { value: 8, percent: 0.4, direction: 'up', isGood: true },
+        target: { max: 0, label: 'target: none' },
+      }),
+    );
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent;
+    expect(text).not.toContain('vs previous');
+    expect(text).not.toContain('target: none');
+    expect(fixture.nativeElement.querySelector('.dash-delta')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.dash-status')).toBeNull();
   });
 
   it('renders an em dash and an explanation rather than a zero when there is no value', () => {
@@ -249,14 +261,6 @@ describe('stat-tile', () => {
     fixture.detectChanges();
     const card = fixture.nativeElement.querySelector('.dash-stat');
     expect(card.querySelector('.dash-caveat').textContent).toContain('gap G2');
-  });
-
-  it('renders status as icon plus word plus colour, never colour alone', () => {
-    fixture.componentInstance.current.set(stat({ status: 'critical', target: null }));
-    fixture.detectChanges();
-    const badge = fixture.nativeElement.querySelector('.dash-status--critical');
-    expect(badge.querySelector('.material-symbols-rounded')).not.toBeNull();
-    expect(badge.textContent.trim().length).toBeGreaterThan(1);
   });
 
   it('hides a sparkline that has too few points to be a trend', () => {

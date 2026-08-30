@@ -13,9 +13,19 @@
 
 .viz-donut__track { fill: none; stroke: var(--viz-plane); stroke-width: 18; }
 
+// The centre label is confined to the hole, not the whole ring.
+//
+// The hole is 2*(48-18) = 60 of the 120 viewBox units across, i.e. half the
+// diameter. With `inset: 0` a caption as short as "Selections this period"
+// laid itself out across the full width and ran underneath the wedges, which
+// is what made the ring look broken. Insetting to the hole's own width forces
+// the caption to wrap inside it instead.
+//
+// 46% rather than a flat 50% leaves a little breathing room, since text set on
+// a circle needs to clear the chord, not the diameter.
 .viz-donut__center {
   position: absolute;
-  inset: 0;
+  inset: 0 27%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -31,7 +41,15 @@
   font-variant-numeric: proportional-nums;
 }
 
-.viz-donut__caption { font-size: 0.75rem; color: var(--viz-ink-muted); }
+.viz-donut__caption {
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  color: var(--viz-ink-muted);
+  // Long single words ("institutional") would otherwise push the box wider
+  // than the hole and undo the inset above.
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
 
 .viz-donut__legend {
   list-style: none;
@@ -59,3 +77,47 @@
 .viz-donut__name { color: var(--viz-ink-secondary); }
 
 .viz-donut__empty { font-size: 0.8125rem; color: var(--viz-ink-muted); text-align: center; padding: var(--space-3); }
+
+// A wedge is positioned in the ring's own coordinate space, so its lift is a
+// radial nudge along its bisector (set inline per segment) rather than the
+// fill-box scale the rectangular marks use. `view-box` keeps that translation
+// in viewBox units so a 4px nudge is 4px at every card width.
+.viz-mark--wedge {
+  transform-box: view-box;
+  transform-origin: center;
+}
+
+// The legend follows the ring: the selected row gains weight, the rest recede.
+// Without this the ring and the legend disagree about what is selected.
+.viz-donut__item {
+  transition:
+    opacity 180ms var(--ease-standard),
+    color 180ms var(--ease-standard);
+}
+
+.viz-donut__item--selected .viz-donut__name { color: var(--viz-ink); font-weight: 600; }
+.viz-donut__item--dimmed { opacity: 0.45; }
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-donut__item { transition: none; }
+}
+
+// The read-out under the ring. Previously unstyled, so the `<strong>` fell back
+// to the browser's bold and the line read as a heading shouting a segment name
+// rather than as the quiet detail row it is. Same treatment as every other
+// chart's tooltip, with the name carrying weight through colour, not boldness.
+.viz-tooltip {
+  margin: var(--space-1) 0 0;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-control);
+  background: var(--viz-plane);
+  font-size: 0.75rem;
+  color: var(--viz-ink-secondary);
+  text-align: center;
+
+  strong {
+    font-weight: 600;
+    color: var(--viz-ink);
+    margin-right: 0.35rem;
+  }
+}

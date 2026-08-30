@@ -9,6 +9,7 @@ import { InternalDataPageComponent } from '../../../../../shared/components/inte
 import { FeedbackBannerComponent } from '../../../../../shared/components/feedback-banner/feedback-banner';
 import { FormModalComponent } from '../../../../../shared/components/form-modal/form-modal';
 import { ViewToggleComponent, defaultListViewMode } from '../../../../../shared/components/view-toggle/view-toggle';
+import { DetailField, DetailViewComponent } from '../../../../../shared/components/detail-view/detail-view';
 
 type ViewMode = 'table' | 'card';
 
@@ -17,7 +18,7 @@ type ViewMode = 'table' | 'card';
 // belong in Inbox instead (hub-club-requests), since those need action now rather than tracking.
 @Component({
   selector: 'app-hub-ongoing-clubs',
-  imports: [ViewToggleComponent, FeedbackBannerComponent, InternalPageHeaderComponent, InternalDataPageComponent, FormModalComponent, InternalSearchFieldComponent, InternalResetButtonComponent],
+  imports: [ViewToggleComponent, FeedbackBannerComponent, InternalPageHeaderComponent, InternalDataPageComponent, FormModalComponent, DetailViewComponent, InternalSearchFieldComponent, InternalResetButtonComponent],
   templateUrl: './hub-ongoing-clubs.html',
   styleUrl: './hub-ongoing-clubs.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -107,6 +108,21 @@ export class HubOngoingClubsComponent {
   handleAction(event: InternalRowActionEvent): void {
     const request = this.requests().find((item) => item.id === event.record.id);
     if (request) this.openDetails(request);
+  }
+
+  detailTags(request: ClubJoinRequestRecord): readonly DetailField[] {
+    return [{ label: 'Status', value: 'Request pending', icon: 'schedule', tone: 'warning' }];
+  }
+
+  detailFields(request: ClubJoinRequestRecord): readonly DetailField[] {
+    return [
+      { label: 'Club', value: request.clubName, icon: 'groups' },
+      { label: 'Requested', value: this.formatDate(request.createdAt), icon: 'event' },
+    ];
+  }
+
+  detailSections(request: ClubJoinRequestRecord): readonly { title: string; body: string }[] {
+    return [{ title: 'Why you want to join', body: request.reason || 'No reason provided.' }];
   }
 
   openDetails(request: ClubJoinRequestRecord): void { this.detailsTarget.set(request); }

@@ -38,6 +38,12 @@
           <h3>{{ event.eventTitle }}</h3>
           <p class="created-by-me__schedule">{{ firstScheduleLabel(event) }}</p>
           <p class="created-by-me__stat">{{ spotsLeftLabel(event) }}</p>
+          @if (event.clubs.length > 0) {
+            <p class="created-by-me__clubs">
+              <span class="material-symbols-rounded" aria-hidden="true">groups</span>
+              {{ event.clubs.join(', ') }}
+            </p>
+          }
           @if (event.pendingRegistrationCount > 0) {
             <span class="created-by-me__pending-badge">{{ event.pendingRegistrationCount }} awaiting your decision</span>
           }
@@ -90,6 +96,12 @@
         <span>Event type</span>
         <strong>{{ event.isFree ? 'Free' : ('RM ' + event.cost) }}</strong>
       </article>
+      @if (event.clubs.length > 0) {
+        <article class="created-by-me-info__stat">
+          <span>{{ event.clubs.length === 1 ? 'Club' : 'Clubs' }}</span>
+          <strong>{{ event.clubs.join(', ') }}</strong>
+        </article>
+      }
     </section>
 
     <h3 class="created-by-me-info__section-title">Registrants</h3>

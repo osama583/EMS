@@ -15,6 +15,7 @@ another's panel.
                       department.py's module note
     cafeteria         the shift dashboard
     cfo               the institutional finance dashboard, R7 aggregates throughout
+    proposals         proposal-shaped widgets shared by the CFO and F&B pages
 """
 from __future__ import annotations
 
@@ -23,6 +24,7 @@ from . import (  # noqa: F401  (imported for the side effect of registering)
     cfo,
     department,
     fmb,
+    proposals,
 )
 from .base import WIDGET_REGISTRY, build
 

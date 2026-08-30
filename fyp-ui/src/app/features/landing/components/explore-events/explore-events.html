@@ -69,7 +69,7 @@
   }
 
   @if (showSkeleton()) {
-    <app-loading-state variant="grid" label="Loading events…" [count]="pageSize()" />
+    <app-skeleton variant="cards" label="Loading events…" [count]="pageSize()" />
   } @else if (loadError()) {
     <div class="explore-empty" role="status">
       <span aria-hidden="true">⚠</span>

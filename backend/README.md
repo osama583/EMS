@@ -133,6 +133,136 @@ The workflow tests drive real SQL against the seeded database inside a
 transaction that is always rolled back, so they exercise real constraints
 without leaving anything behind.
 
+## Scheduled jobs
+
+Everything else in the system emails from inside a request - somebody approves a
+proposal, the applicant is told. Three emails cannot work that way, because
+nothing happens at the moment they become due: a saved event fills up, or a date
+gets closer. Those are sent by a job.
+
+```bash
+# Linux/macOS (what cron runs); on a Windows dev box the interpreter is
+# .venv/Scripts/python instead.
+.venv/bin/python -m scripts.send_event_reminders --dry-run   # show, send nothing
+.venv/bin/python -m scripts.send_event_reminders             # send
+```
+
+| Reminder | Goes to |
+|---|---|
+| Saved event is filling up | Saved it, has NOT registered, event now past `SAVED_CAPACITY_PERCENT` |
+| Saved event starting soon | Saved it, still has NOT registered, within `EVENT_REMINDER_LEAD_DAYS` |
+| Registered event starting soon | Holds a live registration, within `EVENT_REMINDER_LEAD_DAYS` |
+
+Both thresholds live in `config` and are read on every run, so an admin can
+change them without a deploy.
+
+**Run it once a day.** It is safe to run more often, and safe to miss a day:
+every send is recorded in `event_reminder_sent` and every query excludes what is
+already recorded, so a second run the same day sends nothing and a missed day is
+caught up on the next run. Always check `--dry-run` after changing a threshold -
+it prints exactly who would be emailed without sending or recording anything.
+
+### Scheduling it with cron
+
+Install the entry once with `crontab -e`, then cron runs it every day at 08:00
+with no further action:
+
+```cron
+# APU EMS - event reminders (saved filling up, saved starting, registered starting)
+0 8 * * *  cd /path/to/backend && .venv/bin/python -m scripts.send_event_reminders >> var/reminders.log 2>&1
+```
+
+`crontab -l` lists it, `crontab -r` removes it.
+
+Four things that make the difference between this working and silently doing
+nothing:
+
+- **Use absolute paths.** cron does not run your shell profile, so `python`
+  alone will usually not resolve - name the venv interpreter directly, as above.
+- **`cd` into the backend first.** The script is run as a module
+  (`-m scripts.send_event_reminders`) and reads `.env` from the working
+  directory, so the `cd` is load-bearing, not cosmetic.
+- **Keep the redirect.** cron mails output to the local user by default, which
+  on most boxes goes nowhere. `>> var/reminders.log 2>&1` is the only record you
+  will have of a failed run.
+- **Check the timezone.** cron uses the server's clock, not the university's.
+  `timedatectl` (or `date`) tells you what that is.
+
+Verify it before trusting it:
+
+```bash
+cd /path/to/backend && .venv/bin/python -m scripts.send_event_reminders --dry-run
+```
+
+That prints exactly who would be emailed and sends nothing. Run it once by hand
+after installing the crontab entry - if the command works there, cron will run
+the same thing.
+
+### Approval escalation (second job)
+
+The reminders above are about events people signed up for. This second job is
+about proposals nobody has decided on: it chases the approver while the event is
+still savable, and records the failure when it is not.
+
+```bash
+.venv/bin/python -m scripts.process_escalations --dry-run   # show, change nothing
+.venv/bin/python -m scripts.process_escalations             # run
+```
+
+| Band | Condition | What happens |
+|---|---|---|
+| Warning | event within `APPROVAL_WARNING_DAYS` | amber in the inbox; approver emailed every `APPROVAL_WARNING_EMAIL_DAYS` |
+| Urgent | event within `APPROVAL_URGENT_DAYS` | red and pinned to the top; approver emailed every `APPROVAL_URGENT_EMAIL_DAYS`, applicant copied |
+| Overdue | event date passed, still undecided | status becomes `overdue_<stage>`, proposal moves to History, applicant emailed an apology with F&B copied |
+
+Late department tasks are flagged `is_overdue` in the same run. A late task stays
+workable until its event has finished - on a three-day event a day-one task can
+still be completed on day three - and is retired only once the event is over.
+
+All five thresholds live in `config` (Policies page, "Approval Escalation") and
+are read on every run. Setting an `*_EMAIL_DAYS` value to `0` keeps the colour in
+the inbox but sends no email.
+
+```cron
+# APU EMS - approval escalation (warn, chase, mark overdue)
+30 7 * * *  cd /path/to/backend && .venv/bin/python -m scripts.process_escalations >> var/escalations.log 2>&1
+```
+
+07:30 so a red flag is already waiting when approvers start the day. The same
+four cron rules above apply - absolute interpreter path, `cd` first, keep the
+redirect, check the timezone.
+
+**Safe to run repeatedly and safe to miss.** Every chase is recorded in
+`proposal_escalation_sent` against the stage it was sent for, and the cadence
+check reads that timestamp, so a second run the same day sends nothing. Because
+the ledger is keyed by stage, a proposal that moves on to the next approver
+starts that person's clock fresh rather than inheriting an expired one.
+
+**Order within a run** is warnings, then urgent, then overdue - so a proposal is
+never told "decide today" and marked overdue by the same run.
+
+### Running it without cron
+
+cron is the intended production setup and the crontab entry above is the real
+answer. This deployment does not have an always-on Linux host to install it on,
+so a **System Admin** can also run the identical sweep on demand from the
+sidebar ("Send Reminders", next to "Purge Deleted"). Same reasoning as the
+purge sweep, which is unscheduled for exactly the same reason.
+
+It is a second TRIGGER, never a second implementation. `POST
+/admin/send-event-reminders` calls the same `reminders.send_due_reminders()`
+the cron job calls, so the two cannot drift - a test asserts it, and asserts
+that the endpoint never writes its own row into the send log.
+
+The button previews before it sends: it shows how many emails are due and the
+thresholds they were computed with, and only then asks for confirmation - the
+same information `--dry-run` prints. Because every send is recorded, pressing
+it twice sends nothing the second time, and pressing it after a cron run sends
+only what cron did not.
+
+Readers opt out per list from My Events > Saved / Registered; the toggles are
+stored in `notification_preference` and honoured by the queries above.
+
 ## API documentation
 
 ```bash

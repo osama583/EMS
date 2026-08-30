@@ -76,6 +76,48 @@ def days_out(n: int) -> str:
     return (date.today() + timedelta(days=n)).isoformat()
 
 
+# --- Venues ---------------------------------------------------------------
+# "Inside University" is a CFO-managed catalogue (venue_options), not free text:
+# every venue-backed request field renders a dropdown built from it (see
+# event-proposal.ts's buildRequirementDefinitions, where `location` is a
+# `venueId` select). So a seeded row must send `venueId`, exactly as the form
+# would - the service then freezes the matching label onto the row's `location`
+# column from the id (proposals.py's _resolve_location).
+#
+# Writing a bare `location` string here instead was the bug this replaces: it
+# left venue_option_id NULL, so the dropdown had nothing to re-select and the
+# row showed a label that was not in the catalogue at all (or, worse, a raw id
+# like "11" typed into the text box).
+#
+# Resolved by LABEL against the live table rather than by hardcoded id, because
+# ids are assigned by the catalogue seed and a literal here would silently rot
+# the moment that order changed.
+_VENUE_IDS: dict[str, int] = {}
+
+
+def load_venues(cur) -> None:
+    """Cache the live venue catalogue once per run."""
+    _VENUE_IDS.clear()
+    for row in fetch_all(cur, "SELECT venue_option_id, label FROM venue_options WHERE active"):
+        _VENUE_IDS[row["label"]] = row["venue_option_id"]
+    if not _VENUE_IDS:
+        raise SystemExit("no active venues - run `python -m seed.run` first")
+
+
+def venue(label: str) -> str:
+    """The "venue:{id}" reference the proposal form submits for `label`.
+
+    Fails loudly on an unknown label: a typo that silently fell through to free
+    text is precisely what produced the bad rows this function exists to prevent.
+    """
+    if label not in _VENUE_IDS:
+        raise SystemExit(
+            f"unknown venue {label!r} - it must exist in venue_options. "
+            f"Known: {', '.join(sorted(_VENUE_IDS))}"
+        )
+    return f"venue:{_VENUE_IDS[label]}"
+
+
 def placeholder_image(seed_text: str) -> str:
     """A short, deterministic placeholder image URL - event_image is VARCHAR(255),
     so this must stay well under that limit (see proposals.py's _event_image_url)."""
@@ -94,10 +136,10 @@ def make_payload(**overrides) -> dict:
         "registrationMode": "Automatic",
         "eventImage": placeholder_image(str(overrides.get("eventTitle") or "Event")),
         "totalPax": 20,
-        "scheduleRows": [{"date": day, "start": "09:00", "end": "17:00", "location": "Auditorium"}],
+        "scheduleRows": [{"date": day, "start": "09:00", "end": "17:00", "venueId": venue("Auditorium")}],
         "selectedRequirements": ["logistics"],
         "requestRows": {"logistics": [{"item": "logistics:1", "quantity": 10, "date": day,
-                                        "start": "08:00", "end": "18:00", "location": "Auditorium",
+                                        "start": "08:00", "end": "18:00", "venueId": venue("Auditorium"),
                                         "notes": "Setup two hours before doors open."}]},
     }
     payload.update(overrides)
@@ -175,8 +217,10 @@ def scenario_low_pax_public_approved(cur) -> int:
         goals="Connect Computing students with industry recruiters.",
         benefits="Direct access to internship and graduate roles.",
         eventVisibility="Public", registrationMode="Automatic",
-        totalPax=45, eventCategories=[1, 2],
-        scheduleRows=[{"date": days_out(45), "start": "10:00", "end": "16:00", "location": "Main Hall"}],
+        # Below HIGH_PAX_THRESHOLD (config, currently 30) so this routes straight from
+        # HOS/HOD to department_review - which is what this scenario asserts.
+        totalPax=25, eventCategories=[1, 2],
+        scheduleRows=[{"date": days_out(45), "start": "10:00", "end": "16:00", "venueId": venue("Main Hall")}],
     )
     wf.submit(cur, request_id)
     wf.approve(cur, request_id, principal_for(cur, "hoshod@demo.apu.edu.my"))
@@ -198,11 +242,11 @@ def scenario_high_pax_public_approved(cur) -> int:
         benefits="Builds community and campus spirit.",
         eventVisibility="Public", registrationMode="Automatic",
         totalPax=300, eventCategories=[4, 6],
-        scheduleRows=[{"date": day, "start": "18:00", "end": "22:00", "location": "Grand Hall"}],
+        scheduleRows=[{"date": day, "start": "18:00", "end": "22:00", "venueId": venue("Grand Hall")}],
         selectedRequirements=["soundLight", "campusTour"],
         requestRows={
             "soundLight": [{"item": "soundLight:2", "date": day, "start": "16:00", "end": "22:30",
-                             "location": "Grand Hall", "notes": "Full stage sound with engineer on site."}],
+                             "venueId": venue("Grand Hall"), "notes": "Full stage sound with engineer on site."}],
             "campusTour": [{"startPoint": "campusTourStart:1", "tourType": "campusTourType:1",
                              "date": day, "pax": 40, "notes": "Pre-event campus tour for visiting performers."}],
         },
@@ -229,14 +273,17 @@ def scenario_hoshod_self_review_skip_approved(cur) -> int:
         goals="Share ongoing research across the School.",
         benefits="Cross-disciplinary collaboration opportunities.",
         eventVisibility="Public", registrationMode="Manual",
-        totalPax=35, eventCategories=[1],
-        scheduleRows=[{"date": days_out(40), "start": "09:00", "end": "17:00", "location": "Seminar Room 2"}],
+        # Skipping hos_hod_review does NOT skip the pax gate - stage_after_hos_hod still
+        # routes >HIGH_PAX_THRESHOLD to fmb_review. Kept below it so the skip lands
+        # directly in department_review, which is what this scenario asserts.
+        totalPax=22, eventCategories=[1],
+        scheduleRows=[{"date": days_out(40), "start": "09:00", "end": "17:00", "venueId": venue("Seminar Room 2")}],
         selectedRequirements=["logistics", "photoVideo"],
         requestRows={
             "logistics": [{"item": "logistics:2", "quantity": 15, "date": days_out(40),
-                            "start": "08:00", "end": "17:30", "location": "Seminar Room 2"}],
+                            "start": "08:00", "end": "17:30", "venueId": venue("Seminar Room 2")}],
             "photoVideo": [{"service": "photoVideo:1", "date": days_out(40),
-                             "start": "09:00", "end": "17:00", "location": "Seminar Room 2"}],
+                             "start": "09:00", "end": "17:00", "venueId": venue("Seminar Room 2")}],
         },
     )
     wf.submit(cur, request_id)
@@ -257,7 +304,7 @@ def scenario_cfo_self_review_skip_private_approved(cur) -> int:
         benefits="Transparency across finance operations.",
         eventVisibility="Private", registrationMode="Automatic",
         totalPax=150,
-        scheduleRows=[{"date": days_out(35), "start": "14:00", "end": "16:00", "location": "Boardroom A"}],
+        scheduleRows=[{"date": days_out(35), "start": "14:00", "end": "16:00", "venueId": venue("Boardroom A")}],
         selectedRequirements=["logistics"],
     )
     wf.submit(cur, request_id)
@@ -278,7 +325,7 @@ def scenario_funding_only_auto_completes(cur) -> int:
         benefits="Improves teaching lab reliability.",
         eventVisibility="Private", registrationMode="Automatic",
         totalPax=1,
-        scheduleRows=[{"date": days_out(20), "start": "09:00", "end": "10:00", "location": "N/A"}],
+        scheduleRows=[{"date": days_out(20), "start": "09:00", "end": "10:00", "venueId": venue("Innovation Lab")}],
         selectedRequirements=["fundingPurchase"],
         requestRows={"fundingPurchase": [{"mainItem": "fundingMain:5", "subItem": "fundingSub:9",
                                            "quantity": 4, "unit": "1200.00",
@@ -304,11 +351,13 @@ def scenario_fmb_order_fulfilled_public(cur) -> int:
         goals="Connect current students with alumni mentors.",
         benefits="Career guidance and networking.",
         eventVisibility="Public", registrationMode="Automatic",
-        totalPax=40, eventCategories=[1, 6],
-        scheduleRows=[{"date": day, "start": "12:00", "end": "14:00", "location": "Hall A"}],
+        # Below HIGH_PAX_THRESHOLD (config, currently 30) so this routes straight from
+        # HOS/HOD to department_review - which is what this scenario asserts.
+        totalPax=28, eventCategories=[1, 6],
+        scheduleRows=[{"date": day, "start": "12:00", "end": "14:00", "venueId": venue("Grand Hall")}],
         selectedRequirements=["fmb"],
         requestRows={"fmb": [{"foodType": "fmb:1", "quantity": 40, "date": day,
-                               "start": "12:00", "location": "Hall A",
+                               "start": "12:00", "venueId": venue("Grand Hall"),
                                "notes": "Halal set, allow 30 min setup."}]},
     )
     wf.submit(cur, request_id)
@@ -354,14 +403,16 @@ def scenario_club_public_event(cur, club_name: str, president_email: str, title:
         goals=f"Deliver {club_name}'s flagship activity for the semester.",
         benefits="Open participation for all interested students.",
         eventVisibility="Public", registrationMode="Automatic",
-        totalPax=45, eventCategories=category_ids,
-        scheduleRows=[{"date": day, "start": "13:00", "end": "18:00", "location": "Multipurpose Hall"}],
+        # Below HIGH_PAX_THRESHOLD (config, currently 30) so this routes straight from
+        # HOS/HOD to department_review - which is what this scenario asserts.
+        totalPax=28, eventCategories=category_ids,
+        scheduleRows=[{"date": day, "start": "13:00", "end": "18:00", "venueId": venue("Level 6 Multipurpose Hall")}],
         selectedRequirements=["logistics", "soundLight"],
         requestRows={
             "logistics": [{"item": "logistics:3", "quantity": 60, "date": day,
-                            "start": "12:00", "end": "18:30", "location": "Multipurpose Hall"}],
+                            "start": "12:00", "end": "18:30", "venueId": venue("Level 6 Multipurpose Hall")}],
             "soundLight": [{"item": "soundLight:1", "date": day, "start": "12:30",
-                             "end": "18:30", "location": "Multipurpose Hall"}],
+                             "end": "18:30", "venueId": venue("Level 6 Multipurpose Hall")}],
         },
     )
     wf.submit(cur, request_id)
@@ -402,7 +453,7 @@ def scenario_private_approved_simple(cur) -> int:
         benefits="Consistent LMS usage across the School.",
         eventVisibility="Private", registrationMode="Automatic",
         totalPax=25,
-        scheduleRows=[{"date": days_out(25), "start": "09:00", "end": "12:00", "location": "Training Room 1"}],
+        scheduleRows=[{"date": days_out(25), "start": "09:00", "end": "12:00", "venueId": venue("Seminar Room 1")}],
         selectedRequirements=["logistics"],
     )
     wf.submit(cur, request_id)
@@ -422,7 +473,7 @@ def scenario_pending_hos_hod_review(cur) -> int:
         benefits="Exposure and feedback for student founders.",
         eventVisibility="Public", registrationMode="Automatic",
         totalPax=70, eventCategories=[1],
-        scheduleRows=[{"date": days_out(48), "start": "17:00", "end": "20:00", "location": "Auditorium"}],
+        scheduleRows=[{"date": days_out(48), "start": "17:00", "end": "20:00", "venueId": venue("Auditorium")}],
     )
     wf.submit(cur, request_id)
     assert status_of(cur, request_id) == "hos_hod_review"
@@ -438,7 +489,7 @@ def scenario_pending_fmb_review(cur) -> int:
         benefits="Stronger sense of belonging from day one.",
         eventVisibility="Public", registrationMode="Automatic",
         totalPax=400, eventCategories=[6],
-        scheduleRows=[{"date": days_out(70), "start": "10:00", "end": "16:00", "location": "Sports Field"}],
+        scheduleRows=[{"date": days_out(70), "start": "10:00", "end": "16:00", "venueId": venue("Sports Complex")}],
     )
     wf.submit(cur, request_id)
     wf.approve(cur, request_id, principal_for(cur, "hoshod@demo.apu.edu.my"))
@@ -455,7 +506,7 @@ def scenario_pending_cfo_review(cur) -> int:
         benefits="Industry exposure and recruiter interest.",
         eventVisibility="Public", registrationMode="Automatic",
         totalPax=250, eventCategories=[1, 2],
-        scheduleRows=[{"date": days_out(65), "start": "09:00", "end": "17:00", "location": "Exhibition Hall"}],
+        scheduleRows=[{"date": days_out(65), "start": "09:00", "end": "17:00", "venueId": venue("Atrium Concourse")}],
     )
     wf.submit(cur, request_id)
     wf.approve(cur, request_id, principal_for(cur, "hoshod@demo.apu.edu.my"))
@@ -476,11 +527,11 @@ def scenario_pending_department_review(cur) -> int:
         benefits="Inter-school engagement and school pride.",
         eventVisibility="Public", registrationMode="Manual",
         totalPax=90, eventCategories=[1],
-        scheduleRows=[{"date": day, "start": "10:00", "end": "17:00", "location": "Debate Hall"}],
+        scheduleRows=[{"date": day, "start": "10:00", "end": "17:00", "venueId": venue("Seminar Room 1")}],
         selectedRequirements=["logistics", "transportation"],
         requestRows={
             "logistics": [{"item": "logistics:1", "quantity": 20, "date": day,
-                            "start": "08:00", "end": "17:30", "location": "Debate Hall"}],
+                            "start": "08:00", "end": "17:30", "venueId": venue("Seminar Room 1")}],
             "transportation": [{"type": "transportation:2", "requestedPax": 18,
                                  "pickup": "School of Business", "dropoff": "Debate Hall",
                                  "date": day, "start": "08:30"}],
@@ -508,7 +559,7 @@ def scenario_resubmission_required(cur) -> int:
         benefits="Potential donor and mentorship pipeline.",
         eventVisibility="Private", registrationMode="Manual",
         totalPax=120, eventCategories=[4],
-        scheduleRows=[{"date": days_out(75), "start": "18:30", "end": "22:00", "location": "Grand Ballroom"}],
+        scheduleRows=[{"date": days_out(75), "start": "18:30", "end": "22:00", "venueId": venue("Grand Hall")}],
     )
     wf.submit(cur, request_id)
     wf.send_back(
@@ -528,7 +579,10 @@ def scenario_rejected(cur) -> int:
         benefits="Student morale.",
         eventVisibility="Public", registrationMode="Automatic",
         totalPax=200, eventCategories=[6],
-        scheduleRows=[{"date": days_out(38), "start": "11:00", "end": "20:00", "location": "Off-Campus Beach"}],
+        scheduleRows=[{"date": days_out(38), "start": "11:00", "end": "20:00",
+                       # Deliberately outside the university: free text is the correct shape
+                       # here, and locationKind is what tells the form to read it that way.
+                       "locationKind": "outside", "location": "Port Dickson Beach Resort"}],
     )
     wf.submit(cur, request_id)
     wf.reject(
@@ -547,8 +601,10 @@ def scenario_cancelled(cur) -> int:
         goals="Expose students to industry practitioners.",
         benefits="Real-world perspective on distributed systems.",
         eventVisibility="Public", registrationMode="Automatic",
-        totalPax=50, eventCategories=[1],
-        scheduleRows=[{"date": days_out(90), "start": "14:00", "end": "16:00", "location": "Lecture Theatre 3"}],
+        # Below HIGH_PAX_THRESHOLD (config, currently 30) so this routes straight from
+        # HOS/HOD to department_review - which is what this scenario asserts.
+        totalPax=24, eventCategories=[1],
+        scheduleRows=[{"date": days_out(90), "start": "14:00", "end": "16:00", "venueId": venue("Lecture Theatre 3")}],
     )
     wf.submit(cur, request_id)
     wf.approve(cur, request_id, principal_for(cur, "hoshod@demo.apu.edu.my"))
@@ -568,7 +624,7 @@ def scenario_draft_only(cur) -> int:
         eventTitle="Sustainability Awareness Week (Draft)",
         shortIntroduction="Draft proposal, not yet submitted.",
         eventVisibility="Public", totalPax=100,
-        scheduleRows=[{"date": days_out(80), "start": "09:00", "end": "17:00", "location": "Campus Green"}],
+        scheduleRows=[{"date": days_out(80), "start": "09:00", "end": "17:00", "venueId": venue("Campus Green")}],
     )
     return proposals.create(cur, applicant, payload, draft=True)
 
@@ -591,6 +647,9 @@ def main() -> None:
 
     created: list[tuple[str, int]] = []
     with transaction() as cur:
+        # Every scenario below submits venueId references, so the catalogue has to
+        # be loaded before the first one runs.
+        load_venues(cur)
         created.append(("public/low-pax/approved", scenario_low_pax_public_approved(cur)))
         created.append(("public/high-pax/fmb+cfo/approved", scenario_high_pax_public_approved(cur)))
         created.append(("public/hoshod-self-skip/approved", scenario_hoshod_self_review_skip_approved(cur)))

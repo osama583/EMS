@@ -83,7 +83,7 @@
         @if (!selectedDefinitions().length) {
           <section class="proposal-empty"><span class="material-symbols-rounded">playlist_remove</span><h3>No requirements selected yet</h3><p>Return to Required for Event and select the services your event needs.</p><button type="button" class="table-control" (click)="goToStep(2)">Choose requirements</button></section>
         } @else if (requestCatalogLoading()) {
-          <app-loading-state variant="bars" label="Loading request options…" [count]="4" />
+          <app-skeleton variant="cards" label="Loading request options…" [count]="4" />
         } @else {
           @for (definition of selectedDefinitions(); track definition.key) {
             <section class="proposal-request-table">

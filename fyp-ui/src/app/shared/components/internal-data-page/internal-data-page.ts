@@ -55,6 +55,10 @@ export class InternalDataPageComponent {
   // that genuinely have nothing card-shaped to show can opt out with [showViewToggle]="false".
   readonly showViewToggle = input(true);
 
+  // Draw as many skeleton rows as the page is about to fill, capped so a
+  // 25-per-page setting doesn't flood the viewport with bones.
+  readonly skeletonRows = computed(() => Math.min(this.pageSize(), 6));
+
   readonly searchChange = output<string>();
   readonly filterChange = output<InternalFilterChange>();
   readonly reset = output<void>();

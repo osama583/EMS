@@ -1,8 +1,10 @@
 <div class="task-calendar">
-  <div class="task-calendar__mode">
-    <button type="button" class="task-calendar__mode-btn" [class.task-calendar__mode-btn--active]="mode() === 'single'" (click)="setMode('single')">Single day</button>
-    <button type="button" class="task-calendar__mode-btn" [class.task-calendar__mode-btn--active]="mode() === 'range'" (click)="setMode('range')">Date range</button>
-  </div>
+  @if (!lockMode()) {
+    <div class="task-calendar__mode">
+      <button type="button" class="task-calendar__mode-btn" [class.task-calendar__mode-btn--active]="mode() === 'single'" (click)="setMode('single')">Single day</button>
+      <button type="button" class="task-calendar__mode-btn" [class.task-calendar__mode-btn--active]="mode() === 'range'" (click)="setMode('range')">Date range</button>
+    </div>
+  }
 
   <div class="task-calendar__header">
     <button type="button" class="task-calendar__nav" aria-label="Previous month" (click)="navigate(-1)">

@@ -6,7 +6,6 @@ import { FormFieldComponent } from '../../../../shared/components/form-controls/
 import { SearchableDropdownComponent } from '../../../../shared/components/searchable-dropdown/searchable-dropdown';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
 import { ProposalTableComponent, ProposalTableColumn } from '../../../../shared/components/proposal-table/proposal-table';
-import { LoadingStateComponent } from '../../../../shared/components/loading-state/loading-state';
 import { EditableRow, EditableTableColumn, SelectOption, FormControlType } from '../../../../shared/components/form-controls/form-controls.models';
 import { RequestOption } from '../../../../core/request-options/request-option.models';
 import { RequestOptionService } from '../../../../core/request-options/request-option.service';
@@ -25,12 +24,13 @@ import { userIsApplicantForProposal } from '../../../../core/proposals/proposal-
 import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 import { ReviewerCommentsDrawerComponent } from '../../../../shared/components/reviewer-comments-drawer/reviewer-comments-drawer';
 import { ReviewerCommentEntry, allCommentEntries } from '../../../../core/proposals/proposal-status.models';
+import { SkeletonComponent } from '../../../../shared/components/skeleton/skeleton';
 
 // A department can only send its OWN task back with a comment (it has no reject) - see tasks.py's
 // send_task_back.
 @Component({
   selector: 'app-department-resubmit',
-  imports: [FormFieldComponent, SearchableDropdownComponent, FormModalComponent, ProposalTableComponent, LoadingStateComponent, ReviewerCommentsDrawerComponent],
+  imports: [SkeletonComponent, FormFieldComponent, SearchableDropdownComponent, FormModalComponent, ProposalTableComponent, ReviewerCommentsDrawerComponent],
   templateUrl: './department-resubmit.html',
   styleUrl: './department-resubmit.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

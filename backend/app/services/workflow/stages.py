@@ -51,6 +51,7 @@ from .constants import (
     cancellation_deadline_days,
     high_pax_threshold,
 )
+from ..email import dispatch
 from .tasks import create_department_tasks
 
 
@@ -143,6 +144,12 @@ def submit(cur, request_id: int) -> dict:
         previous_status=previous,
         new_status=next_status,
     )
+    # Tell whoever now owns it. department_review fans out per task instead of
+    # to a single reviewer, which is why the two calls are not interchangeable.
+    if next_status == DEPARTMENT_REVIEW:
+        dispatch.department_tasks_created(cur, request_id)
+    else:
+        dispatch.proposal_entered_stage(cur, request_id)
     return load_request(cur, request_id)
 
 
@@ -174,6 +181,10 @@ def approve(cur, request_id: int, principal: Principal) -> dict:
         previous_status=previous,
         new_status=next_status,
     )
+    if next_status == DEPARTMENT_REVIEW:
+        dispatch.department_tasks_created(cur, request_id)
+    else:
+        dispatch.proposal_entered_stage(cur, request_id)
     return load_request(cur, request_id)
 
 
@@ -199,6 +210,7 @@ def reject(cur, request_id: int, principal: Principal, reason: str) -> dict:
         previous_status=previous,
         new_status=COMPLETED_REJECTED,
     )
+    dispatch.proposal_rejected(cur, request_id, reason)
     return load_request(cur, request_id)
 
 
@@ -233,6 +245,7 @@ def send_back(cur, request_id: int, principal: Principal, comment: str) -> dict:
         previous_status=previous,
         new_status=RESUBMISSION_REQUIRED,
     )
+    dispatch.proposal_sent_back(cur, request_id, comment)
     return load_request(cur, request_id)
 
 
@@ -279,6 +292,9 @@ def applicant_resubmit(cur, request_id: int, principal: Principal, comment: str 
                 previous_status="resubmitted",
                 new_status="pending",
             )
+            # Only the department that sent this task back is told - the others
+            # never stopped working and have nothing new to look at.
+            dispatch.department_task_resubmitted(cur, request_id, task)
         return _touch(cur, request_id)
 
     if request["status"] != RESUBMISSION_REQUIRED:
@@ -296,6 +312,10 @@ def applicant_resubmit(cur, request_id: int, principal: Principal, comment: str 
         previous_status=RESUBMISSION_REQUIRED,
         new_status=resume_status,
     )
+    if resume_status == DEPARTMENT_REVIEW:
+        dispatch.department_tasks_created(cur, request_id)
+    else:
+        dispatch.proposal_entered_stage(cur, request_id, is_resubmission=True)
     return load_request(cur, request_id)
 
 
@@ -337,6 +357,9 @@ def cancel(cur, request_id: int, principal: Principal) -> dict:
         "SELECT * FROM request_task WHERE request_id = %s AND NOT (status = ANY(%s))",
         (request_id, list(TASK_TERMINAL)),
     )
+    # Gather who is holding what BEFORE the loop below cancels the rows, so each
+    # head can be told which of their own items just went away.
+    dispatch.proposal_cancelled(cur, request_id, dispatch.open_items_by_user(cur, open_tasks))
     for task in open_tasks:
         cur.execute(
             "UPDATE request_task SET status = 'cancelled', resolved_at = now(), "

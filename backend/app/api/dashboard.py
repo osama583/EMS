@@ -29,13 +29,22 @@ from ..security import require_auth, require_internal
 from ..security.principal import current_principal
 from ..services import dashboard as svc
 from ..services.dashboard.profiles import NoDashboardProfile
-from ..services.dashboard.scope import PERIOD_KEYS
+from ..services.dashboard.scope import CUSTOM_PERIOD, PERIOD_KEYS
 
 bp = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 
 
 def _period() -> str | None:
+    """The period key, or None to let the service pick its default.
+
+    A custom range arrives as `custom:<from>:<to>`, so the check is on the
+    prefix rather than exact membership. The dates themselves are not validated
+    here - resolve_period() parses them and falls back to the default window on
+    anything malformed, which is the one place that decision belongs.
+    """
     value = (request.args.get("period") or "").strip().lower()
+    if value.startswith(f"{CUSTOM_PERIOD}:"):
+        return value
     return value if value in PERIOD_KEYS else None
 
 

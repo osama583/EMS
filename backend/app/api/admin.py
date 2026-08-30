@@ -18,6 +18,7 @@ user assignment is blocked rather than cascaded.
 """
 from __future__ import annotations
 
+import datetime as dt
 import secrets
 
 from flask import Blueprint, jsonify, request
@@ -27,6 +28,8 @@ from ..errors import BadRequest, Conflict, Forbidden, NotFound
 from ..logging_setup import audit
 from ..security import require_admin
 from ..security.passwords import hash_password
+from ..services import soft_delete
+from ..services.email import notifications, recipients, reminders
 from ..security.principal import HEAD_ROLE_CODES, current_principal
 from ..services.identity import CAFETERIA_UNIT_PREFIX
 from ._helpers import body, flag, required
@@ -197,6 +200,15 @@ def create_user():
                 (user_id, department),
             )
         audit("admin.user.created", target_user_id=user_id, actor_user_id=current_principal().user_id)
+        # Sent from inside the transaction because this is the ONLY point the
+        # password exists in plaintext - it is hashed on the way into the row,
+        # so it cannot be recovered afterwards to email later.
+        notifications.account_created_with_password(
+            email=str(email).strip().lower(),
+            full_name=str(display_name).strip(),
+            password=str(password),
+            role_label=recipients.role_label(cur, user_id),
+        )
     return jsonify(_user_response(user_id)), 201
 
 
@@ -1509,3 +1521,126 @@ def preview_nav():
         }
     ]
     return jsonify(nav_tree_for(0, fake_roles))
+
+
+@bp.post("/purge-deleted")
+@require_admin
+def purge_deleted():
+    """Permanently remove everything that has outlived the retention window.
+
+    The bin is a 7-day recovery window (RETENTION_DAYS), not storage: once a
+    record has sat there longer than that, nobody is coming back for it. This
+    is what empties it.
+
+    Meant to run nightly from cron (scripts/purge_deleted.py), but this
+    deployment has no always-on host to install that crontab on, so a System
+    Admin triggers the identical sweep from the sidebar instead. Both call
+    soft_delete.purge_everything(), so the button and the job can never sweep
+    different things.
+
+    Safety is in the sweep itself, not here: dependencies are re-checked per row
+    IMMEDIATELY BEFORE deletion rather than trusted from when the row was
+    archived (a week is long enough for something to have come to reference it),
+    each row is committed in its own transaction so one failure cannot abort the
+    rest, and a row that has picked up a dependency is left in the bin and
+    reported as `blocked` rather than force-deleted.
+
+    ?dryRun=1 reports what WOULD go without deleting anything.
+    """
+    principal = current_principal()
+    dry_run = flag("dryRun")
+
+    if dry_run:
+        by_entity = {
+            entity: {"eligible": len(soft_delete.expired(entity)), "purged": 0, "blocked": 0, "failed": 0}
+            for entity in sorted(soft_delete.DELETION_RULES)
+        }
+        with transaction() as cur:
+            by_entity[soft_delete.ASSIGNMENT_ENTITY] = {
+                "eligible": len(soft_delete.expired_assignments(cur)),
+                "purged": 0,
+                "blocked": 0,
+                "failed": 0,
+            }
+        return jsonify({
+            "dryRun": True,
+            "byEntity": by_entity,
+            "entities": sorted(by_entity),
+            "totalPurged": 0,
+            "totalBlocked": 0,
+            "totalEligible": sum(v["eligible"] for v in by_entity.values()),
+            "retentionDays": soft_delete.RETENTION_DAYS,
+        })
+
+    by_entity = soft_delete.purge_everything()
+    total_purged = sum(v["purged"] for v in by_entity.values())
+    total_blocked = sum(v["blocked"] for v in by_entity.values())
+    audit(
+        "admin.purge_deleted.swept",
+        actor_user_id=principal.user_id,
+        purged=total_purged,
+        blocked=total_blocked,
+    )
+    return jsonify({
+        "dryRun": False,
+        "byEntity": by_entity,
+        "entities": sorted(by_entity),
+        "totalPurged": total_purged,
+        "totalBlocked": total_blocked,
+        "totalEligible": sum(v["eligible"] for v in by_entity.values()),
+        "retentionDays": soft_delete.RETENTION_DAYS,
+    })
+
+
+@bp.post("/send-event-reminders")
+@require_admin
+def send_event_reminders():
+    """Run the event-reminder sweep now, on demand.
+
+    Same situation as the purge sweep above: the reminders are designed to be
+    driven by cron (see scripts/send_event_reminders.py and "Scheduled jobs" in
+    the backend README), but this deployment has no always-on server to install
+    a crontab on. Rather than leave the feature unreachable, a System Admin can
+    trigger the identical code path from the UI.
+
+    This is NOT a second implementation - it calls the same
+    reminders.send_due_reminders() the cron job calls, so what happens here and
+    what would happen at 08:00 are the same thing by construction, and the
+    idempotency guarantee holds across both: every send is recorded in
+    event_reminder_sent, so pressing the button twice sends nothing the second
+    time, and pressing it after a cron run sends only what cron did not.
+
+    ?dryRun=1 reports who WOULD be emailed without sending or recording
+    anything - the safe way to check a threshold change before it reaches real
+    mailboxes.
+    """
+    dry_run = flag("dryRun")
+    today = dt.date.today()
+
+    with transaction() as cur:
+        if dry_run:
+            due = {
+                "savedCapacity": len(reminders.due_capacity_reminders(cur)),
+                "savedStarting": len(reminders.due_saved_starting_reminders(cur)),
+                "registeredStarting": len(reminders.due_registered_starting_reminders(cur)),
+            }
+            return jsonify({
+                "dryRun": True,
+                "byKind": due,
+                "total": sum(due.values()),
+                "capacityPercent": reminders.capacity_percent(cur),
+                "leadDays": reminders.lead_days(cur),
+            })
+
+        sent = reminders.send_due_reminders(cur, today)
+        by_kind = {
+            "savedCapacity": sent[reminders.CAPACITY],
+            "savedStarting": sent[reminders.SAVED_STARTING],
+            "registeredStarting": sent[reminders.REGISTERED_STARTING],
+        }
+        audit(
+            "admin.event_reminders.sent",
+            actor_user_id=current_principal().user_id,
+            total=sum(by_kind.values()),
+        )
+    return jsonify({"dryRun": False, "byKind": by_kind, "total": sum(by_kind.values())})
