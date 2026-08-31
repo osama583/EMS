@@ -54,7 +54,9 @@ export interface ClubRecord {
   readonly viewerHasPendingRequest?: boolean;
   readonly viewerIsPresident?: boolean;
   // The date the VIEWER joined this club — null for a club they do not belong to.
-  // Drives the "Member Since" column on Discover Clubs.
+  // Drives the "Member Since" column on My Clubs, where every row is a club they
+  // are in. Discover Clubs listed it too, but almost every row there is a club
+  // the viewer has not joined, so the column was empty and has been removed.
   readonly viewerMemberSince?: string | null;
   // Whether a president-change request for this club is still awaiting a Club Admin's decision.
   // A club may hold only one at a time (uq_pcr_pending_per_club), so this is what stops My Clubs

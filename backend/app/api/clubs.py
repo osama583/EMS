@@ -96,10 +96,10 @@ _CLUB_SELECT = """
              WHERE j.club_id = c.club_id AND j.status = 'pending') AS "pendingRequestCount",
            EXISTS (SELECT 1 FROM club_members m
                     WHERE m.club_id = c.club_id AND m.user_id = %(viewer)s) AS "viewerIsMember",
-           -- When the VIEWER joined, for the "Member Since" column on Discover
-           -- Clubs. NULL for a club they do not belong to, which is most rows -
-           -- a correlated scalar rather than a join so the row count is
-           -- unaffected and a non-member simply reads NULL.
+           -- When the VIEWER joined, for the "Member Since" column on My Clubs.
+           -- NULL for a club they do not belong to - a correlated scalar rather
+           -- than a join, so the row count is unaffected and a non-member simply
+           -- reads NULL.
            (SELECT m.date_joined FROM club_members m
              WHERE m.club_id = c.club_id AND m.user_id = %(viewer)s) AS "viewerMemberSince",
            EXISTS (SELECT 1 FROM club_join_requests j

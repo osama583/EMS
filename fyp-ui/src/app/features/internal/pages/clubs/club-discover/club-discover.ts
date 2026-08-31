@@ -61,7 +61,7 @@ export class ClubDiscoverComponent {
     ariaLabel: 'Discover clubs', paginationLabel: 'Club pages', rowsPerPageLabel: 'Clubs per page', mobileListLabel: 'Club cards',
     header: { title: 'Discover Clubs', description: 'Browse active clubs and send a request to join.', countLabel: `${this.filteredClubs().length} club${this.filteredClubs().length === 1 ? '' : 's'}` },
     search: { ariaLabel: 'Search clubs', placeholder: 'Search club name or description' },
-    columns: [{ key: 'club', label: 'Club' }, { key: 'category', label: 'Category' }, { key: 'president', label: 'President' }, { key: 'members', label: 'Members' }, { key: 'memberSince', label: 'Member Since' }, { key: 'actions', label: 'Actions', actions: true }],
+    columns: [{ key: 'club', label: 'Club' }, { key: 'category', label: 'Category' }, { key: 'president', label: 'President' }, { key: 'members', label: 'Members' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [{ key: 'join', label: 'Request to join', icon: 'person_add' }],
     emptyTitle: 'No clubs found', emptyDescription: 'Try a different search or category filter.',
   }));
@@ -76,7 +76,6 @@ export class ClubDiscoverComponent {
       category: { primary: club.categories.map((category) => category.name).join(', ') || 'Uncategorized' },
       president: { primary: club.president?.displayName ?? 'Unassigned' },
       members: { primary: `${club.memberCount} member${club.memberCount === 1 ? '' : 's'}` },
-      memberSince: this.memberSinceCell(club),
       actions: { primary: this.requestingId() === club.id ? 'Sending…' : '' },
     },
     mobile: {
@@ -84,26 +83,10 @@ export class ClubDiscoverComponent {
       details: [
         { icon: 'how_to_reg', text: club.president?.displayName ?? 'Unassigned' },
         { icon: 'group', text: `${club.memberCount} member${club.memberCount === 1 ? '' : 's'}` },
-        ...(club.viewerMemberSince ? [{ icon: 'event_available', text: `Member since ${this.formatMemberSince(club.viewerMemberSince)}` }] : []),
       ],
     },
   })));
 
-  /**
-   * "Member Since" is the viewer's OWN join date, so it is blank for the clubs this page mostly
-   * lists — the ones they have not joined. A President presides rather than holds a membership
-   * row, so they are labelled instead of dashed: an empty cell there would read as a data gap.
-   */
-  private memberSinceCell(club: ClubRecord): { primary: string; secondary?: string } {
-    if (club.viewerMemberSince) return { primary: this.formatMemberSince(club.viewerMemberSince) };
-    if (club.viewerIsPresident) return { primary: 'President' };
-    return { primary: '—' };
-  }
-
-  private formatMemberSince(iso: string): string {
-    const date = new Date(iso);
-    return isNaN(date.getTime()) ? '—' : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-  }
   constructor() {
     this.loadAll();
   }

@@ -66,7 +66,7 @@ export class HubMyClubsComponent {
     ariaLabel: 'My clubs', paginationLabel: 'Club pages', rowsPerPageLabel: 'Clubs per page', mobileListLabel: 'Club cards',
     header: { title: this.headerConfig().title, description: this.headerConfig().description, countLabel: this.headerConfig().countLabel },
     search: { ariaLabel: 'Search clubs', placeholder: 'Search club name' },
-    columns: [{ key: 'club', label: 'Club' }, { key: 'category', label: 'Categories' }, { key: 'role', label: 'Your role' }, { key: 'members', label: 'Members' }, { key: 'actions', label: 'Actions', actions: true }],
+    columns: [{ key: 'club', label: 'Club' }, { key: 'category', label: 'Categories' }, { key: 'role', label: 'Your role' }, { key: 'members', label: 'Members' }, { key: 'memberSince', label: 'Member Since' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [
       { key: 'roster', label: 'View members', icon: 'group' },
       { key: 'categories', label: 'Edit categories', icon: 'tune' },
@@ -82,14 +82,36 @@ export class HubMyClubsComponent {
       category: { primary: club.categories.map((category) => category.name).join(', ') || 'No categories set' },
       role: { primary: club.viewerIsPresident ? 'President' : 'Member', badge: true, tone: club.viewerIsPresident ? 'blue' : 'neutral' },
       members: { primary: `${club.memberCount} member${club.memberCount === 1 ? '' : 's'}` },
+      memberSince: this.memberSinceCell(club),
       actions: { primary: '' },
     },
     mobile: {
       eyebrow: club.viewerIsPresident ? 'President' : 'Member', status: '', title: club.name,
-      details: [{ icon: 'category', text: club.categories.map((category) => category.name).join(', ') || 'No categories set' }, { icon: 'group', text: `${club.memberCount} member${club.memberCount === 1 ? '' : 's'}` }],
+      details: [
+        { icon: 'category', text: club.categories.map((category) => category.name).join(', ') || 'No categories set' },
+        { icon: 'group', text: `${club.memberCount} member${club.memberCount === 1 ? '' : 's'}` },
+        ...(club.viewerMemberSince ? [{ icon: 'event_available', text: `Member since ${this.formatMemberSince(club.viewerMemberSince)}` }] : []),
+      ],
     },
     actionKeys: club.viewerIsPresident ? ['roster', 'categories', 'president-change'] : ['roster', 'leave'],
   })));
+
+  /**
+   * "Member Since" is the viewer's OWN join date. Every row here is a club they belong to, so it
+   * is populated for members - unlike on Discover Clubs, where it was blank for almost every row
+   * and is why it was moved. A President presides rather than holding a membership row, so they
+   * are labelled instead of dashed: an empty cell there would read as a data gap.
+   */
+  private memberSinceCell(club: ClubRecord): { primary: string; secondary?: string } {
+    if (club.viewerMemberSince) return { primary: this.formatMemberSince(club.viewerMemberSince) };
+    if (club.viewerIsPresident) return { primary: 'President' };
+    return { primary: '—' };
+  }
+
+  private formatMemberSince(iso: string): string {
+    const date = new Date(iso);
+    return isNaN(date.getTime()) ? '—' : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
   readonly filters: readonly InternalFilterConfig[] = [];
 
   constructor() {
