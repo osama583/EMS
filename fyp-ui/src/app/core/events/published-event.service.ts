@@ -190,7 +190,7 @@ export class PublishedEventService implements EventRegistrationApi {
   // The search box, every filter group and page/pageSize are real server query params (events.py's
   // my_registrations()) - the server narrows by scope, filters, counts and slices in SQL, so the
   // browser only ever receives the one page of results it is about to render.
-  private myRegistrations(scope: 'active' | 'pending' | 'history', params: EventSearchParams): Observable<RegisteredEventsResponse> {
+  private myRegistrations(scope: 'active' | 'pending' | 'history' | 'conducted', params: EventSearchParams): Observable<RegisteredEventsResponse> {
     return this.http.get<RegisteredEventsResponse>(`${this.baseUrl}/me/registrations`, {
       params: eventSearchHttpParams(params).set('scope', scope),
     });
@@ -209,6 +209,13 @@ export class PublishedEventService implements EventRegistrationApi {
 
   getRegistrationHistory(params: EventSearchParams): Observable<RegisteredEventsResponse> {
     return this.myRegistrations('history', params);
+  }
+
+  // Events I held a confirmed place on that have since finished — the Conducted tab. Narrower
+  // than getRegistrationHistory(), which also carries registrations that were turned down: those
+  // are settled, but they were never attended.
+  getConductedRegistrations(params: EventSearchParams): Observable<RegisteredEventsResponse> {
+    return this.myRegistrations('conducted', params);
   }
 
   // Events I proposed (or co-own) that are now published — my own organiser dashboard (Created by Me).

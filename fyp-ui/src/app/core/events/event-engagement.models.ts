@@ -43,7 +43,12 @@ export interface RegistrationHistoryRow {
   readonly eventTitle: string;
   readonly eventCode: string;
   readonly outcome: 'confirmed' | 'rejected';
+  // When the person asked to attend.
   readonly registeredAt: string;
+  // When the record became history — the event finished, or the organiser decided. This is what
+  // the Date column shows; registeredAt answers a different question and belongs in the detail
+  // panel, not in a list of concluded things.
+  readonly historyAt: string;
   readonly registrantName: string | null;
   readonly registrantEmail: string | null;
   readonly reason: string | null;

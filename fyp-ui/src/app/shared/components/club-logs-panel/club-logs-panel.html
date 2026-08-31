@@ -1,0 +1,95 @@
+<nav class="shared-tabs club-logs__tabs" aria-label="Club log categories">
+  @for (tab of tabs; track tab.key) {
+    <button
+      type="button"
+      class="shared-tabs__tab"
+      [class.shared-tabs__tab--active]="category() === tab.key"
+      [attr.aria-current]="category() === tab.key ? 'page' : null"
+      (click)="setCategory(tab.key)"
+    >
+      <span class="material-symbols-rounded" aria-hidden="true">{{ tab.icon }}</span>
+      {{ tab.label }}
+    </button>
+  }
+</nav>
+
+<label class="club-logs__search">
+  <span class="material-symbols-rounded" aria-hidden="true">search</span>
+  <input
+    type="search"
+    [value]="search()"
+    [attr.aria-label]="'Search the ' + activeTab().label.toLowerCase() + ' log'"
+    placeholder="Search by name or email"
+    (input)="setSearch($any($event.target).value)"
+  />
+</label>
+
+@if (errorMessage()) {
+  <p class="club-logs__message" role="alert">{{ errorMessage() }}</p>
+} @else if (loading()) {
+  <div class="club-logs__loading" role="status" aria-label="Loading log">
+    @for (line of [1, 2, 3]; track line) { <span></span> }
+  </div>
+} @else if (entries().length === 0) {
+  <p class="club-logs__message">{{ search().trim() ? 'Nothing in this log matches that search.' : activeTab().emptyText }}</p>
+} @else {
+  <div class="club-logs__table-scroll">
+    <table class="shared-data-table club-logs__table">
+      <thead>
+        <tr>
+          <th scope="col">{{ showsReference() ? 'Proposed by' : 'Member' }}</th>
+          @if (showsReference()) { <th scope="col">Event</th> }
+          <th scope="col">Action</th>
+          <th scope="col">Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (entry of entries(); track entry.occurredAt + entry.subjectEmail + entry.action) {
+          <tr>
+            <td>
+              <div class="shared-data-cell">
+                <span class="shared-data-cell__copy">
+                  <strong>{{ entry.subjectName }}</strong>
+                  <small>{{ entry.subjectEmail }}</small>
+                </span>
+              </div>
+            </td>
+            @if (showsReference()) {
+              <td>
+                <div class="shared-data-cell">
+                  <span class="shared-data-cell__copy">
+                    <strong>{{ entry.referenceTitle }}</strong>
+                    <small>{{ entry.referenceCode }}</small>
+                  </span>
+                </div>
+              </td>
+            }
+            <td>
+              <div class="shared-data-cell">
+                <span class="shared-data-cell__copy">
+                  <strong>{{ actionLabel(entry) }}</strong>
+                  @if (actorLabel(entry)) { <small>{{ actorLabel(entry) }}</small> }
+                </span>
+              </div>
+            </td>
+            <td>{{ formatDate(entry.occurredAt) }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (totalPages() > 1) {
+    <footer class="club-logs__pagination">
+      <button type="button" [disabled]="page() <= 1" (click)="previousPage()">
+        <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+        Previous
+      </button>
+      <span>Page {{ page() }} of {{ totalPages() }} · {{ total() }} entr{{ total() === 1 ? 'y' : 'ies' }}</span>
+      <button type="button" [disabled]="page() >= totalPages()" (click)="nextPage()">
+        Next
+        <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+      </button>
+    </footer>
+  }
+}

@@ -9,6 +9,9 @@
 }
 @keyframes club-roster-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 
+// The modal supplies its own padding, so the strip only needs separating from the content.
+.club-roster__views { margin-bottom: var(--space-3); }
+
 .club-roster__error,
 .club-roster__empty { margin: 0; color: var(--apu-text-muted); }
 

@@ -1,1 +1,15 @@
+<nav class="shared-tabs" aria-label="My Clubs sections">
+  @for (tab of tabs; track tab.key) {
+    <a
+      class="shared-tabs__tab"
+      [routerLink]="tab.path"
+      routerLinkActive="shared-tabs__tab--active"
+      [routerLinkActiveOptions]="{ exact: tab.exact }"
+    >
+      <span class="material-symbols-rounded" aria-hidden="true">{{ tab.icon }}</span>
+      {{ tab.label }}
+    </a>
+  }
+</nav>
+
 <router-outlet />

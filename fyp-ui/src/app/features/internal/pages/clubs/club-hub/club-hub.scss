@@ -3,3 +3,7 @@
   margin-top: 0;
 }
 
+// The tab strip is chrome for the page below it, not a section of its own.
+.shared-tabs {
+  margin-bottom: var(--space-4);
+}

@@ -48,6 +48,9 @@ export interface ClubRecord {
   readonly viewerIsMember?: boolean;
   readonly viewerHasPendingRequest?: boolean;
   readonly viewerIsPresident?: boolean;
+  // The date the VIEWER joined this club — null for a club they do not belong to.
+  // Drives the "Member Since" column on Discover Clubs.
+  readonly viewerMemberSince?: string | null;
 }
 
 /** Mirrors ClubCategoryPage — the envelope for the server-paginated /clubs/search list. */
@@ -148,4 +151,69 @@ export interface PresidentChangeRequestQuery {
 export interface ClubOption {
   readonly id: string;
   readonly name: string;
+}
+
+// --- Previous clubs -------------------------------------------------------
+/** How a membership ended. Mirrors club_membership_log's departure actions. */
+export type PreviousClubAction = 'left' | 'removed' | 'president_stepped_down';
+
+/** The Status filter on /app/clubs/my-clubs/previous — sent to the server, not applied here. */
+export type PreviousClubStatus = 'all' | 'left' | 'removed' | 'stepped-down';
+
+/**
+ * A club the viewer used to belong to. Rows come from club_membership_log, so this list only
+ * knows about departures recorded from migration 040 onward — a club left before then left no
+ * trace anywhere to reconstruct.
+ */
+export interface PreviousClubRecord {
+  readonly clubId: string;
+  readonly clubName: string;
+  readonly clubImageUrl: string | null;
+  readonly action: PreviousClubAction;
+  /** The role held at the moment of leaving, frozen at write time. */
+  readonly roleLabel: string;
+  /** When the membership ended. */
+  readonly occurredAt: string;
+  /** Who ended it — null when the viewer left of their own accord, or for a backfilled row. */
+  readonly actorName: string | null;
+  /** When it started, if the log knows. */
+  readonly joinedAt: string | null;
+}
+
+export interface PreviousClubPage {
+  readonly items: readonly PreviousClubRecord[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly totalPages: number;
+}
+
+// --- Club logs ------------------------------------------------------------
+/** The three tabs of the President's club log. */
+export type ClubLogCategory = 'member' | 'event' | 'request';
+
+/**
+ * One log entry. Every category returns this same shape so all three tabs render through one
+ * table view; the fields a category has nothing to say about come back null.
+ */
+export interface ClubLogEntry {
+  readonly occurredAt: string;
+  readonly subjectName: string;
+  readonly subjectEmail: string;
+  /** e.g. 'joined', 'removed', 'president_assigned', 'event_draft', 'join_rejected'. */
+  readonly action: string;
+  readonly roleLabel: string | null;
+  /** Who caused it, where that is a different person from the subject. */
+  readonly actorName: string | null;
+  /** Event tab only — the proposal's code and title. */
+  readonly referenceCode: string | null;
+  readonly referenceTitle: string | null;
+}
+
+export interface ClubLogPage {
+  readonly items: readonly ClubLogEntry[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly totalPages: number;
 }

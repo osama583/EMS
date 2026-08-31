@@ -100,16 +100,25 @@ export class HubHistoryEventsComponent {
       event: { primary: entry.eventTitle, secondary: entry.eventCode },
       requester: { primary: this.requesterLabel(entry), badge: true, tone: entry.requester === 'me' ? 'blue' : 'neutral' },
       outcome: { primary: entry.outcome === 'confirmed' ? 'Confirmed' : 'Rejected', badge: true, tone: entry.outcome === 'confirmed' ? 'success' : 'danger' },
-      date: { primary: this.formatDate(entry.registeredAt) },
+      date: { primary: this.formatDate(entry.historyAt), secondary: this.historyReason(entry) },
       actions: { primary: '' },
     },
     mobile: {
       eyebrow: this.requesterLabel(entry),
       status: entry.outcome === 'confirmed' ? 'Confirmed' : 'Rejected',
       title: entry.eventTitle,
-      details: [{ icon: 'schedule', text: this.formatDate(entry.registeredAt) }],
+      details: [{ icon: 'schedule', text: `${this.historyReason(entry)} ${this.formatDate(entry.historyAt)}` }],
     },
   })));
+
+  /**
+   * Why this row is history, which is also what its date means. A confirmed registration got
+   * here by its event finishing; a rejected one by the organiser's decision. Showing the date
+   * without the reason invites reading it as the event date in both cases.
+   */
+  historyReason(entry: RegistrationHistoryRow): string {
+    return entry.outcome === 'confirmed' ? 'Event ended' : 'Decided';
+  }
 
   requesterLabel(entry: RegistrationHistoryRow): string {
     const name = entry.requester === 'me'

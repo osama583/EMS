@@ -850,10 +850,13 @@ def decide_registration(event_id: int, registration_id: int):
             """UPDATE event_registration
                   SET status = %s,
                       payment_status = CASE WHEN %s AND payment_status = 'pending_review'
-                                            THEN 'approved' ELSE payment_status END
+                                            THEN 'approved' ELSE payment_status END,
+                      decided_by_user_id = %s,
+                      decided_at = now()
                 WHERE event_registration_id = %s AND request_id = %s AND status = 'pending_approval'
             RETURNING event_registration_id, status""",
-            ("registered" if approve else "rejected", approve, registration_id, event_id),
+            ("registered" if approve else "rejected", approve, principal.user_id,
+             registration_id, event_id),
         )
         row = cur.fetchone()
         if row is None:
@@ -899,6 +902,11 @@ _REGISTRATION_SCOPES = {
     "pending": _AWAITING_DECISION,
     # Everything settled: turned down, or attended and now over.
     "history": f"({_TURNED_DOWN} OR ({_REGISTERED} AND {_HAS_ENDED}))",
+    # Attended: a confirmed place on an event that has since finished. The
+    # narrower half of `history` - a registration you were turned down for is
+    # settled but was never conducted, and the Conducted tab is a record of what
+    # you actually went to.
+    "conducted": f"{_REGISTERED} AND {_HAS_ENDED}",
 }
 
 
@@ -910,7 +918,8 @@ def my_registrations():
     ?scope=active restricts to confirmed registrations for events that have not
     ended yet; ?scope=pending restricts to manual-approval registrations still
     awaiting the organiser's decision; ?scope=history returns everything else
-    (past confirmed events, and any rejected registration). Cancelled
+    (past confirmed events, and any rejected registration); ?scope=conducted is
+    the attended half of history, without the rejections. Cancelled
     registrations never appear.
 
     Search (?q=) and every Explore Events filter group are accepted here too and
@@ -1105,15 +1114,28 @@ _HISTORY_UNION_SQL = """
         -- rejected. Mirrors my_registrations()'s scope='history' branch (status <> 'pending',
         -- and a confirmed one only counts once its event's last date has passed) but selects
         -- only the columns this page actually renders instead of the full decorated event.
+        --
+        -- Two dates, deliberately: "registeredAt" is when the person asked to attend and
+        -- "historyAt" is when the record stopped being live. They are the same only by
+        -- coincidence, and dating the page by the first was what made a registration made in
+        -- January show up as January in a list of things that concluded in June.
         SELECT 'me:' || r.request_id::text AS key,
                'me' AS requester,
                r.event_title AS "eventTitle",
                r.request_code AS "eventCode",
                CASE er.status WHEN 'registered' THEN 'confirmed' ELSE 'rejected' END AS outcome,
-               coalesce(
-                   (SELECT min(s."date")::timestamp FROM event_schedule s WHERE s.request_id = r.request_id),
-                   er.registered_at
-               ) AS "registeredAt",
+               er.registered_at AS "registeredAt",
+               -- The date this record BECAME history, which is what the page's Date
+               -- column reports. The two outcomes get there by different routes: a
+               -- confirmed registration waits for its event to finish, a rejected one
+               -- enters the moment the organiser decides. decided_at is NULL for a
+               -- decision made before migration 039, so those fall back to a real
+               -- timestamp from the same request rather than to nothing.
+               CASE WHEN er.status = 'registered'
+                    THEN (SELECT max(s."date")::timestamp FROM event_schedule s
+                           WHERE s.request_id = r.request_id)
+                    ELSE coalesce(er.decided_at, er.registered_at)
+               END AS "historyAt",
                NULL::text AS "registrantName",
                NULL::text AS "registrantEmail",
                NULL::text AS reason,
@@ -1141,6 +1163,9 @@ _HISTORY_UNION_SQL = """
                r.request_code AS "eventCode",
                CASE er.status WHEN 'registered' THEN 'confirmed' ELSE 'rejected' END AS outcome,
                er.registered_at AS "registeredAt",
+               -- A row the viewer decided entered history when they decided it,
+               -- whichever way it went - there is nothing to wait for.
+               coalesce(er.decided_at, er.registered_at) AS "historyAt",
                er.registrant_name AS "registrantName",
                er.registrant_email AS "registrantEmail",
                coalesce(er.reason_for_attending, '') AS reason,
@@ -1215,7 +1240,7 @@ def registration_history():
         rows = fetch_all(
             cur,
             f"""SELECT * FROM ({_HISTORY_UNION_SQL}) u WHERE {where_sql}
-                ORDER BY {date_order('"registeredAt"')}
+                ORDER BY {date_order('"historyAt"')}
                 LIMIT %(limit)s OFFSET %(offset)s""",
             {**params, "limit": limit, "offset": offset},
         )

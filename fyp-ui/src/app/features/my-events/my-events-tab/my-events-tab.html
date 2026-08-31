@@ -29,7 +29,7 @@
           [saved]="savedEvents.savedEventIds().has(entry.event.id)"
           [registrationStatus]="entry.status"
           [registering]="registeringEventId() === entry.event.id"
-          [showRegister]="mode() !== 'history'"
+          [showRegister]="mode() !== 'history' && mode() !== 'conducted'"
           (favourite)="toggleSaved($event)"
           (explore)="selectedEvent.set(entry.event)"
           (register)="registerForEvent($event)"

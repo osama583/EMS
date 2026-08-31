@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { DeletionMetadata, DeletionPreview } from '../../shared/models/deletion.models';
-import { ClubCategoryName, ClubOption, ClubCategoryPage, ClubCategoryRecord, ClubDraft, ClubJoinRequestPage, ClubJoinRequestRecord, ClubMemberRecord, ClubMyStatus, ClubPage, ClubRecord, ClubSortKey, ClubUserSummary, PresidentChangeRequestPage, PresidentChangeRequestQuery } from './club.models';
+import { ClubCategoryName, ClubOption, ClubCategoryPage, ClubCategoryRecord, ClubDraft, ClubJoinRequestPage, ClubJoinRequestRecord, ClubMemberRecord, ClubMyStatus, ClubPage, ClubRecord, ClubSortKey, ClubUserSummary, PresidentChangeRequestPage, PresidentChangeRequestQuery, ClubLogCategory, ClubLogPage, PreviousClubPage, PreviousClubStatus } from './club.models';
 
 @Injectable({ providedIn: 'root' })
 export class ClubService {
@@ -195,5 +195,28 @@ export class ClubService {
   }
   rejectPresidentChange(id: string, comment: string): Observable<void> {
     return this.http.post<void>(`${this.baseUrl}/clubs/president-change-requests/${encodeURIComponent(id)}/reject`, { comment });
+  }
+
+  // Clubs the caller used to belong to. Search, status and pagination are real query params —
+  // clubs.py's my_previous_clubs() narrows, counts and slices in SQL, so the browser only ever
+  // holds the page it is about to render.
+  getPreviousClubs(query: { q?: string; status?: PreviousClubStatus; page: number; pageSize: number; order?: 'asc' | 'desc' }): Observable<PreviousClubPage> {
+    let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
+    if (query.q) params = params.set('q', query.q);
+    if (query.status && query.status !== 'all') params = params.set('status', query.status);
+    if (query.order) params = params.set('order', query.order);
+    return this.http.get<PreviousClubPage>(`${this.baseUrl}/clubs/me/previous`, { params });
+  }
+
+  // One club's activity log, one tab at a time. Same envelope for all three categories.
+  getClubLogs(clubId: string, query: { category: ClubLogCategory; q?: string; action?: string; page: number; pageSize: number; order?: 'asc' | 'desc' }): Observable<ClubLogPage> {
+    let params = new HttpParams()
+      .set('category', query.category)
+      .set('page', query.page)
+      .set('pageSize', query.pageSize);
+    if (query.q) params = params.set('q', query.q);
+    if (query.action && query.action !== 'all') params = params.set('action', query.action);
+    if (query.order) params = params.set('order', query.order);
+    return this.http.get<ClubLogPage>(`${this.baseUrl}/clubs/${encodeURIComponent(clubId)}/logs`, { params });
   }
 }

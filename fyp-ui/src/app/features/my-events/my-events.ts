@@ -27,6 +27,9 @@ export class MyEventsComponent {
   private static readonly internalTabs = [
     { key: 'saved', label: 'Saved Events', path: 'saved', icon: 'bookmark' },
     { key: 'registered', label: 'Registered Events', path: 'registered', icon: 'how_to_reg' },
+    // Registered only ever holds events still to come — one that has finished moves itself here,
+    // which is why there is no action to "complete" an event anywhere: the date decides.
+    { key: 'conducted', label: 'Conducted Events', path: 'conducted', icon: 'task_alt' },
   ] as const;
 
   readonly tabs = this.publicLayout ? MyEventsComponent.publicTabs : MyEventsComponent.internalTabs;

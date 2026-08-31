@@ -106,8 +106,12 @@
 
       <dl>
         <div>
-          <dt>{{ entry.requester === 'me' ? 'Event date' : 'Registered' }}</dt>
+          <dt>Registered</dt>
           <dd>{{ formatDate(entry.registeredAt) }}</dd>
+        </div>
+        <div>
+          <dt>{{ entry.outcome === 'confirmed' ? 'Event ended' : 'Decided' }}</dt>
+          <dd>{{ formatDate(entry.historyAt) }}</dd>
         </div>
       </dl>
     </article>

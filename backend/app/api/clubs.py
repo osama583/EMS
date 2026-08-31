@@ -7,6 +7,8 @@
     GET                    /clubs/join-requests               mine, or my inbox
     POST                   /clubs/join-requests/{id}/decision approve | reject
     GET/POST/PATCH/DELETE  /clubs/categories[/{id}]
+    GET                    /clubs/me/previous                 clubs I used to be in
+    GET                    /clubs/{id}/logs                   member | event | request log
     POST                   /clubs/{id}/president-change-requests       President submits
     GET                    /clubs/president-change-requests/inbox      Club Admin: pending
     GET                    /clubs/president-change-requests/mine       President: own history
@@ -49,6 +51,31 @@ def _is_president(cur, club_id: int, user_id: int) -> bool:
     )
 
 
+def _log_membership(
+    cur,
+    club_id: int,
+    subject_user_id: int,
+    action: str,
+    actor_user_id: int | None = None,
+    role_label: str = "Member",
+) -> None:
+    """Append a membership transition to club_membership_log (migration 040).
+
+    club_members is a snapshot and leaving DELETEs the row, so this append-only
+    log is the ONLY record that someone was ever a member. Previous Clubs and
+    the President's member log both read it, which is why every write path that
+    touches club_members calls this in the same transaction - a membership that
+    changed without an entry is a membership that, as far as either page is
+    concerned, never happened.
+    """
+    cur.execute(
+        """INSERT INTO club_membership_log
+               (club_id, subject_user_id, actor_user_id, action, role_label)
+           VALUES (%s, %s, %s, %s, %s)""",
+        (club_id, subject_user_id, actor_user_id, action, role_label),
+    )
+
+
 def _assert_club_admin() -> None:
     principal = current_principal()
     if not principal.is_admin and not principal.has_role("club-admin"):
@@ -68,6 +95,12 @@ _CLUB_SELECT = """
              WHERE j.club_id = c.club_id AND j.status = 'pending') AS "pendingRequestCount",
            EXISTS (SELECT 1 FROM club_members m
                     WHERE m.club_id = c.club_id AND m.user_id = %(viewer)s) AS "viewerIsMember",
+           -- When the VIEWER joined, for the "Member Since" column on Discover
+           -- Clubs. NULL for a club they do not belong to, which is most rows -
+           -- a correlated scalar rather than a join so the row count is
+           -- unaffected and a non-member simply reads NULL.
+           (SELECT m.date_joined FROM club_members m
+             WHERE m.club_id = c.club_id AND m.user_id = %(viewer)s) AS "viewerMemberSince",
            EXISTS (SELECT 1 FROM club_join_requests j
                     WHERE j.club_id = c.club_id AND j.requester_user_id = %(viewer)s
                       AND j.status = 'pending') AS "viewerHasPendingRequest",
@@ -537,6 +570,8 @@ def create_club():
             "INSERT INTO club_members (club_id, user_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
             (club_id, president_id),
         )
+        _log_membership(cur, club_id, president_id, "president_assigned",
+                        actor_user_id=principal.user_id, role_label="President")
         audit("clubs.created", club_id=club_id, actor_user_id=principal.user_id)
     return jsonify(_club_response(club_id, principal.user_id)), 201
 
@@ -562,11 +597,14 @@ def _set_club_categories(cur, club_id: int, category_ids) -> None:
 
 
 def _apply_club_update(club_id: int, payload: dict) -> dict:
-    """Club Admin edits anything; a President may edit their own club's blurb."""
+    """Club Admin edits anything; a President their own club's blurb and categories."""
     principal = current_principal()
     with transaction() as cur:
-        if fetch_one(cur, "SELECT 1 FROM clubs WHERE club_id = %s", (club_id,)) is None:
+        current = fetch_one(cur, "SELECT user_id FROM clubs WHERE club_id = %s", (club_id,))
+        if current is None:
             raise NotFound("Club not found.")
+        # Read before the UPDATE below overwrites it.
+        outgoing_president = current["user_id"]
         is_admin = principal.is_admin or principal.has_role("club-admin")
         if not is_admin and not _is_president(cur, club_id, principal.user_id):
             raise Forbidden("Only a Club Admin or this club's President can edit it.")
@@ -607,8 +645,12 @@ def _apply_club_update(club_id: int, payload: dict) -> dict:
         # `categoryIds` is what the client sends; `categories` is the older name.
         categories = payload.get("categoryIds", payload.get("categories"))
         if categories is not None:
-            if not is_admin:
-                raise Forbidden("Only a Club Admin can change a club's categories.")
+            # A President may retag their OWN club. Unlike renaming or installing a
+            # successor, a category is how the club describes itself to Discover
+            # Clubs - it says nothing about the club's standing, and the 1-3 count
+            # in _set_club_categories still bounds it. The authority check at the
+            # top of this function has already established Club Admin or this
+            # club's President, which is exactly who may do this.
             _set_club_categories(cur, club_id, categories)
         elif not fields:
             raise BadRequest("No updatable fields were supplied.")
@@ -621,6 +663,15 @@ def _apply_club_update(club_id: int, payload: dict) -> dict:
                 "ON CONFLICT DO NOTHING",
                 (club_id, fields["user_id"]),
             )
+            # Two entries, because two things happened: someone stopped presiding
+            # and someone else started. A single "president changed" row would
+            # leave the outgoing President with no departure in their own history,
+            # which is exactly what Previous Clubs reads.
+            if outgoing_president and outgoing_president != fields["user_id"]:
+                _log_membership(cur, club_id, outgoing_president, "president_stepped_down",
+                                actor_user_id=principal.user_id, role_label="President")
+            _log_membership(cur, club_id, fields["user_id"], "president_assigned",
+                            actor_user_id=principal.user_id, role_label="President")
         audit("clubs.updated", club_id=club_id, actor_user_id=principal.user_id)
     return _club_response(club_id, principal.user_id)
 
@@ -650,7 +701,11 @@ def set_club_status(club_id: int):
 @bp.patch("/<int:club_id>/categories")
 @require_internal
 def set_club_categories(club_id: int):
-    _assert_club_admin()
+    """Club Admin, or this club's own President - _apply_club_update decides.
+
+    My Clubs offers "Edit categories" to a President, so gating this on Club
+    Admin made that button a guaranteed 403 for the only people it was shown to.
+    """
     payload = body()
     categories = payload.get("categoryIds", payload.get("categories"))
     if categories is None:
@@ -666,6 +721,9 @@ def delete_club(club_id: int):
         cur.execute("DELETE FROM club_category_links WHERE club_id = %s", (club_id,))
         cur.execute("DELETE FROM club_join_requests WHERE club_id = %s", (club_id,))
         cur.execute("DELETE FROM club_members WHERE club_id = %s", (club_id,))
+        # The log references clubs(club_id); the row about to be destroyed cannot
+        # leave entries pointing at it.
+        cur.execute("DELETE FROM club_membership_log WHERE club_id = %s", (club_id,))
         cur.execute("DELETE FROM clubs WHERE club_id = %s RETURNING club_id", (club_id,))
         if cur.fetchone() is None:
             raise NotFound("Club not found.")
@@ -722,6 +780,9 @@ def remove_member(club_id: int, user_id: int):
         )
         if cur.fetchone() is None:
             raise NotFound("That person is not a member of this club.")
+        # The distinction the log exists to keep: walking out is not being shown out.
+        _log_membership(cur, club_id, user_id, "left" if is_self else "removed",
+                        actor_user_id=principal.user_id)
     return "", 204
 
 
@@ -957,6 +1018,8 @@ def _decide_join_request(join_request_id: int, decision: str, comment: str) -> d
                 "INSERT INTO club_members (club_id, user_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
                 (join_request["club_id"], join_request["requester_user_id"]),
             )
+            _log_membership(cur, join_request["club_id"], join_request["requester_user_id"],
+                            "joined", actor_user_id=principal.user_id)
         audit("clubs.join_request.decided", club_id=join_request["club_id"],
               decision=decision, actor_user_id=principal.user_id)
         dispatch.club_join_decided(
@@ -1237,6 +1300,16 @@ def _decide_president_change(request_id: int, decision: str, comment: str) -> di
                 "DELETE FROM club_members WHERE club_id = %s AND user_id = %s",
                 (pcr["club_id"], pcr["requested_president_user_id"]),
             )
+            # The outgoing President keeps no membership row either (they never had
+            # one separate from presiding), so without this entry a handover would
+            # erase them from the club entirely, with nothing to show they had ever
+            # led it.
+            _log_membership(cur, pcr["club_id"], pcr["current_president_user_id"],
+                            "president_stepped_down", actor_user_id=principal.user_id,
+                            role_label="President")
+            _log_membership(cur, pcr["club_id"], pcr["requested_president_user_id"],
+                            "president_assigned", actor_user_id=principal.user_id,
+                            role_label="President")
         audit("clubs.president_change_request.decided", club_id=pcr["club_id"],
               decision=decision, actor_user_id=principal.user_id)
     return _pcr_response(request_id)
@@ -1254,3 +1327,232 @@ def reject_president_change(request_id: int):
     payload = body()
     comment = str(payload.get("comment") or "").strip()
     return jsonify(_decide_president_change(request_id, "reject", comment))
+
+
+# --- Previous Clubs -------------------------------------------------------
+# How a membership ended, which is the Status filter on /app/clubs/my-clubs/previous.
+# Keyed by the query-string value the client sends; the SQL is fixed here and the
+# key is looked up rather than interpolated, so nothing from the request reaches
+# the statement.
+_PREVIOUS_CLUB_STATUSES = {
+    "left": ("left",),
+    "removed": ("removed",),
+    "stepped-down": ("president_stepped_down",),
+}
+_PREVIOUS_CLUB_ACTIONS = ("left", "removed", "president_stepped_down")
+
+# The most recent departure per (club, viewer), and the role they held at the time.
+# DISTINCT ON collapses a club someone joined and left more than once to the last
+# time they left it - the page is "clubs I used to be in", not a per-episode
+# timeline, and a club appearing three times would read as three clubs.
+#
+# The NOT EXISTS is what makes it PREVIOUS: rejoining a club, or being installed
+# as its President again, removes it from this list even though the old departure
+# entry is still on file.
+_PREVIOUS_CLUBS_SQL = """
+    SELECT DISTINCT ON (l.club_id)
+           l.club_id::text AS "clubId",
+           c.club_name AS "clubName",
+           c.image_url AS "clubImageUrl",
+           l.action,
+           l.role_label AS "roleLabel",
+           l.occurred_at AS "occurredAt",
+           actor.full_name AS "actorName",
+           (SELECT min(j.occurred_at) FROM club_membership_log j
+             WHERE j.club_id = l.club_id AND j.subject_user_id = l.subject_user_id
+               AND j.action IN ('joined', 'president_assigned')) AS "joinedAt"
+      FROM club_membership_log l
+      JOIN clubs c ON c.club_id = l.club_id
+ LEFT JOIN users actor ON actor.user_id = l.actor_user_id
+     WHERE l.subject_user_id = %(viewer)s
+       AND l.action = ANY(%(actions)s)
+       AND c.archived_at IS NULL
+       AND NOT EXISTS (
+             SELECT 1 FROM club_members m
+              WHERE m.club_id = l.club_id AND m.user_id = %(viewer)s
+           )
+       AND c.user_id IS DISTINCT FROM %(viewer)s
+  ORDER BY l.club_id, l.occurred_at DESC
+"""
+
+
+@bp.get("/me/previous")
+@require_auth
+def my_previous_clubs():
+    """Clubs the caller used to belong to - /app/clubs/my-clubs/previous.
+
+    Search (?q= club name), status (?status=left|removed|stepped-down) and
+    page/pageSize are all resolved in SQL, so the browser only receives the one
+    page it is about to render. Reads club_membership_log (migration 040), which
+    is the only record that a membership ever existed once club_members' row is
+    gone - so this list starts at that migration and grows from there.
+    """
+    principal = current_principal()
+    params: dict = {"viewer": principal.user_id, "actions": list(_PREVIOUS_CLUB_ACTIONS)}
+    where = ["1 = 1"]
+
+    status = (request.args.get("status") or "all").strip()
+    if status in _PREVIOUS_CLUB_STATUSES:
+        params["actions"] = list(_PREVIOUS_CLUB_STATUSES[status])
+
+    search = (request.args.get("q") or "").strip()
+    if search:
+        where.append('"clubName" ILIKE %(q)s')
+        params["q"] = f"%{search}%"
+
+    where_sql = " AND ".join(where)
+    with transaction() as cur:
+        total = fetch_one(
+            cur, f"SELECT count(*) AS c FROM ({_PREVIOUS_CLUBS_SQL}) p WHERE {where_sql}", params
+        )["c"]
+        limit, offset = pagination()
+        rows = fetch_all(
+            cur,
+            f"""SELECT * FROM ({_PREVIOUS_CLUBS_SQL}) p WHERE {where_sql}
+                ORDER BY {date_order('"occurredAt"')}, "clubId"
+                LIMIT %(limit)s OFFSET %(offset)s""",
+            {**params, "limit": limit, "offset": offset},
+        )
+    return jsonify(paged(rows, total))
+
+
+# --- Club logs ------------------------------------------------------------
+# Three tabs, one row shape, one endpoint. Every tab returns the same columns so
+# the client renders all three through a single table view: when, who it is
+# about, what happened, and a line of context.
+#
+# Only the Members tab reads club_membership_log. The other two are derived live
+# from tables that already hold the history - request_clubs/request for the
+# events addressed to this club, club_join_requests/club_president_change_requests
+# for the applications it has received. Copying those into the log would create a
+# second version of a fact the database already has, and it would only ever cover
+# what happened after migration 040; derived, they are complete from day one.
+_LOG_MEMBERS_SQL = """
+    SELECT l.occurred_at AS "occurredAt",
+           subject.full_name AS "subjectName",
+           subject.email AS "subjectEmail",
+           l.action,
+           l.role_label AS "roleLabel",
+           actor.full_name AS "actorName",
+           NULL::text AS "referenceCode",
+           NULL::text AS "referenceTitle"
+      FROM club_membership_log l
+      JOIN users subject ON subject.user_id = l.subject_user_id
+ LEFT JOIN users actor ON actor.user_id = l.actor_user_id
+     WHERE l.club_id = %(club)s
+"""
+
+# Every proposal addressed to this club, whatever stage it reached - a draft that
+# was never submitted included, since "someone started one and abandoned it" is
+# exactly the kind of thing a President opens a log to find out. Dated by
+# submission where there is one, else by creation.
+_LOG_EVENTS_SQL = """
+    SELECT coalesce(r.submitted_at, r.created_at) AS "occurredAt",
+           applicant.full_name AS "subjectName",
+           applicant.email AS "subjectEmail",
+           'event_' || r.status AS action,
+           NULL::text AS "roleLabel",
+           NULL::text AS "actorName",
+           r.request_code AS "referenceCode",
+           r.event_title AS "referenceTitle"
+      FROM request_clubs rc
+      JOIN request r ON r.request_id = rc.request_id
+      JOIN users applicant ON applicant.user_id = r.applicant_user_id
+     WHERE rc.club_id = %(club)s
+"""
+
+# Applications the club received, both kinds, each appearing once at the point it
+# was decided (or as still pending). A rejected join request never becomes a
+# membership entry, so this tab is the only place it is visible at all.
+_LOG_REQUESTS_SQL = """
+    SELECT coalesce(j.resolved_at, j.created_at) AS "occurredAt",
+           requester.full_name AS "subjectName",
+           requester.email AS "subjectEmail",
+           'join_' || j.status AS action,
+           NULL::text AS "roleLabel",
+           decider.full_name AS "actorName",
+           NULL::text AS "referenceCode",
+           NULL::text AS "referenceTitle"
+      FROM club_join_requests j
+      JOIN users requester ON requester.user_id = j.requester_user_id
+ LEFT JOIN users decider ON decider.user_id = j.resolved_by_user_id
+     WHERE j.club_id = %(club)s
+
+    UNION ALL
+
+    SELECT coalesce(p.resolved_at, p.created_at) AS "occurredAt",
+           nominee.full_name AS "subjectName",
+           nominee.email AS "subjectEmail",
+           'president_change_' || p.status AS action,
+           'President' AS "roleLabel",
+           decider.full_name AS "actorName",
+           NULL::text AS "referenceCode",
+           NULL::text AS "referenceTitle"
+      FROM club_president_change_requests p
+      JOIN users nominee ON nominee.user_id = p.requested_president_user_id
+ LEFT JOIN users decider ON decider.user_id = p.resolved_by_user_id
+     WHERE p.club_id = %(club)s
+"""
+
+CLUB_LOG_CATEGORIES = {
+    "member": _LOG_MEMBERS_SQL,
+    "event": _LOG_EVENTS_SQL,
+    "request": _LOG_REQUESTS_SQL,
+}
+
+
+@bp.get("/<int:club_id>/logs")
+@require_internal
+def club_logs(club_id: int):
+    """This club's activity log - ?category=member|event|request, one tab each.
+
+    Scoped to the CLUB, not to whoever is presiding: a new President reads the
+    same entries their predecessor did, including the handover that put them
+    there. That is the whole point of keeping it in a table rather than deriving
+    it from what the current President happens to be able to see.
+    """
+    principal = current_principal()
+    category = (request.args.get("category") or "member").strip()
+    if category not in CLUB_LOG_CATEGORIES:
+        raise BadRequest("category must be one of: member, event, request.")
+
+    with transaction() as cur:
+        if fetch_one(cur, "SELECT 1 FROM clubs WHERE club_id = %s", (club_id,)) is None:
+            raise NotFound("Club not found.")
+        # The President reads their own club's log; a Club Admin reads any. A plain
+        # member does not - the log names who was removed and by whom, which is the
+        # President's business and not the roster's.
+        if not (principal.is_admin or principal.has_role("club-admin")):
+            if not _is_president(cur, club_id, principal.user_id):
+                raise Forbidden("Only this club's President can view its logs.")
+
+        base = CLUB_LOG_CATEGORIES[category]
+        params: dict = {"club": club_id}
+        where = ["1 = 1"]
+
+        search = (request.args.get("q") or "").strip()
+        if search:
+            where.append(
+                '("subjectName" ILIKE %(q)s OR "subjectEmail" ILIKE %(q)s '
+                'OR coalesce("referenceTitle", \'\') ILIKE %(q)s)'
+            )
+            params["q"] = f"%{search}%"
+
+        action = (request.args.get("action") or "all").strip()
+        if action and action != "all":
+            where.append("action = %(action)s")
+            params["action"] = action
+
+        where_sql = " AND ".join(where)
+        total = fetch_one(
+            cur, f"SELECT count(*) AS c FROM ({base}) l WHERE {where_sql}", params
+        )["c"]
+        limit, offset = pagination()
+        rows = fetch_all(
+            cur,
+            f"""SELECT * FROM ({base}) l WHERE {where_sql}
+                ORDER BY {date_order('"occurredAt"')}, "subjectName"
+                LIMIT %(limit)s OFFSET %(offset)s""",
+            {**params, "limit": limit, "offset": offset},
+        )
+    return jsonify(paged(rows, total))

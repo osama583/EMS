@@ -321,6 +321,7 @@ export const routes: Routes = [
               { path: '', pathMatch: 'full', redirectTo: 'saved' },
               { path: 'saved', loadComponent: () => import('./features/my-events/my-events-tab/my-events-tab').then((module) => module.MyEventsTabComponent), data: { mode: 'saved' } },
               { path: 'registered', loadComponent: () => import('./features/my-events/my-events-tab/my-events-tab').then((module) => module.MyEventsTabComponent), data: { mode: 'registered' } },
+              { path: 'conducted', loadComponent: () => import('./features/my-events/my-events-tab/my-events-tab').then((module) => module.MyEventsTabComponent), data: { mode: 'conducted' } },
             ],
           },
           // Pending/history are centralized under /app/ongoing/events and /app/history/events.
@@ -414,6 +415,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/internal/pages/clubs/club-hub/club-hub').then((module) => module.ClubHubComponent),
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'my-clubs' },
+          {
+            path: 'my-clubs/previous',
+            loadComponent: () => import('./features/internal/pages/clubs/club-hub/hub-previous-clubs/hub-previous-clubs').then((module) => module.HubPreviousClubsComponent),
+            title: 'Previous Clubs | APU Events',
+          },
           {
             path: 'my-clubs',
             loadComponent: () => import('./features/internal/pages/clubs/club-hub/hub-my-clubs/hub-my-clubs').then((module) => module.HubMyClubsComponent),

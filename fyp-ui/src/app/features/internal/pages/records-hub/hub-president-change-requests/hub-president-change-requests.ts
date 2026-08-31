@@ -95,6 +95,10 @@ export class HubPresidentChangeRequestsComponent {
         { key: 'currentPresident', label: 'Current President', width: '15rem' },
         { key: 'requestedPresident', label: 'Requested President', width: '15rem' },
         { key: 'requested', label: 'Requested', width: '11rem', sortKey: 'createdAt' },
+        // History lists what has already been settled, so it also carries the date it was
+        // settled on - the moment the record left the inbox. Inbox and Ongoing hold rows that
+        // are by definition undecided, where the column would be empty on every row.
+        ...(this.bucket === 'history' ? [{ key: 'resolved', label: 'Decided', width: '11rem' }] as const : []),
         { key: 'status', label: 'Status', width: '9rem' },
         ...(admin && inbox ? [{ key: 'actions', label: 'Actions', actions: true, width: '9rem' }] as const : []),
       ],
@@ -117,6 +121,7 @@ export class HubPresidentChangeRequestsComponent {
       currentPresident: { primary: request.currentPresident.displayName, secondary: request.currentPresident.email },
       requestedPresident: { primary: request.requestedPresident.displayName, secondary: request.requestedPresident.email },
       requested: { primary: this.formatDate(request.createdAt) },
+      resolved: { primary: request.resolvedAt ? this.formatDate(request.resolvedAt) : '—' },
       status: { primary: STATUS_LABELS[request.status], badge: true, tone: STATUS_TONES[request.status] },
       actions: { primary: '' },
     },

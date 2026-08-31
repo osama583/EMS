@@ -16,7 +16,7 @@ import { PAGE_SIZE_OPTIONS, InternalPageHeaderConfig } from '../../../shared/com
 import { SkeletonComponent } from '../../../shared/components/skeleton/skeleton';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 
-export type MyEventsTabMode = 'saved' | 'pending' | 'registered' | 'history';
+export type MyEventsTabMode = 'saved' | 'pending' | 'registered' | 'history' | 'conducted';
 
 interface TabEntry {
   readonly event: PublishedEvent;
@@ -118,6 +118,7 @@ export class MyEventsTabComponent {
       case 'saved': return 'favorite';
       case 'pending': return 'hourglass_top';
       case 'registered': return 'event_available';
+      case 'conducted': return 'task_alt';
       default: return 'history';
     }
   });
@@ -127,6 +128,7 @@ export class MyEventsTabComponent {
       case 'saved': return 'No saved events yet';
       case 'pending': return 'No pending registrations';
       case 'registered': return 'No active registrations';
+      case 'conducted': return 'No conducted events yet';
       default: return 'No past events yet';
     }
   });
@@ -136,6 +138,7 @@ export class MyEventsTabComponent {
       case 'saved': return 'Use the heart on any event card to keep it here.';
       case 'pending': return 'Registrations for manual-approval events will appear here while you wait for the organizer to decide.';
       case 'registered': return 'Register for an event to see it appear here.';
+      case 'conducted': return 'An event you are registered for moves here on its own once it has finished.';
       default: return 'Events you attended will appear here once they end.';
     }
   });
@@ -193,9 +196,10 @@ export class MyEventsTabComponent {
     };
   }
 
-  private registrations(mode: 'pending' | 'registered' | 'history', params: EventSearchParams): Observable<RegisteredEventsResponse> {
+  private registrations(mode: 'pending' | 'registered' | 'history' | 'conducted', params: EventSearchParams): Observable<RegisteredEventsResponse> {
     if (mode === 'pending') return this.eventService.getPendingApprovalRegistrations(params);
     if (mode === 'registered') return this.eventService.getActiveRegistrations(params);
+    if (mode === 'conducted') return this.eventService.getConductedRegistrations(params);
     return this.eventService.getRegistrationHistory(params);
   }
 

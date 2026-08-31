@@ -1,13 +1,40 @@
 <app-form-modal
   [open]="open()"
-  [title]="(club()?.name ?? 'Club') + ' — Members'"
+  [title]="(club()?.name ?? 'Club') + (canViewLogs() ? '' : ' — Members')"
   [hidePrimary]="true"
   secondaryLabel="Close"
   (close)="close.emit()"
   (cancel)="close.emit()"
   (submit)="close.emit()"
 >
-  @if (loading()) {
+  @if (canViewLogs()) {
+    <nav class="shared-tabs club-roster__views" aria-label="Club views">
+      <button
+        type="button"
+        class="shared-tabs__tab"
+        [class.shared-tabs__tab--active]="view() === 'roster'"
+        [attr.aria-current]="view() === 'roster' ? 'page' : null"
+        (click)="setView('roster')"
+      >
+        <span class="material-symbols-rounded" aria-hidden="true">group</span>
+        Members
+      </button>
+      <button
+        type="button"
+        class="shared-tabs__tab"
+        [class.shared-tabs__tab--active]="view() === 'logs'"
+        [attr.aria-current]="view() === 'logs' ? 'page' : null"
+        (click)="setView('logs')"
+      >
+        <span class="material-symbols-rounded" aria-hidden="true">receipt_long</span>
+        Club Logs
+      </button>
+    </nav>
+  }
+
+  @if (view() === 'logs' && club(); as activeClub) {
+    <app-club-logs-panel [clubId]="activeClub.id" [active]="open() && view() === 'logs'" />
+  } @else if (loading()) {
     <div class="club-roster__loading" role="status" aria-label="Loading members">
       @for (line of [1, 2, 3]; track line) { <span></span> }
     </div>

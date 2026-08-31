@@ -1,0 +1,110 @@
+:host {
+  display: grid;
+  gap: var(--space-3);
+}
+
+// Inside a modal the strip has no page header above it to sit under, so it carries its own
+// bottom rule rather than relying on the one .shared-tabs draws against a page background.
+.club-logs__tabs {
+  margin-bottom: 0;
+}
+
+.club-logs__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-control);
+  background: var(--apu-surface);
+
+  &:focus-within {
+    border-color: var(--apu-blue-600);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--apu-blue-600) 18%, transparent);
+  }
+
+  > .material-symbols-rounded {
+    flex: 0 0 auto;
+    color: var(--apu-text-soft);
+    font-size: 1.15rem;
+  }
+
+  input {
+    width: 100%;
+    padding: var(--space-2) 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+
+    &:focus { outline: none; }
+    // The type=search clear affordance is drawn by the browser and ignores the field's colours.
+    &::-webkit-search-cancel-button { cursor: pointer; }
+  }
+}
+
+.club-logs__loading {
+  display: grid;
+  gap: var(--space-2);
+}
+.club-logs__loading span {
+  height: 3rem;
+  border-radius: var(--radius-control);
+  background: var(--apu-surface-muted);
+  animation: club-logs-pulse 1.4s ease-in-out infinite;
+}
+@keyframes club-logs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+
+.club-logs__message {
+  margin: 0;
+  padding: var(--space-4) 0;
+  color: var(--apu-text-muted);
+  text-align: center;
+}
+
+.club-logs__table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-container);
+}
+
+.club-logs__table {
+  min-width: 30rem;
+  border-radius: var(--radius-container);
+}
+
+.club-logs__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+
+  span {
+    color: var(--apu-text-muted);
+    font-size: var(--type-label);
+  }
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--apu-border);
+    border-radius: var(--radius-control);
+    background: var(--apu-surface);
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--type-label);
+
+    &:hover:not(:disabled) { background: var(--apu-surface-muted); }
+    &:disabled { opacity: .5; cursor: default; }
+  }
+}
+
+@media (max-width: 47.99rem) {
+  .club-logs__table { min-width: 26rem; }
+}

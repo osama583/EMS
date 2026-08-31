@@ -133,11 +133,14 @@ DELETION_RULES: dict[str, DeletionRule] = {
                 "{n} president change request(s) have been submitted",
             ),
         ),
-        # Only the two rows created by the act of creating the club itself: the president's own
-        # membership, and the categories picked on the form.
+        # Only the rows created by the act of creating the club itself: the president's own
+        # membership, the categories picked on the form, and the log entries those two writes
+        # produced. A club only reaches a purge with no members but its president and no join
+        # requests, so its log holds nothing but its own founding.
         owned_children=(
             ("club_category_links", "club_id"),
             ("club_members", "club_id"),
+            ("club_membership_log", "club_id"),
         ),
     ),
     # --- Accounts ---------------------------------------------------------

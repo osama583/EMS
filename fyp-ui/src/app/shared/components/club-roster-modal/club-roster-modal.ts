@@ -1,17 +1,22 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
 import { ClubMemberRecord, ClubRecord } from '../../../core/clubs/club.models';
 import { ClubService } from '../../../core/clubs/club.service';
 import { FormModalComponent } from '../form-modal/form-modal';
 import { ConfirmDialogComponent } from '../confirm-dialog/confirm-dialog';
+import { ClubLogsPanelComponent } from '../club-logs-panel/club-logs-panel';
 import { ToastService, apiErrorMessage } from '../toast/toast.service';
 
-// Roster popup opened from My Clubs — lets a member or President see who else belongs to a club (name,
-// email, role, date joined), read-only.
+// Club popup opened from My Clubs. Two views behind one modal: the roster (who belongs to this
+// club now, read-only for a member) and, for the President, the club's log — who joined, who left,
+// who handed over, what the club has proposed and what it has been asked.
+//
+// The log is a tab rather than a second modal because it answers questions about the same people
+// the roster lists: "when did they join" and "who else has been here" are one thought.
 @Component({
   selector: 'app-club-roster-modal',
-  imports: [FormModalComponent, ConfirmDialogComponent],
+  imports: [FormModalComponent, ConfirmDialogComponent, ClubLogsPanelComponent],
   templateUrl: './club-roster-modal.html',
   styleUrl: './club-roster-modal.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -27,6 +32,12 @@ export class ClubRosterModalComponent {
   // Emitted after a member is removed, so the parent can refresh its own club list (memberCount).
   readonly membershipChanged = output<void>();
 
+  readonly view = signal<'roster' | 'logs'>('roster');
+  // Only the President gets the log: it names who was removed and by whom, which is not the
+  // roster's business. The server enforces the same rule, so hiding the tab is presentation,
+  // not the access check.
+  readonly canViewLogs = computed(() => !!this.club()?.viewerIsPresident);
+
   readonly members = signal<readonly ClubMemberRecord[]>([]);
   readonly loading = signal(false);
   readonly errorMessage = signal('');
@@ -38,7 +49,14 @@ export class ClubRosterModalComponent {
       const club = this.club();
       if (this.open() && club) this.loadMembers(club.id);
     });
+    // Reopening on a different club must not leave the reader on a tab that club has no room
+    // for — a member's popup has no Logs tab to be parked on.
+    effect(() => {
+      if (!this.canViewLogs()) this.view.set('roster');
+    });
   }
+
+  setView(view: 'roster' | 'logs'): void { this.view.set(view); }
 
   private loadMembers(clubId: string): void {
     this.loading.set(true);
