@@ -1463,9 +1463,9 @@ def get_reminders():
 def set_reminders():
     """Merges over the existing row, so saving one toggle never resets another.
 
-    The client sends only the keys it changed (the Saved tab sends its two, the
-    Registered tab sends its one), which is why every field is optional and
-    falls back to the stored value - or to the default when no row exists yet.
+    The client sends only the toggle it changed, which is why every field is
+    optional and falls back to the stored value - or to the default when no row
+    exists yet.
     """
     principal = current_principal()
     payload = body()

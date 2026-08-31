@@ -63,7 +63,7 @@ export const routes: Routes = [
   },
   { path: 'saved-events', pathMatch: 'full', redirectTo: 'my-events/saved' },
   { path: 'registered-events', pathMatch: 'full', redirectTo: 'my-events/registered' },
-  { path: 'reminder-preferences', pathMatch: 'full', redirectTo: 'my-events/saved' },
+  { path: 'reminder-preferences', pathMatch: 'full', redirectTo: 'app/profile' },
   {
     path: 'app',
     canActivate: [authGuard],

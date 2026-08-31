@@ -3,10 +3,6 @@
     <app-internal-page-header [config]="headerConfig()" />
   }
 
-  @if (reminderScope(); as scope) {
-    <app-reminder-settings [scope]="scope" />
-  }
-
   <app-event-filter-bar
     [state]="filters"
     [resultCount]="total()"

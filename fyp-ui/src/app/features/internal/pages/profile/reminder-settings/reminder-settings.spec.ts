@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { environment } from '../../../../environments/environment';
+import { environment } from '../../../../../../environments/environment';
 import { ReminderSettingsComponent } from './reminder-settings';
 
 const URL = `${environment.apiBaseUrl}/events/me/reminders`;
@@ -12,12 +12,11 @@ const ALL_ON = {
   registeredStartingReminder: true,
 };
 
-function create(scope: 'saved' | 'registered'): {
+function create(): {
   fixture: ComponentFixture<ReminderSettingsComponent>;
   httpMock: HttpTestingController;
 } {
   const fixture = TestBed.createComponent(ReminderSettingsComponent);
-  fixture.componentRef.setInput('scope', scope);
   fixture.detectChanges();
   return { fixture, httpMock: TestBed.inject(HttpTestingController) };
 }
@@ -34,31 +33,28 @@ describe('ReminderSettingsComponent', () => {
     TestBed.inject(HttpTestingController).verify();
   });
 
-  it('shows only the toggles its own tab owns', () => {
-    const saved = create('saved');
-    expect(saved.fixture.componentInstance.toggles().map((t) => t.key)).toEqual([
+  it('shows every reminder, because the profile is now the only place to change one', () => {
+    const { fixture } = create();
+    expect(fixture.componentInstance.toggles.map((t) => t.key)).toEqual([
       'savedCapacityReminder',
       'savedStartingReminder',
-    ]);
-
-    const registered = create('registered');
-    expect(registered.fixture.componentInstance.toggles().map((t) => t.key)).toEqual([
       'registeredStartingReminder',
     ]);
   });
 
   it('costs no request until the panel is opened', () => {
-    const { fixture, httpMock } = create('saved');
-    // Every My Events tab mounts this component, so loading eagerly would put a
-    // request on a page the reader may never expand.
+    const { fixture, httpMock } = create();
+    // The profile is read for a name or a password far more often than it is
+    // read for a reminder, so loading eagerly would put a request on a page
+    // most readers never expand this panel on.
     httpMock.expectNone(URL);
 
     fixture.componentInstance.toggleOpen();
     httpMock.expectOne((r) => r.url === URL && r.method === 'GET').flush(ALL_ON);
   });
 
-  it('sends ONLY the changed toggle, so one tab cannot reset the other', () => {
-    const { fixture, httpMock } = create('saved');
+  it('sends ONLY the changed toggle, so a stale read cannot reset the others', () => {
+    const { fixture, httpMock } = create();
     fixture.componentInstance.toggleOpen();
     httpMock.expectOne((r) => r.method === 'GET').flush(ALL_ON);
 
@@ -67,8 +63,8 @@ describe('ReminderSettingsComponent', () => {
     } as unknown as Event);
 
     const put = httpMock.expectOne((r) => r.url === URL && r.method === 'PUT');
-    // The whole point: a partial body. Sending all three would let the Saved
-    // tab overwrite the Registered tab's setting.
+    // The whole point: a partial body. Sending all three would write back
+    // whatever this panel last read, overwriting a change made elsewhere.
     expect(put.request.body).toEqual({ savedCapacityReminder: false });
     put.flush({ ...ALL_ON, savedCapacityReminder: false });
 
@@ -77,7 +73,7 @@ describe('ReminderSettingsComponent', () => {
   });
 
   it('moves the switch immediately and restores it only if the write fails', () => {
-    const { fixture, httpMock } = create('registered');
+    const { fixture, httpMock } = create();
     fixture.componentInstance.toggleOpen();
     httpMock.expectOne((r) => r.method === 'GET').flush(ALL_ON);
 
@@ -96,7 +92,7 @@ describe('ReminderSettingsComponent', () => {
   });
 
   it('falls back to all-on when the preferences cannot be loaded', () => {
-    const { fixture, httpMock } = create('saved');
+    const { fixture, httpMock } = create();
     fixture.componentInstance.toggleOpen();
     httpMock
       .expectOne((r) => r.method === 'GET')
@@ -108,14 +104,14 @@ describe('ReminderSettingsComponent', () => {
     expect(fixture.componentInstance.loading()).toBe(false);
   });
 
-  it('counts only its own enabled toggles', () => {
-    const { fixture, httpMock } = create('saved');
+  it('counts the enabled reminders for the collapsed summary line', () => {
+    const { fixture, httpMock } = create();
     fixture.componentInstance.toggleOpen();
     httpMock
       .expectOne((r) => r.method === 'GET')
       .flush({ ...ALL_ON, savedCapacityReminder: false });
 
-    // 1 of the Saved tab's 2 - the Registered tab's toggle must not be counted.
-    expect(fixture.componentInstance.enabledCount()).toBe(1);
+    // Reads "2 of 3 on" under the heading.
+    expect(fixture.componentInstance.enabledCount()).toBe(2);
   });
 });

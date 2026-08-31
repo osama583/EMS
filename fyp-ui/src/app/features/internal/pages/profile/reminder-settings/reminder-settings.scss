@@ -1,8 +1,8 @@
-// Collapsed by default so it never competes with the event grid it sits above -
-// it is a setting, not the content of the page.
+// Collapsed by default: the summary line already says how many reminders are
+// on, so the profile shows the answer without the reader opening anything.
 :host {
   display: block;
-  margin-bottom: var(--space-3, 1rem);
+  max-width: 34rem;
 }
 
 .reminder-settings {

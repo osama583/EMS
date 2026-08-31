@@ -1,12 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DestroyRef } from '@angular/core';
-import { NotificationPreference, ReminderKey } from '../../../core/events/event-engagement.models';
-import { SavedEventsService } from '../../../core/events/saved-events.service';
-import { ToastService, apiErrorMessage } from '../../../shared/components/toast/toast.service';
-
-/** Which My Events tab this instance belongs to — decides which toggles it owns. */
-export type ReminderScope = 'saved' | 'registered';
+import { NotificationPreference, ReminderKey } from '../../../../../core/events/event-engagement.models';
+import { SavedEventsService } from '../../../../../core/events/saved-events.service';
+import { ToastService, apiErrorMessage } from '../../../../../shared/components/toast/toast.service';
 
 interface ToggleDefinition {
   readonly key: ReminderKey;
@@ -14,31 +11,27 @@ interface ToggleDefinition {
   readonly description: string;
 }
 
-// Each tab owns only its own reminders, so the Saved tab cannot switch off an
-// email about an event you are actually attending, and vice versa. Splitting
-// them this way is the whole point of the feature: "remind me about what I am
-// going to" and "nag me about what I bookmarked" are different appetites.
-const TOGGLES: Record<ReminderScope, readonly ToggleDefinition[]> = {
-  saved: [
-    {
-      key: 'savedCapacityReminder',
-      label: 'Tell me when a saved event is filling up',
-      description: 'Emailed once a saved event you have not registered for is nearly full.',
-    },
-    {
-      key: 'savedStartingReminder',
-      label: 'Remind me before a saved event I have not registered for',
-      description: 'A last nudge while there is still time to register.',
-    },
-  ],
-  registered: [
-    {
-      key: 'registeredStartingReminder',
-      label: 'Remind me before an event I am registered for',
-      description: 'So a date you have a place at does not pass you by.',
-    },
-  ],
-};
+// One list, one place. These three are a single row server-side, and they are
+// all configured here on the profile — "remind me before what I am going to"
+// and "nag me about what I bookmarked" are different appetites, but both are
+// account settings rather than properties of the list you happen to be reading.
+const TOGGLES: readonly ToggleDefinition[] = [
+  {
+    key: 'savedCapacityReminder',
+    label: 'Tell me when a saved event is filling up',
+    description: 'Emailed once a saved event you have not registered for is nearly full.',
+  },
+  {
+    key: 'savedStartingReminder',
+    label: 'Remind me before a saved event I have not registered for',
+    description: 'A last nudge while there is still time to register.',
+  },
+  {
+    key: 'registeredStartingReminder',
+    label: 'Remind me before an event I am registered for',
+    description: 'So a date you have a place at does not pass you by.',
+  },
+];
 
 @Component({
   selector: 'app-reminder-settings',
@@ -52,27 +45,26 @@ export class ReminderSettingsComponent {
   private readonly toast = inject(ToastService);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly scope = input.required<ReminderScope>();
-
   readonly open = signal(false);
   readonly loading = signal(false);
   readonly saving = signal<ReminderKey | null>(null);
   readonly preferences = signal<NotificationPreference | null>(null);
 
-  readonly toggles = computed(() => TOGGLES[this.scope()]);
+  readonly toggles = TOGGLES;
 
-  /** How many of THIS tab's reminders are on — drives the summary line. */
+  /** How many reminders are on — drives the summary line while collapsed. */
   readonly enabledCount = computed(() => {
     const preferences = this.preferences();
     if (!preferences) return 0;
-    return this.toggles().filter((toggle) => preferences[toggle.key]).length;
+    return this.toggles.filter((toggle) => preferences[toggle.key]).length;
   });
 
   toggleOpen(): void {
     const next = !this.open();
     this.open.set(next);
-    // Loaded on first open rather than on construction: a reader who never
-    // opens the panel costs no request, and every tab mounts this component.
+    // Loaded on first open rather than on construction: a reader who came to
+    // the profile for their name or their password costs no request for a
+    // panel they never expand.
     if (next && this.preferences() === null && !this.loading()) this.load();
   }
 
@@ -115,8 +107,9 @@ export class ReminderSettingsComponent {
     this.preferences.set({ ...previous, [key]: next });
     this.saving.set(key);
 
-    // Sends ONLY this key. The server merges it over the stored row, so this
-    // tab can never overwrite a toggle belonging to the other tab.
+    // Sends ONLY this key, which the server merges over the stored row - so a
+    // switch flipped against a stale read cannot carry the other two back with
+    // it.
     this.savedEvents
       .updateNotificationPreferences({ [key]: next })
       .pipe(takeUntilDestroyed(this.destroyRef))

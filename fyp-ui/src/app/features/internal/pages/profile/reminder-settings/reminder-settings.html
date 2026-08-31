@@ -11,9 +11,9 @@
       <strong>Email reminders</strong>
       <small>
         @if (preferences(); as prefs) {
-          {{ enabledCount() }} of {{ toggles().length }} on
+          {{ enabledCount() }} of {{ toggles.length }} on
         } @else {
-          Choose which emails this list sends you
+          Choose which emails we send you
         }
       </small>
     </span>
@@ -27,7 +27,7 @@
       @if (loading()) {
         <p class="reminder-settings__loading">Loading your settings…</p>
       } @else {
-        @for (toggle of toggles(); track toggle.key) {
+        @for (toggle of toggles; track toggle.key) {
           <label class="reminder-toggle">
             <input
               type="checkbox"
@@ -44,8 +44,7 @@
           </label>
         }
         <p class="reminder-settings__note">
-          These settings apply to this list only. Reminders are sent by email to the address on
-          your account.
+          Reminders are sent by email to the address on your account.
         </p>
       }
     </div>

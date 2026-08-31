@@ -15,7 +15,6 @@ import { InternalPageHeaderComponent, InternalPageStateComponent, InternalPagina
 import { PAGE_SIZE_OPTIONS, InternalPageHeaderConfig } from '../../../shared/components/internal-data-page/internal-data-page.models';
 import { SkeletonComponent } from '../../../shared/components/skeleton/skeleton';
 import { ToastService } from '../../../shared/components/toast/toast.service';
-import { ReminderScope, ReminderSettingsComponent } from '../reminder-settings/reminder-settings';
 
 export type MyEventsTabMode = 'saved' | 'pending' | 'registered' | 'history';
 
@@ -53,7 +52,6 @@ const DEFAULT_PAGE_SIZE = 10;
     InternalPageHeaderComponent,
     InternalPageStateComponent,
     InternalPaginationComponent,
-    ReminderSettingsComponent,
     SkeletonComponent,
   ],
   templateUrl: './my-events-tab.html',
@@ -106,14 +104,6 @@ export class MyEventsTabComponent {
 
   /** True once the reader has narrowed the list themself — changes what an empty result means. */
   readonly isFiltered = computed(() => this.filters.appliedCount() > 0 || !!this.filters.searchTerm().trim());
-
-  // Only the Saved and Registered tabs own reminder settings - pending/history
-  // are views of events whose reminders belong to one of those two lists, so
-  // showing the panel there would offer the same switch in three places.
-  readonly reminderScope = computed<ReminderScope | null>(() => {
-    const mode = this.mode();
-    return mode === 'saved' || mode === 'registered' ? mode : null;
-  });
 
   private readonly reloadTick = signal(0);
 

@@ -3,10 +3,11 @@ import { AuthService } from '../../../../core/auth/auth.service';
 import { UserAvatarComponent } from '../../../../shared/components/user-avatar/user-avatar';
 import { FormFieldComponent } from '../../../../shared/components/form-controls/form-field';
 import { ForgotPasswordModalComponent } from '../../../../shared/components/forgot-password-modal/forgot-password-modal';
+import { ReminderSettingsComponent } from './reminder-settings/reminder-settings';
 
 @Component({
   selector: 'app-profile',
-  imports: [UserAvatarComponent, FormFieldComponent, ForgotPasswordModalComponent],
+  imports: [UserAvatarComponent, FormFieldComponent, ForgotPasswordModalComponent, ReminderSettingsComponent],
   templateUrl: './profile.html',
   styleUrl: './profile.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
