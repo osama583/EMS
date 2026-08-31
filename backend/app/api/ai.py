@@ -96,6 +96,7 @@ from ..ai.knowledge_base import (
     role_capability_document,
     self_capability_document,
 )
+from ..ai.suggestions import DEFAULT_LIMIT as SUGGESTION_LIMIT, suggestions_for
 from ..ai.sql_llm import generate_sql_answer
 from ..ai.sql_runner import rows_to_document
 from ..config import config
@@ -635,3 +636,21 @@ def ask():
         "clubs": club_cards,
         "navigation": navigation_cards,
     })
+
+
+@bp.get("/suggestions")
+@limiter.limit("60 per minute")
+def suggestions():
+    """The opening suggestion cards, chosen for whoever is asking.
+
+    Deliberately its own endpoint rather than a field on /ask: the panel needs
+    these before any question exists, and the list is a function of the caller's
+    page grants alone.
+
+    Open to guests (authenticate_optional), who get the guest-open subset - the
+    same tier topic_access.GUEST_OPEN_TOPICS describes. Never returns an empty
+    array; see suggestions_for().
+    """
+    authenticate_optional()
+    principal = getattr(g, "principal", None)
+    return jsonify({"suggestions": suggestions_for(principal, limit=SUGGESTION_LIMIT)})

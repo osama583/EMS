@@ -108,7 +108,17 @@ export class RecordsHubComponent {
     return (this.bucket === 'ongoing' || this.bucket === 'history')
       && !!user && hasRole(user, 'student');
   });
-  readonly showEventsTab = computed(() => (this.bucket === 'ongoing' || this.bucket === 'history') && !!this.auth.user());
+
+  // Both halves of this tab are about REGISTERING for events: the registrations the viewer made,
+  // and the ones they decided on their own events as organiser. Doing either requires My Events,
+  // and Page Visibility does not grant My Events to a System Admin, Cafeteria Admin, CFO or
+  // cafeteria staff (seed/nav.py grants it to ALL_UNIT_ROLES only). The tab used to be shown to
+  // every signed-in user regardless, so those roles got an Events tab that could not, even in
+  // principle, ever hold a row — an admin opening History > Events was looking at an empty table
+  // for a feature they have no access to. Same canAccess() check showRegistrationsTab uses above,
+  // reading the already-loaded nav tree rather than naming roles.
+  readonly showEventsTab = computed(() =>
+    (this.bucket === 'ongoing' || this.bucket === 'history') && this.auth.canAccess('/app/events/my-events'));
 
   readonly title = this.bucket === 'inbox' ? 'Inbox' : this.bucket === 'ongoing' ? 'Ongoing' : 'History';
 

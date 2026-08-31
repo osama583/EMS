@@ -37,14 +37,20 @@ export class PresidentChangeRequestModalComponent {
   readonly candidateOptions = computed<readonly SelectOption[]>(() =>
     this.candidates().map((user) => ({ value: user.id, label: user.displayName, description: `Student · ${user.email}` })),
   );
-  readonly isValid = computed(() => this.selectedId().length > 0);
+  // A club carries at most one open request (uq_pcr_pending_per_club). When one is already
+  // open the modal reports it rather than offering a form whose only possible outcome is a
+  // 409 — the state comes from the club record itself, so it is right the moment the list is.
+  readonly alreadyPending = computed(() => this.club()?.hasPendingPresidentChange === true);
+  readonly isValid = computed(() => !this.alreadyPending() && this.selectedId().length > 0);
 
   constructor() {
     effect(() => {
       if (this.open() && this.club()) {
         this.selectedId.set('');
         this.errorMessage.set('');
-        this.loadCandidates();
+        // Nothing to pick from when the answer is "one is already open" — and the candidate
+        // list is a request this modal has no use for in that state.
+        if (!this.alreadyPending()) this.loadCandidates();
       }
     });
   }
@@ -61,7 +67,7 @@ export class PresidentChangeRequestModalComponent {
 
   submit(): void {
     const club = this.club();
-    if (!club || !this.isValid() || this.saving()) return;
+    if (!club || this.alreadyPending() || !this.isValid() || this.saving()) return;
     this.saving.set(true);
     this.errorMessage.set('');
     this.clubService.requestPresidentChange(club.id, this.selectedId())

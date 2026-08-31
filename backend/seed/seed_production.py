@@ -1522,8 +1522,16 @@ def seed_registrations(cur, ctx: Ctx, rng: random.Random, published: list[dict])
                     payment_status = "rejected"
                 else:
                     payment_status = "pending_review"
-                proof = f"/api/v1/uploads/receipt-{event['request_id']}-{user_id}.jpg"
-                proof_name = f"receipt-{user_id}.jpg"
+                # Every seeded receipt points at ONE real file that this function
+                # writes to the upload directory. It used to invent a per-user
+                # key ("receipt-{request}-{user}.jpg") that had never been
+                # uploaded and so was never on disk, which made every seeded
+                # proof link a 404: an organiser clicking "Payment approved" in
+                # Created by Me got the API's raw JSON error body instead of a
+                # receipt. A shared placeholder is honest about being sample
+                # data and, unlike a fabricated key, actually opens.
+                proof = f"/api/v1/uploads/{_placeholder_receipt_key()}"
+                proof_name = f"receipt-{user_id}.png"
             rows.append((event["request_id"], user_id, full_name, email, reason, status,
                          proof, proof_name, payment_status, registered_at, decided_by))
 
@@ -1539,6 +1547,35 @@ def seed_registrations(cur, ctx: Ctx, rng: random.Random, published: list[dict])
             )
             inserted += len(rows)
     return inserted
+
+
+_PLACEHOLDER_RECEIPT_KEY: str | None = None
+
+# A 1x1 PNG. The point is only that the URL resolves to a real, servable image -
+# sample registrations have no real receipt behind them, and pretending otherwise
+# with a fabricated key is what produced the broken links this replaces.
+_PLACEHOLDER_RECEIPT_PNG = bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
+    "890000000a49444154789c6360000002000100ffff03000006000557bfabd400"
+    "00000049454e44ae426082"
+)
+
+
+def _placeholder_receipt_key() -> str:
+    """Write the placeholder receipt into the upload directory once, and return
+    its storage key.
+
+    Content-addressed exactly as api/uploads.py does it, so the seeder and the
+    upload endpoint agree on where a file with these bytes lives and re-seeding
+    reuses the one file rather than accumulating copies.
+    """
+    global _PLACEHOLDER_RECEIPT_KEY
+    if _PLACEHOLDER_RECEIPT_KEY is None:
+        from app.api.uploads import UPLOAD_DIR, _store
+
+        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        _PLACEHOLDER_RECEIPT_KEY = _store(_PLACEHOLDER_RECEIPT_PNG, ".png")
+    return _PLACEHOLDER_RECEIPT_KEY
 
 
 def seed_engagement(cur, ctx: Ctx, rng: random.Random, published: list[dict]) -> tuple[int, int]:

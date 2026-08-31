@@ -48,8 +48,3 @@
   (confirm)="confirmDelete()" (cancel)="cancelDelete()"
 />
 
-<app-delete-confirm-dialog
-  [open]="!!purgeTargetId()" [permanent]="true" [entityKind]="entityLabel()" [entityLabel]="purgeTargetLabel()"
-  [checkingDependencies]="checkingPurge()" [preview]="purgePreview()" [deleting]="purging()"
-  (confirm)="confirmPurge()" (cancel)="cancelPurge()"
-/>

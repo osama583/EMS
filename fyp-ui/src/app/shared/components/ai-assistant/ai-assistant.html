@@ -204,7 +204,7 @@
             <div class="ai-suggestions" aria-label="Suggested questions">
               <p class="ai-suggestions__label">What would you like to know?</p>
               <div class="ai-suggestions__track">
-                @for (page of cardPages; track $index) {
+                @for (page of cardPages(); track $index) {
                   <div class="ai-suggestions__page">
                     @for (card of page; track card.title) {
                       <button type="button" class="ai-suggestion-card" (click)="selectCard(card)">
@@ -216,7 +216,11 @@
                   </div>
                 }
               </div>
-              <div class="ai-suggestions__dots" aria-hidden="true"><i></i><i></i></div>
+              @if (cardPages().length > 1) {
+                <div class="ai-suggestions__dots" aria-hidden="true">
+                  @for (page of cardPages(); track $index) { <i></i> }
+                </div>
+              }
             </div>
           }
         </div>

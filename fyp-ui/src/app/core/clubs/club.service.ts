@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { DeletionMetadata, DeletionPreview } from '../../shared/models/deletion.models';
-import { ClubCategoryName, ClubOption, ClubCategoryPage, ClubCategoryRecord, ClubDraft, ClubJoinRequestPage, ClubJoinRequestRecord, ClubMemberRecord, ClubMyStatus, ClubPage, ClubRecord, ClubSortKey, ClubUserSummary, PresidentChangeRequestPage, PresidentChangeRequestQuery, ClubLogCategory, ClubLogPage, PreviousClubPage, PreviousClubStatus } from './club.models';
+import { ClubCategoryName, ClubOption, ClubCategoryPage, ClubCategoryRecord, ClubCategoryStatus, ClubDraft, ClubJoinRequestPage, ClubJoinRequestRecord, ClubMemberRecord, ClubMyStatus, ClubPage, ClubRecord, ClubSortKey, ClubUserSummary, PresidentChangeRequestPage, PresidentChangeRequestQuery, ClubLogCategory, ClubLogPage, PreviousClubPage, PreviousClubStatus } from './club.models';
 
 @Injectable({ providedIn: 'root' })
 export class ClubService {
@@ -77,13 +77,16 @@ export class ClubService {
     return this.http.get<readonly ClubCategoryName[]>(`${this.baseUrl}/club-categories`, { params: { namesOnly: 'true' } });
   }
   // Server-side search/pagination for the /app/club-category management page — filtering, the
-  // active/inactive split, and the page slice all happen in SQL, not in the browser.
-  searchCategories(options: { search?: string; includeInactive?: boolean; page: number; pageSize: number; order?: 'asc' | 'desc' }): Observable<ClubCategoryPage> {
+  // active/inactive split, and the page slice all happen in SQL, not in the browser. `status` is
+  // sent verbatim ('active' | 'inactive' | 'all'), which is what lets `total` describe the same
+  // set as the rows: the page used to ask for the broader includeInactive result and narrow it
+  // again locally, so the pager counted rows the table was not showing.
+  searchCategories(options: { search?: string; status?: ClubCategoryStatus; page: number; pageSize: number; order?: 'asc' | 'desc' }): Observable<ClubCategoryPage> {
     const params: Record<string, string> = { page: String(options.page), pageSize: String(options.pageSize) };
     if (options.search) params['q'] = options.search;
     // Created is the only sortable column, so the server needs a direction, not a field.
     if (options.order) params['order'] = options.order;
-    if (options.includeInactive) params['includeInactive'] = 'true';
+    params['status'] = options.status ?? 'active';
     return this.http.get<ClubCategoryPage>(`${this.baseUrl}/club-categories/search`, { params });
   }
   createCategory(name: string, createdByUserId: string): Observable<ClubCategoryRecord> {

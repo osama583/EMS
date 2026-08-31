@@ -114,13 +114,6 @@ export class AdminDirectoryComponent {
   readonly deleting = signal(false);
   readonly restoringId = signal<string | null>(null);
 
-  // "Delete forever" (purge) — immediate and unrecoverable, alongside Restore in the Deleted tab.
-  readonly purgeTargetId = signal<string | null>(null);
-  readonly purgePreview = signal<DeletionPreview | null>(null);
-  readonly checkingPurge = signal(false);
-  readonly purgeTargetLabel = signal('');
-  readonly purging = signal(false);
-
   // ---------------------------------------------------------------------------
   // Assignments tab (Users entity only) — one row per user, each carrying every (unit, role) pair they
   // hold.
@@ -279,7 +272,6 @@ export class AdminDirectoryComponent {
       : [{ key: 'unit', label: 'Unit' }, { key: 'deletedAt', label: 'Deleted' }, { key: 'remaining', label: 'Permanent deletion' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [
       { key: 'restore', label: 'Restore', icon: 'restore_from_trash' },
-      { key: 'purge', label: 'Delete forever', icon: 'delete_forever' },
     ],
     emptyTitle: `No deleted ${this.entity}`, emptyDescription: `Records you delete will appear here for 7 days before being permanently removed.`,
   }));
@@ -513,7 +505,6 @@ export class AdminDirectoryComponent {
   }
   handleDeletedAction(event: InternalRowActionEvent): void {
     if (event.action.key === 'restore') { this.restoreTarget.set({ id: String(event.record.id), label: restoreLabelFor(event.record) }); return; }
-    if (event.action.key === 'purge') this.requestPurge(String(event.record.id));
   }
   // Users tab's relationship badge: a single relationship already shows in full, so only a
   // multi-badge ("N grants") needs a click target — opens the same read-only popover as the
@@ -619,46 +610,6 @@ export class AdminDirectoryComponent {
     });
   }
 
-  // "Delete forever" (purge) — immediate and unrecoverable, alongside Restore above.
-  requestPurge(id: string): void {
-    this.clearMessages();
-    const record = this.entity === 'users' ? this.deletedUsers().find((u) => u.id === id) : this.deletedUnits().find((u) => u.id === id);
-    this.purgeTargetLabel.set(record ? `"${this.entity === 'users' ? (record as Archived<AdminUserRecord>).displayName : (record as Archived<AdminUnitRecord>).name}"` : '');
-    this.purgeTargetId.set(id);
-    // Dependencies are re-checked server-side at purge time, so a record archived while unused
-    // can still be blocked now. Ask first, the same way delete does.
-    this.purgePreview.set(null);
-    this.checkingPurge.set(true);
-    const check = this.entity === 'users'
-      ? this.service.checkUserDeletion(id)
-      : this.service.checkUnitDeletion(id);
-    check.pipe(
-      finalize(() => this.checkingPurge.set(false)),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: (preview) => this.purgePreview.set(preview),
-      error: () => this.toast.error('Could not check record', 'Please try again.'),
-    });
-  }
-  cancelPurge(): void {
-    if (!this.purging()) { this.purgeTargetId.set(null); this.purgePreview.set(null); }
-  }
-  confirmPurge(): void {
-    const id = this.purgeTargetId();
-    if (!id) return;
-    this.purging.set(true);
-    const request: Observable<void> = this.entity === 'users' ? this.service.purgeUser(id) : this.service.purgeUnit(id);
-    request.pipe(finalize(() => this.purging.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        this.purgeTargetId.set(null);
-        this.purgePreview.set(null);
-        this.toast.success(`${this.entityKindLabel()} permanently deleted.`);
-        this.loadDeleted();
-      },
-      error: (err) => this.toast.error('The record could not be permanently deleted', apiErrorMessage(err, 'Please try again.')),
-    });
-  }
-
   private userDraft(): AdminUserDraft {
     return {
       displayName: this.value('displayName').trim(),
@@ -706,7 +657,7 @@ export class AdminDirectoryComponent {
   }); }
   private deletedUserRecords(): readonly InternalDataRecord[] { return this.deletedUsers().map((user) => ({
     id: user.id,
-    actionKeys: ['restore', 'purge'],
+    actionKeys: ['restore'],
     cells: {
       identity: { primary: user.displayName, secondary: user.email, avatar: this.initials(user.displayName) },
       deletedAt: { primary: this.formatDate(user.deletedAt) },
@@ -717,7 +668,7 @@ export class AdminDirectoryComponent {
   })); }
   private deletedUnitRecords(): readonly InternalDataRecord[] { return this.deletedUnits().map((unit) => ({
     id: unit.id,
-    actionKeys: ['restore', 'purge'],
+    actionKeys: ['restore'],
     cells: {
       unit: { primary: unit.name, secondary: unit.description },
       deletedAt: { primary: this.formatDate(unit.deletedAt) },

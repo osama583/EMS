@@ -26,7 +26,6 @@ export class ApiRequestOptionRepository implements RequestOptionRepository {
   checkOptionDeletion(id: string): Observable<DeletionPreview> { return this.http.get<DeletionPreview>(`${this.baseUrl}/${encodeURIComponent(id)}/deletion-check`); }
   deleteOption(id: string): Observable<RequestOption> { return this.http.delete<RequestOptionDto>(`${this.baseUrl}/${encodeURIComponent(id)}`).pipe(map(mapRequestOptionResponse)); }
   restoreOption(id: string): Observable<RequestOption> { return this.http.post<RequestOptionDto>(`${this.baseUrl}/${encodeURIComponent(id)}/restore`, {}).pipe(map(mapRequestOptionResponse)); }
-  purgeOption(id: string): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/${encodeURIComponent(id)}/purge`); }
   reorderOptions(kind: RequestOptionKind, ids: readonly string[]): Observable<readonly RequestOption[]> {
     return this.http.put<readonly RequestOptionDto[]>(`${this.baseUrl}/reorder`, { kind, ids }).pipe(map((options) => options.map(mapRequestOptionResponse)));
   }

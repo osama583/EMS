@@ -1,6 +1,8 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnDestroy, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { debounceTime, finalize, switchMap } from 'rxjs';
+import { ToastService, apiErrorMessage } from '../../../../shared/components/toast/toast.service';
 import { EventRegistration, PublishedEvent } from '../../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../../core/events/published-event.service';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
@@ -28,12 +30,14 @@ const DEFAULT_PAGE_SIZE = 10;
   styleUrl: './created-by-me.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class CreatedByMeComponent {
+export class CreatedByMeComponent implements OnDestroy {
   readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
   readonly pageSize = signal(DEFAULT_PAGE_SIZE);
   readonly placeholder = EVENT_IMAGE_PLACEHOLDER;
   private readonly events = inject(PublishedEventService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly http = inject(HttpClient);
+  private readonly toast = inject(ToastService);
 
   readonly loading = signal(true);
   readonly error = signal('');
@@ -149,5 +153,53 @@ export class CreatedByMeComponent {
     if (status === 'pending_review') return 'Payment awaiting review';
     if (status === 'rejected') return 'Payment rejected';
     return '';
+  }
+
+  // The row whose proof is currently being fetched, so the cell can say so and a
+  // double-click cannot start a second download.
+  readonly openingProofFor = signal<string | null>(null);
+  private readonly objectUrls: string[] = [];
+
+  /**
+   * Open a registrant's payment proof in a new tab.
+   *
+   * This used to be a plain <a href> straight at /api/v1/uploads/{key}. Uploads are
+   * content-addressed files on local disk, so any proof whose file is not there —
+   * a receipt uploaded before the volume was reset, or a row whose URL was written
+   * without a file ever being stored — navigated the reader to the API's raw JSON
+   * 404 body. Clicking "Payment approved" and landing on {"error":{"code":
+   * "not_found"...}} reads as the whole app breaking, when the true and much
+   * smaller fact is that one file is missing.
+   *
+   * Fetching it first turns that into a sentence. A proof that IS there opens
+   * exactly as before; one that is not says so and leaves the reader on the page,
+   * with the payment status they came to check still in front of them.
+   */
+  openPaymentProof(row: EventRegistration): void {
+    const url = row.paymentProofUrl;
+    if (!url || this.openingProofFor()) return;
+    this.openingProofFor.set(row.id);
+    this.http.get(url, { responseType: 'blob' }).pipe(
+      finalize(() => this.openingProofFor.set(null)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (file) => {
+        // Revoked on destroy rather than immediately: the new tab is still reading
+        // from this URL, and revoking it now would blank the tab we just opened.
+        const objectUrl = URL.createObjectURL(file);
+        this.objectUrls.push(objectUrl);
+        window.open(objectUrl, '_blank', 'noopener');
+      },
+      error: (err) => this.toast.error(
+        'That payment proof is no longer available',
+        err?.status === 404
+          ? `The file ${row.paymentProofFileName || 'attached to this registration'} is not in storage any more. The payment status on this row is unaffected.`
+          : apiErrorMessage(err, 'The file could not be opened. Please try again.'),
+      ),
+    });
+  }
+
+  ngOnDestroy(): void {
+    for (const url of this.objectUrls) URL.revokeObjectURL(url);
   }
 }

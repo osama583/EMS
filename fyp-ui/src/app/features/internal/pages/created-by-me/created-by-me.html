@@ -134,7 +134,9 @@
                 @if (!event.isFree) {
                   <td>
                     @if (row.paymentProofUrl) {
-                      <a [href]="row.paymentProofUrl" target="_blank" rel="noopener">{{ paymentStatusLabel(row.paymentStatus) || 'View proof' }}</a>
+                      <button type="button" class="created-by-me-info__proof" [disabled]="openingProofFor() === row.id" (click)="openPaymentProof(row)">
+                        {{ openingProofFor() === row.id ? 'Opening…' : (paymentStatusLabel(row.paymentStatus) || 'View proof') }}
+                      </button>
                     } @else {
                       {{ paymentStatusLabel(row.paymentStatus) || '—' }}
                     }

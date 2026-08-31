@@ -25,6 +25,7 @@ _ROLES_SQL = """
  LEFT JOIN unit u ON u.code = uur.unit_code
      WHERE uur.user_id = %s
        AND uur.is_active
+       AND uur.archived_at IS NULL
        AND r.archived_at IS NULL
   ORDER BY uur.user_unit_role_id
 """
@@ -64,6 +65,7 @@ _ACTIVE_INTERNAL_USERS_SQL = """
             WHERE external_role.user_id = u.user_id
               AND external_role.role_code = 'external-user'
               AND external_role.is_active
+              AND external_role.archived_at IS NULL
        )
   ORDER BY u.full_name
 """
@@ -73,7 +75,7 @@ _ALL_ACTIVE_ROLES_SQL = """
       FROM user_unit_roles uur
       JOIN role r ON r.role_code = uur.role_code
  LEFT JOIN unit u ON u.code = uur.unit_code
-     WHERE uur.is_active AND r.archived_at IS NULL
+     WHERE uur.is_active AND uur.archived_at IS NULL AND r.archived_at IS NULL
 """
 
 

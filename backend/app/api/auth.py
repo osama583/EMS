@@ -292,6 +292,7 @@ _INTERNAL_DIRECTORY_SQL = """
             WHERE external_role.user_id = u.user_id
               AND external_role.role_code = 'external-user'
               AND external_role.is_active
+              AND external_role.archived_at IS NULL
        )
   ORDER BY u.full_name
 """
@@ -303,7 +304,8 @@ _INTERNAL_DIRECTORY_ROLES_SQL = """
       JOIN role r ON r.role_code = uur.role_code
  LEFT JOIN unit un ON un.code = uur.unit_code
      WHERE uur.user_id = ANY(%s)
-       AND uur.is_active AND r.is_active AND r.archived_at IS NULL
+       AND uur.is_active AND uur.archived_at IS NULL
+       AND r.is_active AND r.archived_at IS NULL
   ORDER BY uur.user_id, uur.user_unit_role_id
 """
 
@@ -415,7 +417,7 @@ _DEV_USER_ROLES_SQL = """
       FROM user_unit_roles uur
       JOIN role r ON r.role_code = uur.role_code
  LEFT JOIN unit u ON u.code = uur.unit_code
-     WHERE r.archived_at IS NULL
+     WHERE uur.archived_at IS NULL AND r.archived_at IS NULL
   ORDER BY uur.user_id, uur.user_unit_role_id
 """
 

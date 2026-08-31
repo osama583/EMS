@@ -15,15 +15,13 @@ interface SuggestionCard { readonly icon: string; readonly title: string; readon
 const PROMPTS = ['Need help?', 'Have a question?', 'Want to create a request?', 'Questions about the process?'] as const;
 const GREETING = 'Hi! I can help you understand events, proposals, and the APU request process.';
 
-const SUGGESTION_CARDS: readonly SuggestionCard[] = [
-  { icon: 'help', title: 'Questions About the Process', description: 'Explain the complete event approval process.', prompt: 'Can you explain the complete event approval process?' },
-  { icon: 'badge', title: 'Who Can Apply?', description: 'Find out whether you are eligible to submit an event.', prompt: 'Who is eligible to submit an event proposal?' },
-  { icon: 'schedule', title: 'Approval Timeline', description: 'Learn how long the approval process typically takes.', prompt: 'How long does the approval process typically take?' },
-  { icon: 'event_available', title: 'Submission Deadline', description: 'Find out how long before the event you should submit your proposal.', prompt: 'How long before my event should I submit the proposal?' },
-  { icon: 'chat', title: 'Submit Through Chat', description: 'Let the AI guide you through creating and submitting an event proposal.', prompt: 'Can you guide me through creating and submitting an event proposal?' },
-  { icon: 'description', title: 'Required Documents', description: 'Discover what information and documents are required before submission.', prompt: 'What information and documents do I need before submission?' },
-  { icon: 'fact_check', title: 'Proposal Status', description: 'Check the status of an existing proposal and understand the current workflow stage.', prompt: 'How do I check the status of my existing proposal?' },
-  { icon: 'groups', title: 'Department Responsibilities', description: 'Learn which departments are involved and what each department is responsible for.', prompt: 'Which departments are involved and what is each one responsible for?' },
+// Shown only when GET /ai/suggestions cannot be reached. Deliberately the three questions that
+// need no access at all to answer — anything role-specific would be a guess about a reader whose
+// grants we just failed to load, and guessing is what the server-driven list exists to stop.
+const FALLBACK_SUGGESTION_CARDS: readonly SuggestionCard[] = [
+  { icon: 'quiz', title: 'What Can I Ask?', description: 'See the topics you can ask about with your access.', prompt: 'What can I ask you about?' },
+  { icon: 'account_circle', title: 'What Can I Do Here?', description: 'Find out what your account lets you do.', prompt: 'What can I do in this app with my account?' },
+  { icon: 'info', title: 'About This App', description: 'Understand what the platform is for.', prompt: 'What is this app for and what can it do?' },
 ];
 
 // Phone-width screens open the full-page assistant with its standing sidebar already collapsed to
@@ -35,10 +33,13 @@ function startsSidebarCollapsed(): boolean {
 }
 
 const CARDS_PER_PAGE = 4;
-const SUGGESTION_CARD_PAGES: readonly (readonly SuggestionCard[])[] = Array.from(
-  { length: Math.ceil(SUGGESTION_CARDS.length / CARDS_PER_PAGE) },
-  (_, page) => SUGGESTION_CARDS.slice(page * CARDS_PER_PAGE, page * CARDS_PER_PAGE + CARDS_PER_PAGE),
-);
+
+function paginateCards(cards: readonly SuggestionCard[]): readonly (readonly SuggestionCard[])[] {
+  return Array.from(
+    { length: Math.ceil(cards.length / CARDS_PER_PAGE) },
+    (_, page) => cards.slice(page * CARDS_PER_PAGE, page * CARDS_PER_PAGE + CARDS_PER_PAGE),
+  );
+}
 
 function newMessageId(): string { return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`; }
 
@@ -135,7 +136,12 @@ export class AiAssistantComponent implements OnDestroy {
   readonly error = signal('');
   readonly eyeX = signal(0);
   readonly eyeY = signal(0);
-  readonly cardPages = SUGGESTION_CARD_PAGES;
+  // Loaded from the server on first open (see loadSuggestions()) — what a reader may usefully ask
+  // depends on their role, and the panel used to offer everyone the same eight proposal questions
+  // regardless of whether they could submit a proposal at all.
+  readonly suggestionCards = signal<readonly SuggestionCard[]>(FALLBACK_SUGGESTION_CARDS);
+  readonly cardPages = computed(() => paginateCards(this.suggestionCards()));
+  private suggestionsRequested = false;
   // Card click opens the event details modal on top of the chat (chat stays open) instead of
   // navigating away — see openEventFromCard().
   readonly selectedCardEvent = signal<PublishedEvent | null>(null);
@@ -279,7 +285,28 @@ export class AiAssistantComponent implements OnDestroy {
     this.resetEyes();
     this.phase.set('visible');
     if (this.hideTimer) clearTimeout(this.hideTimer);
+    this.loadSuggestions();
     setTimeout(() => this.composer()?.nativeElement.focus(), 0);
+  }
+
+  /**
+   * Fetch the opening cards for whoever is signed in.
+   *
+   * On first open rather than at construction: the assistant is mounted on every page, so
+   * requesting them eagerly would put a call on every load for a panel most visits never open.
+   * Requested once per session — the cards follow the reader's page grants, which do not change
+   * mid-session, and re-fetching on each open would only re-render an identical list.
+   *
+   * A failure is silent by design: the fallback cards are already on screen and they are real,
+   * answerable questions, so there is nothing to warn about and nothing lost by saying nothing.
+   */
+  private loadSuggestions(): void {
+    if (this.suggestionsRequested) return;
+    this.suggestionsRequested = true;
+    this.assistant.suggestions().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (cards) => { if (cards.length) this.suggestionCards.set(cards); },
+      error: () => { /* keep the fallback cards */ },
+    });
   }
 
   closePanel(): void {

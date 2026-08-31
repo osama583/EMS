@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 export interface AiAssistantSource {
@@ -71,6 +71,16 @@ export interface AiAssistantAnswer {
   readonly navigation?: readonly AiAssistantNavigation[];
 }
 
+// One opening suggestion card. The set is chosen server-side from the caller's live page grants
+// (backend/app/ai/suggestions.py), so the panel offers each reader questions they can actually
+// have answered rather than one fixed proposal-shaped list shown to everybody.
+export interface AiAssistantSuggestion {
+  readonly icon: string;
+  readonly title: string;
+  readonly description: string;
+  readonly prompt: string;
+}
+
 // One prior turn, sent back to the server so it can resolve follow-up questions ("what about the
 // location?") — see backend/app/api/ai.py's history handling.
 export interface AiAssistantHistoryTurn {
@@ -86,5 +96,14 @@ export class AiAssistantService {
 
   ask(question: string, history: readonly AiAssistantHistoryTurn[] = []): Observable<AiAssistantAnswer> {
     return this.http.post<AiAssistantAnswer>(`${this.baseUrl}/ask`, { question, history });
+  }
+
+  // The opening cards for whoever is signed in — a separate request from ask() because the panel
+  // needs them before any question exists, and the list depends only on the caller's page grants.
+  // Open to guests, who get the guest-visible subset.
+  suggestions(): Observable<readonly AiAssistantSuggestion[]> {
+    return this.http
+      .get<{ suggestions: readonly AiAssistantSuggestion[] }>(`${this.baseUrl}/suggestions`)
+      .pipe(map((response) => response.suggestions ?? []));
   }
 }

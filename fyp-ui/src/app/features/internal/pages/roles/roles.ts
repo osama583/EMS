@@ -65,12 +65,6 @@ export class RolesComponent {
   readonly deleting = signal(false);
   readonly restoringCode = signal<string | null>(null);
 
-  // "Delete forever" (purge) — immediate and unrecoverable, alongside Restore in the Deleted tab.
-  readonly purgeTargetCode = signal<string | null>(null);
-  readonly purgePreview = signal<DeletionPreview | null>(null);
-  readonly checkingPurge = signal(false);
-  readonly purging = signal(false);
-
   readonly editingRole = computed(() => this.roles().find((role) => role.roleCode === this.editingCode()) ?? null);
   readonly editingProtected = computed(() => this.editingRole()?.isProtected ?? false);
   readonly derivedRoleCode = computed(() => deriveRoleCode(this.value('roleName')));
@@ -113,7 +107,7 @@ export class RolesComponent {
 
   readonly deletedRecords = computed<readonly InternalDataRecord[]>(() => this.deletedRoles().map((role) => ({
     id: role.roleCode,
-    actionKeys: ['restore', 'purge'],
+    actionKeys: ['restore'],
     cells: {
       identity: { primary: role.roleName, secondary: role.description || role.roleCode },
       deletedAt: { primary: this.formatDate(role.deletedAt) },
@@ -133,7 +127,6 @@ export class RolesComponent {
     columns: [{ key: 'identity', label: 'Role' }, { key: 'deletedAt', label: 'Deleted' }, { key: 'remaining', label: 'Permanent deletion' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [
       { key: 'restore', label: 'Restore', icon: 'restore_from_trash' },
-      { key: 'purge', label: 'Delete forever', icon: 'delete_forever' },
     ],
     emptyTitle: 'No deleted roles', emptyDescription: 'Roles you delete will appear here for 7 days before being permanently removed.',
   }));
@@ -186,7 +179,6 @@ export class RolesComponent {
   }
   handleDeletedAction(event: InternalRowActionEvent): void {
     if (event.action.key === 'restore') { this.restoreTarget.set({ id: String(event.record.id), label: restoreLabelFor(event.record) }); return; }
-    if (event.action.key === 'purge') this.requestPurge(String(event.record.id));
   }
   closeModal(): void { if (!this.saving()) this.modalOpen.set(false); }
   setDraft(key: string, value: string | boolean | readonly string[]): void { this.draft.update((draft) => ({ ...draft, [key]: value })); }
@@ -279,39 +271,6 @@ export class RolesComponent {
     this.service.restoreRole(code).pipe(finalize(() => this.restoringCode.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.toast.success('Role restored'); this.loadDeleted(); },
       error: (err) => this.toast.error('The role could not be restored', apiErrorMessage(err, 'Please try again.')),
-    });
-  }
-
-  purgeTargetLabel(): string {
-    const code = this.purgeTargetCode();
-    const role = code ? this.deletedRoles().find((r) => r.roleCode === code) : null;
-    return role ? `"${role.roleName}"` : '';
-  }
-  requestPurge(code: string): void {
-    this.clearMessages();
-    this.purgeTargetCode.set(code);
-    // The server re-checks dependencies at purge time, so a role archived while unused can
-    // still be blocked now. Ask, rather than letting the click fail with a bare toast.
-    this.purgePreview.set(null);
-    this.checkingPurge.set(true);
-    this.service.checkRoleDeletion(code).pipe(
-      finalize(() => this.checkingPurge.set(false)),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: (preview) => this.purgePreview.set(preview),
-      error: () => this.toast.error('Could not check role', 'Please try again.'),
-    });
-  }
-  cancelPurge(): void {
-    if (!this.purging()) { this.purgeTargetCode.set(null); this.purgePreview.set(null); }
-  }
-  confirmPurge(): void {
-    const code = this.purgeTargetCode();
-    if (!code) return;
-    this.purging.set(true);
-    this.service.purgeRole(code).pipe(finalize(() => this.purging.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.purgeTargetCode.set(null); this.purgePreview.set(null); this.toast.success('Role permanently deleted'); this.loadDeleted(); },
-      error: (err) => this.toast.error('The role could not be permanently deleted', apiErrorMessage(err, 'Please try again.')),
     });
   }
 

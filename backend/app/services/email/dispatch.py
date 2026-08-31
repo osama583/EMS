@@ -453,6 +453,31 @@ def club_join_decided(cur, join_request_id: int, *, approved: bool, comment: str
     )
 
 
+def club_member_removed(cur, club_id: int, member_user_id: int, *, by_president: bool) -> None:
+    """Tell someone their club membership was ended for them.
+
+    Only ever called for a removal performed by SOMEONE ELSE. Walking out is not
+    being shown out (the same distinction club_membership_log records), and
+    mailing a person to report an action they just took themselves is noise.
+    """
+    row = fetch_one(
+        cur,
+        "SELECT c.club_name, u.full_name AS member_name, u.email AS member_email "
+        "  FROM clubs c JOIN users u ON u.user_id = %s WHERE c.club_id = %s",
+        (member_user_id, club_id),
+    )
+    if row is None or not row["member_email"]:
+        return
+    _safe(
+        "club_membership_removed",
+        notifications.club_membership_removed,
+        member_email=row["member_email"],
+        member_name=row["member_name"],
+        club_name=row["club_name"],
+        removed_by="the club's President" if by_president else "a Club Administrator",
+    )
+
+
 # --- Approval escalation (migration 037) ------------------------------------
 # Unlike everything above, these are called from the daily job rather than from
 # inside a workflow transaction. They are still best-effort for the same reason:

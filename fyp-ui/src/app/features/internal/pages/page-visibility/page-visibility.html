@@ -193,11 +193,6 @@
   (confirm)="confirmRemoveGrant()" (cancel)="cancelRemoveGrant()"
 />
 
-<app-delete-confirm-dialog
-  [open]="!!purgeTargetCode()" [permanent]="true" entityKind="Page" [entityLabel]="purgeTargetLabel()"
-  [checkingDependencies]="checkingPurge()" [preview]="purgePreview()" [deleting]="purgingPage()"
-  (confirm)="confirmPurgePage()" (cancel)="cancelPurgePage()"
-/>
 
 <app-confirm-dialog
   [open]="restoreTarget() !== null"

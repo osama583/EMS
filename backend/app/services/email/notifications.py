@@ -799,6 +799,54 @@ def club_join_request_rejected(
     )
 
 
+def club_membership_removed(
+    *,
+    member_email: str,
+    member_name: str,
+    club_name: str,
+    removed_by: str,
+) -> bool:
+    """4.4 President/Club Admin removes a member -> the member.
+
+    The one club transition the member does not initiate and would otherwise
+    never be told about: their club simply stops appearing in My Clubs, and the
+    members-only events they could see yesterday quietly vanish from the
+    calendar. Being removed is also the one case where "you can ask to join
+    again" is genuinely useful and not a brush-off - nothing here bars them
+    from reapplying, so the mail says so.
+
+    Deliberately carries NO reason: unlike a rejected join request, removal has
+    no comment field to quote, and inventing an explanation on the club's behalf
+    would be worse than leaving it to them to give in person. `removed_by` names
+    the authority, not the individual - "the club's President" rather than a
+    name, so the mail does not read as pointing a finger.
+    """
+    subject = f"Your membership of {club_name} has ended"
+    body = [
+        render.paragraph(f"Dear {render.escape_name(member_name)},"),
+        render.paragraph(
+            f"You have been removed from {render.escape_name(club_name)} by {removed_by}. "
+            "Your membership has ended, so the club will no longer appear in My Clubs and you "
+            "will stop seeing its members-only events."
+        ),
+        render.paragraph(
+            "If you think this was a mistake, speak to the club directly - nothing stops you "
+            "asking to join again from Discover Clubs."
+        ),
+    ]
+    return send(
+        to=member_email,
+        subject=subject,
+        html=render.render(
+            subject=subject,
+            preheader=f"Your membership of {club_name} has ended",
+            body_paragraphs=body,
+            cta_label="Browse clubs",
+            cta_link=f"{_APP_URL_PLACEHOLDER}/app/clubs",
+        ),
+    )
+
+
 # --------------------------------------------------------------------------
 # 5. Event reminders (time- and capacity-driven)
 #

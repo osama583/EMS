@@ -169,7 +169,6 @@ export class EventCatalogSectionComponent {
   }
 
   // ---------------------------------------------------------------------------
-  // Delete (soft) / Deleted tab / Restore / Delete forever (purge) — mirrors page-visibility.ts's
   // deleteTarget/deletePreview/deletedPages structure.
   readonly deleteTarget = signal<EventCatalogEntry | null>(null);
   readonly deletePreview = signal<DeletionPreview | null>(null);
@@ -179,7 +178,7 @@ export class EventCatalogSectionComponent {
   readonly deletedLoading = computed(() => this.service().deletedLoading());
   readonly deletedRecords = computed<readonly InternalDataRecord[]>(() => this.service().deletedEntries().map((entry) => ({
     id: entry.id,
-    actionKeys: ['restore', 'purge'],
+    actionKeys: ['restore'],
     cells: {
       identity: { primary: entry.name, secondary: entry.code },
       deletedAt: { primary: this.formatDate(entry.deletedAt) },
@@ -199,7 +198,6 @@ export class EventCatalogSectionComponent {
     columns: [{ key: 'identity', label: this.entityLabel() }, { key: 'deletedAt', label: 'Deleted' }, { key: 'remaining', label: 'Permanent deletion' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [
       { key: 'restore', label: 'Restore', icon: 'restore_from_trash' },
-      { key: 'purge', label: 'Delete forever', icon: 'delete_forever' },
     ],
     emptyTitle: `No deleted ${this.entityLabelPlural().toLowerCase()}`, emptyDescription: `${this.entityLabelPlural()} you delete will appear here for 7 days before being permanently removed.`,
   }));
@@ -243,7 +241,6 @@ export class EventCatalogSectionComponent {
   handleDeletedAction(event: InternalRowActionEvent): void {
     const id = String(event.record.id);
     if (event.action.key === 'restore') { this.restore(id); return; }
-    if (event.action.key === 'purge') this.requestPurge(id);
   }
   restore(id: string): void {
     this.clearMessages();
@@ -251,46 +248,6 @@ export class EventCatalogSectionComponent {
     this.service().restore(id).pipe(finalize(() => this.restoringId.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => this.toast.success(`${this.entityLabel()} restored.`),
       error: (err) => this.toast.error(err?.error?.message || `The ${this.entityLabel().toLowerCase()} could not be restored.`),
-    });
-  }
-
-  readonly purgeTargetId = signal<string | null>(null);
-  readonly purgePreview = signal<DeletionPreview | null>(null);
-  readonly checkingPurge = signal(false);
-  readonly purging = signal(false);
-  requestPurge(id: string): void {
-    this.clearMessages();
-    this.purgeTargetId.set(id);
-    // Dependencies are re-checked server-side at purge time, so ask before offering the button.
-    this.purgePreview.set(null);
-    this.checkingPurge.set(true);
-    this.service().checkDeletion(id).pipe(
-      finalize(() => this.checkingPurge.set(false)),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: (preview) => this.purgePreview.set(preview),
-      error: () => this.toast.error('Could not check entry', 'Please try again.'),
-    });
-  }
-  cancelPurge(): void {
-    if (!this.purging()) { this.purgeTargetId.set(null); this.purgePreview.set(null); }
-  }
-  purgeTargetLabel(): string {
-    const id = this.purgeTargetId();
-    const entry = id ? this.service().deletedEntries().find((e) => e.id === id) : null;
-    return entry ? `"${entry.name}"` : '';
-  }
-  confirmPurge(): void {
-    const id = this.purgeTargetId();
-    if (!id) return;
-    this.purging.set(true);
-    this.service().purge(id).pipe(finalize(() => this.purging.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => {
-        this.purgeTargetId.set(null);
-        this.purgePreview.set(null);
-        this.toast.success(`${this.entityLabel()} permanently deleted.`);
-      },
-      error: (err) => this.toast.error(err?.error?.message || `The ${this.entityLabel().toLowerCase()} could not be permanently deleted.`),
     });
   }
 

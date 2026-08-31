@@ -61,10 +61,6 @@ export class CafeteriaManageComponent {
   readonly deletedCafeterias = signal<readonly Archived<Cafeteria>[]>([]);
   readonly deletedLoading = signal(false);
   readonly restoringCode = signal<string | null>(null);
-  readonly purgeTargetCode = signal<string | null>(null);
-  readonly purgePreview = signal<DeletionPreview | null>(null);
-  readonly checkingPurge = signal(false);
-  readonly purging = signal(false);
 
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.total() / this.pageSize())));
   readonly records = computed<readonly InternalDataRecord[]>(() => this.cafeteriaRecords());
@@ -96,7 +92,7 @@ export class CafeteriaManageComponent {
 
   readonly deletedRecords = computed<readonly InternalDataRecord[]>(() => this.deletedCafeterias().map((c) => ({
     id: c.code,
-    actionKeys: ['restore', 'purge'],
+    actionKeys: ['restore'],
     cells: {
       identity: { primary: c.name, secondary: c.code },
       deletedAt: { primary: this.formatDate(c.deletedAt) },
@@ -116,7 +112,6 @@ export class CafeteriaManageComponent {
     columns: [{ key: 'identity', label: 'Cafeteria' }, { key: 'deletedAt', label: 'Deleted' }, { key: 'remaining', label: 'Permanent deletion' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [
       { key: 'restore', label: 'Restore', icon: 'restore_from_trash' },
-      { key: 'purge', label: 'Delete forever', icon: 'delete_forever' },
     ],
     emptyTitle: 'No deleted cafeterias', emptyDescription: 'Cafeterias you delete will appear here for 7 days before being permanently removed.',
   }));
@@ -185,7 +180,6 @@ export class CafeteriaManageComponent {
   }
   handleDeletedAction(event: InternalRowActionEvent): void {
     if (event.action.key === 'restore') { this.restoreTarget.set({ id: String(event.record.id), label: restoreLabelFor(event.record) }); return; }
-    if (event.action.key === 'purge') this.requestPurge(String(event.record.id));
   }
   closeModal(): void { if (!this.saving()) this.modalOpen.set(false); }
   setName(value: string): void { this.draft.update((d) => ({ ...d, name: value })); }
@@ -262,39 +256,6 @@ export class CafeteriaManageComponent {
     this.service.restore(code).pipe(finalize(() => this.restoringCode.set(null)), takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => { this.toast.success('Cafeteria restored'); this.loadDeleted(); },
       error: (err) => this.toast.error('The cafeteria could not be restored', apiErrorMessage(err, 'Please try again.')),
-    });
-  }
-
-  purgeTargetLabel(): string {
-    const code = this.purgeTargetCode();
-    const cafeteria = code ? this.deletedCafeterias().find((c) => c.code === code) : null;
-    return cafeteria ? `"${cafeteria.name}"` : '';
-  }
-  requestPurge(code: string): void {
-    this.clearMessages();
-    this.purgeTargetCode.set(code);
-    // The server re-checks dependencies at purge time, so a cafeteria can be blocked here even
-    // though it was clean when it was archived. Ask first, for the same reason delete does.
-    this.purgePreview.set(null);
-    this.checkingPurge.set(true);
-    this.service.checkDeletion(code).pipe(
-      finalize(() => this.checkingPurge.set(false)),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: (preview) => this.purgePreview.set(preview),
-      error: () => this.toast.error('Could not check cafeteria', 'Please try again.'),
-    });
-  }
-  cancelPurge(): void {
-    if (!this.purging()) { this.purgeTargetCode.set(null); this.purgePreview.set(null); }
-  }
-  confirmPurge(): void {
-    const code = this.purgeTargetCode();
-    if (!code) return;
-    this.purging.set(true);
-    this.service.purge(code).pipe(finalize(() => this.purging.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.purgeTargetCode.set(null); this.purgePreview.set(null); this.toast.success('Cafeteria permanently deleted'); this.loadDeleted(); },
-      error: (err) => { this.purgeTargetCode.set(null); this.purgePreview.set(null); this.toast.error('The cafeteria could not be permanently deleted', apiErrorMessage(err, 'Please try again.')); },
     });
   }
 

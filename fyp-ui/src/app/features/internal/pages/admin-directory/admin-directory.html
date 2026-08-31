@@ -79,11 +79,6 @@
   (confirm)="confirmDelete()" (cancel)="cancelDelete()"
 />
 
-<app-delete-confirm-dialog
-  [open]="!!purgeTargetId()" [permanent]="true" [entityKind]="entityKindLabel()" [entityLabel]="purgeTargetLabel()"
-  [checkingDependencies]="checkingPurge()" [preview]="purgePreview()" [deleting]="purging()"
-  (confirm)="confirmPurge()" (cancel)="cancelPurge()"
-/>
 
 @if (entity === 'users') {
   <app-form-modal

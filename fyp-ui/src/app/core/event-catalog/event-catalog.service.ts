@@ -54,7 +54,6 @@ export abstract class EventCatalogEntryService {
   checkDeletion(id: string): Observable<DeletionPreview> { return this.repository.checkEntryDeletion(this.resource, id); }
   delete(id: string): Observable<EventCatalogEntry> { return this.repository.deleteEntry(this.resource, id).pipe(tap(() => this.refresh())); }
   restore(id: string): Observable<EventCatalogEntry> { return this.repository.restoreEntry(this.resource, id).pipe(tap(() => { this.refresh(); this.loadDeleted(); })); }
-  purge(id: string): Observable<void> { return this.repository.purgeEntry(this.resource, id).pipe(tap(() => this.loadDeleted())); }
 }
 
 @Injectable({ providedIn: 'root' })

@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { debounceTime, finalize, Subject, switchMap } from 'rxjs';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { ClubService } from '../../../../core/clubs/club.service';
-import { ClubCategoryRecord } from '../../../../core/clubs/club.models';
+import { ClubCategoryRecord, ClubCategoryStatus } from '../../../../core/clubs/club.models';
 import { DeletionMetadata, DeletionPreview } from '../../../../shared/models/deletion.models';
 import { FormFieldComponent } from '../../../../shared/components/form-controls/form-field';
 import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
@@ -40,7 +40,7 @@ export class ClubCategoryManagementComponent {
   readonly loading = signal(true);
   readonly errorMessage = signal('');
   readonly search = signal('');
-  readonly statusFilter = signal<'active' | 'inactive'>('active');
+  readonly statusFilter = signal<ClubCategoryStatus>('all');
   readonly page = signal(1);
   readonly pageSize = signal(10);
   // Created is the only sortable column on this table; oldest first, so the
@@ -104,9 +104,16 @@ export class ClubCategoryManagementComponent {
     emptyTitle: 'No deleted categories', emptyDescription: 'Categories you delete will appear here for 7 days before being permanently removed.',
   }));
 
+  // "All" leads and is the default: the question this page is opened with is "what categories are
+  // there", and answering it used to mean reading Active, then Inactive, and holding both lists in
+  // your head — the one view that showed the whole table did not exist.
   readonly filters = computed(() => [{
     key: 'status', ariaLabel: 'Filter categories by status', value: this.statusFilter(),
-    options: [{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }],
+    options: [
+      { value: 'all', label: 'All' },
+      { value: 'active', label: 'Active' },
+      { value: 'inactive', label: 'Inactive' },
+    ],
   }]);
 
   readonly records = computed<readonly InternalDataRecord[]>(() => this.categories().map((category) => ({
@@ -150,7 +157,7 @@ export class ClubCategoryManagementComponent {
         this.loading.set(true);
         return this.clubService.searchCategories({
           search: this.search().trim(),
-          includeInactive: this.statusFilter() === 'inactive',
+          status: this.statusFilter(),
           page: this.page(),
           pageSize: this.pageSize(),
           order: this.sort().order,
@@ -159,11 +166,12 @@ export class ClubCategoryManagementComponent {
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: (result) => {
-        // "Inactive" is a subset of includeInactive's broader result, so the active/inactive split
-        // itself still happens here rather than asking the server for two different boolean shapes.
-        const items = this.statusFilter() === 'inactive' ? result.items.filter((item) => !item.active) : result.items;
-        this.categories.set(items);
-        this.total.set(this.statusFilter() === 'inactive' ? items.length : result.total);
+        // Taken exactly as returned. The status filter is now a real query param, so the server
+        // decides the set, counts it and slices it — the page no longer re-filters the response
+        // (which made `total` count rows the table was not showing, and left the last page of an
+        // "Inactive" view mostly empty).
+        this.categories.set(result.items);
+        this.total.set(result.total);
         this.totalPages.set(Math.max(1, result.totalPages));
       },
       error: () => { this.errorMessage.set('Categories could not be loaded. Please try again.'); this.loading.set(false); },
@@ -175,11 +183,11 @@ export class ClubCategoryManagementComponent {
 
   setSearch(value: string): void { this.search.set(value); this.page.set(1); this.triggerReload(); }
   setFilter(change: InternalFilterChange): void {
-    if (change.key === 'status') this.statusFilter.set(change.value as 'active' | 'inactive');
+    if (change.key === 'status') this.statusFilter.set(change.value as ClubCategoryStatus);
     this.page.set(1);
     this.triggerReload();
   }
-  reset(): void { this.search.set(''); this.statusFilter.set('active'); this.page.set(1); this.triggerReload(); }
+  reset(): void { this.search.set(''); this.statusFilter.set('all'); this.page.set(1); this.triggerReload(); }
   setPage(page: number): void { this.page.set(Math.max(1, Math.min(page, this.totalPages()))); this.triggerReload(); }
   setPageSize(size: number): void { this.pageSize.set(size); this.page.set(1); this.triggerReload(); }
 

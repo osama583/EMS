@@ -42,7 +42,6 @@ export class RequestOptionService {
   checkDeletion(id: string): Observable<DeletionPreview> { return this.repository.checkOptionDeletion(id); }
   delete(id: string): Observable<RequestOption> { return this.repository.deleteOption(id).pipe(tap(() => this.refresh())); }
   restore(id: string): Observable<RequestOption> { return this.repository.restoreOption(id).pipe(tap(() => this.refresh())); }
-  purge(id: string): Observable<void> { return this.repository.purgeOption(id).pipe(tap(() => this.refresh())); }
   reorder(kind: RequestOptionKind, ids: readonly string[]): Observable<readonly RequestOption[]> { return this.repository.reorderOptions(kind, ids).pipe(tap(() => this.refresh())); }
 
   // Every Inside University venue dropdown in the system reads this, and only this.

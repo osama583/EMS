@@ -139,7 +139,6 @@ export interface RequestOptionRepository {
   checkOptionDeletion(id: string): import('rxjs').Observable<import('../../shared/models/deletion.models').DeletionPreview>;
   deleteOption(id: string): import('rxjs').Observable<RequestOption>;
   restoreOption(id: string): import('rxjs').Observable<RequestOption>;
-  purgeOption(id: string): import('rxjs').Observable<void>;
   getDeletedOptions(): import('rxjs').Observable<readonly ArchivedRequestOption[]>;
   // Whole-list write: the caller sends the order it wants and the server assigns
   // the positions, so two managers reordering at once cannot interleave into a

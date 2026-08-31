@@ -5,6 +5,11 @@ export interface ClubUserSummary {
   readonly email: string;
 }
 
+// The three views of the club-category table. 'all' is the default a reader wants when the
+// question is "what categories are there" — the two single-status views could only answer half
+// of it each.
+export type ClubCategoryStatus = 'active' | 'inactive' | 'all';
+
 export interface ClubCategoryRecord {
   readonly id: string;
   readonly name: string;
@@ -51,6 +56,10 @@ export interface ClubRecord {
   // The date the VIEWER joined this club — null for a club they do not belong to.
   // Drives the "Member Since" column on Discover Clubs.
   readonly viewerMemberSince?: string | null;
+  // Whether a president-change request for this club is still awaiting a Club Admin's decision.
+  // A club may hold only one at a time (uq_pcr_pending_per_club), so this is what stops My Clubs
+  // offering "Request President change" a second time and collecting a 409.
+  readonly hasPendingPresidentChange?: boolean;
 }
 
 /** Mirrors ClubCategoryPage — the envelope for the server-paginated /clubs/search list. */

@@ -455,7 +455,7 @@ def purge_expired(entities: Iterator[str] | None = None) -> dict[str, dict[str, 
 # (migration 023) but deliberately NOT registered in DELETION_RULES: the "has
 # this ever been used" check is scoped to a specific unit_code (an order claimed
 # AT THIS OUTLET), which the generic used_by() helper above cannot express, so
-# cafeterias.py keeps its own bespoke _assignment_blockers().
+# assignment_blockers() below states it by hand instead.
 #
 # It still has to be swept, so it lives here as its own function rather than in
 # the cron script - both the script and POST /admin/purge-deleted call it, and a
@@ -479,12 +479,57 @@ def expired_assignments(cur) -> list[dict]:
     return list(cur.fetchall())
 
 
+def assignment_blockers(cur, user_id: int, unit_code: str) -> list[str]:
+    """What this person has actually DONE at this outlet - the posting's version
+    of check_dependencies().
+
+    Scoped to the outlet, not to the person, and that is the whole reason this
+    cannot be a DELETION_RULES entry: used_by() counts every row pointing at a
+    key, but a posting's key is (user, unit) together. A cook who claimed fifty
+    orders at Main Cafeteria has done nothing at Annexe, and removing their
+    Annexe posting takes no history with it.
+
+    Deliberately counts settled work as well as outstanding work, matching
+    used_by()'s rule: a fulfilled order is proof the posting meant something to
+    somebody, and deleting it would blank a name out of that order's record.
+    Suspending the posting (is_active = FALSE) remains the answer for anyone who
+    has worked a shift here.
+    """
+    blockers: list[str] = []
+    claimed = fetch_one(
+        cur,
+        "SELECT count(*) AS c FROM request_fmb_selection "
+        " WHERE claimed_by_user_id = %s AND unit_code = %s",
+        (user_id, unit_code),
+    )["c"]
+    if claimed:
+        blockers.append(f"{claimed} catering order(s) at this cafeteria were claimed by this person")
+
+    tasks = fetch_one(
+        cur,
+        "SELECT count(*) AS c FROM task_assignment ta "
+        "  JOIN request_task rt ON rt.request_task_id = ta.request_task_id "
+        " WHERE ta.staff_user_id = %s AND rt.assigned_unit_code = %s",
+        (user_id, unit_code),
+    )["c"]
+    if tasks:
+        blockers.append(f"{tasks} task(s) at this cafeteria are assigned to this person")
+
+    resolved = fetch_one(
+        cur,
+        "SELECT count(*) AS c FROM request_task "
+        " WHERE resolved_by_user_id = %s AND assigned_unit_code = %s",
+        (user_id, unit_code),
+    )["c"]
+    if resolved:
+        blockers.append(f"{resolved} task(s) at this cafeteria were decided by this person")
+    return blockers
+
+
 def purge_expired_assignments() -> dict[str, int]:
     """Same contract as purge_expired()'s per-entity value: one transaction per
     row, blockers re-checked immediately before deletion, one bad row never ends
     the sweep."""
-    from ..api.cafeterias import _assignment_blockers
-
     with transaction() as cur:
         rows = expired_assignments(cur)
 
@@ -492,7 +537,7 @@ def purge_expired_assignments() -> dict[str, int]:
     for row in rows:
         try:
             with transaction() as cur:
-                blockers = _assignment_blockers(cur, row["key"], row["user_id"], row["unit_code"])
+                blockers = assignment_blockers(cur, row["user_id"], row["unit_code"])
                 if blockers:
                     blocked += 1
                     log.info(

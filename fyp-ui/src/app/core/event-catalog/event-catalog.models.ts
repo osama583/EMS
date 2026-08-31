@@ -25,6 +25,5 @@ export interface EventCatalogRepository {
   checkEntryDeletion(id: string): Observable<DeletionPreview>;
   deleteEntry(id: string): Observable<EventCatalogEntry>;
   restoreEntry(id: string): Observable<EventCatalogEntry>;
-  purgeEntry(id: string): Observable<void>;
   getDeletedEntries(): Observable<readonly ArchivedEventCatalogEntry[]>;
 }

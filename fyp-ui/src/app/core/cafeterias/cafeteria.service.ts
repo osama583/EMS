@@ -57,7 +57,8 @@ export class CafeteriaService {
     return this.http.get<DeletionPreview>(`${this.baseUrl}/${encodeURIComponent(code)}/deletion-check`);
   }
   // Soft-delete — kept recoverable for 7 days, same lifecycle as every other Admin Settings
-  // entity (see cafeterias.routes.js's GET /deleted, POST /:code/restore, DELETE /:code/purge).
+  // entity (see cafeterias.py's GET /deleted and POST /{code}/restore). Permanent removal is
+  // the 7-day sweep's job, not a button on the Deleted tab.
   delete(code: string): Observable<Cafeteria> {
     return this.http.delete<Cafeteria>(`${this.baseUrl}/${encodeURIComponent(code)}`).pipe(tap(() => this.refresh()));
   }
@@ -66,9 +67,6 @@ export class CafeteriaService {
   }
   restore(code: string): Observable<Cafeteria> {
     return this.http.post<Cafeteria>(`${this.baseUrl}/${encodeURIComponent(code)}/restore`, {}).pipe(tap(() => this.refresh()));
-  }
-  purge(code: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/${encodeURIComponent(code)}/purge`).pipe(tap(() => this.refresh()));
   }
   // What this posting's holder has actually done at this outlet — orders claimed, tasks assigned.
   checkAssignmentDeletion(assignmentId: string): Observable<DeletionPreview> {
@@ -109,15 +107,12 @@ export class CafeteriaService {
     return this.http.delete<void>(`${this.baseUrl}/assignments/${encodeURIComponent(assignmentId)}`).pipe(tap(() => this.refresh()));
   }
   // Soft-delete — kept recoverable for 7 days, same lifecycle as every other soft-deletable
-  // entity (see cafeterias.py's list_deleted_assignments/restore_assignment/purge_assignment).
+  // entity (see cafeterias.py's list_deleted_assignments/restore_assignment).
   getDeletedAssignments(): Observable<readonly (CafeteriaAssignment & DeletionMetadata)[]> {
     return this.http.get<readonly (CafeteriaAssignment & DeletionMetadata)[]>(`${this.baseUrl}/assignments/deleted`);
   }
   restoreAssignment(assignmentId: string): Observable<CafeteriaAssignment> {
     return this.http.post<CafeteriaAssignment>(`${this.baseUrl}/assignments/${encodeURIComponent(assignmentId)}/restore`, {}).pipe(tap(() => this.refresh()));
-  }
-  purgeAssignment(assignmentId: string): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/assignments/${encodeURIComponent(assignmentId)}/purge`).pipe(tap(() => this.refresh()));
   }
 
   // Server-side searched/filtered/sorted/paginated audit trail of staff create/edit/suspend/

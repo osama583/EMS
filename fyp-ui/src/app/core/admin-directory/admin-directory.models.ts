@@ -111,7 +111,6 @@ export interface AdminDirectoryRepository {
   checkUserDeletion(id: string): import('rxjs').Observable<DeletionPreview>;
   deleteUser(id: string): import('rxjs').Observable<AdminUserRecord>;
   restoreUser(id: string): import('rxjs').Observable<AdminUserRecord>;
-  purgeUser(id: string): import('rxjs').Observable<void>;
   getDeletedUsers(): import('rxjs').Observable<readonly Archived<AdminUserRecord>[]>;
   getUserAssignments(userId: string): import('rxjs').Observable<readonly AdminUserAssignment[]>;
   assignRole(userId: string, roleCode: string, unitCode?: string): import('rxjs').Observable<readonly AdminUserAssignment[]>;
@@ -124,7 +123,6 @@ export interface AdminDirectoryRepository {
   checkUnitDeletion(id: string): import('rxjs').Observable<DeletionPreview>;
   deleteUnit(id: string): import('rxjs').Observable<AdminUnitRecord>;
   restoreUnit(id: string): import('rxjs').Observable<AdminUnitRecord>;
-  purgeUnit(id: string): import('rxjs').Observable<void>;
   getDeletedUnits(): import('rxjs').Observable<readonly Archived<AdminUnitRecord>[]>;
   getRoles(): import('rxjs').Observable<readonly AdminRoleRecord[]>;
   createRole(draft: AdminRoleDraft): import('rxjs').Observable<AdminRoleRecord>;
@@ -132,7 +130,6 @@ export interface AdminDirectoryRepository {
   checkRoleDeletion(code: string): import('rxjs').Observable<DeletionPreview>;
   deleteRole(code: string): import('rxjs').Observable<AdminRoleRecord>;
   restoreRole(code: string): import('rxjs').Observable<AdminRoleRecord>;
-  purgeRole(code: string): import('rxjs').Observable<void>;
   getDeletedRoles(): import('rxjs').Observable<readonly Archived<AdminRoleRecord>[]>;
   getNavPages(): import('rxjs').Observable<readonly AdminNavPageRecord[]>;
   createNavPage(draft: AdminNavPageDraft): import('rxjs').Observable<AdminNavPageRecord>;
@@ -140,7 +137,6 @@ export interface AdminDirectoryRepository {
   checkNavPageDeletion(code: string): import('rxjs').Observable<DeletionPreview>;
   deleteNavPage(code: string): import('rxjs').Observable<AdminNavPageRecord>;
   restoreNavPage(code: string): import('rxjs').Observable<AdminNavPageRecord>;
-  purgeNavPage(code: string): import('rxjs').Observable<void>;
   getDeletedNavPages(): import('rxjs').Observable<readonly Archived<AdminNavPageRecord>[]>;
   eligibleRolesForUnits(unitCodes: readonly string[]): import('rxjs').Observable<readonly AdminRoleRecord[]>;
   addNavPageGrant(pageCode: string, draft: AdminNavPageGrantDraft): import('rxjs').Observable<AdminNavPageGrant>;

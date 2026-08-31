@@ -139,6 +139,11 @@ export class HubMyClubsComponent {
   }
 
   openPresidentChange(club: ClubRecord): void { this.presidentChangeClub.set(club); }
+  // A club holds at most one pending president-change request. Before this, the menu item was
+  // offered unconditionally and the President had no way to see the request they had already
+  // sent was still open — so the second attempt came back 409 for doing exactly what the page
+  // invited them to do. The modal reports the pending request instead of the form.
+  hasPendingPresidentChange(club: ClubRecord): boolean { return club.hasPendingPresidentChange === true; }
   closePresidentChange(): void { this.presidentChangeClub.set(null); }
   onPresidentChangeSubmitted(): void { this.presidentChangeClub.set(null); }
 

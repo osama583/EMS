@@ -43,6 +43,10 @@ export class ApiPaymentProofUploadService implements PaymentProofUploadApi {
         fileName: request.file.name,
         mimeType: request.file.type,
         sizeBytes: request.file.size,
+        // A receipt is stored and linked, never rendered in an <img>, so PDF is
+        // allowed here and nowhere else. Without this the server took images
+        // only, and the PDF the upload form openly offers was rejected.
+        kind: 'document',
         dataUrl,
       })),
       map((response) => ({ url: response.url, fileName: request.file.name })),

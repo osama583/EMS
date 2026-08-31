@@ -6,6 +6,9 @@
     DELETE               /catalog/cafeterias/{code}/purge
     GET/POST             /catalog/cafeterias/assignments
     PUT/DELETE           /catalog/cafeterias/assignments/{id}
+    GET                  /catalog/cafeterias/assignments/{id}/deletion-check
+    GET                  /catalog/cafeterias/assignments/deleted
+    POST                 /catalog/cafeterias/assignments/{id}/restore
     GET                  /catalog/cafeterias/assignable-users
     GET                  /catalog/cafeterias/staff-requests-history
 
@@ -20,6 +23,12 @@ TWO AUTHORITIES, both able to write directly:
                       remove staff at their own outlet directly - scoped to
                       their own cafeteria code and to the 'cafeteria-staff'
                       role only (they cannot appoint a peer manager).
+
+An outlet may hold more than one manager, and the last one cannot be removed,
+suspended or moved away (_assert_not_last_manager). The two rules are a pair: a
+cafeteria with nobody running it has no one to answer its catering orders, so a
+handover has to install the successor before retiring the incumbent, which is
+only possible if both may hold the role at once.
 """
 from __future__ import annotations
 
@@ -32,6 +41,7 @@ from ..errors import BadRequest, Conflict, Forbidden, NotFound
 from ..logging_setup import audit
 from ..security import require_auth, require_internal
 from ..security.passwords import MAX_PASSWORD_BYTES, hash_password
+from ..services import soft_delete
 from ..services.email import notifications
 from ..security.principal import current_principal
 from ._helpers import body, flag, paged, pagination, required
@@ -383,7 +393,10 @@ _ASSIGNMENT_FROM = """
     JOIN users u ON u.user_id = uur.user_id
     JOIN unit un ON un.code = uur.unit_code
 """
-_ASSIGNMENT_SELECT = f"SELECT {_ASSIGNMENT_COLUMNS} {_ASSIGNMENT_FROM} WHERE uur.role_code = ANY(%s) AND un.archived_at IS NULL"
+_ASSIGNMENT_SELECT = (
+    f"SELECT {_ASSIGNMENT_COLUMNS} {_ASSIGNMENT_FROM} "
+    "WHERE uur.role_code = ANY(%s) AND un.archived_at IS NULL AND uur.archived_at IS NULL"
+)
 
 
 def _shape_assignments(rows: list[dict]) -> list[dict]:
@@ -421,7 +434,7 @@ def list_assignments():
     (already role-scoped) array as before, for any caller that still wants
     that - only Staff Assignments sends them.
     """
-    where = ["uur.role_code = ANY(%s)", "un.archived_at IS NULL"]
+    where = ["uur.role_code = ANY(%s)", "un.archived_at IS NULL", "uur.archived_at IS NULL"]
     params: list = [list(STAFF_ROLES)]
     if not _is_cafeteria_admin():
         managed = _managed_codes()
@@ -510,26 +523,58 @@ def _assert_assignable(cur, user_id: int, cafeteria_code: str, role_code: str,
     clash = fetch_one(
         cur,
         "SELECT 1 FROM user_unit_roles WHERE user_id = %s AND role_code = ANY(%s) "
-        "AND (%s::bigint IS NULL OR user_unit_role_id <> %s)",
+        "AND archived_at IS NULL AND (%s::bigint IS NULL OR user_unit_role_id <> %s)",
         (user_id, list(STAFF_ROLES), exclude_assignment, exclude_assignment),
     )
     if clash:
         raise Conflict("That user already staffs a cafeteria. Remove that assignment first.")
 
-    # One manager per outlet: two would each believe the roster is theirs.
-    if role_code == "cafeteria-manager":
-        existing = fetch_one(
-            cur,
-            "SELECT u.full_name FROM user_unit_roles r JOIN users u ON u.user_id = r.user_id "
-            "WHERE r.unit_code = %s AND r.role_code = 'cafeteria-manager' "
-            "  AND (%s::bigint IS NULL OR r.user_unit_role_id <> %s)",
-            (cafeteria_code, exclude_assignment, exclude_assignment),
-        )
-        if existing:
-            raise Conflict(
-                f"{existing['full_name']} already manages this cafeteria. "
-                "Remove that assignment first."
-            )
+    # An outlet may briefly hold TWO managers, deliberately. It used to be capped
+    # at one, which read as tidy but made a handover impossible to perform
+    # safely: the only way to install a successor was to remove the incumbent
+    # first, leaving the outlet unmanaged in between - and _assert_not_last_manager()
+    # below now refuses exactly that removal. Appointing the successor first and
+    # retiring the incumbent second is the sequence those two rules describe
+    # together, so the cap has to go for either of them to be satisfiable.
+
+
+def _assert_not_last_manager(cur, assignment_id: int, unit_code: str, role_code: str,
+                             *, action: str) -> None:
+    """Refuse to leave an outlet with nobody running it.
+
+    A cafeteria with no manager has no one to approve its catering orders, no
+    one who can hire or suspend its staff, and no addressee for the emails the
+    workflow sends it - the orders simply queue up unanswered. Losing the last
+    manager is therefore not a staffing change, it is an outage, and it is
+    almost always a step someone meant to pair with appointing a replacement.
+
+    So the replacement comes first: _assert_assignable() lets a second manager
+    be appointed alongside the incumbent precisely so this check passes when the
+    incumbent is then retired. `action` names what was refused ("removed",
+    "suspended", "moved") so the message tells the caller which click to undo.
+
+    Only counts LIVE, ACTIVE postings - an archived or suspended manager cannot
+    approve anything, so being succeeded by one is the same outage.
+    """
+    if role_code != "cafeteria-manager":
+        return
+    others = fetch_one(
+        cur,
+        "SELECT count(*) AS c FROM user_unit_roles uur JOIN users u ON u.user_id = uur.user_id "
+        " WHERE uur.unit_code = %s AND uur.role_code = 'cafeteria-manager' "
+        "   AND uur.user_unit_role_id <> %s AND uur.archived_at IS NULL AND uur.is_active "
+        "   AND u.is_active AND u.archived_at IS NULL",
+        (unit_code, assignment_id),
+    )["c"]
+    if others:
+        return
+    outlet = fetch_one(cur, "SELECT description FROM unit WHERE code = %s", (unit_code,))
+    name = (outlet and outlet["description"]) or unit_code
+    raise Conflict(
+        f"This is the only Cafeteria Manager for {name}, so the posting cannot be {action}. "
+        "Assign another manager to this cafeteria first - both can hold the role while you "
+        "hand over."
+    )
 
 
 @bp.post("/assignments")
@@ -602,7 +647,7 @@ def update_assignment(assignment_id: int):
         existing = fetch_one(
             cur,
             "SELECT user_id, unit_code, role_code FROM user_unit_roles "
-            "WHERE user_unit_role_id = %s AND role_code = ANY(%s)",
+            "WHERE user_unit_role_id = %s AND role_code = ANY(%s) AND archived_at IS NULL",
             (assignment_id, list(STAFF_ROLES)),
         )
         if existing is None:
@@ -615,6 +660,14 @@ def update_assignment(assignment_id: int):
             cur, existing["user_id"], str(cafeteria_code), str(role_code),
             exclude_assignment=assignment_id,
         )
+        # Moving this posting to another outlet, or demoting it to staff, takes a
+        # manager off its current cafeteria exactly as removing it would.
+        if existing["role_code"] == "cafeteria-manager" and (
+            cafeteria_code != existing["unit_code"] or role_code != "cafeteria-manager"
+        ):
+            _assert_not_last_manager(
+                cur, assignment_id, existing["unit_code"], existing["role_code"], action="moved",
+            )
         cur.execute(
             "UPDATE user_unit_roles SET unit_code = %s, role_code = %s "
             "WHERE user_unit_role_id = %s",
@@ -655,12 +708,17 @@ def set_assignment_status(assignment_id: int):
         existing = fetch_one(
             cur,
             "SELECT user_id, unit_code, role_code FROM user_unit_roles "
-            "WHERE user_unit_role_id = %s AND role_code = ANY(%s)",
+            "WHERE user_unit_role_id = %s AND role_code = ANY(%s) AND archived_at IS NULL",
             (assignment_id, list(STAFF_ROLES)),
         )
         if existing is None:
             raise NotFound("Assignment not found.")
         _assert_may_staff(existing["unit_code"], existing["role_code"])
+        if not payload["active"]:
+            _assert_not_last_manager(
+                cur, assignment_id, existing["unit_code"], existing["role_code"],
+                action="suspended",
+            )
         cur.execute(
             "UPDATE user_unit_roles SET is_active = %s "
             "WHERE user_unit_role_id = %s AND role_code = ANY(%s)",
@@ -680,29 +738,82 @@ def set_assignment_status(assignment_id: int):
     return jsonify(_assignment_response(assignment_id))
 
 
+def _load_assignment(cur, assignment_id: int, *, archived: bool = False) -> dict:
+    """One posting, live or binned, with the details every delete path reports."""
+    row = fetch_one(
+        cur,
+        "SELECT uur.user_id, uur.unit_code, uur.role_code, u.full_name, u.email "
+        "  FROM user_unit_roles uur JOIN users u ON u.user_id = uur.user_id "
+        " WHERE uur.user_unit_role_id = %s AND uur.role_code = ANY(%s) "
+        f"   AND uur.archived_at IS {'NOT NULL' if archived else 'NULL'}",
+        (assignment_id, list(STAFF_ROLES)),
+    )
+    if row is None:
+        raise NotFound(
+            "No deleted assignment with that id." if archived else "Assignment not found."
+        )
+    return row
+
+
+def _assignment_delete_blockers(cur, assignment_id: int, row: dict) -> list[str]:
+    """Everything that refuses this delete: work done here, and the outage rule.
+
+    soft_delete.assignment_blockers() answers "has this posting been used",
+    scoped to the outlet. The last-manager rule is a second, different refusal -
+    the posting may be brand new and still be the only thing keeping the outlet
+    running - so it is folded in here rather than left to surprise the caller
+    after the confirm dialog already said yes.
+    """
+    blockers = soft_delete.assignment_blockers(cur, row["user_id"], row["unit_code"])
+    try:
+        _assert_not_last_manager(
+            cur, assignment_id, row["unit_code"], row["role_code"], action="removed",
+        )
+    except Conflict as exc:
+        blockers.append(str(exc))
+    return blockers
+
+
+@bp.get("/assignments/<int:assignment_id>/deletion-check")
+@require_internal
+def assignment_deletion_check(assignment_id: int):
+    """What deleting this posting would run into. Shown before the click, so a
+    posting that cannot go explains itself in the dialog rather than the delete
+    being refused after it."""
+    with transaction() as cur:
+        row = _load_assignment(cur, assignment_id)
+        _assert_may_staff(row["unit_code"], row["role_code"])
+        blockers = _assignment_delete_blockers(cur, assignment_id, row)
+    return jsonify(
+        {"canDelete": not blockers, "blockingReasons": blockers, "entityLabel": row["full_name"]}
+    )
+
+
 @bp.delete("/assignments/<int:assignment_id>")
 @require_internal
 def delete_assignment(assignment_id: int):
-    """Remove a posting outright. A Cafeteria Manager may do this for their
-    own outlet's staff."""
+    """Retire a posting. A Cafeteria Manager may do this for their own outlet's
+    staff.
+
+    Soft delete, which is what migration 023 added the column for: the row is
+    stamped rather than removed, so a mis-click stays recoverable for
+    RETENTION_DAYS and the sweep performs the permanent removal. `is_active` is
+    deliberately left alone - archived_at is what every live read now filters
+    on, and preserving the suspend flag means a restore brings the posting back
+    exactly as it was found.
+    """
     with transaction() as cur:
-        existing = fetch_one(
-            cur,
-            "SELECT uur.user_id, uur.unit_code, uur.role_code, u.full_name, u.email "
-            "FROM user_unit_roles uur JOIN users u ON u.user_id = uur.user_id "
-            "WHERE uur.user_unit_role_id = %s AND uur.role_code = ANY(%s)",
-            (assignment_id, list(STAFF_ROLES)),
-        )
-        if existing is None:
-            raise NotFound("Assignment not found.")
+        existing = _load_assignment(cur, assignment_id)
         _assert_may_staff(existing["unit_code"], existing["role_code"])
+        blockers = _assignment_delete_blockers(cur, assignment_id, existing)
+        if blockers:
+            raise Conflict(blockers[0])
         cur.execute(
-            "DELETE FROM user_unit_roles WHERE user_unit_role_id = %s AND role_code = ANY(%s) "
-            "RETURNING user_id, unit_code",
+            "UPDATE user_unit_roles SET archived_at = now() "
+            "WHERE user_unit_role_id = %s AND role_code = ANY(%s) AND archived_at IS NULL",
             (assignment_id, list(STAFF_ROLES)),
         )
-        row = cur.fetchone()
-        if row is None:
+        if cur.rowcount == 0:
             raise NotFound("Assignment not found.")
         _record_staff_audit(
             cur, cafeteria_code=existing["unit_code"], action="remove",
@@ -710,8 +821,70 @@ def delete_assignment(assignment_id: int):
             target_email=existing["email"], role_code=existing["role_code"],
         )
         audit("cafeterias.assignment.deleted", assignment_id=assignment_id,
-              target_user_id=row["user_id"], actor_user_id=current_principal().user_id)
+              target_user_id=existing["user_id"], actor_user_id=current_principal().user_id)
     return "", 204
+
+
+@bp.get("/assignments/deleted")
+@require_internal
+def list_deleted_assignments():
+    """The bin: postings awaiting a restore or the sweep, scoped to the caller's
+    own outlets exactly like the live list."""
+    where = ["uur.role_code = ANY(%s)", "uur.archived_at IS NOT NULL"]
+    params: list = [list(STAFF_ROLES)]
+    if not _is_cafeteria_admin():
+        managed = _managed_codes()
+        if not managed:
+            raise Forbidden("You do not manage a cafeteria.")
+        where.append("uur.unit_code = ANY(%s)")
+        params.append(sorted(managed))
+    rows = query(
+        f"SELECT {_ASSIGNMENT_COLUMNS},"
+        '       uur.archived_at AS "deletedAt",'
+        '       (uur.archived_at + make_interval(days => %s)) AS "permanentDeletionAt",'
+        "       GREATEST(0, %s - EXTRACT(DAY FROM now() - uur.archived_at)::int)"
+        '           AS "daysRemaining"'
+        f" {_ASSIGNMENT_FROM} WHERE {' AND '.join(where)} ORDER BY uur.archived_at DESC",
+        [RETENTION_DAYS, RETENTION_DAYS, *params],
+    )
+    return jsonify(_shape_assignments(rows))
+
+
+@bp.post("/assignments/<int:assignment_id>/restore")
+@require_internal
+def restore_assignment(assignment_id: int):
+    """Bring a posting back out of the bin.
+
+    Refused when the person has taken a LIVE posting in the meantime:
+    uq_user_unit_roles_live (migration 024) would reject the write anyway, and a
+    unique-violation 500 is a worse answer than saying what happened.
+    """
+    with transaction() as cur:
+        existing = _load_assignment(cur, assignment_id, archived=True)
+        _assert_may_staff(existing["unit_code"], existing["role_code"])
+        clash = fetch_one(
+            cur,
+            "SELECT 1 FROM user_unit_roles WHERE user_id = %s AND role_code = ANY(%s) "
+            "  AND archived_at IS NULL",
+            (existing["user_id"], list(STAFF_ROLES)),
+        )
+        if clash:
+            raise Conflict(
+                f"{existing['full_name']} already staffs a cafeteria. "
+                "Remove that posting before restoring this one."
+            )
+        cur.execute(
+            "UPDATE user_unit_roles SET archived_at = NULL WHERE user_unit_role_id = %s",
+            (assignment_id,),
+        )
+        _record_staff_audit(
+            cur, cafeteria_code=existing["unit_code"], action="restore",
+            target_user_id=existing["user_id"], target_display_name=existing["full_name"],
+            target_email=existing["email"], role_code=existing["role_code"],
+        )
+        audit("cafeterias.assignment.restored", assignment_id=assignment_id,
+              actor_user_id=current_principal().user_id)
+    return jsonify(_assignment_response(assignment_id))
 
 
 def _hash_new_password(plaintext: str) -> str:
@@ -785,6 +958,23 @@ def _apply_user_detail_changes(cur, user_id: int, req: dict) -> None:
         fields["password"] = req["payload_password_hash"]
     if not fields:
         return
+
+    # Switching the ACCOUNT off takes its postings down with it, so the outlet is
+    # left unmanaged exactly as removing the posting would leave it - the Edit
+    # Staff form is simply another way to reach that state, and it has to be
+    # refused from here too.
+    if fields.get("is_active") is False:
+        for row in fetch_all(
+            cur,
+            "SELECT user_unit_role_id, unit_code, role_code FROM user_unit_roles "
+            " WHERE user_id = %s AND role_code = 'cafeteria-manager' "
+            "   AND archived_at IS NULL AND is_active",
+            (user_id,),
+        ):
+            _assert_not_last_manager(
+                cur, row["user_unit_role_id"], row["unit_code"], row["role_code"],
+                action="deactivated",
+            )
 
     email = fields.get("email")
     if email and fetch_one(

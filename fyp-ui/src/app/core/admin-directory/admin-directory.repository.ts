@@ -17,7 +17,6 @@ export class ApiAdminDirectoryRepository implements AdminDirectoryRepository {
   checkUserDeletion(id: string): Observable<DeletionPreview> { return this.http.get<DeletionPreview>(`${this.baseUrl}/users/${encodeURIComponent(id)}/deletion-check`); }
   deleteUser(id: string): Observable<AdminUserRecord> { return this.http.delete<AdminUserRecord>(`${this.baseUrl}/users/${encodeURIComponent(id)}`); }
   restoreUser(id: string): Observable<AdminUserRecord> { return this.http.post<AdminUserRecord>(`${this.baseUrl}/users/${encodeURIComponent(id)}/restore`, {}); }
-  purgeUser(id: string): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/users/${encodeURIComponent(id)}/purge`); }
   getDeletedUsers(): Observable<readonly Archived<AdminUserRecord>[]> { return this.http.get<readonly Archived<AdminUserRecord>[]>(`${this.baseUrl}/users/deleted`); }
   getUserAssignments(userId: string): Observable<readonly AdminUserAssignment[]> { return this.http.get<readonly AdminUserAssignment[]>(`${this.baseUrl}/users/${encodeURIComponent(userId)}/assignments`); }
   assignRole(userId: string, roleCode: string, unitCode?: string): Observable<readonly AdminUserAssignment[]> { return this.http.post<readonly AdminUserAssignment[]>(`${this.baseUrl}/users/${encodeURIComponent(userId)}/assignments`, { roleCode, unitCode }); }
@@ -30,7 +29,6 @@ export class ApiAdminDirectoryRepository implements AdminDirectoryRepository {
   checkUnitDeletion(id: string): Observable<DeletionPreview> { return this.http.get<DeletionPreview>(`${this.baseUrl}/units/${encodeURIComponent(id)}/deletion-check`); }
   deleteUnit(id: string): Observable<AdminUnitRecord> { return this.http.delete<AdminUnitRecord>(`${this.baseUrl}/units/${encodeURIComponent(id)}`); }
   restoreUnit(id: string): Observable<AdminUnitRecord> { return this.http.post<AdminUnitRecord>(`${this.baseUrl}/units/${encodeURIComponent(id)}/restore`, {}); }
-  purgeUnit(id: string): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/units/${encodeURIComponent(id)}/purge`); }
   getDeletedUnits(): Observable<readonly Archived<AdminUnitRecord>[]> { return this.http.get<readonly Archived<AdminUnitRecord>[]>(`${this.baseUrl}/units/archive`); }
   getRoles(): Observable<readonly AdminRoleRecord[]> { return this.http.get<readonly AdminRoleRecord[]>(`${this.baseUrl}/roles`); }
   createRole(draft: AdminRoleDraft): Observable<AdminRoleRecord> { return this.http.post<AdminRoleRecord>(`${this.baseUrl}/roles`, draft); }
@@ -38,7 +36,6 @@ export class ApiAdminDirectoryRepository implements AdminDirectoryRepository {
   checkRoleDeletion(code: string): Observable<DeletionPreview> { return this.http.get<DeletionPreview>(`${this.baseUrl}/roles/${encodeURIComponent(code)}/deletion-check`); }
   deleteRole(code: string): Observable<AdminRoleRecord> { return this.http.delete<AdminRoleRecord>(`${this.baseUrl}/roles/${encodeURIComponent(code)}`); }
   restoreRole(code: string): Observable<AdminRoleRecord> { return this.http.post<AdminRoleRecord>(`${this.baseUrl}/roles/${encodeURIComponent(code)}/restore`, {}); }
-  purgeRole(code: string): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/roles/${encodeURIComponent(code)}/purge`); }
   getDeletedRoles(): Observable<readonly Archived<AdminRoleRecord>[]> { return this.http.get<readonly Archived<AdminRoleRecord>[]>(`${this.baseUrl}/roles/archive`); }
   getNavPages(): Observable<readonly AdminNavPageRecord[]> { return this.http.get<readonly AdminNavPageRecord[]>(`${this.baseUrl}/nav-pages`); }
   createNavPage(draft: AdminNavPageDraft): Observable<AdminNavPageRecord> { return this.http.post<AdminNavPageRecord>(`${this.baseUrl}/nav-pages`, draft); }
@@ -46,7 +43,6 @@ export class ApiAdminDirectoryRepository implements AdminDirectoryRepository {
   checkNavPageDeletion(code: string): Observable<DeletionPreview> { return this.http.get<DeletionPreview>(`${this.baseUrl}/nav-pages/${encodeURIComponent(code)}/deletion-check`); }
   deleteNavPage(code: string): Observable<AdminNavPageRecord> { return this.http.delete<AdminNavPageRecord>(`${this.baseUrl}/nav-pages/${encodeURIComponent(code)}`); }
   restoreNavPage(code: string): Observable<AdminNavPageRecord> { return this.http.post<AdminNavPageRecord>(`${this.baseUrl}/nav-pages/${encodeURIComponent(code)}/restore`, {}); }
-  purgeNavPage(code: string): Observable<void> { return this.http.delete<void>(`${this.baseUrl}/nav-pages/${encodeURIComponent(code)}/purge`); }
   getDeletedNavPages(): Observable<readonly Archived<AdminNavPageRecord>[]> { return this.http.get<readonly Archived<AdminNavPageRecord>[]>(`${this.baseUrl}/nav-pages/deleted`); }
   eligibleRolesForUnits(unitCodes: readonly string[]): Observable<readonly AdminRoleRecord[]> {
     return this.http.get<readonly AdminRoleRecord[]>(`${this.baseUrl}/nav-pages/eligible-roles`, { params: { unitCodes: unitCodes.join(',') } });

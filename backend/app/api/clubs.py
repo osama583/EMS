@@ -36,6 +36,7 @@ from ..errors import BadRequest, Conflict, Forbidden, NotFound
 from ..logging_setup import audit
 from ..security import require_auth, require_internal
 from ..security.principal import current_principal
+from ..services import soft_delete
 from ..services.email import dispatch
 from ._helpers import body, date_order, flag, paged, pagination, required
 
@@ -104,7 +105,16 @@ _CLUB_SELECT = """
            EXISTS (SELECT 1 FROM club_join_requests j
                     WHERE j.club_id = c.club_id AND j.requester_user_id = %(viewer)s
                       AND j.status = 'pending') AS "viewerHasPendingRequest",
-           (c.user_id = %(viewer)s) AS "viewerIsPresident"
+           (c.user_id = %(viewer)s) AS "viewerIsPresident",
+           -- A club may hold only ONE pending president-change request
+           -- (uq_pcr_pending_per_club), so submitting a second is a guaranteed
+           -- 409. My Clubs offered the button anyway, with no way to know the
+           -- request it already sent was still sitting there - the President
+           -- got a conflict error for doing exactly what the UI invited. This
+           -- is what lets that button report the pending request instead.
+           EXISTS (SELECT 1 FROM club_president_change_requests pcr
+                    WHERE pcr.club_id = c.club_id AND pcr.status = 'pending')
+               AS "hasPendingPresidentChange"
       FROM clubs c
  LEFT JOIN users p ON p.user_id = c.user_id
  LEFT JOIN users b ON b.user_id = c.created_by_user_id
@@ -151,7 +161,7 @@ def _shape_clubs(rows: list[dict]) -> list[dict]:
 
 
 def _club_response(club_id: int, viewer_id: int) -> dict:
-    rows = query(_CLUB_SELECT + " WHERE c.club_id = %(club)s",
+    rows = query(_CLUB_SELECT + " WHERE c.club_id = %(club)s AND c.archived_at IS NULL",
                  {"viewer": viewer_id, "club": club_id})
     if not rows:
         raise NotFound("Club not found.")
@@ -167,9 +177,9 @@ def list_clubs():
     club_join_requests to the browser to join locally.
     """
     principal = current_principal()
-    sql = _CLUB_SELECT
+    sql = _CLUB_SELECT + " WHERE c.archived_at IS NULL"
     if flag("activeOnly") or flag("active"):
-        sql += " WHERE c.active"
+        sql += " AND c.active"
     rows = query(sql + " ORDER BY c.club_name", {"viewer": principal.user_id})
     return jsonify(_shape_clubs(rows))
 
@@ -193,7 +203,7 @@ def search_clubs():
     _assert_club_admin()
     principal = current_principal()
 
-    where = ["1 = 1"]
+    where = ["c.archived_at IS NULL"]
     params: dict = {"viewer": principal.user_id}
 
     status = (request.args.get("status") or "all").strip()
@@ -250,7 +260,7 @@ def search_clubs():
 # and the client manages them from their own screen.
 categories_bp = Blueprint("club_categories", __name__, url_prefix="/club-categories")
 
-RETENTION_DAYS = 7
+RETENTION_DAYS = soft_delete.RETENTION_DAYS
 
 _CATEGORY_SELECT = """
     SELECT club_category_id AS id, name, active, created_at AS "createdAt", archived_at
@@ -299,9 +309,19 @@ def list_categories():
 def search_categories():
     """Server-side filtered/paginated categories for the /app/club-category management
     page - search, status, LIMIT/OFFSET and the total count all happen in SQL rather than
-    shipping the whole table to the browser. Defaults to active-only (the same "don't load
-    what you're not viewing" rule the deleted-categories tab already follows by being its own
-    endpoint); pass ?includeInactive=true to also see deactivated-but-not-deleted categories."""
+    shipping the whole table to the browser.
+
+    ?status=active|inactive|all, defaulting to active. `all` exists because the two
+    single-status views could not answer "what categories are there", which is the
+    question someone opens this page with; before it, seeing the full set meant
+    reading one filter and then the other and holding both in your head.
+
+    ?includeInactive=true is the older spelling of ?status=all and still works -
+    it was the only way to reach an inactive category, so the client narrowed the
+    broader result down again in the browser, which made `total` (and therefore the
+    pager) describe a different set from the rows on screen. Stating the status
+    server-side is what fixes that; the alias is kept so an in-flight client is not
+    broken by the rename."""
     _assert_club_admin()
     where = ["archived_at IS NULL"]
     params: list = []
@@ -309,8 +329,16 @@ def search_categories():
     if search:
         where.append("name ILIKE %s")
         params.append(f"%{search}%")
-    if not flag("includeInactive"):
+
+    status = (request.args.get("status") or "").strip().lower()
+    if not status:
+        status = "all" if flag("includeInactive") else "active"
+    if status not in ("active", "inactive", "all"):
+        raise BadRequest("status must be one of: active, inactive, all.")
+    if status == "active":
         where.append("active")
+    elif status == "inactive":
+        where.append("NOT active")
     where_sql = " AND ".join(where)
     with transaction() as cur:
         total = fetch_one(
@@ -496,7 +524,11 @@ def my_status(user_id: int):
     principal = current_principal()
     if user_id != principal.user_id and not principal.is_admin:
         raise Forbidden("You can only read your own club status.")
-    rows = query("SELECT club_id FROM clubs WHERE user_id = %s ORDER BY club_id", (user_id,))
+    rows = query(
+        "SELECT club_id FROM clubs WHERE user_id = %s AND archived_at IS NULL "
+        "ORDER BY club_id",
+        (user_id,),
+    )
     is_club_admin = principal.is_admin or principal.has_role("club-admin")
     return jsonify(
         {
@@ -713,22 +745,96 @@ def set_club_categories(club_id: int):
     return jsonify(_apply_club_update(club_id, {"categoryIds": categories}))
 
 
+@bp.get("/<int:club_id>/deletion-check")
+@require_internal
+def club_deletion_check(club_id: int):
+    """What deleting this club would take with it. Shown before the click.
+
+    Runs the shared gate (soft_delete's "club" rule), so a club anyone has
+    joined or applied to reports why it cannot go rather than the delete being
+    refused after the confirm dialog already said yes. Deactivating it is the
+    answer for a club that has been used - it leaves discovery without taking
+    fifty people's application history with it.
+    """
+    _assert_club_admin()
+    with transaction() as cur:
+        preview = soft_delete.preview(cur, "club", club_id)
+    if not preview:
+        raise NotFound("Club not found.")
+    return jsonify(preview)
+
+
 @bp.delete("/<int:club_id>")
 @require_internal
 def delete_club(club_id: int):
+    """Soft delete, refused while anything depends on the club.
+
+    This used to hard-delete the row and hand-cascade its category links, join
+    requests and members away, so one mis-click destroyed the roster and the
+    whole join history with nothing to restore from. Migration 022 added
+    archived_at for exactly this; the gate below is the same one every other
+    admin entity goes through.
+
+    club_membership_log is deliberately NOT a blocker even though it references
+    the club: migration 040 backfilled a row for every current membership, so
+    counting it would refuse every club in the system. It stays an owned child
+    instead, cleared by the sweep when the club is finally purged.
+    """
     _assert_club_admin()
     with transaction() as cur:
-        cur.execute("DELETE FROM club_category_links WHERE club_id = %s", (club_id,))
-        cur.execute("DELETE FROM club_join_requests WHERE club_id = %s", (club_id,))
-        cur.execute("DELETE FROM club_members WHERE club_id = %s", (club_id,))
-        # The log references clubs(club_id); the row about to be destroyed cannot
-        # leave entries pointing at it.
-        cur.execute("DELETE FROM club_membership_log WHERE club_id = %s", (club_id,))
-        cur.execute("DELETE FROM clubs WHERE club_id = %s RETURNING club_id", (club_id,))
-        if cur.fetchone() is None:
+        if fetch_one(cur, "SELECT 1 FROM clubs WHERE club_id = %s AND archived_at IS NULL",
+                     (club_id,)) is None:
             raise NotFound("Club not found.")
+        blockers = soft_delete.soft_delete(cur, "club", club_id)
+        if blockers:
+            raise Conflict(
+                blockers[0] + ". Deactivate the club instead - that hides it from Discover "
+                "Clubs without erasing what its members did."
+            )
         audit("clubs.deleted", club_id=club_id, actor_user_id=current_principal().user_id)
     return "", 204
+
+
+# The three retention columns the Deleted tab renders, spliced into _CLUB_SELECT's
+# projection. Written as its own fragment rather than a second full SELECT so the
+# bin and the live list can never disagree about what a club record looks like.
+_CLUB_DELETION_COLUMNS = """,
+           c.archived_at AS "deletedAt",
+           (c.archived_at + make_interval(days => %(retention)s)) AS "permanentDeletionAt",
+           GREATEST(0, %(retention)s - EXTRACT(DAY FROM now() - c.archived_at)::int)
+               AS "daysRemaining\""""
+
+
+@bp.get("/deleted")
+@require_internal
+def list_deleted_clubs():
+    """The bin: clubs awaiting a restore or the sweep, with the days left on
+    each. Same shape as the deleted-categories list above."""
+    _assert_club_admin()
+    rows = query(
+        _CLUB_SELECT.replace("\n      FROM clubs c", _CLUB_DELETION_COLUMNS + "\n      FROM clubs c")
+        + " WHERE c.archived_at IS NOT NULL ORDER BY c.archived_at DESC",
+        {"viewer": current_principal().user_id, "retention": RETENTION_DAYS},
+    )
+    return jsonify(_shape_clubs(rows))
+
+
+@bp.post("/<int:club_id>/restore")
+@require_internal
+def restore_club(club_id: int):
+    """Bring a club back out of the bin - deactivated, deliberately.
+
+    `active` is left FALSE so a club returning from the bin never silently
+    reappears in Discover Clubs; someone re-enables it explicitly, after
+    checking it should be. Matches soft_delete.restore()'s rule for every other
+    entity.
+    """
+    _assert_club_admin()
+    with transaction() as cur:
+        if not soft_delete.restore(cur, "club", club_id):
+            raise NotFound("No deleted club with that id.")
+        audit("clubs.restored", club_id=club_id, actor_user_id=current_principal().user_id)
+    return jsonify(_club_response(club_id, current_principal().user_id))
 
 
 # --- Membership -----------------------------------------------------------
@@ -769,7 +875,8 @@ def remove_member(club_id: int, user_id: int):
     principal = current_principal()
     with transaction() as cur:
         is_self = user_id == principal.user_id
-        if not is_self and not _is_president(cur, club_id, principal.user_id):
+        by_president = not is_self and _is_president(cur, club_id, principal.user_id)
+        if not is_self and not by_president:
             if not (principal.is_admin or principal.has_role("club-admin")):
                 raise Forbidden("Only this club's President can remove a member.")
         if _is_president(cur, club_id, user_id):
@@ -783,6 +890,12 @@ def remove_member(club_id: int, user_id: int):
         # The distinction the log exists to keep: walking out is not being shown out.
         _log_membership(cur, club_id, user_id, "left" if is_self else "removed",
                         actor_user_id=principal.user_id)
+        # Removal is the one club transition the member did not ask for, so it is
+        # the one they would otherwise discover only by noticing the club had
+        # vanished from My Clubs. Someone leaving of their own accord already
+        # knows and is deliberately not mailed.
+        if not is_self:
+            dispatch.club_member_removed(cur, club_id, user_id, by_president=by_president)
     return "", 204
 
 

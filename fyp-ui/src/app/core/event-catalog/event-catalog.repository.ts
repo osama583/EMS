@@ -42,9 +42,6 @@ export class EventCatalogRepositoryImpl {
   restoreEntry(resource: EventCatalogResource, id: string): Observable<EventCatalogEntry> {
     return this.http.post<EventCatalogEntry>(this.urlFor(resource, `/${encodeURIComponent(id)}/restore`), {});
   }
-  purgeEntry(resource: EventCatalogResource, id: string): Observable<void> {
-    return this.http.delete<void>(this.urlFor(resource, `/${encodeURIComponent(id)}/purge`));
-  }
   getDeletedEntries(resource: EventCatalogResource): Observable<readonly ArchivedEventCatalogEntry[]> {
     return this.http.get<readonly ArchivedEventCatalogEntry[]>(this.urlFor(resource, '/deleted'));
   }

@@ -212,6 +212,24 @@ def create_user():
     return jsonify(_user_response(user_id)), 201
 
 
+def _assert_account_holds_no_last_post(cur, user_id: int, *, action: str) -> None:
+    """Apply the last-holder rules to every posting this ACCOUNT carries.
+
+    Deactivating the account is the same outage as removing the assignment -
+    _last_holder_blocker() already discounts holders whose account is inactive,
+    so a School whose only head is switched off is a School with no head. Going
+    through the account rather than the assignment is simply the other way users
+    reach the same state, and it has to be refused from there too.
+    """
+    for row in fetch_all(
+        cur,
+        "SELECT user_unit_role_id FROM user_unit_roles "
+        " WHERE user_id = %s AND unit_code IS NOT NULL AND archived_at IS NULL AND is_active",
+        (user_id,),
+    ):
+        _assert_unit_keeps_its_leaders(cur, row["user_unit_role_id"], action=action)
+
+
 def _apply_user_update(user_id: int, payload: dict) -> dict:
     fields: dict[str, object] = {}
     if "displayName" in payload:
@@ -231,6 +249,8 @@ def _apply_user_update(user_id: int, payload: dict) -> dict:
     with transaction() as cur:
         # Raises NotFound for a missing or archived account before anything is written.
         _user_row(cur, user_id)
+        if fields.get("is_active") is False:
+            _assert_account_holds_no_last_post(cur, user_id, action="deactivated")
         if "email" in fields:
             _assert_email_free(cur, str(fields["email"]), user_id)
         assignments = ", ".join(f"{c} = %s" for c in fields)
@@ -416,18 +436,13 @@ def create_assignment(user_id: int):
         if not legal_units and unit_code:
             raise BadRequest("This is a system-wide role and cannot be tied to a unit.")
 
-        if role_code in HEAD_ROLE_CODES and unit_code:
-            existing_head = fetch_one(
-                cur,
-                """SELECT u.full_name FROM user_unit_roles uur JOIN users u ON u.user_id = uur.user_id
-                    WHERE uur.unit_code = %s AND uur.role_code = ANY(%s) AND uur.user_id <> %s""",
-                (unit_code, list(HEAD_ROLE_CODES), user_id),
-            )
-            if existing_head:
-                raise Conflict(
-                    f"{existing_head['full_name']} already heads this unit. "
-                    "Remove that assignment first - a unit has one head at a time."
-                )
+        # A unit used to be capped at one head, which made a handover impossible
+        # to perform safely: installing a successor meant removing the incumbent
+        # first, leaving the unit headless in between - and _last_holder_blocker()
+        # below now refuses exactly that removal. Appointing the successor first
+        # and retiring the incumbent second is the sequence those two rules
+        # describe together, so the cap had to go for either to be satisfiable.
+        # Two heads is an overlap during a handover, not a steady state.
 
         duplicate = fetch_one(
             cur,
@@ -449,10 +464,76 @@ def create_assignment(user_id: int):
     return jsonify({"id": assignment_id}), 201
 
 
+def _last_holder_blocker(cur, assignment_id: int, role_codes: tuple[str, ...],
+                         label: str, remedy: str, *, action: str) -> None:
+    """Refuse to leave a unit with nobody holding `role_codes`.
+
+    Two situations share this shape and this consequence. A School or Department
+    with no head has no one to decide the proposals routed to its Head of
+    School/Department stage; a cafeteria with no manager has no one to approve
+    its catering orders. Either way the work does not fail loudly - it queues in
+    an inbox that belongs to no account, and no amount of chasing moves it. So
+    losing the last holder is not a staffing change but a stall, and it is nearly
+    always a step someone meant to pair with naming a successor.
+
+    The successor therefore comes first: create_assignment() no longer caps a
+    unit at one head, precisely so this check passes when the incumbent is then
+    retired. `action` names what was refused ("removed", "deactivated") so the
+    message points at the click to undo.
+
+    Only counts LIVE, ACTIVE holders whose ACCOUNT is also live - a head on a
+    deactivated account cannot open an inbox, so being succeeded by one leaves
+    the same stall. A flat (unit-less) role is never a headship and returns
+    immediately.
+    """
+    row = fetch_one(
+        cur,
+        "SELECT role_code, unit_code FROM user_unit_roles WHERE user_unit_role_id = %s",
+        (assignment_id,),
+    )
+    if row is None or row["role_code"] not in role_codes or not row["unit_code"]:
+        return
+    others = fetch_one(
+        cur,
+        "SELECT count(*) AS c FROM user_unit_roles uur JOIN users u ON u.user_id = uur.user_id "
+        " WHERE uur.unit_code = %s AND uur.role_code = ANY(%s) "
+        "   AND uur.user_unit_role_id <> %s AND uur.archived_at IS NULL AND uur.is_active "
+        "   AND u.is_active AND u.archived_at IS NULL",
+        (row["unit_code"], list(role_codes), assignment_id),
+    )["c"]
+    if others:
+        return
+    unit = fetch_one(cur, "SELECT description FROM unit WHERE code = %s", (row["unit_code"],))
+    name = (unit and unit["description"]) or row["unit_code"]
+    raise Conflict(
+        f"This is the only {label} for {name}, so the assignment cannot be {action}. "
+        f"{remedy} first - both can hold the role while you hand over."
+    )
+
+
+def _assert_unit_keeps_its_leaders(cur, assignment_id: int, *, action: str) -> None:
+    """Both last-holder rules, applied to one assignment.
+
+    The cafeteria half duplicates what cafeterias.py already enforces on its own
+    staffing routes. That is deliberate: Admin > Users is a second door into the
+    same user_unit_roles rows, and a rule that holds from one door but not the
+    other does not hold.
+    """
+    _last_holder_blocker(
+        cur, assignment_id, HEAD_ROLE_CODES, "head",
+        "Give the unit another Head of School or Head of Department", action=action,
+    )
+    _last_holder_blocker(
+        cur, assignment_id, ("cafeteria-manager",), "Cafeteria Manager",
+        "Assign another manager to that cafeteria", action=action,
+    )
+
+
 @bp.delete("/users/<int:user_id>/assignments/<int:assignment_id>")
 @require_admin
 def delete_assignment(user_id: int, assignment_id: int):
     with transaction() as cur:
+        _assert_unit_keeps_its_leaders(cur, assignment_id, action="removed")
         cur.execute(
             "DELETE FROM user_unit_roles WHERE user_unit_role_id = %s AND user_id = %s "
             "RETURNING role_code, unit_code",
@@ -1161,46 +1242,44 @@ def update_nav_page(page_code: str):
 @bp.get("/nav-pages/<page_code>/deletion-check")
 @require_admin
 def nav_page_deletion_check(page_code: str):
+    """What deleting this page would take with it.
+
+    Runs the shared gate (soft_delete's "nav_page" rule) rather than counting
+    child pages by hand. The hand-written version only ever looked downward at
+    the folder tree, so a page nobody had filed under a folder read as free to
+    delete no matter how many roles were relying on it - and deleting it revoked
+    every one of those grants silently. A page's grants ARE its usage: they are
+    the whole reason the row exists, and the rule for everything else in this app
+    is that a record somebody is using gets deactivated, never deleted.
+    """
     with transaction() as cur:
-        row = fetch_one(
-            cur, "SELECT label FROM nav_page WHERE page_code = %s", (page_code,)
-        )
-        if row is None:
-            raise NotFound("Page not found.")
-        children = fetch_one(
-            cur,
-            "SELECT count(*) AS c FROM nav_page "
-            "WHERE parent_page_code = %s AND archived_at IS NULL",
-            (page_code,),
-        )["c"]
-    blockers = [f"{children} child page(s) sit under this folder"] if children else []
-    return jsonify(
-        {"canDelete": not blockers, "blockingReasons": blockers, "entityLabel": row["label"]}
-    )
+        preview = soft_delete.preview(cur, "nav_page", page_code)
+    if not preview:
+        raise NotFound("Page not found.")
+    return jsonify(preview)
 
 
 @bp.delete("/nav-pages/<page_code>")
 @require_admin
 def delete_nav_page(page_code: str):
-    """Soft delete. Refused while the folder still holds pages - deleting it
-    would orphan them out of the sidebar entirely."""
+    """Soft delete, refused while anything still depends on the page.
+
+    Two things do. Child pages: deleting their folder orphans them out of the
+    sidebar entirely. Permission grants: they are what makes the page visible to
+    anyone, so deleting a granted page revokes access that an administrator
+    deliberately gave, without ever showing them the list of who loses it.
+
+    Hiding a page that is in use is what the is_active toggle is for - it takes
+    the page out of every sidebar and leaves the grants intact to come back to.
+    """
     with transaction() as cur:
         if fetch_one(cur, "SELECT 1 FROM nav_page WHERE page_code = %s", (page_code,)) is None:
             raise NotFound("Page not found.")
-        children = fetch_one(
-            cur,
-            "SELECT count(*) AS c FROM nav_page "
-            "WHERE parent_page_code = %s AND archived_at IS NULL",
-            (page_code,),
-        )["c"]
-        if children:
+        blockers = soft_delete.soft_delete(cur, "nav_page", page_code)
+        if blockers:
             raise Conflict(
-                f"{children} child page(s) sit under this folder. Move or delete them first."
+                blockers[0] + ". Clear that first, or deactivate the page instead of deleting it."
             )
-        cur.execute(
-            "UPDATE nav_page SET archived_at = now(), is_active = FALSE WHERE page_code = %s",
-            (page_code,),
-        )
         audit("admin.nav_page.deleted", page_code=page_code,
               actor_user_id=current_principal().user_id)
     return jsonify(_nav_page_response(page_code))

@@ -381,7 +381,7 @@ export class PageVisibilityComponent {
   // ---------------------------------------------------------------------------
   readonly deletedRecords = computed<readonly InternalDataRecord[]>(() => this.deletedPages().map((page) => ({
     id: page.pageCode,
-    actionKeys: ['restore', 'purge'],
+    actionKeys: ['restore'],
     cells: {
       identity: { primary: page.label, secondary: page.pageCode },
       deletedAt: { primary: this.formatDate(page.deletedAt) },
@@ -401,13 +401,11 @@ export class PageVisibilityComponent {
     columns: [{ key: 'identity', label: 'Page' }, { key: 'deletedAt', label: 'Deleted' }, { key: 'remaining', label: 'Permanent deletion' }, { key: 'actions', label: 'Actions', actions: true }],
     actions: [
       { key: 'restore', label: 'Restore', icon: 'restore_from_trash' },
-      { key: 'purge', label: 'Delete forever', icon: 'delete_forever' },
     ],
     emptyTitle: 'No deleted pages', emptyDescription: 'Pages you delete will appear here for 7 days before being permanently removed.',
   }));
   handleDeletedAction(event: InternalRowActionEvent): void {
     if (event.action.key === 'restore') { this.restoreTarget.set({ id: String(event.record.id), label: restoreLabelFor(event.record) }); return; }
-    if (event.action.key === 'purge') this.requestPurgePage(String(event.record.id));
   }
   // Restoring brings an archived record back into circulation immediately, so it is
   // confirmed first like every other state-changing action.
@@ -432,44 +430,6 @@ export class PageVisibilityComponent {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Deleted tab — "Delete forever" (purge), immediate and unrecoverable, alongside Restore above.
-  // ---------------------------------------------------------------------------
-  readonly purgeTargetCode = signal<string | null>(null);
-  readonly purgePreview = signal<DeletionPreview | null>(null);
-  readonly checkingPurge = signal(false);
-  readonly purgingPage = signal(false);
-  requestPurgePage(code: string): void {
-    this.clearMessages();
-    this.purgeTargetCode.set(code);
-    // Dependencies are re-checked server-side at purge time, so ask before offering the button.
-    this.purgePreview.set(null);
-    this.checkingPurge.set(true);
-    this.service.checkNavPageDeletion(code).pipe(
-      finalize(() => this.checkingPurge.set(false)),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: (preview) => this.purgePreview.set(preview),
-      error: () => this.toast.error('Could not check page', 'Please try again.'),
-    });
-  }
-  cancelPurgePage(): void {
-    if (!this.purgingPage()) { this.purgeTargetCode.set(null); this.purgePreview.set(null); }
-  }
-  purgeTargetLabel(): string {
-    const code = this.purgeTargetCode();
-    const page = code ? this.deletedPages().find((p) => p.pageCode === code) : null;
-    return page ? `"${page.label}"` : '';
-  }
-  confirmPurgePage(): void {
-    const code = this.purgeTargetCode();
-    if (!code) return;
-    this.purgingPage.set(true);
-    this.service.purgeNavPage(code).pipe(finalize(() => this.purgingPage.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => { this.purgeTargetCode.set(null); this.purgePreview.set(null); this.toast.success('Page permanently deleted'); this.loadDeleted(); },
-      error: (err) => this.toast.error('The page could not be permanently deleted', apiErrorMessage(err, 'Please try again.')),
-    });
-  }
   private formatDate(iso: string): string { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
 
   private clearMessages(): void { this.errorMessage.set(''); }

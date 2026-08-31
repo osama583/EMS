@@ -63,8 +63,8 @@
                       Edit categories
                     </button>
                     <button type="button" role="menuitem" (click)="closeMenu(); openPresidentChange(club)">
-                      <span class="material-symbols-rounded" aria-hidden="true">swap_horiz</span>
-                      Request President change
+                      <span class="material-symbols-rounded" aria-hidden="true">{{ hasPendingPresidentChange(club) ? 'hourglass_top' : 'swap_horiz' }}</span>
+                      {{ hasPendingPresidentChange(club) ? 'President change pending' : 'Request President change' }}
                     </button>
                   } @else {
                     <button type="button" role="menuitem" class="club-page__menu-danger" (click)="closeMenu(); openLeave(club)">
