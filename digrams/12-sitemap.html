@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Site map with role-grant overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#fff}
+  body{display:flex;justify-content:center;padding:24px 18px}
+  svg{width:100%;max-width:1660px;height:auto;display:block}
+
+  .zone {font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:18px;letter-spacing:.16em;text-transform:uppercase;fill:#27456F}
+  .root {font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:22px;letter-spacing:.08em;text-transform:uppercase;fill:#FFFFFF}
+  .fold {font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:15px;letter-spacing:.06em;text-transform:uppercase;fill:#141A20}
+  .pg   {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11px;fill:#243039}
+  .pgm  {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:9.5px;fill:#8A939D}
+  .tok  {font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:8.5px;fill:#4E6A93}
+  .note {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10.5px;fill:#8A939D}
+  .warn {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10.5px;fill:#8E3A22}
+  .key  {font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:14px;letter-spacing:.14em;text-transform:uppercase;fill:#4E6A93}
+
+  .rootbox{fill:#27456F;stroke:#27456F;stroke-width:1.6}
+  .folder {fill:#E4EAF2;stroke:#27456F;stroke-width:1.5}
+  .page   {fill:#FFFFFF;stroke:#27456F;stroke-width:1.3}
+  .pub    {fill:#FFFFFF;stroke:#C08670;stroke-width:1.4;stroke-dasharray:6 4}
+  .hub    {fill:#FFFFFF;stroke:#27456F;stroke-width:1.8}
+  .tab    {fill:#FAFBFC;stroke:#AFBAC4;stroke-width:1.1}
+  .ln     {stroke:#8FA0B4;stroke-width:1.2;fill:none}
+  .ln-x   {stroke:#C08670;stroke-width:1.3;fill:none;stroke-dasharray:6 4}
+  .nbox   {fill:#FFFFFF;stroke:#AFBAC4;stroke-width:1.1;stroke-dasharray:4 4}
+  .chip   {fill:#EEF2F7;stroke:#AFBAC4;stroke-width:.9}
+</style>
+</head>
+<body>
+
+<svg viewBox="0 0 1660 1420" role="img"
+     aria-label="Site map of the application with role-based page grants">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FA0B4"/></marker>
+  </defs>
+
+  <!-- ══════════ PUBLIC ZONE ══════════ -->
+  <text class="zone" x="36" y="30">Public — no credential required</text>
+
+  <rect class="pub" x="36"  y="44" width="176" height="46" rx="2"/>
+  <text class="pg"  x="124" y="66" text-anchor="middle">Landing page</text>
+  <text class="pgm" x="124" y="80" text-anchor="middle">/</text>
+
+  <rect class="pub" x="236" y="44" width="176" height="46" rx="2"/>
+  <text class="pg"  x="324" y="66" text-anchor="middle">Explore events</text>
+  <text class="pgm" x="324" y="80" text-anchor="middle">/events</text>
+
+  <rect class="pub" x="436" y="44" width="176" height="46" rx="2"/>
+  <text class="pg"  x="524" y="66" text-anchor="middle">Event detail</text>
+  <text class="pgm" x="524" y="80" text-anchor="middle">/events/:id</text>
+
+  <rect class="pub" x="636" y="44" width="176" height="46" rx="2"/>
+  <text class="pg"  x="724" y="66" text-anchor="middle">Log in</text>
+  <text class="pgm" x="724" y="80" text-anchor="middle">/login</text>
+
+  <rect class="pub" x="836" y="44" width="176" height="46" rx="2"/>
+  <text class="pg"  x="924" y="66" text-anchor="middle">Register</text>
+  <text class="pgm" x="924" y="80" text-anchor="middle">/register</text>
+
+  <rect class="pub" x="1036" y="44" width="176" height="46" rx="2"/>
+  <text class="pg"  x="1124" y="66" text-anchor="middle">Reset password</text>
+  <text class="pgm" x="1124" y="80" text-anchor="middle">/reset-password</text>
+
+  <rect class="pub" x="1236" y="44" width="176" height="46" rx="2"/>
+  <text class="pg"  x="1324" y="66" text-anchor="middle">AI assistant</text>
+  <text class="pgm" x="1324" y="80" text-anchor="middle">/assistant</text>
+
+  <path class="ln-x" d="M724,90 V128" marker-end="url(#a)"/>
+  <text class="note" x="736" y="116">authenticate</text>
+
+  <!-- ══════════ APP ROOT ══════════ -->
+  <rect class="rootbox" x="612" y="132" width="224" height="52" rx="2"/>
+  <text class="root" x="724" y="165" text-anchor="middle">/app</text>
+
+  <path class="ln" d="M724,184 V210"/>
+  <path class="ln" d="M110,210 H1560"/>
+
+  <!-- column drops -->
+  <path class="ln" d="M110,210 V246"/>
+  <path class="ln" d="M310,210 V246"/>
+  <path class="ln" d="M510,210 V246"/>
+  <path class="ln" d="M710,210 V246"/>
+  <path class="ln" d="M910,210 V246"/>
+  <path class="ln" d="M1110,210 V246"/>
+  <path class="ln" d="M1310,210 V246"/>
+  <path class="ln" d="M1510,210 V246"/>
+
+  <!-- ══════════ COLUMN 1 — standalone pages ══════════ -->
+  <rect class="page" x="22" y="246" width="176" height="42" rx="2"/>
+  <text class="pg"  x="110" y="264" text-anchor="middle">How it works</text>
+  <text class="tok" x="110" y="280" text-anchor="middle">ST</text>
+
+  <rect class="page" x="22" y="298" width="176" height="42" rx="2"/>
+  <text class="pg"  x="110" y="316" text-anchor="middle">Dashboard</text>
+  <text class="tok" x="110" y="332" text-anchor="middle">HD · CM</text>
+
+  <rect class="page" x="22" y="350" width="176" height="42" rx="2"/>
+  <text class="pg"  x="110" y="368" text-anchor="middle">Reports</text>
+  <text class="tok" x="110" y="384" text-anchor="middle">cafeteria admin</text>
+
+  <rect class="page" x="22" y="402" width="176" height="42" rx="2"/>
+  <text class="pg"  x="110" y="420" text-anchor="middle">My menu</text>
+  <text class="tok" x="110" y="436" text-anchor="middle">CM</text>
+
+  <path class="ln" d="M110,288 V298 M110,340 V350 M110,392 V402"/>
+
+  <!-- ══════════ COLUMN 2 — My Requests ══════════ -->
+  <rect class="folder" x="222" y="246" width="176" height="42" rx="2"/>
+  <text class="fold" x="310" y="264" text-anchor="middle">My requests</text>
+  <text class="tok"  x="310" y="280" text-anchor="middle">ST · HD · CM</text>
+
+  <path class="ln" d="M310,288 V310"/>
+  <path class="ln" d="M250,310 H370"/>
+
+  <rect class="page" x="222" y="322" width="176" height="38" rx="2"/>
+  <text class="pg" x="310" y="345" text-anchor="middle">Ongoing</text>
+  <rect class="page" x="222" y="368" width="176" height="38" rx="2"/>
+  <text class="pg" x="310" y="391" text-anchor="middle">History</text>
+  <rect class="page" x="222" y="414" width="176" height="38" rx="2"/>
+  <text class="pg"  x="310" y="432" text-anchor="middle">Drafts</text>
+  <text class="tok" x="310" y="446" text-anchor="middle">ST · HD — not CM</text>
+  <path class="ln" d="M310,310 V322 M310,360 V368 M310,406 V414"/>
+
+  <!-- ══════════ COLUMN 3 — Inbox hub ══════════ -->
+  <rect class="hub" x="422" y="246" width="176" height="42" rx="2"/>
+  <text class="fold" x="510" y="264" text-anchor="middle">Inbox</text>
+  <text class="tok"  x="510" y="280" text-anchor="middle">hub · ST · HD · CM</text>
+
+  <path class="ln" d="M510,288 V302"/>
+  <text class="note" x="510" y="316" text-anchor="middle">one page, tabs by role</text>
+
+  <rect class="tab" x="422" y="326" width="176" height="30" rx="2"/>
+  <text class="pg" x="510" y="345" text-anchor="middle">Proposals</text>
+  <rect class="tab" x="422" y="360" width="176" height="30" rx="2"/>
+  <text class="pg" x="510" y="379" text-anchor="middle">Tasks</text>
+  <rect class="tab" x="422" y="394" width="176" height="30" rx="2"/>
+  <text class="pg" x="510" y="413" text-anchor="middle">Cafeteria tasks</text>
+  <rect class="tab" x="422" y="428" width="176" height="30" rx="2"/>
+  <text class="pg" x="510" y="447" text-anchor="middle">Requests</text>
+  <rect class="tab" x="422" y="462" width="176" height="30" rx="2"/>
+  <text class="pg" x="510" y="481" text-anchor="middle">Club requests</text>
+  <rect class="tab" x="422" y="496" width="176" height="30" rx="2"/>
+  <text class="pg" x="510" y="515" text-anchor="middle">Registrations</text>
+  <rect class="tab" x="422" y="530" width="176" height="30" rx="2"/>
+  <text class="pg" x="510" y="549" text-anchor="middle">President change</text>
+
+  <text class="note" x="510" y="580" text-anchor="middle">Ongoing and History repeat</text>
+  <text class="note" x="510" y="594" text-anchor="middle">the same tabbed shape</text>
+
+  <!-- ══════════ COLUMN 4 — Events + Forms ══════════ -->
+  <rect class="folder" x="622" y="246" width="176" height="42" rx="2"/>
+  <text class="fold" x="710" y="264" text-anchor="middle">Events</text>
+  <text class="tok"  x="710" y="280" text-anchor="middle">all internal roles</text>
+
+  <path class="ln" d="M710,288 V310"/>
+  <rect class="page" x="622" y="322" width="176" height="38" rx="2"/>
+  <text class="pg" x="710" y="345" text-anchor="middle">Explore events</text>
+  <rect class="page" x="622" y="368" width="176" height="38" rx="2"/>
+  <text class="pg" x="710" y="391" text-anchor="middle">My events</text>
+  <rect class="page" x="622" y="414" width="176" height="38" rx="2"/>
+  <text class="pg" x="710" y="437" text-anchor="middle">Event calendar</text>
+  <path class="ln" d="M710,310 V322 M710,360 V368 M710,406 V414"/>
+
+  <rect class="folder" x="622" y="484" width="176" height="42" rx="2"/>
+  <text class="fold" x="710" y="502" text-anchor="middle">Forms</text>
+  <text class="tok"  x="710" y="518" text-anchor="middle">unit roles only</text>
+  <path class="ln" d="M710,526 V548"/>
+  <rect class="page" x="622" y="548" width="176" height="38" rx="2"/>
+  <text class="pg" x="710" y="571" text-anchor="middle">Event proposal</text>
+
+  <!-- ══════════ COLUMN 5 — Dropdown settings ══════════ -->
+  <rect class="folder" x="822" y="246" width="176" height="42" rx="2"/>
+  <text class="fold" x="910" y="264" text-anchor="middle">Dropdown settings</text>
+  <text class="tok"  x="910" y="280" text-anchor="middle">HD · CFO</text>
+
+  <path class="ln" d="M910,288 V310"/>
+  <rect class="page" x="822" y="322" width="176" height="34" rx="2"/>
+  <text class="pg"  x="910" y="338" text-anchor="middle">Logistics items</text>
+  <text class="tok" x="910" y="350" text-anchor="middle">HD only</text>
+  <rect class="page" x="822" y="362" width="176" height="30" rx="2"/>
+  <text class="pg" x="910" y="381" text-anchor="middle">Transportation types</text>
+  <rect class="page" x="822" y="396" width="176" height="30" rx="2"/>
+  <text class="pg" x="910" y="415" text-anchor="middle">Photography services</text>
+  <rect class="page" x="822" y="430" width="176" height="30" rx="2"/>
+  <text class="pg" x="910" y="449" text-anchor="middle">Sound &amp; light</text>
+  <rect class="page" x="822" y="464" width="176" height="30" rx="2"/>
+  <text class="pg" x="910" y="483" text-anchor="middle">Dietary information</text>
+  <rect class="page" x="822" y="498" width="176" height="30" rx="2"/>
+  <text class="pg" x="910" y="517" text-anchor="middle">Serving units</text>
+  <rect class="page" x="822" y="532" width="176" height="30" rx="2"/>
+  <text class="pg" x="910" y="551" text-anchor="middle">Campus tour points</text>
+  <rect class="page" x="822" y="566" width="176" height="30" rx="2"/>
+  <text class="pg" x="910" y="585" text-anchor="middle">Campus tour types</text>
+  <rect class="page" x="822" y="600" width="176" height="30" rx="2"/>
+  <text class="pg" x="910" y="619" text-anchor="middle">Mineral water</text>
+  <rect class="page" x="822" y="634" width="176" height="30" rx="2"/>
+  <text class="pg" x="910" y="653" text-anchor="middle">Funding main items</text>
+  <rect class="page" x="822" y="668" width="176" height="30" rx="2"/>
+  <text class="pg" x="910" y="687" text-anchor="middle">Funding sub-items</text>
+  <rect class="page" x="822" y="702" width="176" height="30" rx="2"/>
+  <text class="pg" x="910" y="721" text-anchor="middle">Venue management</text>
+
+  <!-- ══════════ COLUMN 6 — Cafeterias ══════════ -->
+  <rect class="folder" x="1022" y="246" width="176" height="42" rx="2"/>
+  <text class="fold" x="1110" y="264" text-anchor="middle">Cafeterias</text>
+  <text class="tok"  x="1110" y="280" text-anchor="middle">cafeteria admin · F&amp;B</text>
+
+  <path class="ln" d="M1110,288 V310"/>
+  <rect class="page" x="1022" y="322" width="176" height="30" rx="2"/>
+  <text class="pg" x="1110" y="341" text-anchor="middle">Manage cafeterias</text>
+  <rect class="page" x="1022" y="356" width="176" height="30" rx="2"/>
+  <text class="pg" x="1110" y="375" text-anchor="middle">Staff assignments</text>
+  <rect class="page" x="1022" y="390" width="176" height="30" rx="2"/>
+  <text class="pg" x="1110" y="409" text-anchor="middle">Menu oversight</text>
+  <rect class="page" x="1022" y="424" width="176" height="30" rx="2"/>
+  <text class="pg" x="1110" y="443" text-anchor="middle">Staff action history</text>
+
+  <rect class="folder" x="1022" y="484" width="176" height="42" rx="2"/>
+  <text class="fold" x="1110" y="502" text-anchor="middle">My cafeteria</text>
+  <text class="tok"  x="1110" y="518" text-anchor="middle">CM</text>
+  <path class="ln" d="M1110,526 V548"/>
+  <rect class="page" x="1022" y="548" width="176" height="38" rx="2"/>
+  <text class="pg" x="1110" y="571" text-anchor="middle">My staff</text>
+
+  <!-- ══════════ COLUMN 7 — Directory + config ══════════ -->
+  <rect class="folder" x="1222" y="246" width="176" height="42" rx="2"/>
+  <text class="fold" x="1310" y="264" text-anchor="middle">Internal directory</text>
+  <text class="tok"  x="1310" y="280" text-anchor="middle">SA</text>
+
+  <path class="ln" d="M1310,288 V310"/>
+  <rect class="page" x="1222" y="322" width="176" height="30" rx="2"/>
+  <text class="pg" x="1310" y="341" text-anchor="middle">Users</text>
+  <rect class="page" x="1222" y="356" width="176" height="30" rx="2"/>
+  <text class="pg" x="1310" y="375" text-anchor="middle">Units</text>
+  <rect class="page" x="1222" y="390" width="176" height="30" rx="2"/>
+  <text class="pg" x="1310" y="409" text-anchor="middle">Roles</text>
+  <rect class="page" x="1222" y="424" width="176" height="30" rx="2"/>
+  <text class="pg" x="1310" y="443" text-anchor="middle">Page visibility</text>
+
+  <rect class="folder" x="1222" y="484" width="176" height="42" rx="2"/>
+  <text class="fold" x="1310" y="502" text-anchor="middle">System config</text>
+  <text class="tok"  x="1310" y="518" text-anchor="middle">SA</text>
+  <path class="ln" d="M1310,526 V548"/>
+  <rect class="page" x="1222" y="548" width="176" height="34" rx="2"/>
+  <text class="pg" x="1310" y="569" text-anchor="middle">Workflows &amp; policies</text>
+  <rect class="page" x="1222" y="586" width="176" height="30" rx="2"/>
+  <text class="pg" x="1310" y="605" text-anchor="middle">Event categories</text>
+  <rect class="page" x="1222" y="620" width="176" height="30" rx="2"/>
+  <text class="pg" x="1310" y="639" text-anchor="middle">Event formats</text>
+
+  <!-- ══════════ COLUMN 8 — Clubs ══════════ -->
+  <rect class="folder" x="1422" y="246" width="176" height="42" rx="2"/>
+  <text class="fold" x="1510" y="264" text-anchor="middle">Clubs</text>
+  <text class="tok"  x="1510" y="280" text-anchor="middle">club admin · ST</text>
+
+  <path class="ln" d="M1510,288 V310"/>
+  <rect class="page" x="1422" y="322" width="176" height="34" rx="2"/>
+  <text class="pg"  x="1510" y="338" text-anchor="middle">Manage clubs</text>
+  <text class="tok" x="1510" y="350" text-anchor="middle">club admin only</text>
+  <rect class="page" x="1422" y="362" width="176" height="30" rx="2"/>
+  <text class="pg" x="1510" y="381" text-anchor="middle">My clubs</text>
+  <rect class="page" x="1422" y="396" width="176" height="30" rx="2"/>
+  <text class="pg" x="1510" y="415" text-anchor="middle">Discover clubs</text>
+  <rect class="page" x="1422" y="430" width="176" height="34" rx="2"/>
+  <text class="pg"  x="1510" y="446" text-anchor="middle">Club category</text>
+  <text class="tok" x="1510" y="458" text-anchor="middle">club admin only</text>
+
+  <!-- ══════════ MECHANISM ══════════ -->
+  <rect class="nbox" x="22" y="800" width="780" height="200" rx="3"/>
+  <text class="key"  x="42" y="828">How visibility is decided</text>
+  <text class="note" x="42" y="856">Nothing above is hardcoded in the client. Every entry is a nav_page row, and it appears for a</text>
+  <text class="note" x="42" y="874">caller only if one of its nav_page_grants matches — either a flat role, or a (role, unit) pair.</text>
+  <text class="note" x="42" y="898">A folder carries grants of its own, and they gate all of its children as a group: a caller who</text>
+  <text class="note" x="42" y="916">fails the folder&#39;s check sees none of the pages beneath it.</text>
+  <text class="note" x="42" y="946">route_path is derived server-side as /app/&lt;page_code&gt; and is never supplied by the client.</text>
+  <text class="note" x="42" y="964">A System Admin can add, rename, reorder or re-grant a page at runtime, with no redeploy —</text>
+  <text class="note" x="42" y="982">which is why the sidebar is data, not code.</text>
+
+  <rect class="nbox" x="822" y="800" width="812" height="200" rx="3"/>
+  <text class="key"  x="842" y="828">Two grants that prove the mechanism is real</text>
+  <text class="warn" x="842" y="858">A Logistics head sees only the Logistics dropdown page, never Sound &amp; Light. Each option list is</text>
+  <text class="warn" x="842" y="876">granted to the one department that owns it, because a uniform grant would put a link on screen</text>
+  <text class="warn" x="842" y="894">that the API would then refuse on click.</text>
+  <text class="warn" x="842" y="924">A Cafeteria Manager holds Inbox, Ongoing and History but never Drafts or Forms. They review</text>
+  <text class="warn" x="842" y="942">food orders and never submit proposals, so the pages that create a proposal are not granted —</text>
+  <text class="warn" x="842" y="960">the same distinction the workflow itself enforces in Fig. 6.</text>
+
+  <!-- ══════════ TOKEN KEY ══════════ -->
+  <text class="key" x="22" y="1044">Role tokens used above</text>
+  <rect class="chip" x="22" y="1058" width="52" height="26" rx="2"/>
+  <text class="tok" x="48" y="1075" text-anchor="middle">ST</text>
+  <text class="note" x="86" y="1075">Student — a unit-scoped role</text>
+
+  <rect class="chip" x="322" y="1058" width="52" height="26" rx="2"/>
+  <text class="tok" x="348" y="1075" text-anchor="middle">HD</text>
+  <text class="note" x="386" y="1075">Head of department, e.g. Logistics</text>
+
+  <rect class="chip" x="682" y="1058" width="52" height="26" rx="2"/>
+  <text class="tok" x="708" y="1075" text-anchor="middle">CM</text>
+  <text class="note" x="746" y="1075">Cafeteria manager — a unit-scoped role</text>
+
+  <rect class="chip" x="1082" y="1058" width="52" height="26" rx="2"/>
+  <text class="tok" x="1108" y="1075" text-anchor="middle">SA</text>
+  <text class="note" x="1146" y="1075">System admin — a flat role</text>
+
+  <rect class="folder" x="22" y="1104" width="52" height="26" rx="2"/>
+  <text class="note" x="86" y="1122">Folder — gates its children</text>
+
+  <rect class="page" x="322" y="1104" width="52" height="26" rx="2"/>
+  <text class="note" x="386" y="1122">Page — a route, granted individually</text>
+
+  <rect class="pub" x="682" y="1104" width="52" height="26" rx="2"/>
+  <text class="note" x="746" y="1122">Public — reachable with no credential</text>
+
+  <rect class="hub" x="1082" y="1104" width="52" height="26" rx="2"/>
+  <text class="note" x="1146" y="1122">Hub — one page carrying role-dependent tabs</text>
+
+</svg>
+</body>
+</html>

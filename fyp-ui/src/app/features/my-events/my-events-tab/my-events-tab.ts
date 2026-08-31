@@ -1,14 +1,19 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
-import { finalize, switchMap } from 'rxjs';
+import { Observable, catchError, debounceTime, finalize, map, of, switchMap } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
-import { PublishedEvent, RegistrationResult, RegistrationStatus } from '../../../core/events/published-event.models';
+import { EventSearchParams, PublishedEvent, RegistrationResult, RegistrationStatus } from '../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../core/events/published-event.service';
+import { RegisteredEventsResponse, SavedEventsResponse } from '../../../core/events/event-engagement.models';
 import { SavedEventsService } from '../../../core/events/saved-events.service';
 import { EventCardComponent } from '../../../shared/components/event-card/event-card';
 import { EventDetailsModalComponent } from '../../../shared/components/event-details-modal/event-details-modal';
+import { EventFilterBarComponent } from '../../../shared/components/event-filter-bar/event-filter-bar';
+import { EventFilterDialogComponent } from '../../../shared/components/event-filter-bar/event-filter-dialog';
+import { EventFilterQuery, EventFilterState, toEventSearchParams } from '../../../shared/components/event-filter-bar/event-filter.state';
 import { InternalPageHeaderComponent, InternalPageStateComponent, InternalPaginationComponent } from '../../../shared/components/internal-data-page/internal-data-page-parts';
 import { PAGE_SIZE_OPTIONS, InternalPageHeaderConfig } from '../../../shared/components/internal-data-page/internal-data-page.models';
+import { SkeletonComponent } from '../../../shared/components/skeleton/skeleton';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { ReminderScope, ReminderSettingsComponent } from '../reminder-settings/reminder-settings';
 
@@ -19,18 +24,42 @@ interface TabEntry {
   readonly status: RegistrationStatus | null;
 }
 
+interface TabPage {
+  readonly items: readonly TabEntry[];
+  readonly total: number;
+  readonly totalPages: number;
+}
+
+const EMPTY_PAGE: TabPage = { items: [], total: 0, totalPages: 1 };
+
 // Default rows per page. The reader can change it - PAGE_SIZE_OPTIONS is the
-// same set of choices every other list in the app offers.
+// same set of choices every other list in the app offers, and the default has to be one of them
+// or the control opens with nothing selected.
 const DEFAULT_PAGE_SIZE = 10;
 
-// Every scope this component renders (saved/pending/registered/history) is now a real server query:
-// page/pageSize go straight through to events.py's search_saved()/my_registrations(), which filter,
-// count, and LIMIT/OFFSET in SQL - the browser only ever holds the one page of events it's about to
-// show, not the whole list sliced client-side.
+// Every scope this component renders (saved/pending/registered/history) is a real server query:
+// the search box, every filter group and page/pageSize go straight through to events.py's
+// search_saved()/my_registrations(), which filter, count and LIMIT/OFFSET in SQL - the browser
+// only ever holds the one page of events it's about to show, never a list it narrows itself.
+// The filter UI is the same EventFilterState/bar/dialog Explore Events uses, so the two surfaces
+// offer the same groups and the same draft/apply flow.
 @Component({
   selector: 'app-my-events-tab',
-  imports: [EventCardComponent, EventDetailsModalComponent, InternalPageHeaderComponent, InternalPageStateComponent, InternalPaginationComponent, ReminderSettingsComponent],
+  imports: [
+    EventCardComponent,
+    EventDetailsModalComponent,
+    EventFilterBarComponent,
+    EventFilterDialogComponent,
+    InternalPageHeaderComponent,
+    InternalPageStateComponent,
+    InternalPaginationComponent,
+    ReminderSettingsComponent,
+    SkeletonComponent,
+  ],
   templateUrl: './my-events-tab.html',
+  // .shared-page-width is a plain block, not the gapped grid column Explore Events lays its
+  // toolbar/grid/pagination out in, so the footer needs its own room under the last row of cards.
+  styles: '.my-events-tab__pagination { margin-top: var(--space-5); }',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MyEventsTabComponent {
@@ -54,7 +83,14 @@ export class MyEventsTabComponent {
   // entry, the only place this is set true.
   readonly showHeader = input(false);
 
+  readonly filters = new EventFilterState();
+
   readonly loading = signal(true);
+  // Only the FIRST load may replace the grid with a skeleton — a later load (a filter, a search, a
+  // page change) keeps the cards mounted and swaps their data in place, the same way Explore
+  // Events does, so the heart on a card survives a refresh.
+  readonly hasLoadedOnce = signal(false);
+  readonly showSkeleton = computed(() => this.loading() && !this.hasLoadedOnce());
   readonly error = signal('');
   readonly entries = signal<readonly TabEntry[]>([]);
   readonly total = signal(0);
@@ -62,6 +98,14 @@ export class MyEventsTabComponent {
   readonly page = signal(1);
   readonly selectedEvent = signal<PublishedEvent | null>(null);
   readonly registeringEventId = signal<string | null>(null);
+
+  // The dialog's live "Show N Results" preview counts within THIS tab's scope, not across every
+  // event — before the first preview lands it falls back to the applied count so the button never
+  // shows a jarring 0.
+  readonly draftResultCount = computed(() => this.filters.draftPreviewCount() ?? this.total());
+
+  /** True once the reader has narrowed the list themself — changes what an empty result means. */
+  readonly isFiltered = computed(() => this.filters.appliedCount() > 0 || !!this.filters.searchTerm().trim());
 
   // Only the Saved and Registered tabs own reminder settings - pending/history
   // are views of events whose reminders belong to one of those two lists, so
@@ -79,6 +123,7 @@ export class MyEventsTabComponent {
   }));
 
   readonly emptyIcon = computed(() => {
+    if (this.isFiltered()) return 'search_off';
     switch (this.mode()) {
       case 'saved': return 'favorite';
       case 'pending': return 'hourglass_top';
@@ -87,6 +132,7 @@ export class MyEventsTabComponent {
     }
   });
   readonly emptyTitle = computed(() => {
+    if (this.isFiltered()) return 'No events found';
     switch (this.mode()) {
       case 'saved': return 'No saved events yet';
       case 'pending': return 'No pending registrations';
@@ -95,6 +141,7 @@ export class MyEventsTabComponent {
     }
   });
   readonly emptyDescription = computed(() => {
+    if (this.isFiltered()) return 'Try another search or remove a few filters.';
     switch (this.mode()) {
       case 'saved': return 'Use the heart on any event card to keep it here.';
       case 'pending': return 'Registrations for manual-approval events will appear here while you wait for the organizer to decide.';
@@ -104,56 +151,98 @@ export class MyEventsTabComponent {
   });
 
   constructor() {
-    toObservable(computed(() => ({ mode: this.mode(), page: this.page(), tick: this.reloadTick() })))
+    // The filter dialog needs its option lists whether or not it has been opened yet, and every
+    // tab here shows it.
+    this.filters.loadOptions();
+
+    toObservable(computed(() => ({
+      mode: this.mode(),
+      page: this.page(),
+      pageSize: this.pageSize(),
+      query: this.filters.query(),
+      tick: this.reloadTick(),
+    })))
       .pipe(
         takeUntilDestroyed(this.destroyRef),
-        switchMap((query) => {
-          const user = this.auth.user();
-          if (!user) return [{ items: [] as readonly TabEntry[], total: 0, totalPages: 1 }];
+        switchMap((request) => {
+          if (!this.auth.user()) return of(EMPTY_PAGE);
           this.loading.set(true);
           this.error.set('');
-          return this.load(query.mode, user.email, query.page).pipe(finalize(() => this.loading.set(false)));
-        }),
-      )
-      .subscribe({
-        next: (result) => {
-          this.entries.set(result.items);
-          this.total.set(result.total);
-          this.totalPages.set(result.totalPages);
-        },
-        error: () => this.error.set('These events could not be loaded.'),
-      });
-  }
-
-  private load(mode: MyEventsTabMode, userEmail: string, page: number) {
-    if (mode === 'saved') {
-      return this.savedEvents.searchSavedEvents(page, this.pageSize()).pipe(
-        switchMap((response) => {
-          if (response.items.length === 0) {
-            return [{ items: [] as readonly TabEntry[], total: response.total, totalPages: response.totalPages }];
-          }
-          return this.eventService.getRegistrationStatuses(response.items.map((item) => item.id)).pipe(
-            switchMap((statuses) => {
-              const items = response.items
-                .map((item): TabEntry => ({ event: item, status: statuses.get(item.id) ?? null }))
-                .filter((entry) => entry.status !== 'confirmed');
-              return [{ items, total: response.total, totalPages: response.totalPages }];
+          return this.load(request.mode, request.query, request.page, request.pageSize).pipe(
+            // Handled here rather than in the subscriber: an error delivered to subscribe()
+            // terminates the outer stream, and the tab would then ignore every later filter,
+            // search or page change.
+            catchError(() => {
+              this.error.set('These events could not be loaded.');
+              return of(EMPTY_PAGE);
             }),
+            finalize(() => { this.loading.set(false); this.hasLoadedOnce.set(true); }),
           );
         }),
-      );
+      )
+      .subscribe((result) => {
+        this.entries.set(result.items);
+        this.total.set(result.total);
+        this.totalPages.set(result.totalPages);
+      });
+
+    this.filters.draftChanges
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        debounceTime(300),
+        switchMap(() => this.count(this.mode(), this.filters.draftQuery()).pipe(catchError(() => of(null)))),
+      )
+      .subscribe((total) => this.filters.draftPreviewCount.set(total));
+  }
+
+  private searchParams(query: EventFilterQuery, page: number, pageSize: number): EventSearchParams {
+    return {
+      ...toEventSearchParams(query, page, pageSize),
+      // Saved only: an event you have a confirmed place on belongs under Registered.
+      excludeConfirmed: this.mode() === 'saved',
+    };
+  }
+
+  private registrations(mode: 'pending' | 'registered' | 'history', params: EventSearchParams): Observable<RegisteredEventsResponse> {
+    if (mode === 'pending') return this.eventService.getPendingApprovalRegistrations(params);
+    if (mode === 'registered') return this.eventService.getActiveRegistrations(params);
+    return this.eventService.getRegistrationHistory(params);
+  }
+
+  private load(mode: MyEventsTabMode, query: EventFilterQuery, page: number, pageSize: number): Observable<TabPage> {
+    const params = this.searchParams(query, page, pageSize);
+    if (mode === 'saved') {
+      return this.savedEvents.searchSavedEvents(params).pipe(switchMap((response) => this.withStatuses(response)));
     }
-    const request = mode === 'pending'
-      ? this.eventService.getPendingApprovalRegistrations(page, this.pageSize())
-      : mode === 'registered'
-        ? this.eventService.getActiveRegistrations(page, this.pageSize())
-        : this.eventService.getRegistrationHistory(page, this.pageSize());
-    return request.pipe(
-      switchMap((response) => [{
-        items: response.items.map((item): TabEntry => ({ event: item.event, status: item.status })),
-        total: response.total,
-        totalPages: response.totalPages,
-      }]),
+    return this.registrations(mode, params).pipe(map((response) => ({
+      items: response.items.map((item): TabEntry => ({ event: item.event, status: item.status })),
+      total: response.total,
+      totalPages: response.totalPages,
+    })));
+  }
+
+  // The filter dialog's live preview: how many events THIS tab would hold under the draft
+  // selection. countOnly means only `total` is read, so the server skips building and decorating
+  // a page of full event records just to report a number.
+  private count(mode: MyEventsTabMode, query: EventFilterQuery): Observable<number> {
+    const params = { ...this.searchParams(query, 1, 1), countOnly: true };
+    const request: Observable<{ total: number }> = mode === 'saved'
+      ? this.savedEvents.searchSavedEvents(params)
+      : this.registrations(mode, params);
+    return request.pipe(map((response) => response.total));
+  }
+
+  // Saved events carry no registration status of their own, so the card's status badge needs one
+  // batched lookup for the page that was returned — not one request per card.
+  private withStatuses(response: SavedEventsResponse): Observable<TabPage> {
+    const page = { total: response.total, totalPages: response.totalPages };
+    if (response.items.length === 0) return of({ ...page, items: [] });
+    return this.eventService.getRegistrationStatuses(response.items.map((item) => item.id)).pipe(
+      map((statuses) => ({
+        ...page,
+        items: response.items.map((item): TabEntry => ({ event: item, status: statuses.get(item.id) ?? null })),
+      })),
+      catchError(() => of({ ...page, items: response.items.map((item): TabEntry => ({ event: item, status: null })) })),
     );
   }
 
@@ -162,6 +251,16 @@ export class MyEventsTabComponent {
   setPage(value: number): void { this.page.set(Math.max(1, Math.min(value, this.totalPages()))); }
   // Back to page 1: page 3 of 25-row pages is not page 3 of 5-row pages.
   setPageSize(size: number): void { this.pageSize.set(size); this.page.set(1); }
+
+  // A narrower list can be shorter than the page you were on, so every query change restarts at
+  // page 1 — the same rule Explore Events follows.
+  onQueryChange(): void { this.page.set(1); }
+
+  clearFilters(): void {
+    this.filters.clearApplied();
+    this.filters.setSearchTerm('');
+    this.onQueryChange();
+  }
 
   toggleSaved(eventId: string): void {
     const user = this.auth.user();

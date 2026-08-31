@@ -10,63 +10,13 @@
     </div>
   }
 
-  <div
-    class="explore-toolbar"
-    [class.explore-toolbar--internal]="variant() === 'internal'"
-    role="search"
-  >
-    <div class="explore-toolbar__controls">
-      @if (variant() === 'internal') {
-        <app-filter-button
-          label="Filters"
-          ariaLabel="Open event filters"
-          [count]="appliedFilterCount()"
-          [expanded]="filterOpen()"
-          (triggered)="openFilters()"
-        />
-      }
-
-      <app-expandable-search
-        ariaLabel="Search events, categories or venues"
-        placeholder="Search events, categories or venues"
-        [value]="searchTerm()"
-        (valueChange)="onSearchTerm($event)"
-      />
-    </div>
-
-    <div class="explore-toolbar__right">
-      <p class="explore-toolbar__count" aria-live="polite">
-        <strong>{{ resultCount() }}</strong>
-        {{ resultCount() === 1 ? 'event' : 'events' }} found
-      </p>
-
-      @if (variant() === 'internal') {
-        <button type="button" class="explore-toolbar__reset" (click)="clearAppliedFilters()">
-          <span class="material-symbols-rounded" aria-hidden="true">refresh</span>
-          Reset
-        </button>
-      }
-    </div>
-  </div>
-
-  @if (variant() === 'internal' && appliedFilterChips().length > 0) {
-    <div class="applied-filters" aria-label="Applied filters">
-      @for (chip of appliedFilterChips(); track chip.group + chip.value) {
-        <button
-          type="button"
-          class="applied-filter"
-          [attr.aria-label]="'Remove ' + chip.value + ' filter'"
-          (click)="removeAppliedFilter(chip.group, chip.value)"
-        >
-          <span>{{ chip.value }}</span>
-          <span aria-hidden="true">×</span>
-        </button>
-      }
-      <button type="button" class="applied-filters__clear" (click)="clearAppliedFilters()">
-        Clear all
-      </button>
-    </div>
-  }
+  <app-event-filter-bar
+    [state]="filters"
+    [resultCount]="resultCount()"
+    [showFilters]="variant() === 'internal'"
+    [flushTop]="variant() === 'internal'"
+    (queryChange)="goToPage(1)"
+  />
 
   @if (showSkeleton()) {
     <app-skeleton variant="cards" label="Loading events…" [count]="pageSize()" />
@@ -117,49 +67,10 @@
 
 <app-event-details-modal [open]="!!selectedPublishedEvent()" [event]="selectedPublishedEvent()" (close)="closeEvent()" (registered)="onModalRegistered($event)" />
 
-<app-form-modal
-  [open]="variant() === 'internal' && filterOpen()"
-  title="Filter events"
-  [primaryLabel]="'Show ' + draftResultCount() + (draftResultCount() === 1 ? ' Result' : ' Results')"
-  secondaryLabel="Reset filters"
-  (close)="closeFilters()"
-  (cancel)="resetDraftFilters()"
-  (submit)="applyFilters()"
->
-  <div class="filter-dialog__body">
-    @for (group of filterGroups(); track group.key) {
-      <fieldset class="filter-group" [class.filter-group--wide]="group.wide">
-        <legend>{{ group.label }}</legend>
-        <div class="filter-options">
-          @for (option of group.options; track option) {
-            <button
-              type="button"
-              class="filter-option"
-              [class.filter-option--selected]="isDraftSelected(group.key, option)"
-              [attr.aria-pressed]="isDraftSelected(group.key, option)"
-              (click)="toggleDraftFilter(group.key, option)"
-            >
-              @if (isDraftSelected(group.key, option)) {
-                <span class="filter-option__check" aria-hidden="true">&#10003;</span>
-              }
-              <span>{{ option }}</span>
-            </button>
-          }
-        </div>
-
-        @if (group.key === 'date' && isDraftSelected('date', 'Custom Date Range')) {
-          <div class="custom-range">
-            <label>
-              <span>From</span>
-              <input type="date" [value]="draftCustomFrom()" (input)="onCustomDate($event, 'from')" />
-            </label>
-            <label>
-              <span>To</span>
-              <input type="date" [value]="draftCustomTo()" (input)="onCustomDate($event, 'to')" />
-            </label>
-          </div>
-        }
-      </fieldset>
-    }
-  </div>
-</app-form-modal>
+@if (variant() === 'internal') {
+  <app-event-filter-dialog
+    [state]="filters"
+    [draftResultCount]="draftResultCount()"
+    (applied)="goToPage(1)"
+  />
+}

@@ -1,11 +1,10 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { SiteFooterComponent } from '../../shared/components/site-footer/site-footer';
 import { SiteHeaderComponent } from '../../shared/components/site-header/site-header';
 
 @Component({
   selector: 'app-my-events',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet, SiteHeaderComponent, SiteFooterComponent],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, SiteHeaderComponent],
   templateUrl: './my-events.html',
   styleUrl: './my-events.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

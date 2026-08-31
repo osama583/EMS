@@ -4,6 +4,7 @@ import { Observable, catchError, map, of, shareReplay } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { MasterCalendarDay, MasterCalendarEventDetail, MasterCalendarSummary } from './master-calendar.models';
 import { EventRegistration, EventSearchParams, EventSearchResponse, PendingEventRegistration, PendingEventRegistrationPage, PublishedEvent, RegistrationResult } from './published-event.models';
+import { eventSearchHttpParams } from './event-search-params';
 import { EventRegistrationApi, RegisteredEventsResponse, RegistrationHistoryPage, RegistrationHistoryQuery, SavedEventsResponse } from './event-engagement.models';
 
 @Injectable({ providedIn: 'root' })
@@ -36,27 +37,7 @@ export class PublishedEventService implements EventRegistrationApi {
   // page/pageSize are all evaluated server-side (see events.py's search_events()) rather than
   // fetching every published event and filtering client-side.
   searchEvents(params: EventSearchParams): Observable<EventSearchResponse> {
-    let httpParams = new HttpParams();
-    const setList = (key: string, values: readonly string[] | undefined) => {
-      for (const value of values ?? []) httpParams = httpParams.append(key, value);
-    };
-    if (params.q) httpParams = httpParams.set('q', params.q);
-    setList('visibility', params.visibility);
-    setList('category', params.category);
-    setList('school', params.school);
-    setList('format', params.format);
-    setList('time', params.time);
-    setList('registration', params.registration);
-    setList('cost', params.cost);
-    setList('club', params.club);
-    setList('date', params.date);
-    if (params.dateFrom) httpParams = httpParams.set('dateFrom', params.dateFrom);
-    if (params.dateTo) httpParams = httpParams.set('dateTo', params.dateTo);
-    if (params.excludeRegistered) httpParams = httpParams.set('excludeRegistered', '1');
-    if (params.countOnly) httpParams = httpParams.set('countOnly', '1');
-    httpParams = httpParams.set('page', String(params.page ?? 1));
-    httpParams = httpParams.set('pageSize', String(params.pageSize ?? 9));
-    return this.http.get<EventSearchResponse>(`${this.baseUrl}/search`, { params: httpParams });
+    return this.http.get<EventSearchResponse>(`${this.baseUrl}/search`, { params: eventSearchHttpParams(params) });
   }
 
   // Explore Events' school-filter facet — distinct schools/departments across published events,
@@ -206,22 +187,28 @@ export class PublishedEventService implements EventRegistrationApi {
     return item.schedule.every((row) => new Date(`${row.date}T${row.end || '23:59'}:00`).getTime() < now);
   }
 
-  // page/pageSize are real server query params (events.py's my_registrations()) - the server
-  // filters by scope, counts, and slices in SQL, so the browser only ever receives the one page
-  // of results it's about to render.
-  getActiveRegistrations(page: number, pageSize: number): Observable<RegisteredEventsResponse> {
-    return this.http.get<RegisteredEventsResponse>(`${this.baseUrl}/me/registrations`, { params: { scope: 'active', page: String(page), pageSize: String(pageSize) } });
+  // The search box, every filter group and page/pageSize are real server query params (events.py's
+  // my_registrations()) - the server narrows by scope, filters, counts and slices in SQL, so the
+  // browser only ever receives the one page of results it is about to render.
+  private myRegistrations(scope: 'active' | 'pending' | 'history', params: EventSearchParams): Observable<RegisteredEventsResponse> {
+    return this.http.get<RegisteredEventsResponse>(`${this.baseUrl}/me/registrations`, {
+      params: eventSearchHttpParams(params).set('scope', scope),
+    });
+  }
+
+  getActiveRegistrations(params: EventSearchParams): Observable<RegisteredEventsResponse> {
+    return this.myRegistrations('active', params);
   }
 
   // Events I registered for that use manual approval and are still awaiting the organiser's
   // decision (my own registration, not the organiser's approval queue - see pending-approvals
   // for that direction).
-  getPendingApprovalRegistrations(page: number, pageSize: number): Observable<RegisteredEventsResponse> {
-    return this.http.get<RegisteredEventsResponse>(`${this.baseUrl}/me/registrations`, { params: { scope: 'pending', page: String(page), pageSize: String(pageSize) } });
+  getPendingApprovalRegistrations(params: EventSearchParams): Observable<RegisteredEventsResponse> {
+    return this.myRegistrations('pending', params);
   }
 
-  getRegistrationHistory(page: number, pageSize: number): Observable<RegisteredEventsResponse> {
-    return this.http.get<RegisteredEventsResponse>(`${this.baseUrl}/me/registrations`, { params: { scope: 'history', page: String(page), pageSize: String(pageSize) } });
+  getRegistrationHistory(params: EventSearchParams): Observable<RegisteredEventsResponse> {
+    return this.myRegistrations('history', params);
   }
 
   // Events I proposed (or co-own) that are now published — my own organiser dashboard (Created by Me).

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security and identity architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#fff}
+  body{display:flex;justify-content:center;padding:24px 18px}
+  svg{width:100%;max-width:1320px;height:auto;display:block}
+
+  .sec  {font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:19px;letter-spacing:.16em;text-transform:uppercase;fill:#27456F}
+  .nm   {font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:20px;letter-spacing:.045em;text-transform:uppercase;fill:#141A20}
+  .nm-s {font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:16px;letter-spacing:.05em;text-transform:uppercase;fill:#141A20}
+  .ent  {font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:13px;fill:#141A20}
+  .cd   {font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:12px;fill:#27456F}
+  .tx   {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11.5px;fill:#57626E}
+  .dim  {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11px;fill:#8A939D}
+  .card {font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:11px;fill:#4E6A93}
+  .tier {font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:10.5px;letter-spacing:.17em;text-transform:uppercase;fill:#4E6A93}
+  .warn {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11.5px;fill:#8E3A22}
+  .warnb{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:15px;letter-spacing:.1em;text-transform:uppercase;fill:#8E3A22}
+
+  .box   {fill:#FFFFFF;stroke:#27456F;stroke-width:1.6}
+  .box-l {fill:#FDFDFC;stroke:#AFBAC4;stroke-width:1.2}
+  .strip {fill:#E4EAF2}
+  .band  {fill:#F6F8FA;stroke:#AFBAC4;stroke-width:1;stroke-dasharray:4 4}
+  .rule  {stroke:#AFBAC4;stroke-width:1.1}
+  .ed    {stroke:#27456F;stroke-width:1.8;fill:none}
+  .ed-t  {stroke:#7C8DA1;stroke-width:1.3;fill:none}
+  .ed-x  {stroke:#C08670;stroke-width:1.6;fill:none;stroke-dasharray:6 4}
+  .ico   {fill:none;stroke:#27456F;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+</style>
+</head>
+<body>
+
+<svg viewBox="0 0 1320 1000" role="img"
+     aria-label="Security and identity architecture: the RBAC model and the three authorization tiers">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#27456F"/>
+    </marker>
+    <marker id="at" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7C8DA1"/>
+    </marker>
+    <marker id="ax" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#C08670"/>
+    </marker>
+  </defs>
+
+  <!-- ══════ LEFT: identity model ══════ -->
+  <rect class="band" x="24" y="52" width="430" height="700" rx="3"/>
+  <text class="sec" x="38" y="40">Identity model — who the actor is</text>
+
+  <!-- users -->
+  <rect class="box" x="52" y="80" width="180" height="86" rx="2"/>
+  <rect class="strip" x="52.8" y="80.8" width="178.4" height="26"/>
+  <line class="rule" x1="52" y1="106.8" x2="232" y2="106.8"/>
+  <text class="ent" x="66" y="99">users</text>
+  <text class="tx"  x="66" y="126">user_id · email</text>
+  <text class="tx"  x="66" y="143">full_name · is_active</text>
+  <text class="tx"  x="66" y="160">password (bcrypt)</text>
+
+  <!-- unit -->
+  <rect class="box" x="256" y="80" width="170" height="86" rx="2"/>
+  <rect class="strip" x="256.8" y="80.8" width="168.4" height="26"/>
+  <line class="rule" x1="256" y1="106.8" x2="426" y2="106.8"/>
+  <text class="ent" x="270" y="99">unit</text>
+  <text class="tx"  x="270" y="126">code · description</text>
+  <text class="dim" x="270" y="143">schools, service</text>
+  <text class="dim" x="270" y="160">departments, cafeterias</text>
+
+  <!-- user_unit_roles (junction) -->
+  <rect class="box" x="112" y="252" width="256" height="104" rx="2"/>
+  <rect class="strip" x="112.8" y="252.8" width="254.4" height="26"/>
+  <line class="rule" x1="112" y1="278.8" x2="368" y2="278.8"/>
+  <text class="ent" x="126" y="271">user_unit_roles</text>
+  <text class="tx"  x="126" y="298">user_id · role_code · unit_code</text>
+  <text class="tx"  x="126" y="316">assigned_at · archived_at</text>
+  <line class="rule" x1="126" y1="328" x2="354" y2="328" stroke-dasharray="3 3"/>
+  <text class="dim" x="126" y="346">one user holds many rows</text>
+
+  <!-- role -->
+  <rect class="box" x="52" y="440" width="180" height="86" rx="2"/>
+  <rect class="strip" x="52.8" y="440.8" width="178.4" height="26"/>
+  <line class="rule" x1="52" y1="466.8" x2="232" y2="466.8"/>
+  <text class="ent" x="66" y="459">role</text>
+  <text class="tx"  x="66" y="486">role_code · role_name</text>
+  <text class="tx"  x="66" y="503">is_protected</text>
+  <text class="dim" x="66" y="520">12 seeded roles</text>
+
+  <!-- role_unit -->
+  <rect class="box" x="256" y="440" width="170" height="86" rx="2"/>
+  <rect class="strip" x="256.8" y="440.8" width="168.4" height="26"/>
+  <line class="rule" x1="256" y1="466.8" x2="426" y2="466.8"/>
+  <text class="ent" x="270" y="459">role_unit</text>
+  <text class="tx"  x="270" y="486">role_code · unit_code</text>
+  <text class="dim" x="270" y="503">which units a role</text>
+  <text class="dim" x="270" y="520">may be paired with</text>
+
+  <!-- relationships -->
+  <path class="ed-t" d="M142,166 V252" marker-end="url(#at)"/>
+  <text class="card" x="150" y="200">1</text>
+  <text class="card" x="150" y="240">N</text>
+  <path class="ed-t" d="M340,166 V252" marker-end="url(#at)"/>
+  <text class="card" x="348" y="200">1</text>
+  <text class="card" x="348" y="240">N</text>
+  <path class="ed-t" d="M142,440 V356" marker-end="url(#at)"/>
+  <text class="card" x="150" y="380">N</text>
+  <text class="card" x="150" y="424">1</text>
+  <path class="ed-t" d="M232,483 H256" marker-end="url(#at)"/>
+
+  <!-- the two shapes a row can take -->
+  <rect class="box-l" x="52" y="574" width="374" height="72" rx="2"/>
+  <text class="tier" x="66" y="594">Flat role</text>
+  <text class="tx"   x="66" y="614">unit_code IS NULL — cfo, system-admin,</text>
+  <text class="tx"   x="66" y="632">club-admin, cafeteria-admin, external-user</text>
+
+  <rect class="box-l" x="52" y="656" width="374" height="72" rx="2"/>
+  <text class="tier" x="66" y="676">Unit-scoped role</text>
+  <text class="tx"   x="66" y="696">unit_code SET — head-of-school @ school_of_computing,</text>
+  <text class="tx"   x="66" y="714">staff @ logistics_and_facilities, …</text>
+
+  <!-- ══════ RIGHT: enforcement chain ══════ -->
+  <text class="sec" x="510" y="40">Enforcement — what the actor may do</text>
+
+  <!-- inbound -->
+  <rect class="box" x="510" y="64" width="330" height="72" rx="2"/>
+  <text class="nm-s" x="528" y="90">Inbound request</text>
+  <text class="tx"   x="528" y="112">Authorization: Bearer &lt;access JWT&gt;</text>
+  <text class="dim"  x="528" y="128">access 30 min · refresh 14 days</text>
+
+  <path class="ed" d="M675,136 V184" marker-end="url(#a)"/>
+
+  <!-- authenticate -->
+  <rect class="box" x="510" y="188" width="330" height="76" rx="2"/>
+  <rect class="strip" x="510.8" y="188.8" width="328.4" height="26"/>
+  <line class="rule" x1="510" y1="214.8" x2="840" y2="214.8"/>
+  <text class="ent" x="528" y="207">security/decorators.authenticate()</text>
+  <text class="tx"  x="528" y="234">decode_token(expected_type=ACCESS)</text>
+  <text class="dim" x="528" y="252">idempotent — safe to apply twice</text>
+
+  <path class="ed" d="M675,264 V312" marker-end="url(#a)"/>
+
+  <!-- principal -->
+  <rect class="box" x="510" y="316" width="330" height="96" rx="2"/>
+  <rect class="strip" x="510.8" y="316.8" width="328.4" height="26"/>
+  <line class="rule" x1="510" y1="342.8" x2="840" y2="342.8"/>
+  <text class="ent" x="528" y="335">security/principal.load_principal()</text>
+  <text class="tx"  x="528" y="362">SELECT role_code, unit_code</text>
+  <text class="tx"  x="528" y="379">FROM user_unit_roles WHERE user_id = %s</text>
+  <text class="tx"  x="528" y="398">→ Principal on flask.g</text>
+
+  <path class="ed-t" d="M510,364 H400 V320" marker-end="url(#at)"/>
+  <text class="dim" x="384" y="392" text-anchor="end">read from</text>
+  <text class="dim" x="384" y="408" text-anchor="end">the junction table</text>
+
+  <!-- the key design decision -->
+  <rect class="box-l" x="870" y="316" width="418" height="96" rx="2"
+        stroke="#C08670" stroke-dasharray="6 4"/>
+  <text class="warnb" x="888" y="340">Rebuilt every request</text>
+  <text class="warn"  x="888" y="362">Roles are never read from the token claims. An</text>
+  <text class="warn"  x="888" y="380">administrator who revokes a role has it take effect</text>
+  <text class="warn"  x="888" y="398">now, not when the access token happens to expire.</text>
+  <path class="ed-x" d="M866,364 H844" marker-end="url(#ax)"/>
+
+  <path class="ed" d="M675,412 V456" marker-end="url(#a)"/>
+
+  <!-- three tiers -->
+  <rect class="band" x="480" y="460" width="808" height="300" rx="3"/>
+  <text class="sec" x="498" y="484">Three enforcement tiers</text>
+
+  <rect class="box" x="498" y="500" width="772" height="72" rx="2"/>
+  <text class="tier"  x="516" y="522">Tier A · coarse, role-shaped</text>
+  <text class="ent"   x="516" y="544">@require_auth · @require_role · @require_internal</text>
+  <text class="dim"   x="516" y="562">Answers &quot;may this KIND of actor call this endpoint at all&quot;. No row loaded yet.</text>
+
+  <rect class="box" x="498" y="584" width="772" height="80" rx="2"/>
+  <text class="tier"  x="516" y="606">Tier B · row-state, needs the record</text>
+  <text class="ent"   x="516" y="628">services/workflow/authorization.py</text>
+  <text class="dim"   x="516" y="646">assert_proposal_owner · authorize_stage_action · authorize_department_task · authorize_cancel</text>
+  <text class="dim"   x="516" y="662">&quot;Is this caller the named reviewer for THIS proposal at THIS stage?&quot;</text>
+
+  <rect class="box" x="498" y="676" width="772" height="70" rx="2"/>
+  <text class="tier"  x="516" y="698">Tier C · scoped in SQL</text>
+  <text class="dim"   x="516" y="720">List endpoints add the caller&#39;s scope as a WHERE predicate, so unauthorised rows are</text>
+  <text class="dim"   x="516" y="737">never fetched — not fetched and then hidden. Same rule drives ai/scope_rules.py.</text>
+
+  <path class="ed-t" d="M884,572 V584" marker-end="url(#at)"/>
+  <path class="ed-t" d="M884,664 V676" marker-end="url(#at)"/>
+
+  <!-- outcomes -->
+  <path class="ed" d="M624,746 V800" marker-end="url(#a)"/>
+  <path class="ed-x" d="M1000,746 V800" marker-end="url(#ax)"/>
+
+  <rect class="box" x="498" y="804" width="252" height="66" rx="2"/>
+  <text class="nm" x="516" y="832">Allowed</text>
+  <text class="dim" x="516" y="854">handler runs, scoped rows returned</text>
+
+  <rect class="box-l" x="874" y="804" width="252" height="66" rx="2"
+        stroke="#C08670" stroke-dasharray="6 4"/>
+  <text class="warnb" x="892" y="830">Refused</text>
+  <text class="warn"  x="892" y="852">401 unauthenticated · 403 forbidden</text>
+
+  <!-- public tier note -->
+  <rect class="box-l" x="498" y="892" width="772" height="72" rx="2"/>
+  <text class="tier" x="516" y="914">Public but personalised</text>
+  <text class="dim"  x="516" y="934">authenticate_optional() — no credential means guest, and the endpoint serves its public tier.</text>
+  <text class="dim"  x="516" y="951">A credential that does not verify still returns 401, so the client can refresh and replay (Fig. 9).</text>
+
+</svg>
+</body>
+</html>

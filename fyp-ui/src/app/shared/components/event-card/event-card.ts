@@ -22,16 +22,19 @@ import { EVENT_IMAGE_PLACEHOLDER } from '../../event-image-placeholder';
 
       <div class="explore-card__content">
         <h3>{{ event().eventTitle }}</h3>
-        <span class="explore-card__category">{{ event().categories.join(' / ') }}</span>
+        <span class="explore-card__category">{{ (event().categories ?? []).join(' / ') }}</span>
         <dl class="explore-card__details">
           <div><dt>Date</dt><dd><time [attr.datetime]="schedule()?.date">{{ displayDate() }}</time></dd></div>
           <div><dt>Time</dt><dd>{{ displayTime() }}</dd></div>
           <div><dt>Venue</dt><dd>{{ schedule()?.location || 'To be confirmed' }}</dd></div>
         </dl>
-        @if (event().clubs.length > 0) {
+        <!-- ?? [] on both collections: a payload that omits one used to throw from inside this
+             template, and a throw here aborts the whole change-detection pass - the card renders
+             half-drawn and the page stops reacting to anything, pagination included. -->
+        @if ((event().clubs ?? []).length > 0) {
           <p class="explore-card__clubs">
             <span class="material-symbols-rounded" aria-hidden="true">groups</span>
-            {{ event().clubs.join(', ') }}
+            {{ (event().clubs ?? []).join(', ') }}
           </p>
         }
         <p class="explore-card__registered">{{ event().confirmedRegistrationCount }} registered</p>

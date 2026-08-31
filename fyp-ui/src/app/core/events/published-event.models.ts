@@ -129,6 +129,10 @@ export interface EventSearchParams {
   readonly dateFrom?: string;
   readonly dateTo?: string;
   readonly excludeRegistered?: boolean;
+  // My Events > Saved only: drops saved events the caller already has a confirmed place on, which
+  // belong under Registered instead. Applied in the same query that produces the count, so the
+  // pagination describes the list actually on screen.
+  readonly excludeConfirmed?: boolean;
   readonly page?: number;
   readonly pageSize?: number;
   // Skips building/decorating `items` server-side entirely (schedule/categories/audience sub-queries,

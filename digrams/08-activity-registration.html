@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Activity — publication, registration and payment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#fff}
+  body{display:flex;justify-content:center;padding:24px 18px}
+  svg{width:100%;max-width:1340px;height:auto;display:block}
+
+  .lane {font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:18px;letter-spacing:.14em;text-transform:uppercase;fill:#27456F}
+  .ac   {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11.5px;fill:#243039}
+  .stt  {font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:10px;fill:#4E6A93}
+  .gd   {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10.5px;fill:#5A6672}
+  .dc   {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10.5px;fill:#243039}
+  .note {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10.5px;fill:#8A939D}
+  .warn {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10.5px;fill:#8E3A22}
+  .fin  {font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:14px;letter-spacing:.08em;text-transform:uppercase;fill:#141A20}
+
+  .lanebg{fill:#F8FAFB}
+  .lanel {stroke:#AFBAC4;stroke-width:1.2}
+  .act   {fill:#FFFFFF;stroke:#27456F;stroke-width:1.5}
+  .dia   {fill:#FFFFFF;stroke:#27456F;stroke-width:1.5}
+  .fl    {stroke:#27456F;stroke-width:1.6;fill:none}
+  .fl-x  {stroke:#C08670;stroke-width:1.5;fill:none;stroke-dasharray:6 4}
+  .fl-b  {stroke:#7C8DA1;stroke-width:1.4;fill:none;stroke-dasharray:5 4}
+  .nbox  {fill:#FFFFFF;stroke:#AFBAC4;stroke-width:1.1;stroke-dasharray:4 4}
+</style>
+</head>
+<body>
+
+<svg viewBox="0 0 1340 1380" role="img"
+     aria-label="Activity diagram: event publication, registration and payment">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#27456F"/></marker>
+    <marker id="ax" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#C08670"/></marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7C8DA1"/></marker>
+  </defs>
+
+  <!-- lanes -->
+  <rect class="lanebg" x="40" y="34" width="320" height="1300"/>
+  <rect class="lanebg" x="680" y="34" width="320" height="1300"/>
+  <line class="lanel" x1="40"   y1="34" x2="40"   y2="1334"/>
+  <line class="lanel" x1="360"  y1="34" x2="360"  y2="1334"/>
+  <line class="lanel" x1="680"  y1="34" x2="680"  y2="1334"/>
+  <line class="lanel" x1="1000" y1="34" x2="1000" y2="1334"/>
+  <line class="lanel" x1="40" y1="34"   x2="1000" y2="34"/>
+  <line class="lanel" x1="40" y1="76"   x2="1000" y2="76"/>
+  <line class="lanel" x1="40" y1="1334" x2="1000" y2="1334"/>
+
+  <text class="lane" x="200" y="62" text-anchor="middle">System</text>
+  <text class="lane" x="520" y="62" text-anchor="middle">Attendee</text>
+  <text class="lane" x="840" y="62" text-anchor="middle">Organizer</text>
+
+  <!-- publication -->
+  <circle cx="200" cy="118" r="11" fill="#27456F"/>
+  <text class="note" x="222" y="122">proposal reaches completed_approved (Fig. 6)</text>
+  <path class="fl" d="M200,129 V156" marker-end="url(#a)"/>
+
+  <rect class="act" x="105" y="160" width="190" height="60" rx="10"/>
+  <text class="ac" x="200" y="182" text-anchor="middle">Publish the event</text>
+  <text class="note" x="200" y="198" text-anchor="middle">explore · search ·</text>
+  <text class="note" x="200" y="212" text-anchor="middle">master calendar</text>
+
+  <path class="fl" d="M295,190 H520 V228" marker-end="url(#a)"/>
+
+  <!-- attendee -->
+  <rect class="act" x="425" y="232" width="190" height="52" rx="10"/>
+  <text class="ac" x="520" y="254" text-anchor="middle">Discover the event</text>
+  <text class="note" x="520" y="270" text-anchor="middle">browse, search or calendar</text>
+
+  <path class="fl" d="M520,284 V316" marker-end="url(#a)"/>
+  <path class="dia" d="M520,320 L606,368 L520,416 L434,368 Z"/>
+  <text class="dc" x="520" y="372" text-anchor="middle">action?</text>
+
+  <path class="fl" d="M434,368 H200 V404" marker-end="url(#a)"/>
+  <text class="gd" x="230" y="360">[save for later]</text>
+
+  <rect class="act" x="105" y="408" width="190" height="52" rx="10"/>
+  <text class="stt" x="200" y="428" text-anchor="middle">saved_event</text>
+  <text class="ac"  x="200" y="446" text-anchor="middle">Add to My Events</text>
+
+  <path class="fl" d="M200,460 V492" marker-end="url(#a)"/>
+  <rect class="act" x="105" y="496" width="190" height="52" rx="10"/>
+  <text class="ac" x="200" y="518" text-anchor="middle">Send reminder</text>
+  <text class="ac" x="200" y="534" text-anchor="middle">per preference</text>
+
+  <path class="fl" d="M520,416 V452" marker-end="url(#a)"/>
+  <text class="gd" x="530" y="440">[register]</text>
+
+  <!-- capacity -->
+  <path class="dia" d="M520,456 L606,504 L520,552 L434,504 Z"/>
+  <text class="dc" x="520" y="500" text-anchor="middle">capacity</text>
+  <text class="dc" x="520" y="514" text-anchor="middle">available?</text>
+
+  <path class="fl-x" d="M434,504 H340 V466" marker-end="url(#ax)"/>
+  <text class="warn" x="300" y="456">[no] refused</text>
+
+  <path class="fl" d="M520,552 V588" marker-end="url(#a)"/>
+  <text class="gd" x="530" y="576">[yes]</text>
+
+  <!-- approval mode -->
+  <path class="dia" d="M520,592 L626,652 L520,712 L414,652 Z"/>
+  <text class="dc" x="520" y="646" text-anchor="middle">registration_approval</text>
+  <text class="dc" x="520" y="660" text-anchor="middle">= auto or manual?</text>
+
+  <path class="fl" d="M414,652 H200 V690" marker-end="url(#a)"/>
+  <text class="gd" x="228" y="644">[auto]</text>
+
+  <rect class="act" x="105" y="694" width="190" height="52" rx="10"/>
+  <text class="stt" x="200" y="714" text-anchor="middle">registered</text>
+  <text class="ac"  x="200" y="732" text-anchor="middle">Place immediately</text>
+
+  <path class="fl" d="M626,652 H840 V690" marker-end="url(#a)"/>
+  <text class="gd" x="654" y="644">[manual]</text>
+
+  <rect class="act" x="745" y="694" width="190" height="60" rx="10"/>
+  <text class="stt" x="840" y="716" text-anchor="middle">pending_approval</text>
+  <text class="ac"  x="840" y="734" text-anchor="middle">Organizer reviews</text>
+  <text class="note" x="840" y="750" text-anchor="middle">reason_for_attending shown</text>
+
+  <path class="fl" d="M840,754 V786" marker-end="url(#a)"/>
+  <path class="dia" d="M840,790 L926,838 L840,886 L754,838 Z"/>
+  <text class="dc" x="840" y="842" text-anchor="middle">decision?</text>
+
+  <path class="fl-x" d="M926,838 H980 V800" marker-end="url(#ax)"/>
+  <text class="warn" x="944" y="790">[reject]</text>
+  <text class="warn" x="944" y="776">rejected</text>
+
+  <path class="fl" d="M754,838 H200 V872" marker-end="url(#a)"/>
+  <text class="gd" x="300" y="830">[approve] → registered</text>
+
+  <!-- payment -->
+  <path class="dia" d="M200,876 L286,924 L200,972 L114,924 Z"/>
+  <text class="dc" x="200" y="918" text-anchor="middle">cost_amount</text>
+  <text class="dc" x="200" y="932" text-anchor="middle">&gt; 0?</text>
+
+  <path class="fl" d="M286,924 H520 V960" marker-end="url(#a)"/>
+  <text class="gd" x="316" y="916">[yes]</text>
+
+  <rect class="act" x="425" y="964" width="190" height="60" rx="10"/>
+  <text class="stt" x="520" y="986" text-anchor="middle">pending_review</text>
+  <text class="ac"  x="520" y="1004" text-anchor="middle">Upload payment proof</text>
+  <text class="note" x="520" y="1020" text-anchor="middle">image or PDF</text>
+
+  <path class="fl" d="M615,994 H840 V1030" marker-end="url(#a)"/>
+
+  <rect class="act" x="745" y="1034" width="190" height="52" rx="10"/>
+  <text class="ac" x="840" y="1056" text-anchor="middle">Review the proof</text>
+  <text class="note" x="840" y="1072" text-anchor="middle">approve or reject</text>
+
+  <path class="fl" d="M840,1086 V1118" marker-end="url(#a)"/>
+  <path class="dia" d="M840,1122 L926,1170 L840,1218 L754,1170 Z"/>
+  <text class="dc" x="840" y="1174" text-anchor="middle">payment ok?</text>
+
+  <path class="fl-x" d="M926,1170 H980 V1132" marker-end="url(#ax)"/>
+  <text class="warn" x="944" y="1122">[no] rejected</text>
+
+  <path class="fl" d="M200,972 V1240" marker-end="url(#a)"/>
+  <text class="gd" x="210" y="1000">[no] — nothing to pay</text>
+  <path class="fl" d="M754,1170 H200" marker-end="url(#a)"/>
+  <text class="gd" x="470" y="1162">[yes] payment_status = approved</text>
+
+  <circle cx="200" cy="1264" r="15" fill="none" stroke="#27456F" stroke-width="1.6"/>
+  <circle cx="200" cy="1264" r="9" fill="#27456F"/>
+  <text class="fin" x="200" y="1302" text-anchor="middle">place confirmed</text>
+
+  <!-- cancel and re-register -->
+  <path class="fl-b" d="M615,254 H660 V1290 H540" marker-end="url(#ab)"/>
+  <rect class="act" x="425" y="1264" width="115" height="52" rx="10"/>
+  <text class="stt" x="482" y="1284" text-anchor="middle">cancelled</text>
+  <text class="ac"  x="482" y="1302" text-anchor="middle">Cancel place</text>
+  <text class="note" x="836" y="1290">cancelling frees the place;</text>
+  <text class="note" x="836" y="1306">the attendee may register</text>
+  <text class="note" x="836" y="1322">for the same event again</text>
+
+  <!-- notes -->
+  <rect class="nbox" x="1020" y="160" width="300" height="158" rx="3"/>
+  <text class="lane" x="1038" y="186">Two status columns</text>
+  <text class="stt"  x="1038" y="212">status</text>
+  <text class="note" x="1038" y="228">registered · pending_approval ·</text>
+  <text class="note" x="1038" y="244">rejected · cancelled</text>
+  <text class="stt"  x="1038" y="268">payment_status</text>
+  <text class="note" x="1038" y="284">not_required · pending_review ·</text>
+  <text class="note" x="1038" y="298">approved · rejected</text>
+
+  <rect class="nbox" x="1020" y="1160" width="300" height="120" rx="3"/>
+  <text class="lane" x="1038" y="1186">Re-registration</text>
+  <text class="note" x="1038" y="1212">The uniqueness rule on (request_id,</text>
+  <text class="note" x="1038" y="1228">user_id) excludes cancelled rows, so</text>
+  <text class="note" x="1038" y="1244">someone who cancels can register for</text>
+  <text class="note" x="1038" y="1260">the same event again later.</text>
+
+</svg>
+</body>
+</html>

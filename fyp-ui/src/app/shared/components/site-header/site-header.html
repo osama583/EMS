@@ -73,6 +73,11 @@
       <div class="site-nav__actions">
         @if (!minimal()) {
           <a class="nav-login-link" href="/my-events/saved" (click)="closeMenu()">My Events</a>
+        } @else {
+          <!-- The minimal header hides the section nav, which would otherwise be the only way
+               back to the listing this page's events came from. navigateToSection() already
+               routes to the landing page when the section is not on the current one. -->
+          <a class="nav-login-link" href="#explore-events" (click)="navigateToSection($event, '#explore-events')">Explore Events</a>
         }
         <button class="apply-link apply-link--logout" type="button" (click)="logout()">
           <span>Logout</span>

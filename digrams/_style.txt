@@ -1,0 +1,25 @@
+SHARED STYLE BLOCK — paste into every figure so all thirteen read as one system.
+Palette and type are identical across figures; only the notation changes.
+
+  html,body{margin:0;padding:0;background:#fff}
+  body{display:flex;justify-content:center;padding:24px 18px}
+  svg{width:100%;height:auto;display:block}
+
+  ink        #141A20   primary text
+  blue       #27456F   structural ink, node borders, arrows
+  strip      #E4EAF2   header fill
+  tint       #F6F8FA   grouping band fill
+  rule       #AFBAC4   hairline
+  dim        #8A939D   secondary annotation
+  pigment    #8E3A22   annotation / constraint / exceptional path
+  pig-soft   #C08670   dashed external + exceptional strokes
+
+  display    Barlow Condensed 600/700, uppercase, letter-spacing .05em
+  mono       IBM Plex Mono 400/500/600 — every identifier, protocol, status value
+
+CONVENTIONS HELD ACROSS ALL FIGURES
+  solid border      inside the system boundary
+  dashed border     outside the boundary / third party
+  pigment stroke    exceptional, refused, or rejected path
+  mono type         a literal identifier copied from source
+  no page frame, no title, no legend block — the figure is the deliverable

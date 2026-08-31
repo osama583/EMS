@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sequence — authentication and session recovery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#fff}
+  body{display:flex;justify-content:center;padding:24px 18px}
+  svg{width:100%;max-width:1360px;height:auto;display:block}
+
+  .ll   {font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:16px;letter-spacing:.05em;text-transform:uppercase;fill:#141A20}
+  .ll-s {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10px;fill:#8A939D}
+  .msg  {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11.5px;fill:#243039}
+  .ret  {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11.5px;fill:#5A6672}
+  .frag {font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:14px;letter-spacing:.12em;text-transform:uppercase;fill:#27456F}
+  .cond {font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:11px;fill:#4E6A93}
+  .note {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10.5px;fill:#8A939D}
+  .warn {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11px;fill:#8E3A22}
+  .phase{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:16px;letter-spacing:.16em;text-transform:uppercase;fill:#4E6A93}
+
+  .head {fill:#E4EAF2;stroke:#27456F;stroke-width:1.5}
+  .life {stroke:#8FA0B4;stroke-width:1.2;stroke-dasharray:5 5}
+  .actv {fill:#FFFFFF;stroke:#27456F;stroke-width:1.3}
+  .call {stroke:#27456F;stroke-width:1.5;fill:none}
+  .back {stroke:#7C8DA1;stroke-width:1.3;fill:none;stroke-dasharray:6 4}
+  .bad  {stroke:#C08670;stroke-width:1.4;fill:none;stroke-dasharray:6 4}
+  .fr   {fill:none;stroke:#27456F;stroke-width:1.4}
+  .frl  {stroke:#27456F;stroke-width:1.1;stroke-dasharray:5 4}
+  .nbox {fill:#FFFDF9;stroke:#C08670;stroke-width:1.3}
+  .pl   {stroke:#AFBAC4;stroke-width:1;stroke-dasharray:3 3}
+</style>
+</head>
+<body>
+
+<svg viewBox="0 0 1360 1220" role="img"
+     aria-label="Sequence diagram: guest registration, login and silent session recovery">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#27456F"/></marker>
+    <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10" fill="none" stroke="#7C8DA1" stroke-width="1.4"/></marker>
+    <marker id="ax" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10" fill="none" stroke="#C08670" stroke-width="1.4"/></marker>
+  </defs>
+
+  <!-- ══════ LIFELINES ══════ -->
+  <rect class="head" x="30"   y="40" width="160" height="46" rx="2"/>
+  <text class="ll"   x="110" y="62" text-anchor="middle">Guest / user</text>
+  <text class="ll-s" x="110" y="78" text-anchor="middle">browser</text>
+  <line class="life" x1="110" y1="86" x2="110" y2="1190"/>
+
+  <rect class="head" x="250"  y="40" width="160" height="46" rx="2"/>
+  <text class="ll"   x="330" y="62" text-anchor="middle">Angular client</text>
+  <text class="ll-s" x="330" y="78" text-anchor="middle">auth.service</text>
+  <line class="life" x1="330" y1="86" x2="330" y2="1190"/>
+
+  <rect class="head" x="480"  y="40" width="160" height="46" rx="2"/>
+  <text class="ll"   x="560" y="62" text-anchor="middle">Interceptor</text>
+  <text class="ll-s" x="560" y="78" text-anchor="middle">auth.interceptor</text>
+  <line class="life" x1="560" y1="86" x2="560" y2="1190"/>
+
+  <rect class="head" x="730"  y="40" width="160" height="46" rx="2"/>
+  <text class="ll"   x="810" y="62" text-anchor="middle">Flask API</text>
+  <text class="ll-s" x="810" y="78" text-anchor="middle">api/auth.py</text>
+  <line class="life" x1="810" y1="86" x2="810" y2="1190"/>
+
+  <rect class="head" x="970"  y="40" width="160" height="46" rx="2"/>
+  <text class="ll"   x="1050" y="62" text-anchor="middle">PostgreSQL</text>
+  <line class="life" x1="1050" y1="86" x2="1050" y2="1190"/>
+
+  <rect class="head" x="1180" y="40" width="150" height="46" rx="2"/>
+  <text class="ll"   x="1255" y="62" text-anchor="middle">SMTP</text>
+  <line class="life" x1="1255" y1="86" x2="1255" y2="1190"/>
+
+  <!-- ══════ PHASE 1 — registration ══════ -->
+  <text class="phase" x="30" y="118">1 · Guest self-registration</text>
+  <line class="pl" x1="30" y1="128" x2="1330" y2="128"/>
+
+  <rect class="actv" x="105" y="150" width="10" height="330"/>
+  <rect class="actv" x="325" y="152" width="10" height="320"/>
+  <rect class="actv" x="805" y="180" width="10" height="130"/>
+  <rect class="actv" x="805" y="360" width="10" height="112"/>
+
+  <path class="call" d="M115,158 H325" marker-end="url(#a)"/>
+  <text class="msg" x="130" y="152">complete the registration form</text>
+
+  <path class="call" d="M335,186 H805" marker-end="url(#a)"/>
+  <text class="msg" x="350" y="180">POST /api/v1/auth/register/start</text>
+
+  <path class="call" d="M815,216 H1045" marker-end="url(#a)"/>
+  <text class="msg" x="828" y="210">INSERT registration_challenge</text>
+  <text class="note" x="828" y="230">otp bcrypt-hashed · attempts · expires_at</text>
+
+  <path class="call" d="M815,262 H1250" marker-end="url(#a)"/>
+  <text class="msg" x="828" y="256">send the six-digit code</text>
+
+  <path class="back" d="M805,300 H335" marker-end="url(#ao)"/>
+  <text class="ret" x="350" y="294">202 — code sent, no account yet</text>
+
+  <path class="call" d="M115,336 H325" marker-end="url(#a)"/>
+  <text class="msg" x="130" y="330">enter the code</text>
+
+  <path class="call" d="M335,366 H805" marker-end="url(#a)"/>
+  <text class="msg" x="350" y="360">POST /api/v1/auth/register/verify</text>
+
+  <path class="call" d="M815,396 H1045" marker-end="url(#a)"/>
+  <text class="msg" x="828" y="390">check code, attempt count and expiry</text>
+
+  <path class="call" d="M815,438 H1045" marker-end="url(#a)"/>
+  <text class="msg" x="828" y="432">INSERT users</text>
+
+  <rect class="nbox" x="330" y="452" width="440" height="54" rx="2"/>
+  <text class="warn" x="346" y="472">The account first exists at this message. An abandoned</text>
+  <text class="warn" x="346" y="490">or unverified attempt never becomes a user row.</text>
+
+  <path class="back" d="M805,530 H335" marker-end="url(#ao)"/>
+  <text class="ret" x="350" y="524">201 created</text>
+
+  <!-- ══════ PHASE 2 — login ══════ -->
+  <text class="phase" x="30" y="576">2 · Login</text>
+  <line class="pl" x1="30" y1="586" x2="1330" y2="586"/>
+
+  <rect class="actv" x="105" y="606" width="10" height="140"/>
+  <rect class="actv" x="325" y="608" width="10" height="140"/>
+  <rect class="actv" x="805" y="636" width="10" height="86"/>
+
+  <path class="call" d="M115,614 H325" marker-end="url(#a)"/>
+  <text class="msg" x="130" y="608">submit email and password</text>
+
+  <path class="call" d="M335,642 H805" marker-end="url(#a)"/>
+  <text class="msg" x="350" y="636">POST /api/v1/auth/login</text>
+
+  <path class="call" d="M815,672 H1045" marker-end="url(#a)"/>
+  <text class="msg" x="828" y="666">SELECT user · bcrypt verify</text>
+
+  <path class="back" d="M805,712 H335" marker-end="url(#ao)"/>
+  <text class="ret" x="350" y="706">access token (30 min) + refresh token (14 days)</text>
+
+  <path class="call" d="M340,740 H392 V730 H340" marker-end="url(#a)"/>
+  <text class="msg" x="400" y="736">store tokens</text>
+
+  <!-- ══════ PHASE 3 — silent recovery ══════ -->
+  <text class="phase" x="30" y="792">3 · Silent session recovery</text>
+  <line class="pl" x1="30" y1="802" x2="1330" y2="802"/>
+
+  <rect class="actv" x="325" y="822" width="10" height="330"/>
+  <rect class="actv" x="555" y="850" width="10" height="290"/>
+  <rect class="actv" x="805" y="878" width="10" height="60"/>
+
+  <path class="call" d="M335,856 H555" marker-end="url(#a)"/>
+  <text class="msg" x="348" y="850">any API call</text>
+
+  <path class="call" d="M565,884 H805" marker-end="url(#a)"/>
+  <text class="msg" x="578" y="878">attach Authorization: Bearer</text>
+
+  <path class="bad" d="M805,924 H565" marker-end="url(#ax)"/>
+  <text class="warn" x="578" y="918">401 — access token expired</text>
+
+  <!-- alt fragment -->
+  <rect class="fr" x="290" y="944" width="920" height="216" rx="2"/>
+  <path class="fr" d="M290,944 H360 L376,962 V972 H290"/>
+  <text class="frag" x="302" y="964">alt</text>
+  <text class="cond" x="390" y="964">[refresh token still valid]</text>
+
+  <rect class="actv" x="805" y="988" width="10" height="52"/>
+
+  <path class="call" d="M565,996 H805" marker-end="url(#a)"/>
+  <text class="msg" x="578" y="990">POST /api/v1/auth/refresh</text>
+
+  <path class="back" d="M805,1030 H565" marker-end="url(#ao)"/>
+  <text class="ret" x="578" y="1024">new access token</text>
+
+  <path class="call" d="M565,1060 H805" marker-end="url(#a)"/>
+  <text class="msg" x="578" y="1054">replay the original request unchanged</text>
+
+  <path class="back" d="M805,1090 H335" marker-end="url(#ao)"/>
+  <text class="ret" x="350" y="1084">200 — the caller never sees the interruption</text>
+
+  <line class="frl" x1="290" y1="1104" x2="1210" y2="1104"/>
+  <text class="cond" x="302" y="1122">[refresh token also expired]</text>
+
+  <path class="bad" d="M555,1146 H335" marker-end="url(#ax)"/>
+  <text class="warn" x="350" y="1140">clear tokens, redirect to login</text>
+
+</svg>
+</body>
+</html>

@@ -5,6 +5,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DestroyRef } from '@angular/core';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../auth/auth.service';
+import { eventSearchHttpParams } from './event-search-params';
+import { EventSearchParams } from './published-event.models';
 import {
   NotificationPreference,
   SavedEventMutationResponse,
@@ -34,11 +36,13 @@ export class SavedEventsService implements SavedEventsApi {
     return this.http.get<SavedEventsResponse>(`${this.baseUrl}/saved`, { params: { email: userEmail.trim().toLowerCase() } });
   }
 
-  // Server-side paginated counterpart to getSavedEvents() above, for the /my-events/saved list
-  // view - getSavedEvents() itself stays unpaginated because it also drives the app-wide "is this
-  // saved" heart-icon state (SavedEventsService.refresh()), which needs the complete id set.
-  searchSavedEvents(page: number, pageSize: number): Observable<SavedEventsResponse> {
-    return this.http.get<SavedEventsResponse>(`${this.baseUrl}/saved/search`, { params: { page: String(page), pageSize: String(pageSize) } });
+  // Server-side searched/filtered/paginated counterpart to getSavedEvents() above, for the
+  // /my-events/saved list view - it takes the same filter params as Explore Events, resolved by
+  // the same server-side builder. getSavedEvents() itself stays unfiltered and unpaginated
+  // because it also drives the app-wide "is this saved" heart-icon state
+  // (SavedEventsService.refresh()), which needs the complete id set.
+  searchSavedEvents(params: EventSearchParams): Observable<SavedEventsResponse> {
+    return this.http.get<SavedEventsResponse>(`${this.baseUrl}/saved/search`, { params: eventSearchHttpParams(params) });
   }
 
   // Optimistic: the heart flips the instant you click it, not after the PUT/DELETE round-trips —

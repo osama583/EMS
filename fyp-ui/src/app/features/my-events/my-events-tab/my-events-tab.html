@@ -7,14 +7,26 @@
     <app-reminder-settings [scope]="scope" />
   }
 
-  @if (loading()) {
-    <app-internal-page-state [loading]="true" [showClear]="false" />
+  <app-event-filter-bar
+    [state]="filters"
+    [resultCount]="total()"
+    (queryChange)="onQueryChange()"
+  />
+
+  @if (showSkeleton()) {
+    <app-skeleton variant="cards" label="Loading events…" [count]="pageSize()" />
   } @else if (error()) {
     <app-internal-page-state icon="error" title="Unable to load events" [description]="error()" [showClear]="false" />
   } @else if (entries().length === 0) {
-    <app-internal-page-state [icon]="emptyIcon()" [title]="emptyTitle()" [description]="emptyDescription()" [showClear]="false" />
+    <app-internal-page-state
+      [icon]="emptyIcon()"
+      [title]="emptyTitle()"
+      [description]="emptyDescription()"
+      [showClear]="isFiltered()"
+      (clear)="clearFilters()"
+    />
   } @else {
-    <section class="explore-grid" [attr.aria-label]="mode() + ' events'">
+    <section class="explore-grid" [class.explore-grid--refreshing]="loading()" [attr.aria-busy]="loading()" [attr.aria-label]="mode() + ' events'">
       @for (entry of entries(); track entry.event.id) {
         <app-event-card
           [event]="entry.event"
@@ -28,15 +40,27 @@
         />
       }
     </section>
-    @if (totalPages() > 1) {
+
+    <footer class="internal-table-workspace__pagination my-events-tab__pagination">
+      <span class="internal-table-workspace__pagination-spacer" aria-hidden="true"></span>
       <app-internal-pagination
-        paginationLabel="Event pages" rowsPerPageLabel="Events per page"
-        [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()" [pageSizeOptions]="pageSizeOptions"
+        paginationLabel="Event pages"
+        rowsPerPageLabel="Events per page"
+        [totalPages]="totalPages()"
+        [page]="page()"
+        [pageSize]="pageSize()"
+        [pageSizeOptions]="pageSizeOptions"
         (pageChange)="setPage($event)"
         (pageSizeChange)="setPageSize($event)"
       />
-    }
+    </footer>
   }
 
   <app-event-details-modal [open]="!!selectedEvent()" [event]="selectedEvent()" (close)="selectedEvent.set(null)" (registered)="onModalRegistered($event)" />
 </div>
+
+<app-event-filter-dialog
+  [state]="filters"
+  [draftResultCount]="draftResultCount()"
+  (applied)="onQueryChange()"
+/>

@@ -1,0 +1,737 @@
+erDiagram
+
+    %% ═══ Identity and access ═══
+    users {
+        bigint user_id PK
+        varchar full_name
+        varchar email UK
+        varchar password
+        boolean is_active
+        timestamp archived_at
+    }
+    staff {
+        bigint staff_id PK
+        bigint user_id FK,UK
+        varchar department_or_school
+    }
+    student {
+        bigint student_id PK
+        bigint user_id FK,UK
+        varchar school
+    }
+    external_user_profile {
+        bigint external_user_profile_id PK
+        bigint user_id FK,UK
+        integer age
+        varchar gender
+        timestamp registered_at
+    }
+    unit {
+        varchar code PK
+        varchar description
+        boolean is_active
+        timestamp archived_at
+    }
+    role {
+        varchar role_code PK
+        varchar role_name
+        varchar description
+        boolean is_protected
+        boolean is_active
+        timestamp archived_at
+    }
+    role_unit {
+        varchar role_code PK,FK
+        varchar unit_code PK,FK
+    }
+    user_unit_roles {
+        bigint user_unit_role_id PK
+        bigint user_id FK
+        varchar unit_code FK
+        varchar role_code FK
+        timestamp assigned_at
+        boolean is_active
+        timestamp archived_at
+    }
+    password_reset_token {
+        bigint password_reset_token_id PK
+        bigint user_id FK
+        varchar token_hash
+        timestamp created_at
+        timestamp expires_at
+    }
+
+    %% ═══ Navigation and page visibility ═══
+    nav_page {
+        varchar page_code PK
+        varchar label
+        varchar entry_type
+        text icon
+        varchar parent_page_code FK
+        integer sort_order
+        varchar route_path
+        boolean is_active
+        timestamp archived_at
+    }
+    nav_page_grants {
+        integer grant_id PK
+        varchar page_code FK,UK
+        varchar grant_type UK
+        boolean is_active
+        timestamp archived_at
+    }
+    nav_page_grant_roles {
+        integer grant_id PK,FK
+        varchar role_code PK,FK
+    }
+    nav_page_grant_units {
+        integer grant_id PK,FK
+        varchar unit_code PK,FK
+    }
+
+    %% ═══ Request core ═══
+    request {
+        bigint request_id PK
+        varchar request_code UK
+        bigint applicant_user_id FK
+        varchar applicant_name
+        varchar applicant_email
+        varchar applicant_department_or_school
+        varchar event_title
+        text short_introduction
+        text goals_objectives
+        text expected_benefits
+        varchar event_visibility
+        bigint event_format_id FK
+        varchar event_format_snapshot
+        varchar registration_approval
+        text promotion_publicity_method
+        varchar event_image
+        integer total_pax
+        integer max_pax
+        numeric cost_amount
+        varchar bank_account_name
+        varchar bank_account_number
+        varchar status
+        varchar resume_stage
+        text reviewer_comment
+        timestamp submitted_at
+        timestamp cancelled_at
+        bigint cancelled_by_user_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+    request_categories {
+        bigint request_id PK,FK
+        bigint category_id PK,FK
+        varchar category_name
+    }
+    application_requirements {
+        bigint request_id PK,FK
+        bigint requirement_id PK,FK
+    }
+    request_clubs {
+        bigint request_id PK,FK
+        bigint club_id PK,FK
+        varchar club_name
+    }
+    co_owners {
+        bigint co_owner_id PK
+        bigint request_id FK
+        bigint staff_id FK
+        varchar staff_first_name
+        varchar staff_last_name
+        varchar staff_email
+        varchar staff_role
+    }
+    organizers {
+        bigint organizer_id PK
+        bigint request_id FK
+        bigint staff_id FK
+        varchar staff_first_name
+        varchar staff_last_name
+        varchar staff_email
+        varchar staff_role
+        text note
+    }
+    important_people {
+        bigint important_person_id PK
+        bigint request_id FK
+        varchar name
+        varchar type
+        varchar organization
+        varchar designation
+    }
+    general_guest {
+        bigint general_guest_id PK
+        bigint request_id FK
+        varchar guest_type
+        integer count
+        text notes
+    }
+    event_schedule {
+        bigint event_schedule_id PK
+        bigint request_id FK
+        date date
+        time start_time
+        time end_time
+        varchar location
+        bigint venue_option_id FK
+        varchar location_kind
+    }
+    brief_agenda {
+        bigint brief_agenda_id PK
+        bigint request_id FK
+        time time
+        varchar activity
+        varchar location
+        varchar pic
+        text notes
+    }
+    request_discussion_topics {
+        bigint request_discussion_topic_id PK
+        bigint request_id FK
+        varchar discussion_topic
+    }
+
+    %% ═══ Requirement detail ═══
+    request_logistics {
+        bigint request_logistics_id PK
+        bigint request_id FK
+        bigint option_id FK
+        varchar item
+        integer quantity
+        date date
+        time start_time
+        time end_time
+        varchar location
+        text notes
+        bigint venue_option_id FK
+    }
+    request_transportation {
+        bigint request_transportation_id PK
+        bigint request_id FK
+        bigint option_id FK
+        varchar type
+        integer requested_pax
+        varchar pickup
+        varchar dropoff
+        date date
+        time moving_time
+        text notes
+    }
+    request_photography_videography {
+        bigint request_photography_videography_id PK
+        bigint request_id FK
+        bigint option_id FK
+        varchar service
+        date date
+        time start_time
+        time end_time
+        varchar location
+        text notes
+        bigint venue_option_id FK
+    }
+    request_sound_light {
+        bigint request_sound_light_id PK
+        bigint request_id FK
+        bigint option_id FK
+        varchar item
+        date date
+        time start_time
+        time end_time
+        varchar location
+        text notes
+        bigint venue_option_id FK
+    }
+    request_fmb {
+        bigint request_fmb_id PK
+        bigint request_id FK
+        bigint option_id FK
+        varchar food_type
+        integer pax
+        date date
+        time serve_time
+        varchar location
+        text notes
+        bigint venue_option_id FK
+    }
+    request_fmb_selection {
+        bigint request_fmb_selection_id PK
+        bigint request_fmb_id FK
+        varchar unit_code FK
+        bigint fmb_option_id FK
+        varchar menu_item_label
+        integer quantity
+        varchar status
+        text notes
+        text manager_comment
+        bigint claimed_by_user_id FK
+        varchar delivery_photo_url
+        timestamp delivered_at
+        timestamp created_at
+        timestamp approved_at
+        timestamp ready_at
+    }
+    request_campus_tour {
+        bigint request_campus_tour_id PK
+        bigint request_id FK
+        date date
+        integer pax
+        bigint start_point_option_id FK
+        varchar start_point
+        bigint tour_type_option_id FK
+        varchar tour_type
+        text notes
+    }
+    request_mineral_water {
+        bigint request_mineral_water_id PK
+        bigint request_id FK
+        integer quantity
+        boolean with_logo
+        date date
+        time start_time
+        time end_time
+        varchar location
+        text notes
+        bigint venue_option_id FK
+    }
+    request_funding_purchase {
+        bigint request_funding_purchase_id PK
+        bigint request_id FK
+        bigint main_option_id FK
+        varchar main_item
+        bigint sub_option_id FK
+        varchar sub_item
+        integer quantity
+        numeric unit_price_rm
+        text notes
+    }
+
+    %% ═══ Workflow and assignment ═══
+    request_task {
+        bigint request_task_id PK
+        bigint request_id FK
+        bigint requirement_id FK
+        varchar stage_code
+        smallint sequence_no
+        varchar assigned_unit_code FK
+        varchar assigned_role
+        varchar assignment_mode
+        varchar status
+        text comment
+        timestamp created_at
+        timestamp resolved_at
+        bigint resolved_by_user_id FK
+        boolean is_overdue
+        timestamp overdue_at
+    }
+    request_row_assignment {
+        bigint request_row_assignment_id PK
+        bigint request_task_id FK
+        varchar requirement_name UK
+        bigint row_id UK
+        bigint staff_user_id FK,UK
+        bigint assigned_by_user_id FK
+        timestamp assigned_at
+        varchar status
+        timestamp resolved_at
+    }
+    task_assignment {
+        bigint task_assignment_id PK
+        bigint request_task_id FK,UK
+        bigint staff_user_id FK,UK
+        bigint assigned_by_user_id FK
+        timestamp assigned_at
+    }
+    workflow_history {
+        bigint workflow_history_id PK
+        bigint request_id FK
+        bigint request_task_id FK
+        bigint requirement_id FK
+        varchar action
+        bigint actor_user_id FK
+        varchar actor_role
+        text comment
+        varchar previous_status
+        varchar new_status
+        timestamp created_at
+    }
+    proposal_escalation_sent {
+        bigint request_id PK,FK
+        varchar kind PK
+        varchar stage_code PK
+        timestamp last_sent_at
+    }
+
+    %% ═══ Events and community ═══
+    event_registration {
+        bigint event_registration_id PK
+        bigint request_id FK
+        bigint user_id FK
+        varchar registrant_name
+        varchar registrant_email
+        varchar reason_for_attending
+        varchar status
+        varchar payment_proof_url
+        varchar payment_proof_file_name
+        varchar payment_status
+        timestamp registered_at
+        bigint decided_by_user_id FK
+    }
+    saved_event {
+        bigint user_id PK,FK
+        bigint request_id PK,FK
+        timestamp saved_at
+    }
+    notification_preference {
+        varchar email PK
+        boolean saved_capacity_reminder
+        boolean saved_starting_reminder
+        boolean registered_starting_reminder
+    }
+    event_reminder_sent {
+        varchar email PK
+        bigint request_id PK,FK
+        varchar kind PK
+        timestamp sent_at
+    }
+    clubs {
+        bigint club_id PK
+        bigint user_id FK
+        varchar club_name
+        text description
+        varchar image_url
+        bigint created_by_user_id FK
+        boolean active
+        timestamp created_at
+        timestamp archived_at
+    }
+    club_categories {
+        bigint club_category_id PK
+        varchar name UK
+        boolean active
+        timestamp created_at
+        timestamp archived_at
+    }
+    club_category_links {
+        bigint club_id PK,FK
+        bigint club_category_id PK,FK
+    }
+    club_members {
+        bigint club_id PK,FK
+        bigint user_id PK,FK
+        date date_joined
+    }
+    club_join_requests {
+        bigint club_join_request_id PK
+        bigint club_id FK
+        bigint requester_user_id FK
+        text reason
+        varchar status
+        text comment
+        timestamp created_at
+        timestamp resolved_at
+        bigint resolved_by_user_id FK
+    }
+    club_president_change_requests {
+        bigint club_president_change_request_id PK
+        bigint club_id FK
+        bigint current_president_user_id FK
+        bigint requested_president_user_id FK
+        varchar status
+        text comment
+        timestamp created_at
+        timestamp resolved_at
+        bigint resolved_by_user_id FK
+    }
+
+    %% ═══ Catalog and dropdown options ═══
+    event_category {
+        bigint event_category_id PK
+        varchar name UK
+        varchar code UK
+        boolean active
+        timestamp archived_at
+    }
+    event_format {
+        bigint event_format_id PK
+        varchar name UK
+        varchar code UK
+        boolean active
+        timestamp archived_at
+    }
+    event_requirements {
+        bigint requirement_id PK
+        varchar requirement_name UK
+    }
+    logistics_options {
+        bigint logistics_option_id PK
+        bigint requirement_id FK
+        varchar label
+        text description
+        boolean active
+        integer available_quantity
+        varchar quantity_unit
+        varchar item_image_url
+        timestamp archived_at
+    }
+    transportation_options {
+        bigint transportation_option_id PK
+        bigint requirement_id FK
+        varchar label
+        text description
+        boolean active
+        integer passenger_capacity
+        integer available_vehicle_count
+        text instructions
+        varchar vehicle_image_url
+        timestamp archived_at
+    }
+    media_options {
+        bigint media_option_id PK
+        bigint requirement_id FK
+        varchar label
+        text description
+        boolean active
+        timestamp archived_at
+    }
+    sound_light_options {
+        bigint sound_light_option_id PK
+        bigint requirement_id FK
+        varchar label
+        text description
+        boolean active
+        text technical_description
+        timestamp archived_at
+    }
+    dietary_information_options {
+        bigint dietary_information_option_id PK
+        varchar label
+        text description
+        boolean active
+        timestamp archived_at
+    }
+    serving_unit_options {
+        bigint serving_unit_option_id PK
+        varchar label
+        text description
+        boolean active
+        timestamp archived_at
+    }
+    fmb_options {
+        bigint fmb_option_id PK
+        bigint requirement_id FK
+        varchar unit_code FK
+        varchar label
+        text description
+        boolean active
+        bigint serving_unit_option_id FK
+        text availability_ordering_notes
+        varchar menu_image_url
+        timestamp archived_at
+        numeric unit_price_rm
+    }
+    fmb_option_dietary_information {
+        bigint fmb_option_id PK,FK
+        bigint dietary_information_option_id PK,FK
+    }
+    campus_tour_start_options {
+        bigint campus_tour_start_option_id PK
+        bigint requirement_id FK
+        varchar label
+        text description
+        boolean active
+        text meeting_instructions
+        integer max_group_size
+        timestamp archived_at
+    }
+    campus_tour_type_options {
+        bigint campus_tour_type_option_id PK
+        bigint requirement_id FK
+        varchar label
+        text description
+        boolean active
+        timestamp archived_at
+    }
+    funding_main_options {
+        bigint funding_main_option_id PK
+        bigint requirement_id FK
+        varchar label
+        text description
+        boolean active
+        varchar budget_category_finance_code
+        text purchasing_guidance
+        timestamp archived_at
+    }
+    funding_sub_options {
+        bigint funding_sub_option_id PK
+        bigint main_option_id FK
+        varchar label
+        text description
+        boolean active
+        varchar finance_procurement_code
+        text default_unit_purchasing_note
+        timestamp archived_at
+    }
+    venue_options {
+        bigint venue_option_id PK
+        varchar label
+        text description
+        boolean active
+        varchar building
+        integer capacity
+        integer sort_order
+        timestamp archived_at
+    }
+
+    %% ═══ Platform and audit ═══
+    config {
+        varchar code PK
+        numeric number
+    }
+    schema_migrations {
+        varchar filename PK
+        varchar checksum
+        timestamp applied_at
+    }
+    cafeteria_staff_audit_log {
+        bigint cafeteria_staff_audit_log_id PK
+        varchar cafeteria_code FK
+        varchar action
+        bigint target_user_id FK
+        varchar target_display_name
+        varchar target_email
+        varchar role_code
+        bigint actor_user_id FK
+        varchar actor_display_name
+        varchar actor_role
+        timestamp created_at
+    }
+    ai_access_denial {
+        bigint denial_id PK
+        bigint user_id FK
+        varchar user_email
+        varchar topic
+        varchar topic_label
+        text required_pages
+        text question
+        timestamp created_at
+        varchar outcome
+        text reason
+        text ai_response
+        varchar user_roles
+    }
+
+    %% ═══ Relationships — 111 foreign keys ═══
+    campus_tour_start_options |o--o{ request_campus_tour : "start_point_option_id"
+    campus_tour_type_options |o--o{ request_campus_tour : "tour_type_option_id"
+    club_categories ||--o{ club_category_links : "club_category_id"
+    clubs ||--o{ club_category_links : "club_id"
+    clubs ||--o{ club_join_requests : "club_id"
+    clubs ||--o{ club_members : "club_id"
+    clubs ||--o{ club_president_change_requests : "club_id"
+    clubs ||--o{ request_clubs : "club_id"
+    dietary_information_options ||--o{ fmb_option_dietary_information : "dietary_information_option_id"
+    event_category ||--o{ request_categories : "category_id"
+    event_format |o--o{ request : "event_format_id"
+    event_requirements ||--o{ application_requirements : "requirement_id"
+    event_requirements ||--o{ campus_tour_start_options : "requirement_id"
+    event_requirements ||--o{ campus_tour_type_options : "requirement_id"
+    event_requirements ||--o{ fmb_options : "requirement_id"
+    event_requirements ||--o{ funding_main_options : "requirement_id"
+    event_requirements ||--o{ logistics_options : "requirement_id"
+    event_requirements ||--o{ media_options : "requirement_id"
+    event_requirements |o--o{ request_task : "requirement_id"
+    event_requirements ||--o{ sound_light_options : "requirement_id"
+    event_requirements ||--o{ transportation_options : "requirement_id"
+    event_requirements |o--o{ workflow_history : "requirement_id"
+    fmb_options ||--o{ fmb_option_dietary_information : "fmb_option_id"
+    fmb_options |o--o{ request_fmb : "option_id"
+    fmb_options ||--o{ request_fmb_selection : "fmb_option_id"
+    funding_main_options ||--o{ funding_sub_options : "main_option_id"
+    funding_main_options |o--o{ request_funding_purchase : "main_option_id"
+    funding_sub_options |o--o{ request_funding_purchase : "sub_option_id"
+    logistics_options |o--o{ request_logistics : "option_id"
+    media_options |o--o{ request_photography_videography : "option_id"
+    nav_page |o--o{ nav_page : "parent_page_code"
+    nav_page ||--o{ nav_page_grants : "page_code"
+    nav_page_grants ||--o{ nav_page_grant_roles : "grant_id"
+    nav_page_grants ||--o{ nav_page_grant_units : "grant_id"
+    request ||--o{ application_requirements : "request_id"
+    request ||--o{ brief_agenda : "request_id"
+    request ||--o{ co_owners : "request_id"
+    request ||--o{ event_registration : "request_id"
+    request ||--o{ event_reminder_sent : "request_id"
+    request ||--o{ event_schedule : "request_id"
+    request ||--o{ general_guest : "request_id"
+    request ||--o{ important_people : "request_id"
+    request ||--o{ organizers : "request_id"
+    request ||--o{ proposal_escalation_sent : "request_id"
+    request ||--o{ request_campus_tour : "request_id"
+    request ||--o{ request_categories : "request_id"
+    request ||--o{ request_clubs : "request_id"
+    request ||--o{ request_discussion_topics : "request_id"
+    request ||--o{ request_fmb : "request_id"
+    request ||--o{ request_funding_purchase : "request_id"
+    request ||--o{ request_logistics : "request_id"
+    request ||--o{ request_mineral_water : "request_id"
+    request ||--o{ request_photography_videography : "request_id"
+    request ||--o{ request_sound_light : "request_id"
+    request ||--o{ request_task : "request_id"
+    request ||--o{ request_transportation : "request_id"
+    request ||--o{ saved_event : "request_id"
+    request ||--o{ workflow_history : "request_id"
+    request_fmb ||--o{ request_fmb_selection : "request_fmb_id"
+    request_task ||--o{ request_row_assignment : "request_task_id"
+    request_task ||--o{ task_assignment : "request_task_id"
+    request_task |o--o{ workflow_history : "request_task_id"
+    role ||--o{ nav_page_grant_roles : "role_code"
+    role ||--o{ role_unit : "role_code"
+    role ||--o{ user_unit_roles : "role_code"
+    serving_unit_options ||--o{ fmb_options : "serving_unit_option_id"
+    sound_light_options |o--o{ request_sound_light : "option_id"
+    staff |o--o{ co_owners : "staff_id"
+    staff |o--o{ organizers : "staff_id"
+    transportation_options |o--o{ request_transportation : "option_id"
+    unit ||--o{ cafeteria_staff_audit_log : "cafeteria_code"
+    unit ||--o{ fmb_options : "unit_code"
+    unit ||--o{ nav_page_grant_units : "unit_code"
+    unit ||--o{ request_fmb_selection : "unit_code"
+    unit |o--o{ request_task : "assigned_unit_code"
+    unit ||--o{ role_unit : "unit_code"
+    unit |o--o{ user_unit_roles : "unit_code"
+    users |o--o{ ai_access_denial : "user_id"
+    users ||--o{ cafeteria_staff_audit_log : "actor_user_id"
+    users ||--o{ cafeteria_staff_audit_log : "target_user_id"
+    users ||--o{ club_join_requests : "requester_user_id"
+    users |o--o{ club_join_requests : "resolved_by_user_id"
+    users ||--o{ club_members : "user_id"
+    users ||--o{ club_president_change_requests : "current_president_user_id"
+    users ||--o{ club_president_change_requests : "requested_president_user_id"
+    users |o--o{ club_president_change_requests : "resolved_by_user_id"
+    users ||--o{ clubs : "created_by_user_id"
+    users ||--o{ clubs : "user_id"
+    users |o--o{ event_registration : "decided_by_user_id"
+    users ||--o{ event_registration : "user_id"
+    users ||--o{ external_user_profile : "user_id"
+    users ||--o{ password_reset_token : "user_id"
+    users ||--o{ request : "applicant_user_id"
+    users |o--o{ request : "cancelled_by_user_id"
+    users |o--o{ request_fmb_selection : "claimed_by_user_id"
+    users |o--o{ request_row_assignment : "assigned_by_user_id"
+    users ||--o{ request_row_assignment : "staff_user_id"
+    users |o--o{ request_task : "resolved_by_user_id"
+    users ||--o{ saved_event : "user_id"
+    users ||--o{ staff : "user_id"
+    users ||--o{ student : "user_id"
+    users |o--o{ task_assignment : "assigned_by_user_id"
+    users ||--o{ task_assignment : "staff_user_id"
+    users ||--o{ user_unit_roles : "user_id"
+    users ||--o{ workflow_history : "actor_user_id"
+    venue_options |o--o{ event_schedule : "venue_option_id"
+    venue_options |o--o{ request_fmb : "venue_option_id"
+    venue_options |o--o{ request_logistics : "venue_option_id"
+    venue_options |o--o{ request_mineral_water : "venue_option_id"
+    venue_options |o--o{ request_photography_videography : "venue_option_id"
+    venue_options |o--o{ request_sound_light : "venue_option_id"

@@ -1,5 +1,5 @@
 import { AuthUser } from '../auth/auth.models';
-import { PublishedEvent, RegistrationStatus } from './published-event.models';
+import { EventSearchParams, PublishedEvent, RegistrationStatus } from './published-event.models';
 
 export interface SavedEventRecord {
   readonly eventId: string;
@@ -143,8 +143,8 @@ export interface SavedEventsApi {
 
 /** The acting user is resolved server-side from the bearer token. */
 export interface EventRegistrationApi {
-  getActiveRegistrations(page: number, pageSize: number): import('rxjs').Observable<RegisteredEventsResponse>;
-  getRegistrationHistory(page: number, pageSize: number): import('rxjs').Observable<RegisteredEventsResponse>;
+  getActiveRegistrations(params: EventSearchParams): import('rxjs').Observable<RegisteredEventsResponse>;
+  getRegistrationHistory(params: EventSearchParams): import('rxjs').Observable<RegisteredEventsResponse>;
 }
 
 export interface ExternalRegistrationApi {

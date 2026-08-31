@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Use case — proposal and approval</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#fff}
+  body{display:flex;justify-content:center;padding:24px 18px}
+  svg{width:100%;max-width:1520px;height:auto;display:block}
+
+  .sys  {font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:21px;letter-spacing:.14em;text-transform:uppercase;fill:#27456F}
+  .pkg  {font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:16px;letter-spacing:.16em;text-transform:uppercase;fill:#4E6A93}
+  .act  {font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:15px;letter-spacing:.05em;text-transform:uppercase;fill:#141A20}
+  .act-s{font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10px;fill:#8A939D}
+  .uc   {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11.5px;fill:#243039}
+  .st   {font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:10.5px;fill:#8E3A22}
+  .note {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11px;fill:#8A939D}
+  .warn {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11.5px;fill:#8E3A22}
+  .warnb{font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:15px;letter-spacing:.1em;text-transform:uppercase;fill:#8E3A22}
+
+  .bound{fill:none;stroke:#27456F;stroke-width:1.8}
+  .pk   {fill:#F6F8FA;stroke:#AFBAC4;stroke-width:1;stroke-dasharray:4 4}
+  .el   {fill:#FFFFFF;stroke:#27456F;stroke-width:1.4}
+  .el-x {fill:#FFFFFF;stroke:#C08670;stroke-width:1.5}
+  .assoc{stroke:#8FA0B4;stroke-width:1.1;fill:none}
+  .dep  {stroke:#C08670;stroke-width:1.3;fill:none;stroke-dasharray:6 4}
+  .fig  {fill:none;stroke:#27456F;stroke-width:1.7;stroke-linecap:round}
+  .nbox {fill:#FFFFFF;stroke:#C08670;stroke-width:1.4;stroke-dasharray:6 4}
+</style>
+</head>
+<body>
+
+<svg viewBox="0 0 1520 1230" role="img"
+     aria-label="Use case diagram: event proposal, approval and fulfilment">
+  <defs>
+    <marker id="dep" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10" fill="none" stroke="#C08670" stroke-width="1.4"/>
+    </marker>
+  </defs>
+
+  <!-- ══════ ACTORS · left ══════ -->
+  <g class="fig"><circle cx="84" cy="150" r="11"/><path d="M84,161 V192 M64,172 H104 M84,192 L70,216 M84,192 L98,216"/></g>
+  <text class="act"   x="84" y="234" text-anchor="middle">Applicant</text>
+  <text class="act-s" x="84" y="250" text-anchor="middle">student · lecturer · staff</text>
+
+  <g class="fig"><circle cx="84" cy="640" r="11"/><path d="M84,651 V682 M64,662 H104 M84,682 L70,706 M84,682 L98,706"/></g>
+  <text class="act"   x="84" y="724" text-anchor="middle">Department staff</text>
+
+  <g class="fig"><circle cx="84" cy="960" r="11"/><path d="M84,971 V1002 M64,982 H104 M84,1002 L70,1026 M84,1002 L98,1026"/></g>
+  <text class="act"   x="84" y="1044" text-anchor="middle">Cafeteria staff</text>
+
+  <!-- ══════ ACTORS · right ══════ -->
+  <g class="fig"><circle cx="1400" cy="300" r="11"/><path d="M1400,311 V342 M1380,322 H1420 M1400,342 L1386,366 M1400,342 L1414,366"/></g>
+  <text class="act"   x="1400" y="384" text-anchor="middle">Head of school</text>
+  <text class="act"   x="1400" y="400" text-anchor="middle">/ department</text>
+
+  <g class="fig"><circle cx="1400" cy="470" r="11"/><path d="M1400,481 V512 M1380,492 H1420 M1400,512 L1386,536 M1400,512 L1414,536"/></g>
+  <text class="act" x="1400" y="554" text-anchor="middle">F&amp;B head</text>
+
+  <g class="fig"><circle cx="1400" cy="640" r="11"/><path d="M1400,651 V682 M1380,662 H1420 M1400,682 L1386,706 M1400,682 L1414,706"/></g>
+  <text class="act" x="1400" y="724" text-anchor="middle">CFO</text>
+
+  <g class="fig"><circle cx="1400" cy="890" r="11"/><path d="M1400,901 V932 M1380,912 H1420 M1400,932 L1386,956 M1400,932 L1414,956"/></g>
+  <text class="act" x="1400" y="974" text-anchor="middle">Department head</text>
+
+  <g class="fig"><circle cx="1400" cy="1080" r="11"/><path d="M1400,1091 V1122 M1380,1102 H1420 M1400,1122 L1386,1146 M1400,1122 L1414,1146"/></g>
+  <text class="act" x="1400" y="1164" text-anchor="middle">Cafeteria manager</text>
+
+  <!-- ══════ SYSTEM BOUNDARY ══════ -->
+  <rect class="bound" x="232" y="58" width="1032" height="1136" rx="2"/>
+  <text class="sys" x="748" y="88" text-anchor="middle">APU Event Management System</text>
+
+  <!-- ── package 1: submission ── -->
+  <rect class="pk" x="254" y="106" width="988" height="212" rx="3"/>
+  <text class="pkg" x="270" y="130">Submission</text>
+
+  <ellipse class="el" cx="396" cy="182" rx="86" ry="30"/>
+  <text class="uc" x="396" y="186" text-anchor="middle">Save draft</text>
+
+  <ellipse class="el" cx="624" cy="182" rx="86" ry="30"/>
+  <text class="uc" x="624" y="178" text-anchor="middle">Submit</text>
+  <text class="uc" x="624" y="193" text-anchor="middle">proposal</text>
+
+  <ellipse class="el" cx="852" cy="182" rx="86" ry="30"/>
+  <text class="uc" x="852" y="178" text-anchor="middle">Resubmit after</text>
+  <text class="uc" x="852" y="193" text-anchor="middle">send-back</text>
+
+  <ellipse class="el" cx="1088" cy="182" rx="92" ry="30"/>
+  <text class="uc" x="1088" y="178" text-anchor="middle">Resubmit one</text>
+  <text class="uc" x="1088" y="193" text-anchor="middle">department&#39;s items</text>
+
+  <ellipse class="el" cx="396" cy="272" rx="86" ry="28"/>
+  <text class="uc" x="396" y="269" text-anchor="middle">Cancel own</text>
+  <text class="uc" x="396" y="284" text-anchor="middle">proposal</text>
+
+  <ellipse class="el" cx="624" cy="272" rx="86" ry="28"/>
+  <text class="uc" x="624" y="269" text-anchor="middle">View approval</text>
+  <text class="uc" x="624" y="284" text-anchor="middle">history</text>
+
+  <!-- ── package 2: review ── -->
+  <rect class="pk" x="254" y="336" width="988" height="296" rx="3"/>
+  <text class="pkg" x="270" y="360">Review and decision — single-actor stages</text>
+
+  <ellipse class="el" cx="396" cy="424" rx="86" ry="30"/>
+  <text class="uc" x="396" y="420" text-anchor="middle">Review a</text>
+  <text class="uc" x="396" y="435" text-anchor="middle">proposal at stage</text>
+
+  <ellipse class="el" cx="640" cy="424" rx="80" ry="28"/>
+  <text class="uc" x="640" y="428" text-anchor="middle">Approve</text>
+
+  <ellipse class="el-x" cx="868" cy="424" rx="80" ry="28"/>
+  <text class="uc" x="868" y="428" text-anchor="middle">Reject outright</text>
+
+  <ellipse class="el" cx="1092" cy="424" rx="88" ry="30"/>
+  <text class="uc" x="1092" y="420" text-anchor="middle">Send back</text>
+  <text class="uc" x="1092" y="435" text-anchor="middle">with comment</text>
+
+  <rect class="nbox" x="330" y="500" width="820" height="104" rx="2"/>
+  <text class="warnb" x="350" y="526">Capability asymmetry</text>
+  <text class="warn"  x="350" y="550">Only the three single-actor stages — hos_hod_review, fmb_review, cfo_review — hold</text>
+  <text class="warn"  x="350" y="568">&quot;Reject outright&quot;. A department can send its own task back, and nothing more; it can</text>
+  <text class="warn"  x="350" y="586">never end the proposal. Stage ordering and routing rules: Fig. 6.</text>
+  <path class="dep" d="M868,452 V500" marker-end="url(#dep)"/>
+
+  <!-- ── package 3: fulfilment ── -->
+  <rect class="pk" x="254" y="650" width="988" height="524" rx="3"/>
+  <text class="pkg" x="270" y="674">Fulfilment — parallel department work</text>
+
+  <ellipse class="el" cx="396" cy="736" rx="86" ry="30"/>
+  <text class="uc" x="396" y="732" text-anchor="middle">Approve a</text>
+  <text class="uc" x="396" y="747" text-anchor="middle">department task</text>
+
+  <ellipse class="el" cx="624" cy="736" rx="86" ry="30"/>
+  <text class="uc" x="624" y="732" text-anchor="middle">Assign staff</text>
+  <text class="uc" x="624" y="747" text-anchor="middle">to a task</text>
+
+  <ellipse class="el" cx="852" cy="736" rx="86" ry="30"/>
+  <text class="uc" x="852" y="732" text-anchor="middle">Assign staff to</text>
+  <text class="uc" x="852" y="747" text-anchor="middle">a single row</text>
+
+  <ellipse class="el" cx="1088" cy="736" rx="88" ry="30"/>
+  <text class="uc" x="1088" y="732" text-anchor="middle">Send task back</text>
+  <text class="uc" x="1088" y="747" text-anchor="middle">to the applicant</text>
+
+  <ellipse class="el" cx="396" cy="844" rx="86" ry="30"/>
+  <text class="uc" x="396" y="848" text-anchor="middle">Start preparing</text>
+
+  <ellipse class="el" cx="624" cy="844" rx="86" ry="30"/>
+  <text class="uc" x="624" y="848" text-anchor="middle">Complete task</text>
+
+  <ellipse class="el" cx="852" cy="844" rx="86" ry="30"/>
+  <text class="uc" x="852" y="840" text-anchor="middle">View assigned</text>
+  <text class="uc" x="852" y="855" text-anchor="middle">rows and dates</text>
+
+  <ellipse class="el" cx="396" cy="964" rx="90" ry="30"/>
+  <text class="uc" x="396" y="960" text-anchor="middle">Review a</text>
+  <text class="uc" x="396" y="975" text-anchor="middle">cafeteria order</text>
+
+  <ellipse class="el" cx="632" cy="964" rx="90" ry="30"/>
+  <text class="uc" x="632" y="960" text-anchor="middle">Send order back</text>
+  <text class="uc" x="632" y="975" text-anchor="middle">to F&amp;B</text>
+
+  <ellipse class="el" cx="868" cy="964" rx="90" ry="30"/>
+  <text class="uc" x="868" y="960" text-anchor="middle">Claim an order</text>
+  <text class="uc" x="868" y="975" text-anchor="middle">from the pool</text>
+
+  <ellipse class="el" cx="1096" cy="964" rx="80" ry="28"/>
+  <text class="uc" x="1096" y="968" text-anchor="middle">Mark ready</text>
+
+  <ellipse class="el" cx="396" cy="1078" rx="86" ry="30"/>
+  <text class="uc" x="396" y="1082" text-anchor="middle">Fulfil an order</text>
+
+  <ellipse class="el" cx="624" cy="1078" rx="86" ry="30"/>
+  <text class="uc" x="624" y="1074" text-anchor="middle">Set delivery</text>
+  <text class="uc" x="624" y="1089" text-anchor="middle">details</text>
+
+  <!-- ══════ ASSOCIATIONS ══════ -->
+  <!-- Applicant -->
+  <path class="assoc" d="M118,178 L310,182"/>
+  <path class="assoc" d="M118,186 L538,186"/>
+  <path class="assoc" d="M118,194 L766,190"/>
+  <path class="assoc" d="M118,202 L996,192"/>
+  <path class="assoc" d="M118,210 L310,268"/>
+  <path class="assoc" d="M118,218 L538,272"/>
+
+  <!-- HOS/HOD, F&B head, CFO share the reviewer stage cases -->
+  <path class="assoc" d="M1366,320 L1180,424"/>
+  <path class="assoc" d="M1366,330 L948,420"/>
+  <path class="assoc" d="M1366,340 L720,420"/>
+  <path class="assoc" d="M1366,350 L482,428"/>
+
+  <path class="assoc" d="M1366,490 L1180,432"/>
+  <path class="assoc" d="M1366,498 L948,430"/>
+  <path class="assoc" d="M1366,506 L720,428"/>
+
+  <path class="assoc" d="M1366,660 L1180,440"/>
+  <path class="assoc" d="M1366,668 L948,438"/>
+  <path class="assoc" d="M1366,676 L720,436"/>
+
+  <!-- Department head -->
+  <path class="assoc" d="M1366,908 L482,742"/>
+  <path class="assoc" d="M1366,916 L710,744"/>
+  <path class="assoc" d="M1366,924 L938,746"/>
+  <path class="assoc" d="M1366,932 L1176,744"/>
+
+  <!-- Department staff -->
+  <path class="assoc" d="M118,664 L310,842"/>
+  <path class="assoc" d="M118,672 L538,846"/>
+  <path class="assoc" d="M118,680 L766,850"/>
+
+  <!-- Cafeteria manager -->
+  <path class="assoc" d="M1366,1098 L486,970"/>
+  <path class="assoc" d="M1366,1106 L722,972"/>
+  <path class="assoc" d="M1366,1114 L710,1082"/>
+
+  <!-- Cafeteria staff -->
+  <path class="assoc" d="M118,984 L778,968"/>
+  <path class="assoc" d="M118,992 L1016,970"/>
+  <path class="assoc" d="M118,1000 L310,1074"/>
+
+</svg>
+</body>
+</html>

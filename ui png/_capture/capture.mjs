@@ -298,7 +298,7 @@ const SHOTS = [
   { id: '4.5.78', group: 'L - AI Assistant', title: 'AI Assistant Dock', keepOpen: true, as: 'logistics', path: '/app/dashboard',
     prep: (p) => click(p, ['button.ai-orb-button', 'app-ai-assistant button']) },
   { id: '4.5.79', group: 'L - AI Assistant', title: 'AI Assistant Full Page', as: 'logistics', path: '/assistant' },
-  { id: '4.5.81', group: 'L - AI Assistant', title: 'AI Access Log', as: 'sysadmin', path: '/app/admin/ai-access-log' },
+  { id: '4.5.80', group: 'L - AI Assistant', title: 'AI Access Log', as: 'sysadmin', path: '/app/admin/ai-access-log' },
 
 ];
 

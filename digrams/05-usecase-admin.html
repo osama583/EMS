@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Use case — administration and configuration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#fff}
+  body{display:flex;justify-content:center;padding:24px 18px}
+  svg{width:100%;max-width:1500px;height:auto;display:block}
+
+  .sys  {font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:21px;letter-spacing:.14em;text-transform:uppercase;fill:#27456F}
+  .pkg  {font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:16px;letter-spacing:.16em;text-transform:uppercase;fill:#4E6A93}
+  .act  {font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:15px;letter-spacing:.05em;text-transform:uppercase;fill:#141A20}
+  .act-s{font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10px;fill:#8A939D}
+  .uc   {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11.5px;fill:#243039}
+  .st   {font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:10.5px;fill:#8E3A22}
+  .note {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11px;fill:#8A939D}
+
+  .bound{fill:none;stroke:#27456F;stroke-width:1.8}
+  .pk   {fill:#F6F8FA;stroke:#AFBAC4;stroke-width:1;stroke-dasharray:4 4}
+  .el   {fill:#FFFFFF;stroke:#27456F;stroke-width:1.4}
+  .assoc{stroke:#8FA0B4;stroke-width:1.1;fill:none}
+  .dep  {stroke:#C08670;stroke-width:1.3;fill:none;stroke-dasharray:6 4}
+  .fig  {fill:none;stroke:#27456F;stroke-width:1.7;stroke-linecap:round}
+</style>
+</head>
+<body>
+
+<svg viewBox="0 0 1500 1150" role="img"
+     aria-label="Use case diagram: administration and configuration">
+  <defs>
+    <marker id="dep" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10" fill="none" stroke="#C08670" stroke-width="1.4"/>
+    </marker>
+  </defs>
+
+  <!-- ══════ ACTORS · left ══════ -->
+  <g class="fig"><circle cx="84" cy="200" r="11"/><path d="M84,211 V242 M64,222 H104 M84,242 L70,266 M84,242 L98,266"/></g>
+  <text class="act"   x="84" y="284" text-anchor="middle">System admin</text>
+  <text class="act-s" x="84" y="300" text-anchor="middle">flat role</text>
+
+  <g class="fig"><circle cx="84" cy="640" r="11"/><path d="M84,651 V682 M64,662 H104 M84,682 L70,706 M84,682 L98,706"/></g>
+  <text class="act"   x="84" y="724" text-anchor="middle">Head of department</text>
+  <text class="act-s" x="84" y="740" text-anchor="middle">unit-scoped</text>
+
+  <g class="fig"><circle cx="84" cy="880" r="11"/><path d="M84,891 V922 M64,902 H104 M84,922 L70,946 M84,922 L98,946"/></g>
+  <text class="act" x="84" y="964" text-anchor="middle">CFO</text>
+
+  <!-- ══════ ACTORS · right ══════ -->
+  <g class="fig"><circle cx="1390" cy="700" r="11"/><path d="M1390,711 V742 M1370,722 H1410 M1390,742 L1376,766 M1390,742 L1404,766"/></g>
+  <text class="act" x="1390" y="784" text-anchor="middle">Cafeteria admin</text>
+
+  <g class="fig"><circle cx="1390" cy="930" r="11"/><path d="M1390,941 V972 M1370,952 H1410 M1390,972 L1376,996 M1390,972 L1404,996"/></g>
+  <text class="act" x="1390" y="1014" text-anchor="middle">Cafeteria manager</text>
+
+  <!-- ══════ SYSTEM BOUNDARY ══════ -->
+  <rect class="bound" x="232" y="58" width="1022" height="1050" rx="2"/>
+  <text class="sys" x="743" y="88" text-anchor="middle">APU Event Management System</text>
+
+  <!-- ── package 1: directory & access ── -->
+  <rect class="pk" x="254" y="106" width="978" height="304" rx="3"/>
+  <text class="pkg" x="270" y="130">Directory and access control</text>
+
+  <ellipse class="el" cx="396" cy="182" rx="86" ry="30"/>
+  <text class="uc" x="396" y="186" text-anchor="middle">Manage users</text>
+
+  <ellipse class="el" cx="624" cy="182" rx="86" ry="30"/>
+  <text class="uc" x="624" y="186" text-anchor="middle">Manage units</text>
+
+  <ellipse class="el" cx="852" cy="182" rx="86" ry="30"/>
+  <text class="uc" x="852" y="186" text-anchor="middle">Manage roles</text>
+
+  <ellipse class="el" cx="1082" cy="182" rx="90" ry="30"/>
+  <text class="uc" x="1082" y="178" text-anchor="middle">Assign a role</text>
+  <text class="uc" x="1082" y="193" text-anchor="middle">in a unit</text>
+
+  <ellipse class="el" cx="396" cy="278" rx="92" ry="30"/>
+  <text class="uc" x="396" y="274" text-anchor="middle">Manage page</text>
+  <text class="uc" x="396" y="289" text-anchor="middle">visibility</text>
+
+  <ellipse class="el" cx="640" cy="278" rx="92" ry="30"/>
+  <text class="uc" x="640" y="274" text-anchor="middle">Run a deletion</text>
+  <text class="uc" x="640" y="289" text-anchor="middle">dependency check</text>
+
+  <ellipse class="el" cx="884" cy="278" rx="86" ry="30"/>
+  <text class="uc" x="884" y="274" text-anchor="middle">Archive and</text>
+  <text class="uc" x="884" y="289" text-anchor="middle">restore a record</text>
+
+  <ellipse class="el" cx="1102" cy="278" rx="80" ry="28"/>
+  <text class="uc" x="1102" y="282" text-anchor="middle">Purge a record</text>
+
+  <path class="dep" d="M884,308 L700,308" marker-end="url(#dep)"/>
+  <text class="st" x="792" y="330" text-anchor="middle">&#171;include&#187;</text>
+  <path class="dep" d="M1102,306 L1032,306 L980,296" marker-end="url(#dep)"/>
+  <text class="note" x="254" y="368" font-size="11">Applies uniformly to users, units, roles, navigation pages, clubs, cafeterias and every dropdown option list —</text>
+  <text class="note" x="254" y="386" font-size="11">one lifecycle in services/soft_delete.py, seven resource families.</text>
+
+  <!-- ── package 2: catalog & configuration ── -->
+  <rect class="pk" x="254" y="428" width="978" height="290" rx="3"/>
+  <text class="pkg" x="270" y="452">Catalog and configuration</text>
+
+  <ellipse class="el" cx="396" cy="514" rx="92" ry="30"/>
+  <text class="uc" x="396" y="510" text-anchor="middle">Manage own</text>
+  <text class="uc" x="396" y="525" text-anchor="middle">dropdown options</text>
+
+  <ellipse class="el" cx="640" cy="514" rx="86" ry="30"/>
+  <text class="uc" x="640" y="510" text-anchor="middle">Reorder</text>
+  <text class="uc" x="640" y="525" text-anchor="middle">option list</text>
+
+  <ellipse class="el" cx="868" cy="514" rx="86" ry="30"/>
+  <text class="uc" x="868" y="510" text-anchor="middle">Manage event</text>
+  <text class="uc" x="868" y="525" text-anchor="middle">categories</text>
+
+  <ellipse class="el" cx="1094" cy="514" rx="86" ry="30"/>
+  <text class="uc" x="1094" y="510" text-anchor="middle">Manage event</text>
+  <text class="uc" x="1094" y="525" text-anchor="middle">formats</text>
+
+  <ellipse class="el" cx="396" cy="620" rx="92" ry="32"/>
+  <text class="uc" x="396" y="616" text-anchor="middle">Set approval</text>
+  <text class="uc" x="396" y="631" text-anchor="middle">thresholds</text>
+
+  <ellipse class="el" cx="640" cy="620" rx="86" ry="30"/>
+  <text class="uc" x="640" y="616" text-anchor="middle">Manage venue</text>
+  <text class="uc" x="640" y="631" text-anchor="middle">options</text>
+
+  <ellipse class="el" cx="868" cy="620" rx="86" ry="30"/>
+  <text class="uc" x="868" y="616" text-anchor="middle">Manage funding</text>
+  <text class="uc" x="868" y="631" text-anchor="middle">option lists</text>
+
+  <text class="note" x="960" y="676">HIGH_PAX_THRESHOLD · CANCELLATION_DEADLINE_DAYS</text>
+  <text class="note" x="960" y="694">MAX_EVENT_CATEGORIES — read live, no deploy needed</text>
+
+  <!-- ── package 3: cafeteria operations ── -->
+  <rect class="pk" x="254" y="736" width="978" height="212" rx="3"/>
+  <text class="pkg" x="270" y="760">Cafeteria operations</text>
+
+  <ellipse class="el" cx="396" cy="820" rx="86" ry="30"/>
+  <text class="uc" x="396" y="816" text-anchor="middle">Manage</text>
+  <text class="uc" x="396" y="831" text-anchor="middle">cafeterias</text>
+
+  <ellipse class="el" cx="624" cy="820" rx="86" ry="30"/>
+  <text class="uc" x="624" y="816" text-anchor="middle">Assign</text>
+  <text class="uc" x="624" y="831" text-anchor="middle">cafeteria staff</text>
+
+  <ellipse class="el" cx="852" cy="820" rx="86" ry="30"/>
+  <text class="uc" x="852" y="816" text-anchor="middle">Oversee</text>
+  <text class="uc" x="852" y="831" text-anchor="middle">menus</text>
+
+  <ellipse class="el" cx="1082" cy="820" rx="86" ry="30"/>
+  <text class="uc" x="1082" y="816" text-anchor="middle">View staff</text>
+  <text class="uc" x="1082" y="831" text-anchor="middle">audit log</text>
+
+  <ellipse class="el" cx="396" cy="908" rx="86" ry="28"/>
+  <text class="uc" x="396" y="912" text-anchor="middle">Manage own menu</text>
+
+  <!-- ── package 4: oversight ── -->
+  <rect class="pk" x="254" y="966" width="978" height="122" rx="3"/>
+  <text class="pkg" x="270" y="990">Insight and oversight</text>
+
+  <ellipse class="el" cx="396" cy="1038" rx="90" ry="30"/>
+  <text class="uc" x="396" y="1034" text-anchor="middle">View role-scoped</text>
+  <text class="uc" x="396" y="1049" text-anchor="middle">dashboard</text>
+
+  <ellipse class="el" cx="636" cy="1038" rx="86" ry="30"/>
+  <text class="uc" x="636" y="1034" text-anchor="middle">Export</text>
+  <text class="uc" x="636" y="1049" text-anchor="middle">dashboard</text>
+
+  <ellipse class="el" cx="872" cy="1038" rx="88" ry="30"/>
+  <text class="uc" x="872" y="1034" text-anchor="middle">Review AI</text>
+  <text class="uc" x="872" y="1049" text-anchor="middle">access log</text>
+
+  <ellipse class="el" cx="1096" cy="1038" rx="86" ry="30"/>
+  <text class="uc" x="1096" y="1034" text-anchor="middle">Refresh AI</text>
+  <text class="uc" x="1096" y="1049" text-anchor="middle">schema cache</text>
+
+  <!-- ══════ ASSOCIATIONS ══════ -->
+  <!-- System admin -->
+  <path class="assoc" d="M118,224 L310,182"/>
+  <path class="assoc" d="M118,232 L538,186"/>
+  <path class="assoc" d="M118,240 L766,190"/>
+  <path class="assoc" d="M118,248 L992,192"/>
+  <path class="assoc" d="M118,256 L304,278"/>
+  <path class="assoc" d="M118,264 L548,284"/>
+  <path class="assoc" d="M118,272 L798,286"/>
+  <path class="assoc" d="M118,280 L1022,288"/>
+  <path class="assoc" d="M118,288 L782,514"/>
+  <path class="assoc" d="M118,296 L1008,518"/>
+  <path class="assoc" d="M118,304 L304,616"/>
+  <path class="assoc" d="M118,312 L784,1038"/>
+  <path class="assoc" d="M118,320 L1010,1040"/>
+
+  <!-- Head of department -->
+  <path class="assoc" d="M118,664 L304,522"/>
+  <path class="assoc" d="M118,672 L554,520"/>
+  <path class="assoc" d="M118,680 L306,1034"/>
+
+  <!-- CFO -->
+  <path class="assoc" d="M118,904 L304,530"/>
+  <path class="assoc" d="M118,912 L554,626"/>
+  <path class="assoc" d="M118,920 L782,624"/>
+  <path class="assoc" d="M118,928 L306,1042"/>
+
+  <!-- Cafeteria admin -->
+  <path class="assoc" d="M1356,720 L482,820"/>
+  <path class="assoc" d="M1356,728 L710,822"/>
+  <path class="assoc" d="M1356,736 L938,824"/>
+  <path class="assoc" d="M1356,744 L1168,822"/>
+
+  <!-- Cafeteria manager -->
+  <path class="assoc" d="M1356,950 L482,910"/>
+  <path class="assoc" d="M1356,958 L1168,830"/>
+  <path class="assoc" d="M1356,966 L484,1044"/>
+
+</svg>
+</body>
+</html>

@@ -15,12 +15,12 @@
     GET  /events/me/registration-statuses    my registration status for many events at once
     DELETE /events/{id}/registrations/mine   cancel my registration
     POST /events/{id}/registrations/{rid}/decision   approve|reject (organiser)
-    GET  /events/me/registrations      my registrations (?scope=active|history)
+    GET  /events/me/registrations      my registrations, searched/filtered/paginated (?scope=active|pending|history)
     GET  /events/me/registration-history  resolved registrations, mine and decided-by-me (History > Events)
     GET  /events/me/pending-approvals  registrations awaiting my decision
     GET  /events/me/organized          events I proposed that are now published, searched/filtered/paginated (Created by Me)
     GET/PUT /events/me/saved/{id}      save / unsave
-    GET  /events/me/saved/search       my saved events, paginated (My Events > Saved)
+    GET  /events/me/saved/search       my saved events, searched/filtered/paginated (My Events > Saved)
     GET/PUT /events/me/reminders       notification preferences
 
 An event is "published" when its proposal reached completed_approved with public
@@ -33,7 +33,6 @@ Everything under /me and the attendee list require a token.
 from __future__ import annotations
 
 import uuid
-from datetime import date
 
 from flask import Blueprint, g, jsonify, request
 
@@ -45,7 +44,7 @@ from ..security.passwords import hash_password
 from ..security.principal import current_principal
 from ..services import workflow as wf
 from ..services.email import dispatch
-from ._helpers import body, date_order, paged, pagination, required
+from ._helpers import body, date_order, flag, paged, pagination, required
 
 bp = Blueprint("events", __name__, url_prefix="/events")
 
@@ -114,6 +113,32 @@ _NOT_ENDED = """NOT EXISTS (
          WHERE r2.request_id = r.request_id
            AND (SELECT max(s."date") FROM event_schedule s WHERE s.request_id = r2.request_id) < current_date
     )"""
+
+
+# The positive form of _NOT_ENDED, for the My Events tabs, which sort events INTO ended and
+# not-ended rather than hiding the ended ones. coalesce(): an event with no schedule row at all has
+# no last date, and "unknown" must read as "not ended" (the same way the Python rule it replaces
+# treated an empty schedule) rather than propagating a NULL that silently drops the row.
+_HAS_ENDED = """coalesce(
+        (SELECT max(s."date") FROM event_schedule s WHERE s.request_id = r.request_id) < current_date,
+        false)"""
+
+
+def _page_args(default_size: int = 9) -> tuple[int, int, int]:
+    """(page, pageSize, offset) from ?page/?pageSize for this module's event lists.
+
+    Its own parser rather than _helpers.pagination(): these endpoints feed card grids, so they
+    cap at 60 rows and default to a grid-shaped page, not the 50/200 of the table endpoints.
+    """
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except ValueError:
+        page = 1
+    try:
+        page_size = min(60, max(1, int(request.args.get("pageSize", default_size))))
+    except ValueError:
+        page_size = default_size
+    return page, page_size, (page - 1) * page_size
 
 
 def _event_select(include_internal: bool, owner_clause: str | None = None) -> str:
@@ -194,6 +219,21 @@ def _decorate(cur, event: dict) -> dict:
             cur, "SELECT DISTINCT guest_type FROM general_guest WHERE request_id = %s", (event_id,)
         )
     ]
+    # The clubs running the event (empty for one that is not club-run). PublishedEvent declares
+    # this as a required list, and the event card reads clubs.length directly - leaving it off the
+    # payload made that read throw inside the template, which aborts Angular's whole
+    # change-detection pass: cards rendered half-drawn and the page stopped reacting to
+    # pagination. Every published-event payload carries it now, not just the calendar's.
+    event["clubs"] = [
+        row["club_name"]
+        for row in fetch_all(
+            cur,
+            """SELECT c.club_name FROM request_clubs rc
+                 JOIN clubs c ON c.club_id = rc.club_id
+                WHERE rc.request_id = %s ORDER BY c.club_name""",
+            (event_id,),
+        )
+    ]
     return event
 
 
@@ -216,10 +256,16 @@ _TIME_PERIODS = {
 }
 
 
-def _list_events_filters(args) -> tuple[str, dict]:
+def _list_events_filters(args, *, principal=None, exclude_ended: bool = True) -> tuple[str, dict]:
     """Builds the WHERE-clause fragments + params for every Explore Events filter,
     mirroring explore-events.ts's getMatchingEvents()/matches()/matchesDate() exactly
     so query params are a drop-in replacement for the old client-side filtering.
+
+    `principal` is only needed by the "My Clubs" filter, which resolves the viewer's
+    clubs live rather than trusting a client-supplied club list. `exclude_ended` is
+    Explore Events' discovery rule (an event nobody can still attend is not a
+    discovery result); the My Events tabs pass False, since a saved or attended event
+    that has already happened is exactly what those lists are for.
 
     Named parameters (%(f0)s, %(f1)s, ...) rather than positional: the visibility
     clause these filters are appended to now binds %(user_id)s by name, and psycopg
@@ -283,6 +329,22 @@ def _list_events_filters(args) -> tuple[str, dict]:
         elif wants_free and not wants_paid:
             clauses.append("(r.cost_amount IS NULL OR r.cost_amount = 0)")
 
+    # "My Clubs": events run by a club the viewer belongs to or presides over. Resolved here
+    # against club_members/clubs.user_id rather than from a client-sent club list, so the filter
+    # can never widen what a caller may see.
+    if "My Clubs" in args.getlist("club") and principal is not None:
+        viewer = _p(principal.user_id)
+        clauses.append(
+            f"""EXISTS (
+                SELECT 1 FROM request_clubs rc
+                 WHERE rc.request_id = r.request_id
+                   AND (EXISTS (SELECT 1 FROM club_members cm
+                                 WHERE cm.club_id = rc.club_id AND cm.user_id = {viewer})
+                        OR EXISTS (SELECT 1 FROM clubs c
+                                    WHERE c.club_id = rc.club_id AND c.user_id = {viewer}))
+            )"""
+        )
+
     time_periods = [p for p in args.getlist("time") if p in _TIME_PERIODS]
     if time_periods:
         time_sql = " OR ".join(f"({_TIME_PERIODS[p]})" for p in time_periods)
@@ -332,8 +394,10 @@ def _list_events_filters(args) -> tuple[str, dict]:
             clauses.append("(" + " OR ".join(date_clauses) + ")")
 
     # Explore Events is discovery, not a records page - an event nobody can still attend has no
-    # business showing up here, so this is unconditional rather than another opt-in filter.
-    clauses.append(_NOT_ENDED)
+    # business showing up there. My Events is the opposite (see exclude_ended above), so this is
+    # the caller's call rather than a fixed rule.
+    if exclude_ended:
+        clauses.append(_NOT_ENDED)
 
     return (" AND " + " AND ".join(clauses) if clauses else ""), params
 
@@ -440,7 +504,7 @@ def search_events():
     principal = getattr(g, "principal", None)
     include_internal = principal is not None and not principal.is_external
 
-    where, params = _list_events_filters(request.args)
+    where, params = _list_events_filters(request.args, principal=principal)
 
     if request.args.get("excludeRegistered") and principal is not None:
         where += (
@@ -452,15 +516,7 @@ def search_events():
         )
         params["excl_user_id"] = principal.user_id
 
-    try:
-        page = max(1, int(request.args.get("page", 1)))
-    except ValueError:
-        page = 1
-    try:
-        page_size = min(60, max(1, int(request.args.get("pageSize", 9))))
-    except ValueError:
-        page_size = 9
-    offset = (page - 1) * page_size
+    page, page_size, offset = _page_args()
 
     count_only = str(request.args.get("countOnly", "")).lower() in ("1", "true", "yes")
 
@@ -819,6 +875,33 @@ def decide_registration(event_id: int, registration_id: int):
     return jsonify(dict(row))
 
 
+def _my_registration_exists(status_sql: str) -> str:
+    """EXISTS() over the caller's own registration rows for the event in the outer query."""
+    return f"""EXISTS (
+                SELECT 1 FROM event_registration er
+                 WHERE er.request_id = r.request_id AND er.user_id = %(user_id)s
+                   AND {status_sql}
+            )"""
+
+
+# scope -> the SQL that decides whether an event belongs in that My Events tab. Previously these
+# three rules were applied in Python over EVERY registration the caller had, which is why the page/
+# pageSize the client sent could not be honoured; expressed in SQL they filter, count and
+# LIMIT/OFFSET in one statement like every other list in the app.
+_REGISTERED = _my_registration_exists("er.status = 'registered'")
+_AWAITING_DECISION = _my_registration_exists("er.status = 'pending_approval'")
+_TURNED_DOWN = _my_registration_exists("er.status = 'rejected'")
+
+_REGISTRATION_SCOPES = {
+    # Confirmed, and the event has not happened yet.
+    "active": f"{_REGISTERED} AND NOT {_HAS_ENDED}",
+    # Waiting on a manual-approval organiser's decision.
+    "pending": _AWAITING_DECISION,
+    # Everything settled: turned down, or attended and now over.
+    "history": f"({_TURNED_DOWN} OR ({_REGISTERED} AND {_HAS_ENDED}))",
+}
+
+
 @bp.get("/me/registrations")
 @require_auth
 def my_registrations():
@@ -829,50 +912,59 @@ def my_registrations():
     awaiting the organiser's decision; ?scope=history returns everything else
     (past confirmed events, and any rejected registration). Cancelled
     registrations never appear.
+
+    Search (?q=) and every Explore Events filter group are accepted here too and
+    resolved in SQL by _list_events_filters(), so the My Events tabs filter the
+    same way and against the same server as Explore Events - see search_events().
+    Ended events are kept (exclude_ended=False): a past event is the whole point of
+    ?scope=history.
     """
     principal = current_principal()
     scope = request.args.get("scope")
+    include_internal = not principal.is_external
+    event_select = _event_select(include_internal=include_internal)
+
+    where, params = _list_events_filters(request.args, principal=principal, exclude_ended=False)
+    where += " AND " + _my_registration_exists("er.status <> 'cancelled'")
+    if scope in _REGISTRATION_SCOPES:
+        where += " AND " + _REGISTRATION_SCOPES[scope]
+    params = {**_viewer_params(include_internal, principal), **params, "user_id": principal.user_id}
+
+    page, page_size, offset = _page_args()
+    count_only = flag("countOnly")
+
     with transaction() as cur:
-        rows = fetch_all(
+        total = fetch_one(cur, f"SELECT count(*) AS n FROM ({event_select}{where}) AS matched", params)["n"]
+        rows = [] if count_only else fetch_all(
             cur,
-            f"""{_event_select(include_internal=not principal.is_external).rstrip()}
-                  AND EXISTS (
-                        SELECT 1 FROM event_registration er
-                         WHERE er.request_id = r.request_id AND er.user_id = %(user_id)s
-                           AND er.status <> 'cancelled'
-                      )
-             ORDER BY "firstDate" NULLS LAST, r.request_id DESC""",
-            {"user_id": principal.user_id},
+            f'{event_select}{where} ORDER BY "firstDate" NULLS LAST, r.request_id DESC '
+            f"LIMIT %(limit)s OFFSET %(offset)s",
+            {**params, "limit": page_size, "offset": offset},
         )
+        events = [_decorate(cur, row) for row in rows]
+        # One status lookup for the page that was actually returned, rather than for every
+        # registration the caller has ever made.
         my_status_by_event = {
             row["request_id"]: row["status"]
             for row in fetch_all(
                 cur,
                 """SELECT request_id, status FROM event_registration
-                    WHERE user_id = %s AND status <> 'cancelled'""",
-                (principal.user_id,),
+                    WHERE user_id = %(user_id)s AND status <> 'cancelled'
+                      AND request_id = ANY(%(event_ids)s)""",
+                {"user_id": principal.user_id, "event_ids": [int(event["id"]) for event in events]},
             )
-        }
-        events = [_decorate(cur, row) for row in rows]
+        } if events else {}
 
-    today = date.today().isoformat() if scope in ("active", "history") else None
+    def _my_status(event: dict) -> str:
+        raw = my_status_by_event.get(int(event["id"]), "registered")
+        return _STATUS_TO_REGISTRATION_STATUS.get(raw, raw)
 
-    items = []
-    for event in events:
-        raw_status = my_status_by_event.get(int(event["id"]), "registered")
-        status = _STATUS_TO_REGISTRATION_STATUS.get(raw_status, raw_status)
-        ended = bool(event["schedule"]) and max(row["date"] for row in event["schedule"]) < today if today else False
-        if scope == "active" and (status != "confirmed" or ended):
-            continue
-        if scope == "pending" and status != "pending":
-            continue
-        if scope == "history" and status == "pending":
-            continue
-        if scope == "history" and status == "confirmed" and not ended:
-            continue
-        items.append({"event": event, "status": status})
+    items = [{"event": event, "status": _my_status(event)} for event in events]
 
-    return jsonify({"items": items, "total": len(items)})
+    return jsonify({
+        "items": items, "page": page, "pageSize": page_size, "total": total,
+        "totalPages": max(1, -(-total // page_size)),
+    })
 
 
 _PENDING_APPROVALS_SELECT = """
@@ -1254,28 +1346,41 @@ def search_saved():
     my_registrations()'s own {items, page, pageSize, total, totalPages} shape
     (SavedEventsResponse) rather than list_saved()'s unpaginated {items, total}, which still
     backs the app-wide "is this saved" heart-icon state and needs the complete id set.
+
+    ?q= and every Explore Events filter group are accepted here as well, resolved in SQL by
+    _list_events_filters() - the Saved tab filters against the server, not over the page it
+    already has.
     """
     principal = current_principal()
-    event_select = _event_select(include_internal=not principal.is_external)
-    where = """ AND EXISTS (
+    include_internal = not principal.is_external
+    event_select = _event_select(include_internal=include_internal)
+
+    # Same search box and same filter groups as Explore Events, resolved by the same builder -
+    # exclude_ended=False because an event you saved and then missed still belongs on your Saved
+    # list, unlike on the discovery page.
+    where, params = _list_events_filters(request.args, principal=principal, exclude_ended=False)
+    where += """ AND EXISTS (
                       SELECT 1 FROM saved_event se
                        WHERE se.request_id = r.request_id AND se.user_id = %(user_id)s
                     )"""
-    params = {"user_id": principal.user_id}
+    # An event you saved AND then got a place on lives under My Events > Registered, not under
+    # Saved - so the Saved tab asks for it to be dropped here, in the same query that counts the
+    # rows, rather than dropping it from the page after the fact (which would leave the total,
+    # and therefore the pagination, describing a different list from the one on screen).
+    if flag("excludeConfirmed"):
+        where += """ AND NOT EXISTS (
+                          SELECT 1 FROM event_registration er
+                           WHERE er.request_id = r.request_id AND er.user_id = %(user_id)s
+                             AND er.status = 'registered'
+                        )"""
+    params = {**_viewer_params(include_internal, principal), **params, "user_id": principal.user_id}
 
-    try:
-        page = max(1, int(request.args.get("page", 1)))
-    except ValueError:
-        page = 1
-    try:
-        page_size = min(60, max(1, int(request.args.get("pageSize", 9))))
-    except ValueError:
-        page_size = 9
-    offset = (page - 1) * page_size
+    page, page_size, offset = _page_args()
+    count_only = flag("countOnly")
 
     with transaction() as cur:
         total = fetch_one(cur, f"SELECT count(*) AS n FROM ({event_select}{where}) AS matched", params)["n"]
-        rows = fetch_all(
+        rows = [] if count_only else fetch_all(
             cur,
             f"""{event_select}{where}
              ORDER BY (SELECT saved_at FROM saved_event

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Use case — access, participation and community</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#fff}
+  body{display:flex;justify-content:center;padding:24px 18px}
+  svg{width:100%;max-width:1500px;height:auto;display:block}
+
+  .sys  {font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:21px;letter-spacing:.14em;text-transform:uppercase;fill:#27456F}
+  .pkg  {font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:16px;letter-spacing:.16em;text-transform:uppercase;fill:#4E6A93}
+  .act  {font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:16px;letter-spacing:.05em;text-transform:uppercase;fill:#141A20}
+  .act-s{font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10px;fill:#8A939D}
+  .uc   {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11.5px;fill:#243039}
+  .st   {font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:10.5px;fill:#8E3A22}
+  .note {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11px;fill:#8A939D}
+
+  .bound{fill:none;stroke:#27456F;stroke-width:1.8}
+  .pk   {fill:#F6F8FA;stroke:#AFBAC4;stroke-width:1;stroke-dasharray:4 4}
+  .el   {fill:#FFFFFF;stroke:#27456F;stroke-width:1.4}
+  .assoc{stroke:#8FA0B4;stroke-width:1.1;fill:none}
+  .dep  {stroke:#C08670;stroke-width:1.3;fill:none;stroke-dasharray:6 4}
+  .gen  {stroke:#7C8DA1;stroke-width:1.3;fill:none}
+  .fig  {fill:none;stroke:#27456F;stroke-width:1.7;stroke-linecap:round}
+</style>
+</head>
+<body>
+
+<svg viewBox="0 0 1500 1180" role="img"
+     aria-label="Use case diagram: access, event participation and community">
+  <defs>
+    <marker id="dep" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10" fill="none" stroke="#C08670" stroke-width="1.4"/>
+    </marker>
+    <marker id="gen" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="11" markerHeight="11" orient="auto-start-reverse">
+      <path d="M0,0 L11,6 L0,12 z" fill="#FFFFFF" stroke="#7C8DA1" stroke-width="1.3"/>
+    </marker>
+  </defs>
+
+  <!-- ══════ ACTORS · left ══════ -->
+  <g class="fig"><circle cx="86" cy="120" r="11"/><path d="M86,131 V162 M66,142 H106 M86,162 L72,186 M86,162 L100,186"/></g>
+  <text class="act"   x="86" y="204" text-anchor="middle">Guest</text>
+  <text class="act-s" x="86" y="220" text-anchor="middle">not signed in</text>
+
+  <g class="fig"><circle cx="86" cy="300" r="11"/><path d="M86,311 V342 M66,322 H106 M86,342 L72,366 M86,342 L100,366"/></g>
+  <text class="act"   x="86" y="384" text-anchor="middle">External user</text>
+  <text class="act-s" x="86" y="400" text-anchor="middle">self-registered</text>
+
+  <g class="fig"><circle cx="86" cy="560" r="11"/><path d="M86,571 V602 M66,582 H106 M86,602 L72,626 M86,602 L100,626"/></g>
+  <text class="act"   x="86" y="644" text-anchor="middle">Internal user</text>
+
+  <!-- generalization children -->
+  <g class="fig"><circle cx="86" cy="760" r="9"/><path d="M86,769 V793 M70,778 H102 M86,793 L75,812 M86,793 L97,812"/></g>
+  <text class="act" x="86" y="830" text-anchor="middle" font-size="14">Student</text>
+
+  <g class="fig"><circle cx="86" cy="880" r="9"/><path d="M86,889 V913 M70,898 H102 M86,913 L75,932 M86,913 L97,932"/></g>
+  <text class="act" x="86" y="950" text-anchor="middle" font-size="14">Lecturer</text>
+
+  <g class="fig"><circle cx="86" cy="1000" r="9"/><path d="M86,1009 V1033 M70,1018 H102 M86,1033 L75,1052 M86,1033 L97,1052"/></g>
+  <text class="act" x="86" y="1070" text-anchor="middle" font-size="14">Staff</text>
+
+  <path class="gen" d="M86,742 V664" marker-end="url(#gen)"/>
+  <path class="gen" d="M86,862 H150 V664 H90" marker-end="url(#gen)"/>
+  <path class="gen" d="M86,982 H176 V664 H90" marker-end="url(#gen)"/>
+  <text class="note" x="150" y="706">generalization</text>
+
+  <!-- ══════ ACTORS · right ══════ -->
+  <g class="fig"><circle cx="1372" cy="330" r="11"/><path d="M1372,341 V372 M1352,352 H1392 M1372,372 L1358,396 M1372,372 L1386,396"/></g>
+  <text class="act" x="1372" y="414" text-anchor="middle" font-size="14">Event organizer</text>
+  <text class="act-s" x="1372" y="430" text-anchor="middle">organiser of an approved event</text>
+
+  <g class="fig"><circle cx="1372" cy="720" r="11"/><path d="M1372,731 V762 M1352,742 H1392 M1372,762 L1358,786 M1372,762 L1386,786"/></g>
+  <text class="act" x="1372" y="804" text-anchor="middle" font-size="14">Club president</text>
+
+  <g class="fig"><circle cx="1372" cy="960" r="11"/><path d="M1372,971 V1002 M1352,982 H1392 M1372,1002 L1358,1026 M1372,1002 L1386,1026"/></g>
+  <text class="act" x="1372" y="1044" text-anchor="middle" font-size="14">Club admin</text>
+
+  <!-- ══════ SYSTEM BOUNDARY ══════ -->
+  <rect class="bound" x="236" y="58" width="1002" height="1090" rx="2"/>
+  <text class="sys" x="737" y="88" text-anchor="middle">APU Event Management System</text>
+
+  <!-- ── package 1 ── -->
+  <rect class="pk" x="258" y="106" width="958" height="212" rx="3"/>
+  <text class="pkg" x="274" y="130">Identity</text>
+
+  <ellipse class="el" cx="400" cy="182" rx="86" ry="30"/>
+  <text class="uc" x="400" y="178" text-anchor="middle">Register</text>
+  <text class="uc" x="400" y="193" text-anchor="middle">account</text>
+
+  <ellipse class="el" cx="628" cy="182" rx="86" ry="30"/>
+  <text class="uc" x="628" y="178" text-anchor="middle">Verify emailed</text>
+  <text class="uc" x="628" y="193" text-anchor="middle">code</text>
+
+  <ellipse class="el" cx="856" cy="182" rx="80" ry="28"/>
+  <text class="uc" x="856" y="186" text-anchor="middle">Log in</text>
+
+  <ellipse class="el" cx="1064" cy="182" rx="86" ry="30"/>
+  <text class="uc" x="1064" y="178" text-anchor="middle">Reset</text>
+  <text class="uc" x="1064" y="193" text-anchor="middle">password</text>
+
+  <ellipse class="el" cx="400" cy="272" rx="86" ry="28"/>
+  <text class="uc" x="400" y="269" text-anchor="middle">Change own</text>
+  <text class="uc" x="400" y="284" text-anchor="middle">password</text>
+
+  <ellipse class="el" cx="628" cy="272" rx="86" ry="28"/>
+  <text class="uc" x="628" y="269" text-anchor="middle">Ask the AI</text>
+  <text class="uc" x="628" y="284" text-anchor="middle">assistant</text>
+
+  <path class="dep" d="M486,182 H542" marker-end="url(#dep)"/>
+  <text class="st" x="514" y="172" text-anchor="middle">&#171;include&#187;</text>
+
+  <!-- ── package 2 ── -->
+  <rect class="pk" x="258" y="336" width="958" height="392" rx="3"/>
+  <text class="pkg" x="274" y="360">Events</text>
+
+  <ellipse class="el" cx="400" cy="412" rx="86" ry="30"/>
+  <text class="uc" x="400" y="408" text-anchor="middle">Browse and</text>
+  <text class="uc" x="400" y="423" text-anchor="middle">search events</text>
+
+  <ellipse class="el" cx="628" cy="412" rx="86" ry="30"/>
+  <text class="uc" x="628" y="408" text-anchor="middle">View master</text>
+  <text class="uc" x="628" y="423" text-anchor="middle">calendar</text>
+
+  <ellipse class="el" cx="856" cy="412" rx="80" ry="28"/>
+  <text class="uc" x="856" y="416" text-anchor="middle">Save event</text>
+
+  <ellipse class="el" cx="1064" cy="412" rx="86" ry="30"/>
+  <text class="uc" x="1064" y="408" text-anchor="middle">Set reminder</text>
+  <text class="uc" x="1064" y="423" text-anchor="middle">preferences</text>
+
+  <ellipse class="el" cx="400" cy="520" rx="86" ry="30"/>
+  <text class="uc" x="400" y="516" text-anchor="middle">Register for</text>
+  <text class="uc" x="400" y="531" text-anchor="middle">an event</text>
+
+  <ellipse class="el" cx="628" cy="520" rx="86" ry="30"/>
+  <text class="uc" x="628" y="516" text-anchor="middle">Upload</text>
+  <text class="uc" x="628" y="531" text-anchor="middle">payment proof</text>
+
+  <ellipse class="el" cx="856" cy="520" rx="86" ry="30"/>
+  <text class="uc" x="856" y="516" text-anchor="middle">Cancel own</text>
+  <text class="uc" x="856" y="531" text-anchor="middle">registration</text>
+
+  <ellipse class="el" cx="400" cy="640" rx="86" ry="30"/>
+  <text class="uc" x="400" y="636" text-anchor="middle">Decide a</text>
+  <text class="uc" x="400" y="651" text-anchor="middle">registration</text>
+
+  <ellipse class="el" cx="628" cy="640" rx="86" ry="30"/>
+  <text class="uc" x="628" y="636" text-anchor="middle">Review</text>
+  <text class="uc" x="628" y="651" text-anchor="middle">payment proof</text>
+
+  <ellipse class="el" cx="856" cy="640" rx="86" ry="30"/>
+  <text class="uc" x="856" y="636" text-anchor="middle">View own</text>
+  <text class="uc" x="856" y="651" text-anchor="middle">registrations</text>
+
+  <!-- Upload payment proof EXTENDS Register for an event: arrow points at the base case -->
+  <path class="dep" d="M542,520 H486" marker-end="url(#dep)"/>
+  <text class="st"   x="514" y="502" text-anchor="middle">&#171;extend&#187;</text>
+  <text class="note" x="514" y="558" text-anchor="middle">cost_amount &gt; 0</text>
+
+  <!-- ── package 3 ── -->
+  <rect class="pk" x="258" y="746" width="958" height="382" rx="3"/>
+  <text class="pkg" x="274" y="770">Clubs</text>
+
+  <ellipse class="el" cx="400" cy="822" rx="86" ry="30"/>
+  <text class="uc" x="400" y="826" text-anchor="middle">Discover clubs</text>
+
+  <ellipse class="el" cx="628" cy="822" rx="86" ry="30"/>
+  <text class="uc" x="628" y="818" text-anchor="middle">Request to</text>
+  <text class="uc" x="628" y="833" text-anchor="middle">join a club</text>
+
+  <ellipse class="el" cx="856" cy="822" rx="86" ry="30"/>
+  <text class="uc" x="856" y="818" text-anchor="middle">Decide a</text>
+  <text class="uc" x="856" y="833" text-anchor="middle">join request</text>
+
+  <ellipse class="el" cx="1064" cy="822" rx="86" ry="30"/>
+  <text class="uc" x="1064" y="818" text-anchor="middle">View own</text>
+  <text class="uc" x="1064" y="833" text-anchor="middle">memberships</text>
+
+  <ellipse class="el" cx="400" cy="936" rx="86" ry="30"/>
+  <text class="uc" x="400" y="932" text-anchor="middle">Request a</text>
+  <text class="uc" x="400" y="947" text-anchor="middle">president change</text>
+
+  <ellipse class="el" cx="628" cy="936" rx="86" ry="30"/>
+  <text class="uc" x="628" y="932" text-anchor="middle">Decide a</text>
+  <text class="uc" x="628" y="947" text-anchor="middle">president change</text>
+
+  <ellipse class="el" cx="400" cy="1050" rx="86" ry="30"/>
+  <text class="uc" x="400" y="1046" text-anchor="middle">Create and</text>
+  <text class="uc" x="400" y="1061" text-anchor="middle">manage clubs</text>
+
+  <ellipse class="el" cx="628" cy="1050" rx="86" ry="30"/>
+  <text class="uc" x="628" y="1046" text-anchor="middle">Manage club</text>
+  <text class="uc" x="628" y="1061" text-anchor="middle">categories</text>
+
+  <!-- ══════ ASSOCIATIONS ══════ -->
+  <!-- Guest -->
+  <path class="assoc" d="M120,150 L314,178"/>
+  <path class="assoc" d="M120,160 L314,406"/>
+  <path class="assoc" d="M120,170 L542,268"/>
+
+  <!-- External user -->
+  <path class="assoc" d="M120,318 L776,190"/>
+  <path class="assoc" d="M120,326 L314,514"/>
+  <path class="assoc" d="M120,334 L770,522"/>
+
+  <!-- Internal user -->
+  <path class="assoc" d="M120,570 L776,196"/>
+  <path class="assoc" d="M120,578 L978,192"/>
+  <path class="assoc" d="M120,586 L314,278"/>
+  <path class="assoc" d="M120,594 L542,278"/>
+  <path class="assoc" d="M120,602 L314,418"/>
+  <path class="assoc" d="M120,610 L776,414"/>
+  <path class="assoc" d="M120,618 L978,416"/>
+  <path class="assoc" d="M120,626 L314,524"/>
+  <path class="assoc" d="M120,634 L770,646"/>
+  <path class="assoc" d="M120,642 L314,818"/>
+  <path class="assoc" d="M120,650 L542,824"/>
+
+  <!-- Event organizer -->
+  <path class="assoc" d="M1338,352 L486,638"/>
+  <path class="assoc" d="M1338,362 L714,642"/>
+
+  <!-- Club president -->
+  <path class="assoc" d="M1338,742 L942,824"/>
+  <path class="assoc" d="M1338,752 L486,940"/>
+
+  <!-- Club admin -->
+  <path class="assoc" d="M1338,982 L714,940"/>
+  <path class="assoc" d="M1338,992 L486,1052"/>
+  <path class="assoc" d="M1338,1002 L714,1054"/>
+
+</svg>
+</body>
+</html>

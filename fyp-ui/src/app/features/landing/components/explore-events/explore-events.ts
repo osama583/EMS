@@ -1,10 +1,8 @@
 import { PAGE_SIZE_OPTIONS } from '../../../../shared/components/internal-data-page/internal-data-page.models';
-import { DOCUMENT } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  HostListener,
   computed,
   effect,
   inject,
@@ -13,59 +11,32 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subject, debounceTime, switchMap } from 'rxjs';
-import { EventSearchParams, EventVisibility, PublishedEvent, RegistrationResult, RegistrationStatus } from '../../../../core/events/published-event.models';
-import { EventCatalogRepositoryImpl } from '../../../../core/event-catalog/event-catalog.repository';
+import { debounceTime, switchMap } from 'rxjs';
+import { EventSearchParams, PublishedEvent, RegistrationResult, RegistrationStatus } from '../../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../../core/events/published-event.service';
 import { EventFavouriteService } from '../../../../core/events/event-favourite.service';
 import { AuthService } from '../../../../core/auth/auth.service';
-import { isSchoolStudentOrLecturer } from '../../../../core/auth/role-access';
 import { GuestRegistrationFlowService } from '../../../../core/auth/external-registration.service';
 import { EventCardComponent } from '../../../../shared/components/event-card/event-card';
 import { EventDetailsModalComponent } from '../../../../shared/components/event-details-modal/event-details-modal';
-import { FormModalComponent } from '../../../../shared/components/form-modal/form-modal';
 import { InternalPaginationComponent } from '../../../../shared/components/internal-data-page/internal-data-page-parts';
-import { ExpandableSearchComponent } from '../../../../shared/components/expandable-search/expandable-search';
-import { FilterButtonComponent } from '../../../../shared/components/filter-button/filter-button';
+import { EventFilterBarComponent } from '../../../../shared/components/event-filter-bar/event-filter-bar';
+import { EventFilterDialogComponent } from '../../../../shared/components/event-filter-bar/event-filter-dialog';
+import { EventFilterKey, EventFilterQuery, EventFilterState, toEventSearchParams } from '../../../../shared/components/event-filter-bar/event-filter.state';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { SkeletonComponent } from '../../../../shared/components/skeleton/skeleton';
-
-type FilterKey =
-  | 'visibility'
-  | 'category'
-  | 'school'
-  | 'format'
-  | 'date'
-  | 'time'
-  | 'registration'
-  | 'cost'
-  | 'club';
-
-type FilterSelection = Record<FilterKey, readonly string[]>;
-
-interface FilterGroup {
-  readonly key: FilterKey;
-  readonly label: string;
-  readonly options: readonly string[];
-  readonly wide?: boolean;
-}
-
-interface AppliedFilterChip {
-  readonly group: FilterKey;
-  readonly value: string;
-}
 
 const PUBLIC_PAGE_SIZE = 6;
 const INTERNAL_PAGE_SIZE = 9;
 
 @Component({
   selector: 'app-explore-events',
-  imports: [SkeletonComponent, FormModalComponent,
+  imports: [SkeletonComponent,
     EventDetailsModalComponent,
     EventCardComponent,
     InternalPaginationComponent,
-    ExpandableSearchComponent,
-    FilterButtonComponent,
+    EventFilterBarComponent,
+    EventFilterDialogComponent,
   ],
   templateUrl: './explore-events.html',
   styleUrl: './explore-events.scss',
@@ -73,18 +44,20 @@ const INTERNAL_PAGE_SIZE = 9;
 })
 export class ExploreEventsComponent {
   readonly pageSizeOptions = PAGE_SIZE_OPTIONS;
-  private readonly document = inject(DOCUMENT);
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly auth = inject(AuthService);
-  private readonly eventCatalogRepository = inject(EventCatalogRepositoryImpl);
   private readonly guestFlow = inject(GuestRegistrationFlowService);
   private readonly publishedEventService = inject(PublishedEventService);
   private readonly toast = inject(ToastService);
   readonly favourites = inject(EventFavouriteService);
   readonly variant = input<'public' | 'internal'>('public');
   readonly registeringEventId = signal<string | null>(null);
+
+  // The search box + filter groups, shared with every My Events tab so the two surfaces can
+  // never offer different filters — see EventFilterState.
+  readonly filters = new EventFilterState();
 
   readonly loading = signal(true);
   // Only the FIRST load may replace the grid with a skeleton. Later loads (a filter, a search, a
@@ -94,15 +67,7 @@ export class ExploreEventsComponent {
   readonly showSkeleton = computed(() => this.loading() && !this.hasLoadedOnce());
   readonly loadError = signal('');
 
-  readonly searchTerm = signal('');
   readonly selectedPublishedEvent = signal<PublishedEvent | null>(null);
-  readonly filterOpen = signal(false);
-  readonly appliedFilters = signal<FilterSelection>(this.emptyFilters());
-  readonly draftFilters = signal<FilterSelection>(this.emptyFilters());
-  readonly appliedCustomFrom = signal('');
-  readonly appliedCustomTo = signal('');
-  readonly draftCustomFrom = signal('');
-  readonly draftCustomTo = signal('');
   readonly currentPage = signal(1);
   // Writable — the internal variant's pagination control lets the user pick 9/18/27 (see
   // changePageSize).
@@ -115,21 +80,6 @@ export class ExploreEventsComponent {
   readonly pagedPublishedEvents = computed(() => this.pageEvents());
   private readonly publishedEventsById = computed(() => new Map(this.pagedPublishedEvents().map((event) => [event.id, event])));
   private readonly registrationStatusByEventId = signal<ReadonlyMap<string, RegistrationStatus | null>>(new Map());
-
-  // School options span every published event the caller can see, not just the current page —
-  // fetched once, independently of the paged search, the same way category/format catalogs are.
-  private readonly allSchools = signal<readonly string[]>([]);
-
-  // Category/format filter options — fetched active-only directly from the catalog (not via
-  // EventCategoryService/EventFormatService's shared entries(), which intentionally includes
-  // inactive rows for admin management and event-proposal's archived-format lookups).
-  private readonly activeCategoryNames = signal<readonly string[]>([]);
-  private readonly activeFormatNames = signal<readonly string[]>([]);
-
-  // Debounced live "Show N Results" preview while the filter dialog is open (internal variant only
-  // — the public variant offers no filter dialog at all, see draftResultCount below).
-  private readonly draftPreviewCount = signal<number | null>(null);
-  private readonly draftPreviewRequests = new Subject<void>();
 
   registrationCount(id: string): number { return this.publishedEventsById().get(id)?.confirmedRegistrationCount ?? 0; }
   publishedEvent(id: string): PublishedEvent | undefined { return this.publishedEventsById().get(id); }
@@ -150,106 +100,22 @@ export class ExploreEventsComponent {
     }
   }
 
-  // Events can carry a null/blank schoolDepartment, and a null in here used to throw
-  // (null.localeCompare) from inside a computed — which aborts Angular's whole change-detection
-  // pass, freezing every other binding on the page (the save-event heart included).
-  readonly schoolOptions = computed(() =>
-    [...this.allSchools()].filter((name): name is string => !!name).sort((a, b) => a.localeCompare(b)),
-  );
-
-  // Only Students and Lecturers can ever be part of a club (as a member or as President — see
-  // AuthUser.presidentOfClubIds, a data fact, not a role) — every other internal role has no path to
-  // club participation, so offering the "Club Only" filter to them would be misleading UI, not just a
-  // functional gap.
-  private readonly canSeeClubOnlyFilter = computed(() => {
-    const user = this.auth.user();
-    if (!user) return false;
-    return isSchoolStudentOrLecturer(user);
-  });
-
-  // Filter groups only exist for the internal variant — the public landing page has no filter UI
-  // at all, just search (see explore-events.html).
-  readonly filterGroups = computed<readonly FilterGroup[]>(() => [
-    {
-      key: 'visibility' as const,
-      label: 'Event Visibility',
-      options: this.canSeeClubOnlyFilter()
-        ? ['Public', 'Internal', 'Club Only']
-        : ['Public', 'Internal'],
-    },
-    {
-      key: 'category',
-      label: 'Category',
-      options: this.activeCategoryNames(),
-      wide: true,
-    },
-    {
-      key: 'school',
-      label: 'School or Department',
-      options: this.schoolOptions(),
-      wide: true,
-    },
-    {
-      key: 'format',
-      label: 'Event Format',
-      options: this.activeFormatNames(),
-    },
-    {
-      key: 'date',
-      label: 'Date',
-      options: ['Today', 'Tomorrow', 'This Week', 'This Weekend', 'This Month', 'Custom Date Range'],
-      wide: true,
-    },
-    {
-      key: 'time',
-      label: 'Time',
-      options: ['Morning', 'Afternoon', 'Evening'],
-    },
-    {
-      key: 'registration',
-      label: 'Registration',
-      options: ['No Registration Required', 'Registration Required'],
-    },
-    {
-      key: 'cost',
-      label: 'Cost',
-      options: ['Free', 'Paid'],
-    },
-    // Only shown to someone who is actually in a club - for everyone else the filter could
-    // only ever return nothing, which reads as a broken filter rather than an empty result.
-    ...(this.canFilterByMyClubs()
-      ? [{ key: 'club' as const, label: 'Club', options: ['My Clubs'] }]
-      : []),
-  ]);
-
-  /**
-   * True when the viewer could have club-run events to narrow to: a club President
-   * (presidentOfClubIds, a data fact) or any student/lecturer, who are the only roles
-   * that can hold a club membership - the same population canSeeClubOnlyFilter uses.
-   */
-  private readonly canFilterByMyClubs = computed(() => {
-    const user = this.auth.user();
-    if (!user) return false;
-    return isSchoolStudentOrLecturer(user) || (user.presidentOfClubIds?.length ?? 0) > 0;
-  });
-
   readonly totalPages = computed(() => Math.max(1, Math.ceil(this.resultCount() / this.pageSize())));
   // draftResultCount shows the live, debounced preview while the filter dialog is open (internal
   // variant only); before the first preview response lands it falls back to the applied count so
   // the button never shows a jarring 0.
-  readonly draftResultCount = computed(() => this.draftPreviewCount() ?? this.resultCount());
-  readonly appliedFilterChips = computed<readonly AppliedFilterChip[]>(() =>
-    (Object.entries(this.appliedFilters()) as [FilterKey, readonly string[]][]).flatMap(
-      ([group, values]) => values.map((value) => ({ group, value })),
-    ),
-  );
-  readonly appliedFilterCount = computed(() => this.appliedFilterChips().length);
+  readonly draftResultCount = computed(() => this.filters.draftPreviewCount() ?? this.resultCount());
+
+  // Delegates onto the shared filter state. Kept as members of this component because the
+  // template and the Explore Events specs address the filter through the page, not through the
+  // bar/dialog components that happen to render it.
+  readonly filterGroups = this.filters.groups;
+  readonly appliedFilterChips = this.filters.appliedChips;
+  readonly appliedFilterCount = this.filters.appliedCount;
+  readonly searchTerm = this.filters.searchTerm;
+  readonly filterOpen = this.filters.filterOpen;
 
   constructor() {
-    this.destroyRef.onDestroy(() => {
-      this.document.body.classList.remove('filters-open');
-    });
-
     // Deep link from anywhere that links to a specific event by id (currently the AI assistant's
     // event-card sources — see ai-assistant.ts) — a ?event=<id> query param opens that event's details
     // modal directly, fetching it on its own if the current page/filter happened not to include it
@@ -262,19 +128,20 @@ export class ExploreEventsComponent {
       });
     }
 
-    this.draftPreviewRequests
+    this.filters.draftChanges
       .pipe(
+        takeUntilDestroyed(this.destroyRef),
         debounceTime(300),
         // Only `total` is ever read (see the subscribe below) — countOnly skips building/
         // decorating a page of full event records server-side just to report how many exist.
         switchMap(() => this.publishedEventService.searchEvents({
-          ...this.buildSearchParams(this.draftFilters(), this.draftCustomFrom(), this.draftCustomTo(), 1, 1),
+          ...this.buildSearchParams(this.filters.draftQuery(), 1, 1),
           countOnly: true,
         })),
       )
       .subscribe({
-        next: (response) => this.draftPreviewCount.set(response.total),
-        error: () => this.draftPreviewCount.set(null),
+        next: (response) => this.filters.draftPreviewCount.set(response.total),
+        error: () => this.filters.draftPreviewCount.set(null),
       });
 
     // variant() is a signal input, so it is not guaranteed to be readable at its final value the
@@ -287,19 +154,13 @@ export class ExploreEventsComponent {
       if (setupDoneFor === current) return;
       setupDoneFor = current;
       this.pageSize.set(current === 'public' ? PUBLIC_PAGE_SIZE : INTERNAL_PAGE_SIZE);
-      if (current === 'internal') {
-        this.loadSchoolOptions();
-        this.loadCatalogFilterOptions();
-      }
+      if (current === 'internal') this.filters.loadOptions();
     });
 
     // Re-fetches whenever applied filters, search term, or pagination change — this IS the data
     // load for both variants, not a client-side re-filter of an already-fetched list.
     effect(() => {
-      this.appliedFilters();
-      this.appliedCustomFrom();
-      this.appliedCustomTo();
-      this.searchTerm();
+      this.filters.query();
       this.currentPage();
       this.pageSize();
       this.load();
@@ -309,7 +170,7 @@ export class ExploreEventsComponent {
   private load(): void {
     this.loading.set(true);
     this.loadError.set('');
-    const params = this.buildSearchParams(this.appliedFilters(), this.appliedCustomFrom(), this.appliedCustomTo(), this.currentPage(), this.pageSize());
+    const params = this.buildSearchParams(this.filters.query(), this.currentPage(), this.pageSize());
     this.publishedEventService.searchEvents(params).subscribe({
       next: (response) => {
         this.pageEvents.set(response.items);
@@ -328,56 +189,19 @@ export class ExploreEventsComponent {
     });
   }
 
-  private loadSchoolOptions(): void {
-    this.publishedEventService.getEventSchools().subscribe({
-      next: (schools) => this.allSchools.set(schools),
-      error: () => this.allSchools.set([]),
-    });
-  }
-
-  private loadCatalogFilterOptions(): void {
-    this.eventCatalogRepository.getEntries('categories', true).subscribe({
-      next: (entries) => this.activeCategoryNames.set(entries.map((entry) => entry.name)),
-      error: () => this.activeCategoryNames.set([]),
-    });
-    this.eventCatalogRepository.getEntries('formats', true).subscribe({
-      next: (entries) => this.activeFormatNames.set(entries.map((entry) => entry.name)),
-      error: () => this.activeFormatNames.set([]),
-    });
-  }
-
-  private buildSearchParams(filters: FilterSelection, customFrom: string, customTo: string, page: number, pageSize: number): EventSearchParams {
+  private buildSearchParams(query: EventFilterQuery, page: number, pageSize: number): EventSearchParams {
     // The public variant offers no filter UI, no auth-aware exclusion, and only ever wants Public-
-    // visibility events — everything else (category/school/format/date/time/
-    // registration/cost/visibility) is the internal variant's applied filters, which stay empty here
-    // since filterGroups/openFilters are never reachable on the public variant.
+    // visibility events — every filter group stays empty there, since the filter dialog is never
+    // reachable on it (see explore-events.html).
     if (this.variant() === 'public') {
-      return {
-        q: this.searchTerm().trim() || undefined,
-        visibility: ['Public'],
-        page,
-        pageSize,
-      };
+      return { q: query.q || undefined, visibility: ['Public'], page, pageSize };
     }
     return {
-      q: this.searchTerm().trim() || undefined,
-      visibility: filters.visibility as readonly EventVisibility[],
-      category: filters.category,
-      school: filters.school,
-      format: filters.format,
-      time: filters.time as EventSearchParams['time'],
-      registration: filters.registration as EventSearchParams['registration'],
-      cost: filters.cost as EventSearchParams['cost'],
-      club: filters.club,
-      date: filters.date,
-      dateFrom: filters.date.includes('Custom Date Range') ? customFrom || undefined : undefined,
-      dateTo: filters.date.includes('Custom Date Range') ? customTo || undefined : undefined,
+      ...toEventSearchParams(query, page, pageSize),
       // Once a user has a confirmed or pending registration for an event, it drops out of Explore
       // Events permanently (not just as a one-off post-register removal) — they can still manage
       // it from My Events. Guests are unaffected (never registered for anything).
       excludeRegistered: !!this.auth.user(),
-      page,
-      pageSize,
     };
   }
 
@@ -395,100 +219,40 @@ export class ExploreEventsComponent {
     });
   }
 
-  @HostListener('document:keydown.escape')
-  onEscape(): void {
-    if (this.filterOpen()) {
-      this.closeFilters();
-    }
-  }
-
   onSearchTerm(value: string): void {
-    this.searchTerm.set(value);
+    this.filters.setSearchTerm(value);
     this.currentPage.set(1);
   }
 
   goToPage(page: number): void { this.currentPage.set(page); }
   changePageSize(size: number): void { this.pageSize.set(size); this.currentPage.set(1); }
 
-  openFilters(): void {
-    this.draftFilters.set(this.cloneFilters(this.appliedFilters()));
-    this.draftCustomFrom.set(this.appliedCustomFrom());
-    this.draftCustomTo.set(this.appliedCustomTo());
-    this.draftPreviewCount.set(null);
-    this.filterOpen.set(true);
-    this.document.body.classList.add('filters-open');
+  openFilters(): void { this.filters.open(); }
+
+  closeFilters(): void { this.filters.close(); }
+
+  toggleDraftFilter(group: EventFilterKey, value: string): void {
+    this.filters.toggleDraft(group, value);
   }
 
-  closeFilters(): void {
-    this.filterOpen.set(false);
-    this.document.body.classList.remove('filters-open');
+  isDraftSelected(group: EventFilterKey, value: string): boolean {
+    return this.filters.isDraftSelected(group, value);
   }
 
-  toggleDraftFilter(group: FilterKey, value: string): void {
-    this.draftFilters.update((filters) => {
-      const current = filters[group];
-      const next = current.includes(value)
-        ? current.filter((item) => item !== value)
-        : [...current, value];
-
-      return { ...filters, [group]: next };
-    });
-    this.draftPreviewRequests.next();
-  }
-
-  isDraftSelected(group: FilterKey, value: string): boolean {
-    return this.draftFilters()[group].includes(value);
-  }
-
-  onCustomDate(event: Event, edge: 'from' | 'to'): void {
-    const value = (event.target as HTMLInputElement).value;
-    if (edge === 'from') {
-      this.draftCustomFrom.set(value);
-    } else {
-      this.draftCustomTo.set(value);
-    }
-    this.draftPreviewRequests.next();
-  }
-
-  resetDraftFilters(): void {
-    this.draftFilters.set(this.emptyFilters());
-    this.draftCustomFrom.set('');
-    this.draftCustomTo.set('');
-    this.draftPreviewRequests.next();
-  }
+  resetDraftFilters(): void { this.filters.resetDraft(); }
 
   applyFilters(): void {
-    this.appliedFilters.set(this.cloneFilters(this.draftFilters()));
-    this.appliedCustomFrom.set(this.draftCustomFrom());
-    this.appliedCustomTo.set(this.draftCustomTo());
+    this.filters.apply();
     this.currentPage.set(1);
-    this.closeFilters();
   }
 
-  removeAppliedFilter(group: FilterKey, value: string): void {
-    const remove = (filters: FilterSelection): FilterSelection => ({
-      ...filters,
-      [group]: filters[group].filter((item) => item !== value),
-    });
-
-    this.appliedFilters.update(remove);
-    this.draftFilters.update(remove);
-    if (group === 'date' && value === 'Custom Date Range') {
-      this.appliedCustomFrom.set('');
-      this.appliedCustomTo.set('');
-      this.draftCustomFrom.set('');
-      this.draftCustomTo.set('');
-    }
+  removeAppliedFilter(group: EventFilterKey, value: string): void {
+    this.filters.removeApplied(group, value);
     this.currentPage.set(1);
   }
 
   clearAppliedFilters(): void {
-    this.appliedFilters.set(this.emptyFilters());
-    this.draftFilters.set(this.emptyFilters());
-    this.appliedCustomFrom.set('');
-    this.appliedCustomTo.set('');
-    this.draftCustomFrom.set('');
-    this.draftCustomTo.set('');
+    this.filters.clearApplied();
     this.currentPage.set(1);
   }
 
@@ -539,33 +303,4 @@ export class ExploreEventsComponent {
       },
     });
   }
-
-  private emptyFilters(): FilterSelection {
-    return {
-      visibility: [],
-      category: [],
-      school: [],
-      format: [],
-      date: [],
-      time: [],
-      registration: [],
-      cost: [],
-      club: [],
-    };
-  }
-
-  private cloneFilters(filters: FilterSelection): FilterSelection {
-    return {
-      visibility: [...filters.visibility],
-      category: [...filters.category],
-      school: [...filters.school],
-      format: [...filters.format],
-      date: [...filters.date],
-      time: [...filters.time],
-      registration: [...filters.registration],
-      cost: [...filters.cost],
-      club: [...filters.club],
-    };
-  }
-
 }

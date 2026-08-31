@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Activity — proposal lifecycle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;background:#fff}
+  body{display:flex;justify-content:center;padding:24px 18px}
+  svg{width:100%;max-width:1520px;height:auto;display:block}
+
+  .lane {font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:18px;letter-spacing:.14em;text-transform:uppercase;fill:#27456F}
+  .ac   {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:11.5px;fill:#243039}
+  .acb  {font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:11.5px;fill:#141A20}
+  .stt  {font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:10px;fill:#4E6A93}
+  .gd   {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10.5px;fill:#5A6672}
+  .dc   {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10.5px;fill:#243039}
+  .warn {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10.5px;fill:#8E3A22}
+  .note {font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10.5px;fill:#8A939D}
+  .fin  {font-family:"Barlow Condensed",sans-serif;font-weight:600;font-size:14px;letter-spacing:.08em;text-transform:uppercase;fill:#141A20}
+
+  .lanebg{fill:#F8FAFB}
+  .lanel {stroke:#AFBAC4;stroke-width:1.2}
+  .act   {fill:#FFFFFF;stroke:#27456F;stroke-width:1.5}
+  .act-x {fill:#FFFFFF;stroke:#C08670;stroke-width:1.5}
+  .dia   {fill:#FFFFFF;stroke:#27456F;stroke-width:1.5}
+  .bar   {fill:#27456F}
+  .fl    {stroke:#27456F;stroke-width:1.6;fill:none}
+  .fl-x  {stroke:#C08670;stroke-width:1.5;fill:none;stroke-dasharray:6 4}
+  .fl-b  {stroke:#7C8DA1;stroke-width:1.4;fill:none;stroke-dasharray:5 4}
+</style>
+</head>
+<body>
+
+<svg viewBox="0 0 1500 1760" role="img"
+     aria-label="Activity diagram: end-to-end proposal lifecycle across all ten statuses">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#27456F"/></marker>
+    <marker id="ax" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#C08670"/></marker>
+    <marker id="ab" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7C8DA1"/></marker>
+  </defs>
+
+  <!-- ══════ SWIMLANES ══════ -->
+  <rect class="lanebg" x="40"   y="34" width="220" height="1700"/>
+  <rect class="lanebg" x="480"  y="34" width="220" height="1700"/>
+  <rect class="lanebg" x="920"  y="34" width="220" height="1700"/>
+  <line class="lanel" x1="40"   y1="34" x2="40"   y2="1734"/>
+  <line class="lanel" x1="260"  y1="34" x2="260"  y2="1734"/>
+  <line class="lanel" x1="480"  y1="34" x2="480"  y2="1734"/>
+  <line class="lanel" x1="700"  y1="34" x2="700"  y2="1734"/>
+  <line class="lanel" x1="920"  y1="34" x2="920"  y2="1734"/>
+  <line class="lanel" x1="1140" y1="34" x2="1140" y2="1734"/>
+  <line class="lanel" x1="1460" y1="34" x2="1460" y2="1734"/>
+  <line class="lanel" x1="40"   y1="34" x2="1460" y2="34"/>
+  <line class="lanel" x1="40"   y1="76" x2="1460" y2="76"/>
+  <line class="lanel" x1="40"   y1="1734" x2="1460" y2="1734"/>
+
+  <text class="lane" x="150"  y="62" text-anchor="middle">Applicant</text>
+  <text class="lane" x="370"  y="62" text-anchor="middle">System</text>
+  <text class="lane" x="590"  y="62" text-anchor="middle">HOS / HOD</text>
+  <text class="lane" x="810"  y="62" text-anchor="middle">F&amp;B head</text>
+  <text class="lane" x="1030" y="62" text-anchor="middle">CFO</text>
+  <text class="lane" x="1300" y="62" text-anchor="middle">Departments</text>
+
+  <!-- ══════ APPLICANT — start ══════ -->
+  <circle cx="150" cy="118" r="11" fill="#27456F"/>
+  <path class="fl" d="M150,129 V152" marker-end="url(#a)"/>
+
+  <rect class="act" x="55" y="156" width="190" height="52" rx="10"/>
+  <text class="stt" x="150" y="176" text-anchor="middle">draft</text>
+  <text class="ac"  x="150" y="194" text-anchor="middle">Create / edit proposal</text>
+
+  <path class="fl" d="M150,208 V246" marker-end="url(#a)"/>
+
+  <rect class="act" x="55" y="250" width="190" height="52" rx="10"/>
+  <text class="stt" x="150" y="270" text-anchor="middle">submitted</text>
+  <text class="ac"  x="150" y="288" text-anchor="middle">Submit proposal</text>
+
+  <path class="fl" d="M245,276 H370 V318" marker-end="url(#a)"/>
+
+  <!-- ══════ SYSTEM — skip gate ══════ -->
+  <path class="dia" d="M370,322 L466,382 L370,442 L274,382 Z"/>
+  <text class="dc" x="370" y="368" text-anchor="middle">applicant heads own</text>
+  <text class="dc" x="370" y="382" text-anchor="middle">unit, is CFO or F&amp;B</text>
+  <text class="dc" x="370" y="396" text-anchor="middle">head, or has no unit?</text>
+
+  <path class="fl" d="M466,382 H590 V424" marker-end="url(#a)"/>
+  <text class="gd" x="500" y="374">[no]</text>
+
+  <path class="fl" d="M370,442 V690" marker-end="url(#a)"/>
+  <text class="gd"   x="380" y="470">[yes] skip</text>
+  <text class="note" x="380" y="520">no impartial</text>
+  <text class="note" x="380" y="534">reviewer exists,</text>
+  <text class="note" x="380" y="548">or the stage</text>
+  <text class="note" x="380" y="562">would deadlock</text>
+
+  <!-- ══════ HOS/HOD ══════ -->
+  <rect class="act" x="495" y="428" width="190" height="52" rx="10"/>
+  <text class="stt" x="590" y="448" text-anchor="middle">hos_hod_review</text>
+  <text class="ac"  x="590" y="466" text-anchor="middle">Review proposal</text>
+
+  <path class="fl" d="M590,480 V510" marker-end="url(#a)"/>
+  <path class="dia" d="M590,514 L672,562 L590,610 L508,562 Z"/>
+  <text class="dc" x="590" y="566" text-anchor="middle">decision?</text>
+
+  <path class="fl" d="M508,562 H400 V690" marker-end="url(#a)"/>
+  <text class="gd" x="412" y="554">[approve]</text>
+
+  <!-- ══════ SYSTEM — pax gate ══════ -->
+  <path class="dia" d="M370,694 L466,754 L370,814 L274,754 Z"/>
+  <text class="dc" x="370" y="748" text-anchor="middle">total_pax &gt;</text>
+  <text class="dc" x="370" y="762" text-anchor="middle">HIGH_PAX_THRESHOLD?</text>
+
+  <path class="fl" d="M466,754 H810 V806" marker-end="url(#a)"/>
+  <text class="gd" x="700" y="746">[yes]</text>
+  <path class="fl" d="M370,814 V1178" marker-end="url(#a)"/>
+  <text class="gd" x="380" y="850">[no] — straight to</text>
+  <text class="gd" x="380" y="866">department review</text>
+
+  <!-- ══════ F&B ══════ -->
+  <rect class="act" x="715" y="810" width="190" height="52" rx="10"/>
+  <text class="stt" x="810" y="830" text-anchor="middle">fmb_review</text>
+  <text class="ac"  x="810" y="848" text-anchor="middle">Review food request</text>
+
+  <path class="fl" d="M810,862 V892" marker-end="url(#a)"/>
+  <path class="dia" d="M810,896 L892,944 L810,992 L728,944 Z"/>
+  <text class="dc" x="810" y="948" text-anchor="middle">decision?</text>
+
+  <path class="fl" d="M892,944 H1030 V990" marker-end="url(#a)"/>
+  <text class="gd" x="906" y="936">[approve]</text>
+
+  <!-- ══════ CFO ══════ -->
+  <rect class="act" x="935" y="994" width="190" height="52" rx="10"/>
+  <text class="stt" x="1030" y="1014" text-anchor="middle">cfo_review</text>
+  <text class="ac"  x="1030" y="1032" text-anchor="middle">Review proposal</text>
+
+  <path class="fl" d="M1030,1046 V1076" marker-end="url(#a)"/>
+  <path class="dia" d="M1030,1080 L1112,1128 L1030,1176 L948,1128 Z"/>
+  <text class="dc" x="1030" y="1132" text-anchor="middle">decision?</text>
+
+  <path class="fl" d="M1112,1128 H1300 V1188" marker-end="url(#a)"/>
+  <text class="gd" x="1126" y="1120">[approve]</text>
+
+  <!-- system → departments when the pax gate said no -->
+  <path class="fl" d="M370,1178 H1300 V1188" marker-end="url(#a)"/>
+
+  <!-- ══════ DEPARTMENTS — fork / join ══════ -->
+  <text class="stt" x="1300" y="1206" text-anchor="middle">department_review</text>
+  <rect class="bar" x="1170" y="1214" width="260" height="7" rx="2"/>
+  <text class="note" x="1300" y="1236" text-anchor="middle">fork &#8212; one flow per selected requirement</text>
+
+  <path class="fl" d="M1218,1221 V1256" marker-end="url(#a)"/>
+  <path class="fl" d="M1300,1221 V1256" marker-end="url(#a)"/>
+  <path class="fl" d="M1382,1221 V1256" marker-end="url(#a)"/>
+
+  <rect class="act" x="1174" y="1260" width="88" height="72" rx="8"/>
+  <text class="ac" x="1218" y="1288" text-anchor="middle">Logistics</text>
+  <text class="ac" x="1218" y="1303" text-anchor="middle">task</text>
+  <text class="note" x="1218" y="1320" text-anchor="middle">Fig. 7</text>
+
+  <rect class="act" x="1256" y="1260" width="88" height="72" rx="8"/>
+  <text class="ac" x="1300" y="1288" text-anchor="middle">F&amp;B</text>
+  <text class="ac" x="1300" y="1303" text-anchor="middle">task</text>
+  <text class="note" x="1300" y="1320" text-anchor="middle">Fig. 7</text>
+
+  <rect class="act" x="1338" y="1260" width="88" height="72" rx="8"/>
+  <text class="ac" x="1382" y="1288" text-anchor="middle">…one per</text>
+  <text class="ac" x="1382" y="1303" text-anchor="middle">requirement</text>
+
+  <path class="fl" d="M1218,1332 V1366" marker-end="url(#a)"/>
+  <path class="fl" d="M1300,1332 V1366" marker-end="url(#a)"/>
+  <path class="fl" d="M1382,1332 V1366" marker-end="url(#a)"/>
+
+  <rect class="bar" x="1170" y="1370" width="260" height="7" rx="2"/>
+  
+  <text class="note" x="1300" y="1398" text-anchor="middle">every sibling task terminal</text>
+
+  <path class="fl" d="M1300,1408 V1440 H370 V1476" marker-end="url(#a)"/>
+
+  <!-- ══════ TERMINAL — approved ══════ -->
+  <circle cx="370" cy="1500" r="15" fill="none" stroke="#27456F" stroke-width="1.6"/>
+  <circle cx="370" cy="1500" r="9" fill="#27456F"/>
+  <text class="fin" x="370" y="1538" text-anchor="middle">completed_approved</text>
+
+  <!-- ══════ REJECT PATHS ══════ -->
+  <path class="fl-x" d="M590,610 V1596 H392" marker-end="url(#ax)"/>
+  <text class="warn" x="600" y="632">[reject]</text>
+  <path class="fl-x" d="M810,992 V1580 H700 V1596" marker-end="url(#ax)"/>
+  <text class="warn" x="820" y="1014">[reject]</text>
+  <path class="fl-x" d="M1030,1176 V1560 H920 V1596" marker-end="url(#ax)"/>
+  <text class="warn" x="1040" y="1198">[reject]</text>
+
+  <circle cx="370" cy="1620" r="15" fill="none" stroke="#C08670" stroke-width="1.6"/>
+  <circle cx="370" cy="1620" r="9" fill="#C08670"/>
+  <text class="fin" x="370" y="1658" text-anchor="middle" fill="#8E3A22">completed_rejected</text>
+  <text class="warn" x="370" y="1676" text-anchor="middle">only the three reviewer stages</text>
+  <text class="warn" x="370" y="1692" text-anchor="middle">can reach this state</text>
+
+  <!-- ══════ SEND BACK / RESUME ══════ -->
+  <path class="fl-b" d="M508,586 H150 V1000" marker-end="url(#ab)"/>
+  <text class="gd" x="200" y="602">[send back with comment]</text>
+
+  <rect class="act" x="55" y="1004" width="190" height="66" rx="10"/>
+  <text class="stt" x="150" y="1026" text-anchor="middle">resubmission_required</text>
+  <text class="ac"  x="150" y="1044" text-anchor="middle">Fix and resubmit</text>
+  <text class="note" x="150" y="1060" text-anchor="middle">resume_stage recorded</text>
+
+  <path class="fl-b" d="M245,1020 H286 V584 H508" marker-end="url(#ab)"/>
+  <text class="note" x="296" y="974">returns to the exact stage</text>
+  <text class="note" x="296" y="990">that pushed it back — a CFO</text>
+  <text class="note" x="296" y="1006">send-back resumes at cfo_review</text>
+
+  <path class="fl-b" d="M728,944 H150 V1004" marker-end="url(#ab)"/>
+  <path class="fl-b" d="M948,1128 H150 V1004" marker-end="url(#ab)"/>
+
+  <!-- ══════ CANCELLATION ══════ -->
+  <rect class="act" x="55" y="1140" width="190" height="52" rx="10"/>
+  <text class="ac" x="150" y="1162" text-anchor="middle">Request</text>
+  <text class="ac" x="150" y="1178" text-anchor="middle">cancellation</text>
+
+  <path class="fl" d="M150,1192 V1226" marker-end="url(#a)"/>
+  <path class="dia" d="M150,1230 L246,1284 L150,1338 L54,1284 Z"/>
+  <text class="dc" x="150" y="1278" text-anchor="middle">within CANCELLATION_</text>
+  <text class="dc" x="150" y="1292" text-anchor="middle">DEADLINE_DAYS?</text>
+
+  <path class="fl" d="M150,1338 V1400" marker-end="url(#a)"/>
+  <text class="gd" x="160" y="1364">[yes]</text>
+  <path class="fl-x" d="M150,1230 V1206 H80" marker-end="url(#ax)"/>
+  <text class="warn" x="60" y="1196">[no] refused &#8212; deadline passed</text>
+
+  <circle cx="150" cy="1424" r="15" fill="none" stroke="#27456F" stroke-width="1.6"/>
+  <circle cx="150" cy="1424" r="9" fill="#27456F"/>
+  <text class="fin" x="150" y="1462" text-anchor="middle">cancelled</text>
+
+  <!-- ══════ AUDIT NOTE ══════ -->
+  <rect class="act" x="495" y="1660" width="640" height="56" rx="4" stroke="#AFBAC4" stroke-dasharray="4 4"/>
+  <text class="note" x="515" y="1684">Every transition above writes a workflow_history row inside the same database transaction</text>
+  <text class="note" x="515" y="1702">as the status change it records, so the audit trail can never disagree with the state (Fig. 10).</text>
+
+</svg>
+</body>
+</html>
