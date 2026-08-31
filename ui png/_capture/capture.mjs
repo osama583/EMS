@@ -67,7 +67,8 @@ const settle = async (page) => {
   // Suppress the rotating AI nudge bubble: transient chrome that would otherwise
   // sit over the corner of all ~164 figures. The orb itself stays visible.
   await page.addStyleTag({ content: '.ai-prompt { display: none !important; }' }).catch(() => {});
-  // Trigger any scroll-reveal / IntersectionObserver content, then return to top.
+  // Walk the page once so IntersectionObserver content renders, then return to
+  // the top - every figure is a viewport shot, so the scroll position matters.
   await page
     .evaluate(async () => {
       const step = Math.max(400, window.innerHeight);
@@ -79,6 +80,18 @@ const settle = async (page) => {
     })
     .catch(() => {});
   await page.waitForTimeout(900);
+};
+
+// Scroll a region into view for a viewport shot. Sticky headers stay pinned to
+// the top of the viewport, so the chrome still reads correctly.
+const scrollTo = async (page, selector) => {
+  const el = page.locator(selector).first();
+  if (!(await el.count().catch(() => 0))) return false;
+  await el.evaluate((node) => node.scrollIntoView({ block: 'start', behavior: 'instant' })).catch(() => {});
+  // Nudge back up so a sticky header does not overlap the top of the region.
+  await page.evaluate(() => window.scrollBy(0, -90)).catch(() => {});
+  await page.waitForTimeout(500);
+  return true;
 };
 
 const openFirstRow = (p) => click(p, ['table tbody tr', '.data-table tbody tr', 'app-proposal-table tbody tr']);
@@ -100,24 +113,59 @@ const pickTaskDate = async (p) => {
   return false;
 };
 
+// Same as pickTaskDate, but dismisses the popover afterwards so the rows
+// underneath are clickable (and the calendar does not cover the figure).
+const pickTaskDateAndClose = async (p) => {
+  const picked = await pickTaskDate(p);
+  await p.keyboard.press('Escape').catch(() => {});
+  await p.waitForTimeout(500);
+  return picked;
+};
+
+// A single marked day often holds only one row (and for History, none at all).
+// Switch the picker to range mode and select a wide span so the table fills.
+const pickTaskRange = async (p) => {
+  if (!(await click(p, ['.staff-tasks-calendar-toggle__btn', '.staff-tasks-calendar-toggle button']))) return false;
+  await p.waitForTimeout(700);
+  await click(p, ['button:has-text("Date range")']);
+  await p.waitForTimeout(400);
+  for (let i = 0; i < 8; i++) {
+    await click(p, ['button[aria-label="Previous month"]']);
+    await p.waitForTimeout(180);
+  }
+  const days = 'button.task-calendar__day:not(.task-calendar__day--muted)';
+  if (!(await click(p, [days]))) return false;
+  await p.waitForTimeout(350);
+  for (let i = 0; i < 16; i++) {
+    await click(p, ['button[aria-label="Next month"]']);
+    await p.waitForTimeout(180);
+  }
+  const all = p.locator(days);
+  const n = await all.count();
+  if (n) await all.nth(n - 1).click({ timeout: 4000 }).catch(() => {});
+  await p.keyboard.press('Escape').catch(() => {});
+  await p.waitForTimeout(900);
+  return true;
+};
+
 // ---------- the shot list ----------
 // as: key into USERS (null = signed out) | path: route | prep: interaction
-// clip: capture just this element | fullPage: false = viewport only
+// scrollTo: bring this region into view first | tall: taller viewport (capped)
 const SHOTS = [
   // ===== A. Public and Authentication =====
-  { id: '4.5.01', group: 'A - Public and Authentication', title: 'Landing Page - Hero', as: null, path: '/', fullPage: false },
-  { id: '4.5.02', group: 'A - Public and Authentication', title: 'Landing Page - Happening Soon Carousel', as: null, path: '/', clip: 'app-happening-soon' },
-  { id: '4.5.03', group: 'A - Public and Authentication', title: 'Landing Page - Explore Events with Filters', as: null, path: '/', clip: 'app-explore-events' },
-  { id: '4.5.04', group: 'A - Public and Authentication', title: 'Landing Page - Campus Life', as: null, path: '/', clip: 'app-campus-life' },
-  { id: '4.5.05', group: 'A - Public and Authentication', title: 'Landing Page - Public Event Calendar', as: null, path: '/', clip: 'app-event-calendar' },
-  { id: '4.5.06', group: 'A - Public and Authentication', title: 'Event Details Modal', as: null, path: '/', fullPage: false,
+  { id: '4.5.01', group: 'A - Public and Authentication', title: 'Landing Page - Hero', as: null, path: '/' },
+  { id: '4.5.02', group: 'A - Public and Authentication', title: 'Landing Page - Happening Soon Carousel', as: null, path: '/', scrollTo: 'app-happening-soon' },
+  { id: '4.5.03', group: 'A - Public and Authentication', title: 'Landing Page - Explore Events with Filters', as: null, path: '/', scrollTo: 'app-explore-events' },
+  { id: '4.5.04', group: 'A - Public and Authentication', title: 'Landing Page - Campus Life', as: null, path: '/', scrollTo: 'app-campus-life' },
+  { id: '4.5.05', group: 'A - Public and Authentication', title: 'Landing Page - Public Event Calendar', as: null, path: '/', scrollTo: 'app-event-calendar' },
+  { id: '4.5.06', group: 'A - Public and Authentication', title: 'Event Details Modal', keepOpen: true, as: null, path: '/',
     prep: (p) => click(p, ['button.explore-card__action', 'button:has-text("Explore Event")']) },
-  { id: '4.5.07', group: 'A - Public and Authentication', title: 'Login Page', as: null, path: '/login', fullPage: false },
-  { id: '4.5.08', group: 'A - Public and Authentication', title: 'Forgot Password Modal', as: null, path: '/login', fullPage: false,
+  { id: '4.5.07', group: 'A - Public and Authentication', title: 'Login Page', as: null, path: '/login' },
+  { id: '4.5.08', group: 'A - Public and Authentication', title: 'Forgot Password Modal', keepOpen: true, as: null, path: '/login',
     prep: (p) => click(p, ['button:has-text("Forgot password")', '.login-form__forgot']) },
-  { id: '4.5.09', group: 'A - Public and Authentication', title: 'Guest Registration - Account Details', as: null, path: '/login', fullPage: false,
+  { id: '4.5.09', group: 'A - Public and Authentication', title: 'Guest Registration - Account Details', keepOpen: true, as: null, path: '/login',
     prep: (p) => click(p, ['button:has-text("Register as a guest")']) },
-  { id: '4.5.10', group: 'A - Public and Authentication', title: 'Guest Registration - Completed Form', as: null, path: '/login', fullPage: false,
+  { id: '4.5.10', group: 'A - Public and Authentication', title: 'Guest Registration - Completed Form', keepOpen: true, as: null, path: '/login',
     prep: async (p) => {
       if (!(await click(p, ['button:has-text("Register as a guest")']))) return false;
       await p.waitForTimeout(700);
@@ -130,7 +178,7 @@ const SHOTS = [
       await fill(p, 'input[type="password"]', 'Guest-Pass-2026');
       return true;
     } },
-  { id: '4.5.11', group: 'A - Public and Authentication', title: 'Reset Password Page', as: null, path: '/reset-password', fullPage: false },
+  { id: '4.5.11', group: 'A - Public and Authentication', title: 'Reset Password Page', as: null, path: '/reset-password' },
 
   // ===== B. External and Student User =====
   { id: '4.5.12', group: 'B - External and Student User', title: 'My Events - Saved', as: 'student', path: '/app/events/my-events/saved' },
@@ -143,10 +191,10 @@ const SHOTS = [
   // Pinned open so the figure shows the labelled menu rather than the icon rail
   // it collapses to by default (the rail expands on hover, which a screenshot
   // cannot convey).
-  { id: '4.5.17', group: 'C - Internal Shell and Onboarding', title: 'Internal Layout and Sidebar Navigation', as: 'logistics', path: '/app/dashboard', fullPage: false, pinSidebar: true },
+  { id: '4.5.17', group: 'C - Internal Shell and Onboarding', title: 'Internal Layout and Sidebar Navigation', as: 'logistics', path: '/app/dashboard', pinSidebar: true },
   { id: '4.5.18', group: 'C - Internal Shell and Onboarding', title: 'How It Works - Onboarding Guide', as: 'student', path: '/app/how-it-works' },
   { id: '4.5.19', group: 'C - Internal Shell and Onboarding', title: 'Master Event Calendar', as: 'hos', path: '/app/event-calendar' },
-  { id: '4.5.20', group: 'C - Internal Shell and Onboarding', title: 'Internal Explore Events', as: 'student', path: '/app/events/explore-events' },
+  { id: '4.5.20', group: 'C - Internal Shell and Onboarding', title: 'Internal Explore Events', as: 'student', path: '/app/events/explore-events', tall: 1200 },
 
   // ===== D. Proposal Creation (6-step form) =====
   { id: '4.5.21', group: 'D - Proposal Creation', title: 'Proposal Form - Step 1 Applicant Info', as: 'student', path: '/app/forms/event-proposal' },
@@ -175,85 +223,83 @@ const SHOTS = [
   { id: '4.5.30', group: 'E - Proposal Tracking and Review', title: 'Proposal Review - Reviewer View', as: 'hos', path: '/app/proposals/review/:hosProposal' },
   { id: '4.5.31', group: 'E - Proposal Tracking and Review', title: 'Proposal Review - Department View', as: 'logistics', path: '/app/proposals/review/:deptProposal' },
   { id: '4.5.32', group: 'E - Proposal Tracking and Review', title: 'Proposal Review - Summary KPI Bar', as: 'hos', path: '/app/proposals/review/:hosProposal',
-    clip: '.prv-kpi-bar' },
-  { id: '4.5.33', group: 'E - Proposal Tracking and Review', title: 'Approval Decision Dialog', as: 'hos', path: '/app/proposals/review/:hosProposal', fullPage: false,
-    prep: (p) => click(p, ['button:has-text("Reject proposal")', 'button:has-text("Approve")']) },
+    scrollTo: '.prv-kpi-bar' },
+  // There is no confirm dialog on the reviewer view - a decision is taken inline
+  // in the Workflow Actions panel, and rejecting without a reason validates in
+  // place. That validation state is the figure.
+  { id: '4.5.33', group: 'E - Proposal Tracking and Review', title: 'Reject Proposal - Reason Required', keepOpen: true, as: 'hos',
+    path: '/app/proposals/review/:hosProposal', scrollTo: '.prv-panel-card--actions',
+    prep: (p) => click(p, ['button:has-text("Reject proposal")']) },
   { id: '4.5.34', group: 'E - Proposal Tracking and Review', title: 'Workflow Actions Panel', as: 'hos', path: '/app/proposals/review/:hosProposal',
-    clip: '.prv-panel-card--actions' },
+    scrollTo: '.prv-panel-card--actions' },
 
   // ===== F. Department Task Handling =====
   { id: '4.5.35', group: 'F - Department Task Handling', title: 'Inbox - Pending Proposals', as: 'hos', path: '/app/inbox/proposals' },
-  { id: '4.5.36', group: 'F - Department Task Handling', title: 'Inbox - Department Tasks', as: 'logstaff', path: '/app/inbox/tasks', prep: pickTaskDate },
+  { id: '4.5.36', group: 'F - Department Task Handling', title: 'Inbox - Department Tasks', as: 'logstaff', path: '/app/inbox/tasks', prep: pickTaskRange },
   { id: '4.5.37', group: 'F - Department Task Handling', title: 'Inbox - Incoming Requests', as: 'logistics', path: '/app/inbox/requests' },
-  { id: '4.5.38', group: 'F - Department Task Handling', title: 'Staff Task Assignment', as: 'logistics', path: '/app/inbox/tasks', fullPage: false,
-    prep: async (p) => {
-      if (!(await pickTaskDate(p))) return false;
-      await p.waitForTimeout(1200);
-      await openRowAction(p);
-      await p.waitForTimeout(1400);
-      return click(p, ['button:has-text("Assign")', 'button:has-text("Assign staff")']);
-    } },
-  { id: '4.5.39', group: 'F - Department Task Handling', title: 'Task Date Filter Calendar', as: 'logstaff', path: '/app/inbox/tasks', fullPage: false,
-    prep: (p) => click(p, ['.staff-tasks-calendar-toggle__btn', '.staff-tasks-calendar-toggle button']) },
-  { id: '4.5.40', group: 'F - Department Task Handling', title: 'Ongoing Records Hub', as: 'hos', path: '/app/ongoing/proposals' },
-  { id: '4.5.41', group: 'F - Department Task Handling', title: 'History Records Hub', as: 'hos', path: '/app/history/proposals' },
-  { id: '4.5.42', group: 'F - Department Task Handling', title: 'Task History', as: 'logstaff', path: '/app/history/tasks', prep: pickTaskDate },
+  // Assignment is not a task-inbox action: the department view of the proposal
+  // review page is where a manager names who does the work (approving IS
+  // assigning - see proposal-department-view.ts).
+  { id: '4.5.38', group: 'F - Department Task Handling', title: 'Staff Task Assignment', as: 'logistics',
+    path: '/app/proposals/review/:deptProposal', keepOpen: true,
+    prep: (p) => click(p, ['button.prv-btn--approve', 'button:has-text("Approve")']) },
+  { id: '4.5.39', group: 'F - Department Task Handling', title: 'Ongoing Records Hub', as: 'hos', path: '/app/ongoing/proposals' },
+  { id: '4.5.40', group: 'F - Department Task Handling', title: 'History Records Hub', as: 'hos', path: '/app/history/proposals' },
+  { id: '4.5.41', group: 'F - Department Task Handling', title: 'Task History', as: 'logstaff', path: '/app/history/tasks', prep: pickTaskRange },
 
   // ===== G. Cafeteria Module =====
-  { id: '4.5.43', group: 'G - Cafeteria Module', title: 'Cafeteria Staff Tasks', as: 'cafstaff', path: '/app/inbox/cafeteria-tasks', prep: pickTaskDate },
-  { id: '4.5.44', group: 'G - Cafeteria Module', title: 'My Menu Management', as: 'cafmgr', path: '/app/menu' },
-  { id: '4.5.45', group: 'G - Cafeteria Module', title: 'Manage Cafeterias', as: 'cafadmin', path: '/app/cafeterias/manage' },
-  { id: '4.5.46', group: 'G - Cafeteria Module', title: 'Cafeteria Staff Assignments', as: 'cafadmin', path: '/app/cafeterias/staff-assignments' },
-  { id: '4.5.47', group: 'G - Cafeteria Module', title: 'Menu Oversight', as: 'cafadmin', path: '/app/cafeterias/menu-oversight' },
-  { id: '4.5.48', group: 'G - Cafeteria Module', title: 'My Staff', as: 'cafmgr', path: '/app/cafeterias/my-staff' },
-  { id: '4.5.49', group: 'G - Cafeteria Module', title: 'Staff Action History', as: 'cafadmin', path: '/app/cafeterias/staff-requests-history' },
+  { id: '4.5.42', group: 'G - Cafeteria Module', title: 'Cafeteria Staff Tasks', as: 'cafstaff', path: '/app/inbox/cafeteria-tasks', prep: pickTaskRange },
+  { id: '4.5.43', group: 'G - Cafeteria Module', title: 'My Menu Management', as: 'cafmgr', path: '/app/menu' },
+  { id: '4.5.44', group: 'G - Cafeteria Module', title: 'Manage Cafeterias', as: 'cafadmin', path: '/app/cafeterias/manage' },
+  { id: '4.5.45', group: 'G - Cafeteria Module', title: 'Cafeteria Staff Assignments', as: 'cafadmin', path: '/app/cafeterias/staff-assignments' },
+  { id: '4.5.46', group: 'G - Cafeteria Module', title: 'Menu Oversight', as: 'cafadmin', path: '/app/cafeterias/menu-oversight' },
+  { id: '4.5.47', group: 'G - Cafeteria Module', title: 'My Staff', as: 'cafmgr', path: '/app/cafeterias/my-staff' },
+  { id: '4.5.48', group: 'G - Cafeteria Module', title: 'Staff Action History', as: 'cafadmin', path: '/app/cafeterias/staff-requests-history' },
 
   // ===== H. Clubs Module =====
-  { id: '4.5.50', group: 'H - Clubs Module', title: 'Discover Clubs', as: 'student', path: '/app/clubs/discover' },
-  { id: '4.5.51', group: 'H - Clubs Module', title: 'My Clubs', as: 'student', path: '/app/clubs/my-clubs' },
-  { id: '4.5.52', group: 'H - Clubs Module', title: 'Club Roster Modal', as: 'student', path: '/app/clubs/my-clubs', fullPage: false,
+  { id: '4.5.49', group: 'H - Clubs Module', title: 'Discover Clubs', as: 'student', path: '/app/clubs/discover' },
+  { id: '4.5.50', group: 'H - Clubs Module', title: 'My Clubs', as: 'student', path: '/app/clubs/my-clubs' },
+  { id: '4.5.51', group: 'H - Clubs Module', title: 'Club Roster Modal', keepOpen: true, as: 'student', path: '/app/clubs/my-clubs',
     prep: (p) => click(p, ['button.club-page__image--clickable', 'button[aria-label^="View members"]']) },
-  { id: '4.5.53', group: 'H - Clubs Module', title: 'Club Join Requests', as: 'student', path: '/app/inbox/club-requests' },
-  { id: '4.5.54', group: 'H - Clubs Module', title: 'President Change Requests', as: 'clubadmin', path: '/app/inbox/president-change-request' },
-  { id: '4.5.55', group: 'H - Clubs Module', title: 'Manage Clubs', as: 'clubadmin', path: '/app/clubs/manage' },
-  { id: '4.5.56', group: 'H - Clubs Module', title: 'Club Categories', as: 'clubadmin', path: '/app/club-category' },
+  { id: '4.5.52', group: 'H - Clubs Module', title: 'Club Join Requests', as: 'student', path: '/app/inbox/club-requests' },
+  { id: '4.5.53', group: 'H - Clubs Module', title: 'President Change Requests', as: 'clubadmin', path: '/app/inbox/president-change-request' },
+  { id: '4.5.54', group: 'H - Clubs Module', title: 'Manage Clubs', as: 'clubadmin', path: '/app/clubs/manage' },
+  { id: '4.5.55', group: 'H - Clubs Module', title: 'Club Categories', as: 'clubadmin', path: '/app/club-category' },
 
   // ===== I. Dashboards (the six roles that actually hold one) =====
-  { id: '4.5.57', group: 'I - Dashboards', title: 'Dashboard - HOD Logistics', as: 'logistics', path: '/app/dashboard' },
-  { id: '4.5.58', group: 'I - Dashboards', title: 'Dashboard - HOD Food and Beverage', as: 'fmb', path: '/app/dashboard' },
-  { id: '4.5.59', group: 'I - Dashboards', title: 'Dashboard - HOD Audio Visual', as: 'av', path: '/app/dashboard' },
-  { id: '4.5.60', group: 'I - Dashboards', title: 'Dashboard - HOD Transport', as: 'transport', path: '/app/dashboard' },
-  { id: '4.5.61', group: 'I - Dashboards', title: 'Dashboard - CFO Finance', as: 'cfo', path: '/app/dashboard' },
-  { id: '4.5.62', group: 'I - Dashboards', title: 'Dashboard - Cafeteria Manager', as: 'cafmgr', path: '/app/dashboard' },
+  { id: '4.5.56', group: 'I - Dashboards', title: 'Dashboard - HOD Logistics', as: 'logistics', path: '/app/dashboard' },
+  { id: '4.5.57', group: 'I - Dashboards', title: 'Dashboard - HOD Food and Beverage', as: 'fmb', path: '/app/dashboard' },
+  { id: '4.5.58', group: 'I - Dashboards', title: 'Dashboard - HOD Audio Visual', as: 'av', path: '/app/dashboard' },
+  { id: '4.5.59', group: 'I - Dashboards', title: 'Dashboard - HOD Transport', as: 'transport', path: '/app/dashboard' },
+  { id: '4.5.60', group: 'I - Dashboards', title: 'Dashboard - CFO Finance', as: 'cfo', path: '/app/dashboard' },
+  { id: '4.5.61', group: 'I - Dashboards', title: 'Dashboard - Cafeteria Manager', as: 'cafmgr', path: '/app/dashboard' },
 
   // ===== J. Events and Registrations =====
-  { id: '4.5.63', group: 'J - Events and Registrations', title: 'Event Registrations Hub', as: 'hos', path: '/app/inbox/registrations' },
-  { id: '4.5.64', group: 'J - Events and Registrations', title: 'Ongoing Events', as: 'hos', path: '/app/ongoing/events' },
-  { id: '4.5.65', group: 'J - Events and Registrations', title: 'Event History', as: 'hos', path: '/app/history/events' },
+  { id: '4.5.62', group: 'J - Events and Registrations', title: 'Event Registrations Hub', as: 'hos', path: '/app/inbox/registrations' },
+  { id: '4.5.63', group: 'J - Events and Registrations', title: 'Ongoing Events', as: 'hos', path: '/app/ongoing/events' },
+  { id: '4.5.64', group: 'J - Events and Registrations', title: 'Event History', as: 'hos', path: '/app/history/events' },
 
   // ===== K. System Administration and Option Catalogues =====
-  { id: '4.5.66', group: 'K - System Administration', title: 'Users Directory', as: 'sysadmin', path: '/app/users' },
-  { id: '4.5.67', group: 'K - System Administration', title: 'Units Directory', as: 'sysadmin', path: '/app/units' },
-  { id: '4.5.68', group: 'K - System Administration', title: 'Roles Management', as: 'sysadmin', path: '/app/roles' },
-  { id: '4.5.69', group: 'K - System Administration', title: 'Page Visibility', as: 'sysadmin', path: '/app/admin/page-visibility' },
-  { id: '4.5.70', group: 'K - System Administration', title: 'System Configuration - Approval Policies', as: 'sysadmin', path: '/app/admin/settings/policies' },
-  { id: '4.5.71', group: 'K - System Administration', title: 'System Configuration - Event Categories', as: 'sysadmin', path: '/app/admin/settings/categories' },
-  { id: '4.5.72', group: 'K - System Administration', title: 'System Configuration - Event Formats', as: 'sysadmin', path: '/app/admin/settings/formats' },
-  { id: '4.5.73', group: 'K - System Administration', title: 'Option Catalogue - Logistics Items', as: 'logistics', path: '/app/dropdown-options/logistics' },
-  { id: '4.5.74', group: 'K - System Administration', title: 'Option Catalogue - Transportation Types', as: 'transport', path: '/app/dropdown-options/transportation' },
-  { id: '4.5.75', group: 'K - System Administration', title: 'Option Catalogue - Sound and Light', as: 'av', path: '/app/dropdown-options/soundLight' },
-  { id: '4.5.76', group: 'K - System Administration', title: 'Option Catalogue - Dietary Information', as: 'fmb', path: '/app/dropdown-options/dietaryInformation' },
-  { id: '4.5.77', group: 'K - System Administration', title: 'Option Catalogue - Venue Management', as: 'cfo', path: '/app/dropdown-options/venue' },
-  { id: '4.5.78', group: 'K - System Administration', title: 'Option Catalogue - Funding Items', as: 'cfo', path: '/app/dropdown-options/fundingMain' },
+  { id: '4.5.65', group: 'K - System Administration', title: 'Users Directory', as: 'sysadmin', path: '/app/users' },
+  { id: '4.5.66', group: 'K - System Administration', title: 'Units Directory', as: 'sysadmin', path: '/app/units' },
+  { id: '4.5.67', group: 'K - System Administration', title: 'Roles Management', as: 'sysadmin', path: '/app/roles' },
+  { id: '4.5.68', group: 'K - System Administration', title: 'Page Visibility', as: 'sysadmin', path: '/app/admin/page-visibility' },
+  { id: '4.5.69', group: 'K - System Administration', title: 'System Configuration - Approval Policies', as: 'sysadmin', path: '/app/admin/settings/policies' },
+  { id: '4.5.70', group: 'K - System Administration', title: 'System Configuration - Event Categories', as: 'sysadmin', path: '/app/admin/settings/categories' },
+  { id: '4.5.71', group: 'K - System Administration', title: 'System Configuration - Event Formats', as: 'sysadmin', path: '/app/admin/settings/formats' },
+  { id: '4.5.72', group: 'K - System Administration', title: 'Option Catalogue - Logistics Items', as: 'logistics', path: '/app/dropdown-options/logistics' },
+  { id: '4.5.73', group: 'K - System Administration', title: 'Option Catalogue - Transportation Types', as: 'transport', path: '/app/dropdown-options/transportation' },
+  { id: '4.5.74', group: 'K - System Administration', title: 'Option Catalogue - Sound and Light', as: 'av', path: '/app/dropdown-options/soundLight' },
+  { id: '4.5.75', group: 'K - System Administration', title: 'Option Catalogue - Dietary Information', as: 'fmb', path: '/app/dropdown-options/dietaryInformation' },
+  { id: '4.5.76', group: 'K - System Administration', title: 'Option Catalogue - Venue Management', as: 'cfo', path: '/app/dropdown-options/venue' },
+  { id: '4.5.77', group: 'K - System Administration', title: 'Option Catalogue - Funding Items', as: 'cfo', path: '/app/dropdown-options/fundingMain' },
 
   // ===== L. AI Assistant =====
-  { id: '4.5.79', group: 'L - AI Assistant', title: 'AI Assistant Dock', as: 'logistics', path: '/app/dashboard', fullPage: false,
+  { id: '4.5.78', group: 'L - AI Assistant', title: 'AI Assistant Dock', keepOpen: true, as: 'logistics', path: '/app/dashboard',
     prep: (p) => click(p, ['button.ai-orb-button', 'app-ai-assistant button']) },
-  { id: '4.5.80', group: 'L - AI Assistant', title: 'AI Assistant Full Page', as: 'logistics', path: '/assistant', fullPage: false },
+  { id: '4.5.79', group: 'L - AI Assistant', title: 'AI Assistant Full Page', as: 'logistics', path: '/assistant' },
   { id: '4.5.81', group: 'L - AI Assistant', title: 'AI Access Log', as: 'sysadmin', path: '/app/admin/ai-access-log' },
 
-  // ===== Design reference (feeds section 4.4) =====
-  { id: '4.4.06', group: '_Interface Design', title: 'Shared Component Library', as: 'sysadmin', path: '/shared' },
 ];
 
 // ---------- runner ----------
@@ -338,7 +384,7 @@ const firstInboxProposal = async (session, { requireDepartment = false } = {}) =
 
 const PROFILES = {
   desktop: { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 },
-  mobile: { ...devices['iPhone 14'] },
+  mobile: { ...devices['iPhone 14'], viewport: { width: 390, height: 844 } },
 };
 
 const safe = (s) => s.replace(/[<>:"/\\|?*]/g, '-').trim();
@@ -405,6 +451,12 @@ for (const profile of ['desktop', 'mobile']) {
       const file = path.join(dir, `${profile}.png`);
       const record = { id: shot.id, title: shot.title, group: shot.group, as: shot.as, path: shot.path, profile, file, status: 'ok', note: '' };
       try {
+        const base = PROFILES[profile].viewport ?? { width: 390, height: 844 };
+        const cap = profile === 'desktop' ? 1200 : 1100;
+        await page.setViewportSize({
+          width: base.width,
+          height: shot.tall ? Math.min(shot.tall, cap) : base.height,
+        });
         await page.goto(APP + shot.path, { waitUntil: 'domcontentloaded', timeout: 45000 });
         if (shot.pinSidebar) {
           // The pin is read from storage at boot, so set it and reload.
@@ -416,18 +468,25 @@ for (const profile of ['desktop', 'mobile']) {
           const done = await shot.prep(page);
           if (done === false) record.note += ' PREP-MISSED';
           await settle(page);
+          // A prep that refetches (changing a date filter) can still be showing
+          // skeleton rows when settle returns, so wait them out explicitly.
+          await page
+            .waitForFunction(() => !document.querySelector('app-skeleton, .skeleton'), null, { timeout: 12000 })
+            .catch(() => {});
+          await page.waitForTimeout(700);
         }
         const landed = new URL(page.url()).pathname;
         if (landed !== shot.path) record.note += ` LANDED->${landed}`;
 
-        if (shot.clip) {
-          const el = page.locator(shot.clip).first();
-          await el.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
-          await page.waitForTimeout(400);
-          await el.screenshot({ path: file, timeout: 20000 });
-        } else {
-          await page.screenshot({ path: file, fullPage: shot.fullPage !== false });
+        if (!shot.keepOpen) {
+          await page.keyboard.press('Escape').catch(() => {});
+          await page.waitForTimeout(350);
         }
+        if (shot.scrollTo && !(await scrollTo(page, shot.scrollTo))) record.note += ' SCROLL-TARGET-MISSING';
+        // Always a viewport shot. A fullPage capture paints position:fixed chrome
+        // (the assistant orb, the sticky top bar) once at the initial scroll
+        // offset, which is what put them halfway down the tall images.
+        await page.screenshot({ path: file });
 
         const txt = (await page.locator('body').innerText().catch(() => '')) || '';
         if (/no (records|results|items|data|events|tasks|proposals)|nothing to show/i.test(txt) && txt.length < 2500) {

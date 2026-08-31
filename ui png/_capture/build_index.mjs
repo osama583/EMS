@@ -21,12 +21,11 @@ const DESIGN_FIGURES = [
   ['4.4.03', 'Screen Layout Anatomy - Mobile', 'Annotated from measured element bounds'],
   ['4.4.04', 'Role-Based Menu Design', 'Student / HOD / CFO / System Admin sidebars'],
   ['4.4.05', 'Design System Tokens', "Read from the running app's computed styles"],
-  ['4.4.06', 'Shared Component Library', 'The live /shared route'],
-  ['4.4.07', 'Form Control and Validation States', 'Proposal form after a failed submit'],
-  ['4.4.08', 'Data Table and Filter Pattern', 'Inbox proposals table workspace'],
-  ['4.4.09', 'Status and Workflow Badge Language', 'Created by Me status column'],
-  ['4.4.10', 'Page Navigation Storyboard', 'Six-step proposal journey'],
-  ['4.4.11', 'Responsive Breakpoint Strategy', 'One page at 1440 / 768 / 390'],
+  ['4.4.06', 'Shared Component Library', 'The /shared route, in six screen-sized parts'],
+  ['4.4.07', 'Storyboard - Event Proposal Lifecycle', 'Six steps, draft through tracking'],
+  ['4.4.08', 'Storyboard - Event Registration Lifecycle', 'Six steps, browse through confirmed'],
+  ['4.4.09', 'Storyboard - Club Joining Lifecycle', 'Four steps, discover through roster'],
+  ['4.4.10', 'Responsive Breakpoint Strategy', 'One page at 1440 / 768 / 390'],
 ];
 
 const manifest = shots.map((s) => {
@@ -72,6 +71,11 @@ for (const p of [...pages.values()].sort((a, b) => a.id.localeCompare(b.id))) {
 
 let md = `# Figure index - Chapter 4\n\n`;
 md += `Every implementation figure exists twice: \`desktop.png\` (1440x900 at 2x) and \`mobile.png\` (iPhone 14, 390x844 at 3x).\n\n`;
+md += `Figures are viewport captures, never full-page. A full-page screenshot paints\n`;
+md += `position:fixed chrome - the assistant orb, the sticky top bar - once at the\n`;
+md += `initial scroll offset, which lands it halfway down a tall image and produces a\n`;
+md += `strip too tall to place in a document. Viewport shots keep every figure at 100%\n`;
+md += `and put the chrome where it belongs.\n\n`;
 md += `| Figures | Location |\n|---|---|\n`;
 md += `| 4.4 Interface Design | \`ui png/Interface Design/\` |\n`;
 md += `| 4.5 Implementation | \`ui png/Implementation/\` |\n`;
@@ -105,8 +109,8 @@ md += `Verified against the live database: these pages have no rows to show for 
 md += `account, so the figure is the application's empty state. That is a real screen\n`;
 md += `rather than a capture failure, but caption it accordingly.\n\n`;
 md += `| # | Figure | Why it is empty |\n|---|---|---|\n`;
-md += `| 4.5.63 | Event Registrations Hub | No registration in the database is in "pending" status, so nothing awaits approval. |\n`;
-md += `| 4.5.64 | Ongoing Events | Same cause - the pending-registration queue is empty. |\n`;
+md += `| 4.5.62 | Event Registrations Hub | No registration in the database is in "pending" status, so nothing awaits approval. |\n`;
+md += `| 4.5.63 | Ongoing Events | Same cause - the pending-registration queue is empty. |\n`;
 
 md += `\n\n## Note keys\n\n`;
 md += `- \`EMPTY-STATE\` - the page rendered its "nothing here yet" state; correct behaviour, but pick a different account if you want a populated figure.\n`;

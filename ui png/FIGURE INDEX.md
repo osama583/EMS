@@ -2,6 +2,12 @@
 
 Every implementation figure exists twice: `desktop.png` (1440x900 at 2x) and `mobile.png` (iPhone 14, 390x844 at 3x).
 
+Figures are viewport captures, never full-page. A full-page screenshot paints
+position:fixed chrome - the assistant orb, the sticky top bar - once at the
+initial scroll offset, which lands it halfway down a tall image and produces a
+strip too tall to place in a document. Viewport shots keep every figure at 100%
+and put the chrome where it belongs.
+
 | Figures | Location |
 |---|---|
 | 4.4 Interface Design | `ui png/Interface Design/` |
@@ -18,12 +24,11 @@ Every implementation figure exists twice: `desktop.png` (1440x900 at 2x) and `mo
 | 4.4.03 | Screen Layout Anatomy - Mobile | Annotated from measured element bounds |
 | 4.4.04 | Role-Based Menu Design | Student / HOD / CFO / System Admin sidebars |
 | 4.4.05 | Design System Tokens | Read from the running app's computed styles |
-| 4.4.06 | Shared Component Library | The live /shared route |
-| 4.4.07 | Form Control and Validation States | Proposal form after a failed submit |
-| 4.4.08 | Data Table and Filter Pattern | Inbox proposals table workspace |
-| 4.4.09 | Status and Workflow Badge Language | Created by Me status column |
-| 4.4.10 | Page Navigation Storyboard | Six-step proposal journey |
-| 4.4.11 | Responsive Breakpoint Strategy | One page at 1440 / 768 / 390 |
+| 4.4.06 | Shared Component Library | The /shared route, in six screen-sized parts |
+| 4.4.07 | Storyboard - Event Proposal Lifecycle | Six steps, draft through tracking |
+| 4.4.08 | Storyboard - Event Registration Lifecycle | Six steps, browse through confirmed |
+| 4.4.09 | Storyboard - Club Joining Lifecycle | Four steps, discover through roster |
+| 4.4.10 | Responsive Breakpoint Strategy | One page at 1440 / 768 / 390 |
 
 ## A - Public and Authentication
 
@@ -81,7 +86,7 @@ Every implementation figure exists twice: `desktop.png` (1440x900 at 2x) and `mo
 | 4.5.30 | Proposal Review - Reviewer View | Head of School - hoshod@demo.apu.edu.my | `/app/proposals/review/:hosProposal` |
 | 4.5.31 | Proposal Review - Department View | HOD Logistics - logistics.manager@demo.apu.edu.my | `/app/proposals/review/:deptProposal` |
 | 4.5.32 | Proposal Review - Summary KPI Bar | Head of School - hoshod@demo.apu.edu.my | `/app/proposals/review/:hosProposal` |
-| 4.5.33 | Approval Decision Dialog | Head of School - hoshod@demo.apu.edu.my | `/app/proposals/review/:hosProposal` |
+| 4.5.33 | Reject Proposal - Reason Required | Head of School - hoshod@demo.apu.edu.my | `/app/proposals/review/:hosProposal` |
 | 4.5.34 | Workflow Actions Panel | Head of School - hoshod@demo.apu.edu.my | `/app/proposals/review/:hosProposal` |
 
 ## F - Department Task Handling
@@ -91,79 +96,78 @@ Every implementation figure exists twice: `desktop.png` (1440x900 at 2x) and `mo
 | 4.5.35 | Inbox - Pending Proposals | Head of School - hoshod@demo.apu.edu.my | `/app/inbox/proposals` |
 | 4.5.36 | Inbox - Department Tasks | Staff - logistics.staff@demo.apu.edu.my | `/app/inbox/tasks` |
 | 4.5.37 | Inbox - Incoming Requests | HOD Logistics - logistics.manager@demo.apu.edu.my | `/app/inbox/requests` |
-| 4.5.38 | Staff Task Assignment | HOD Logistics - logistics.manager@demo.apu.edu.my | `/app/inbox/tasks` |
-| 4.5.39 | Task Date Filter Calendar | Staff - logistics.staff@demo.apu.edu.my | `/app/inbox/tasks` |
-| 4.5.40 | Ongoing Records Hub | Head of School - hoshod@demo.apu.edu.my | `/app/ongoing/proposals` |
-| 4.5.41 | History Records Hub | Head of School - hoshod@demo.apu.edu.my | `/app/history/proposals` |
-| 4.5.42 | Task History | Staff - logistics.staff@demo.apu.edu.my | `/app/history/tasks` |
+| 4.5.38 | Staff Task Assignment | HOD Logistics - logistics.manager@demo.apu.edu.my | `/app/proposals/review/:deptProposal` |
+| 4.5.39 | Ongoing Records Hub | Head of School - hoshod@demo.apu.edu.my | `/app/ongoing/proposals` |
+| 4.5.40 | History Records Hub | Head of School - hoshod@demo.apu.edu.my | `/app/history/proposals` |
+| 4.5.41 | Task History | Staff - logistics.staff@demo.apu.edu.my | `/app/history/tasks` |
 
 ## G - Cafeteria Module
 
 | # | Figure title | Captured as | Route |
 |---|---|---|---|
-| 4.5.43 | Cafeteria Staff Tasks | Cafeteria Staff - cafeteria.staff2@demo.apu.edu.my | `/app/inbox/cafeteria-tasks` |
-| 4.5.44 | My Menu Management | Cafeteria Manager - cafeteria.manager@demo.apu.edu.my | `/app/menu` |
-| 4.5.45 | Manage Cafeterias | Cafeteria Admin - cafeteria.admin@demo.apu.edu.my | `/app/cafeterias/manage` |
-| 4.5.46 | Cafeteria Staff Assignments | Cafeteria Admin - cafeteria.admin@demo.apu.edu.my | `/app/cafeterias/staff-assignments` |
-| 4.5.47 | Menu Oversight | Cafeteria Admin - cafeteria.admin@demo.apu.edu.my | `/app/cafeterias/menu-oversight` |
-| 4.5.48 | My Staff | Cafeteria Manager - cafeteria.manager@demo.apu.edu.my | `/app/cafeterias/my-staff` |
-| 4.5.49 | Staff Action History | Cafeteria Admin - cafeteria.admin@demo.apu.edu.my | `/app/cafeterias/staff-requests-history` |
+| 4.5.42 | Cafeteria Staff Tasks | Cafeteria Staff - cafeteria.staff2@demo.apu.edu.my | `/app/inbox/cafeteria-tasks` |
+| 4.5.43 | My Menu Management | Cafeteria Manager - cafeteria.manager@demo.apu.edu.my | `/app/menu` |
+| 4.5.44 | Manage Cafeterias | Cafeteria Admin - cafeteria.admin@demo.apu.edu.my | `/app/cafeterias/manage` |
+| 4.5.45 | Cafeteria Staff Assignments | Cafeteria Admin - cafeteria.admin@demo.apu.edu.my | `/app/cafeterias/staff-assignments` |
+| 4.5.46 | Menu Oversight | Cafeteria Admin - cafeteria.admin@demo.apu.edu.my | `/app/cafeterias/menu-oversight` |
+| 4.5.47 | My Staff | Cafeteria Manager - cafeteria.manager@demo.apu.edu.my | `/app/cafeterias/my-staff` |
+| 4.5.48 | Staff Action History | Cafeteria Admin - cafeteria.admin@demo.apu.edu.my | `/app/cafeterias/staff-requests-history` |
 
 ## H - Clubs Module
 
 | # | Figure title | Captured as | Route |
 |---|---|---|---|
-| 4.5.50 | Discover Clubs | Student - applicant@demo.apu.edu.my | `/app/clubs/discover` |
-| 4.5.51 | My Clubs | Student - applicant@demo.apu.edu.my | `/app/clubs/my-clubs` |
-| 4.5.52 | Club Roster Modal | Student - applicant@demo.apu.edu.my | `/app/clubs/my-clubs` |
-| 4.5.53 | Club Join Requests | Student - applicant@demo.apu.edu.my | `/app/inbox/club-requests` |
-| 4.5.54 | President Change Requests | Club Admin - club.admin@demo.apu.edu.my | `/app/inbox/president-change-request` |
-| 4.5.55 | Manage Clubs | Club Admin - club.admin@demo.apu.edu.my | `/app/clubs/manage` |
-| 4.5.56 | Club Categories | Club Admin - club.admin@demo.apu.edu.my | `/app/club-category` |
+| 4.5.49 | Discover Clubs | Student - applicant@demo.apu.edu.my | `/app/clubs/discover` |
+| 4.5.50 | My Clubs | Student - applicant@demo.apu.edu.my | `/app/clubs/my-clubs` |
+| 4.5.51 | Club Roster Modal | Student - applicant@demo.apu.edu.my | `/app/clubs/my-clubs` |
+| 4.5.52 | Club Join Requests | Student - applicant@demo.apu.edu.my | `/app/inbox/club-requests` |
+| 4.5.53 | President Change Requests | Club Admin - club.admin@demo.apu.edu.my | `/app/inbox/president-change-request` |
+| 4.5.54 | Manage Clubs | Club Admin - club.admin@demo.apu.edu.my | `/app/clubs/manage` |
+| 4.5.55 | Club Categories | Club Admin - club.admin@demo.apu.edu.my | `/app/club-category` |
 
 ## I - Dashboards
 
 | # | Figure title | Captured as | Route |
 |---|---|---|---|
-| 4.5.57 | Dashboard - HOD Logistics | HOD Logistics - logistics.manager@demo.apu.edu.my | `/app/dashboard` |
-| 4.5.58 | Dashboard - HOD Food and Beverage | HOD Food & Beverage - fmb@demo.apu.edu.my | `/app/dashboard` |
-| 4.5.59 | Dashboard - HOD Audio Visual | HOD A/V - av.manager@demo.apu.edu.my | `/app/dashboard` |
-| 4.5.60 | Dashboard - HOD Transport | HOD Transport - transport.manager@demo.apu.edu.my | `/app/dashboard` |
-| 4.5.61 | Dashboard - CFO Finance | CFO - cfo@demo.apu.edu.my | `/app/dashboard` |
-| 4.5.62 | Dashboard - Cafeteria Manager | Cafeteria Manager - cafeteria.manager@demo.apu.edu.my | `/app/dashboard` |
+| 4.5.56 | Dashboard - HOD Logistics | HOD Logistics - logistics.manager@demo.apu.edu.my | `/app/dashboard` |
+| 4.5.57 | Dashboard - HOD Food and Beverage | HOD Food & Beverage - fmb@demo.apu.edu.my | `/app/dashboard` |
+| 4.5.58 | Dashboard - HOD Audio Visual | HOD A/V - av.manager@demo.apu.edu.my | `/app/dashboard` |
+| 4.5.59 | Dashboard - HOD Transport | HOD Transport - transport.manager@demo.apu.edu.my | `/app/dashboard` |
+| 4.5.60 | Dashboard - CFO Finance | CFO - cfo@demo.apu.edu.my | `/app/dashboard` |
+| 4.5.61 | Dashboard - Cafeteria Manager | Cafeteria Manager - cafeteria.manager@demo.apu.edu.my | `/app/dashboard` |
 
 ## J - Events and Registrations
 
 | # | Figure title | Captured as | Route |
 |---|---|---|---|
-| 4.5.63 | Event Registrations Hub | Head of School - hoshod@demo.apu.edu.my | `/app/inbox/registrations` |
-| 4.5.64 | Ongoing Events | Head of School - hoshod@demo.apu.edu.my | `/app/ongoing/events` |
-| 4.5.65 | Event History | Head of School - hoshod@demo.apu.edu.my | `/app/history/events` |
+| 4.5.62 | Event Registrations Hub | Head of School - hoshod@demo.apu.edu.my | `/app/inbox/registrations` |
+| 4.5.63 | Ongoing Events | Head of School - hoshod@demo.apu.edu.my | `/app/ongoing/events` |
+| 4.5.64 | Event History | Head of School - hoshod@demo.apu.edu.my | `/app/history/events` |
 
 ## K - System Administration
 
 | # | Figure title | Captured as | Route |
 |---|---|---|---|
-| 4.5.66 | Users Directory | System Admin - system.admin@demo.apu.edu.my | `/app/users` |
-| 4.5.67 | Units Directory | System Admin - system.admin@demo.apu.edu.my | `/app/units` |
-| 4.5.68 | Roles Management | System Admin - system.admin@demo.apu.edu.my | `/app/roles` |
-| 4.5.69 | Page Visibility | System Admin - system.admin@demo.apu.edu.my | `/app/admin/page-visibility` |
-| 4.5.70 | System Configuration - Approval Policies | System Admin - system.admin@demo.apu.edu.my | `/app/admin/settings/policies` |
-| 4.5.71 | System Configuration - Event Categories | System Admin - system.admin@demo.apu.edu.my | `/app/admin/settings/categories` |
-| 4.5.72 | System Configuration - Event Formats | System Admin - system.admin@demo.apu.edu.my | `/app/admin/settings/formats` |
-| 4.5.73 | Option Catalogue - Logistics Items | HOD Logistics - logistics.manager@demo.apu.edu.my | `/app/dropdown-options/logistics` |
-| 4.5.74 | Option Catalogue - Transportation Types | HOD Transport - transport.manager@demo.apu.edu.my | `/app/dropdown-options/transportation` |
-| 4.5.75 | Option Catalogue - Sound and Light | HOD A/V - av.manager@demo.apu.edu.my | `/app/dropdown-options/soundLight` |
-| 4.5.76 | Option Catalogue - Dietary Information | HOD Food & Beverage - fmb@demo.apu.edu.my | `/app/dropdown-options/dietaryInformation` |
-| 4.5.77 | Option Catalogue - Venue Management | CFO - cfo@demo.apu.edu.my | `/app/dropdown-options/venue` |
-| 4.5.78 | Option Catalogue - Funding Items | CFO - cfo@demo.apu.edu.my | `/app/dropdown-options/fundingMain` |
+| 4.5.65 | Users Directory | System Admin - system.admin@demo.apu.edu.my | `/app/users` |
+| 4.5.66 | Units Directory | System Admin - system.admin@demo.apu.edu.my | `/app/units` |
+| 4.5.67 | Roles Management | System Admin - system.admin@demo.apu.edu.my | `/app/roles` |
+| 4.5.68 | Page Visibility | System Admin - system.admin@demo.apu.edu.my | `/app/admin/page-visibility` |
+| 4.5.69 | System Configuration - Approval Policies | System Admin - system.admin@demo.apu.edu.my | `/app/admin/settings/policies` |
+| 4.5.70 | System Configuration - Event Categories | System Admin - system.admin@demo.apu.edu.my | `/app/admin/settings/categories` |
+| 4.5.71 | System Configuration - Event Formats | System Admin - system.admin@demo.apu.edu.my | `/app/admin/settings/formats` |
+| 4.5.72 | Option Catalogue - Logistics Items | HOD Logistics - logistics.manager@demo.apu.edu.my | `/app/dropdown-options/logistics` |
+| 4.5.73 | Option Catalogue - Transportation Types | HOD Transport - transport.manager@demo.apu.edu.my | `/app/dropdown-options/transportation` |
+| 4.5.74 | Option Catalogue - Sound and Light | HOD A/V - av.manager@demo.apu.edu.my | `/app/dropdown-options/soundLight` |
+| 4.5.75 | Option Catalogue - Dietary Information | HOD Food & Beverage - fmb@demo.apu.edu.my | `/app/dropdown-options/dietaryInformation` |
+| 4.5.76 | Option Catalogue - Venue Management | CFO - cfo@demo.apu.edu.my | `/app/dropdown-options/venue` |
+| 4.5.77 | Option Catalogue - Funding Items | CFO - cfo@demo.apu.edu.my | `/app/dropdown-options/fundingMain` |
 
 ## L - AI Assistant
 
 | # | Figure title | Captured as | Route |
 |---|---|---|---|
-| 4.5.79 | AI Assistant Dock | HOD Logistics - logistics.manager@demo.apu.edu.my | `/app/dashboard` |
-| 4.5.80 | AI Assistant Full Page | HOD Logistics - logistics.manager@demo.apu.edu.my | `/assistant` |
+| 4.5.78 | AI Assistant Dock | HOD Logistics - logistics.manager@demo.apu.edu.my | `/app/dashboard` |
+| 4.5.79 | AI Assistant Full Page | HOD Logistics - logistics.manager@demo.apu.edu.my | `/assistant` |
 | 4.5.81 | AI Access Log | System Admin - system.admin@demo.apu.edu.my | `/app/admin/ai-access-log` |
 
 
@@ -175,8 +179,8 @@ rather than a capture failure, but caption it accordingly.
 
 | # | Figure | Why it is empty |
 |---|---|---|
-| 4.5.63 | Event Registrations Hub | No registration in the database is in "pending" status, so nothing awaits approval. |
-| 4.5.64 | Ongoing Events | Same cause - the pending-registration queue is empty. |
+| 4.5.62 | Event Registrations Hub | No registration in the database is in "pending" status, so nothing awaits approval. |
+| 4.5.63 | Ongoing Events | Same cause - the pending-registration queue is empty. |
 
 
 ## Note keys

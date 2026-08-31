@@ -303,103 +303,105 @@ const measure = async (page, spec) => {
   await ctx.close();
 }
 
-// ------------------------------------------------- 4.4.07 / 4.4.08 / 4.4.09
+// ---------------------------------------------------------------- 4.4.06
+// The shared component library is a single long page. Emit it as consecutive
+// screen-sized parts rather than one tall strip nothing can read.
 {
-  const jobs = [
-    { id: '4.4.07', title: 'Form Control and Validation States', as: 'student', route: '/app/forms/event-proposal',
-      prep: async (p) => {
-        for (const label of ['Final Review', 'Submit']) {
-          await p.locator(`button:has-text("${label}")`).first().click({ timeout: 5000 }).catch(() => {});
-          await p.waitForTimeout(900);
-        }
-      },
-      clip: ['app-form-field', '.form-grid', 'form'] },
-    { id: '4.4.08', title: 'Data Table and Filter Pattern', as: 'hos', route: '/app/inbox/proposals',
-      clip: ['.internal-table-workspace', 'app-internal-table-workspace', 'table'] },
-    { id: '4.4.09', title: 'Status and Workflow Badge Language', as: 'student', route: '/app/created-by-me',
-      clip: ['.internal-table-workspace', 'table', 'main'] },
+  const ctx = await makeContext(await sessionFor('sysadmin'));
+  const page = await ctx.newPage();
+  await page.goto(`${APP}/shared`, { waitUntil: 'domcontentloaded' });
+  await settle(page);
+  const dir = path.join(OUT, '4.4.06 Shared Component Library');
+  await mkdir(dir, { recursive: true });
+  const total = await page.evaluate(() => document.body.scrollHeight);
+  const step = 900;
+  const parts = Math.min(6, Math.max(1, Math.ceil(total / step)));
+  for (let i = 0; i < parts; i++) {
+    await page.evaluate((y) => window.scrollTo(0, y), i * step);
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: path.join(dir, `part-${i + 1}.png`) });
+  }
+  await shot('4.4.06', `Shared Component Library (${parts} parts)`, dir);
+  await ctx.close();
+}
+
+// -------------------------------------------------- 4.4.07 / 4.4.08 / 4.4.09
+// Three journey storyboards, assembled from the figures already captured.
+{
+  const STORYBOARDS = [
+    ['4.4.07', 'Storyboard - Event Proposal Lifecycle',
+     'Draft, submit, review, fan out to departments, then track - the path a proposal takes.',
+     [
+       ['D - Proposal Creation/4.5.21 Proposal Form - Step 1 Applicant Info', '1. Applicant fills the form'],
+       ['D - Proposal Creation/4.5.23 Proposal Form - Step 3 Required for Event', '2. Chooses requirements'],
+       ['D - Proposal Creation/4.5.26 Proposal Form - Step 6 Final Review', '3. Reviews and submits'],
+       ['E - Proposal Tracking and Review/4.5.30 Proposal Review - Reviewer View', '4. Reviewer decides'],
+       ['F - Department Task Handling/4.5.36 Inbox - Department Tasks', '5. Departments act on tasks'],
+       ['E - Proposal Tracking and Review/4.5.29 Created by Me - Status Tracking', '6. Applicant tracks status'],
+     ]],
+    ['4.4.08', 'Storyboard - Event Registration Lifecycle',
+     'How a visitor finds an event, registers for it, and has that registration confirmed.',
+     [
+       ['A - Public and Authentication/4.5.03 Landing Page - Explore Events with Filters', '1. Browse published events'],
+       ['A - Public and Authentication/4.5.06 Event Details Modal', '2. Open the event details'],
+       ['A - Public and Authentication/4.5.09 Guest Registration - Account Details', '3. Register as a guest'],
+       ['B - External and Student User/4.5.14 My Events - Pending Approval', '4. Registration awaits approval'],
+       ['J - Events and Registrations/4.5.62 Event Registrations Hub', '5. Organiser reviews registrations'],
+       ['B - External and Student User/4.5.13 My Events - Registered', '6. Confirmed in My Events'],
+     ]],
+    ['4.4.09', 'Storyboard - Club Joining Lifecycle',
+     'How a student discovers a club, asks to join, and appears on its roster.',
+     [
+       ['H - Clubs Module/4.5.49 Discover Clubs', '1. Discover clubs'],
+       ['H - Clubs Module/4.5.52 Club Join Requests', '2. Request lands with the president'],
+       ['H - Clubs Module/4.5.51 Club Roster Modal', '3. Member appears on the roster'],
+       ['H - Clubs Module/4.5.50 My Clubs', '4. Club shows under My Clubs'],
+     ]],
   ];
-  for (const job of jobs) {
-    const ctx = await makeContext(await sessionFor(job.as));
-    const page = await ctx.newPage();
-    await page.goto(APP + job.route, { waitUntil: 'domcontentloaded' });
-    await settle(page);
-    if (job.prep) await job.prep(page);
-    await settle(page);
-    const dir = path.join(OUT, `${job.id} ${job.title}`);
-    await mkdir(dir, { recursive: true });
-    const file = path.join(dir, 'figure.png');
-    let ok = false;
-    for (const sel of job.clip) {
-      const el = page.locator(sel).first();
-      if (await el.count().catch(() => 0)) {
-        await el.scrollIntoViewIfNeeded().catch(() => {});
-        await page.waitForTimeout(300);
-        if (await el.screenshot({ path: file, timeout: 15000 }).then(() => true).catch(() => false)) {
-          ok = true;
-          break;
-        }
+
+  for (const [id, title, blurb, steps] of STORYBOARDS) {
+    const cards = [];
+    for (const [rel, caption] of steps) {
+      const file = path.join(IMPL, rel, 'desktop.png');
+      try {
+        await readFile(file);
+        cards.push({ file, caption });
+      } catch {
+        console.log(`   ${id}: missing ${rel}`);
       }
     }
-    if (!ok) await page.screenshot({ path: file });
-    await shot(job.id, job.title, file);
+    if (!cards.length) continue;
+    const cols = cards.length > 4 ? 3 : 2;
+    const html = `<!doctype html><meta charset="utf-8"><style>
+      body{margin:0;padding:26px;background:#eef1f6;font-family:Segoe UI,Arial,sans-serif;width:${cols === 3 ? 1560 : 1120}px}
+      h1{margin:0 0 4px;font-size:21px;color:#12233d}
+      p.sub{margin:0 0 18px;font-size:13.5px;color:#4a5a72}
+      .grid{display:grid;grid-template-columns:repeat(${cols},1fr);gap:16px}
+      .card{background:#fff;border:1px solid #d3dae6;border-radius:10px;overflow:hidden}
+      .cap{padding:9px 12px;background:#1f2a3c;color:#fff;font-size:13px;font-weight:600}
+      img{width:100%;display:block}
+    </style><body>
+      <h1>${title.replace('Storyboard - ', '')}</h1>
+      <p class="sub">${blurb}</p>
+      <div class="grid">${cards
+        .map((c) => `<div class="card"><div class="cap">${c.caption}</div><img src="${pathToFileURL(c.file).href}"></div>`)
+        .join('')}</div>
+    </body>`;
+    const htmlFile = path.join(OUT, `_story_${id}.html`);
+    await writeFile(htmlFile, html, 'utf8');
+    const ctx = await browser.newContext({ viewport: { width: cols === 3 ? 1620 : 1180, height: 900 }, deviceScaleFactor: 2 });
+    const page = await ctx.newPage();
+    await page.goto(pathToFileURL(htmlFile).href, { waitUntil: 'networkidle' });
+    const dir = path.join(OUT, `${id} ${title}`);
+    await mkdir(dir, { recursive: true });
+    const file = path.join(dir, 'storyboard.png');
+    await page.locator('body').screenshot({ path: file });
+    await shot(id, title, file);
     await ctx.close();
   }
 }
 
 // ---------------------------------------------------------------- 4.4.10
-// Storyboard strip assembled from the already-captured proposal journey.
-{
-  const steps = [
-    ['D - Proposal Creation/4.5.21 Proposal Form - Step 1 Applicant Info', '1. Applicant info'],
-    ['D - Proposal Creation/4.5.23 Proposal Form - Step 3 Required for Event', '2. Choose requirements'],
-    ['D - Proposal Creation/4.5.26 Proposal Form - Step 6 Final Review', '3. Review and submit'],
-    ['E - Proposal Tracking and Review/4.5.30 Proposal Review - Reviewer View', '4. Reviewer decision'],
-    ['F - Department Task Handling/4.5.36 Inbox - Department Tasks', '5. Department tasks'],
-    ['E - Proposal Tracking and Review/4.5.29 Created by Me - Status Tracking', '6. Applicant tracks status'],
-  ];
-  const cards = [];
-  for (const [rel, caption] of steps) {
-    const file = path.join(IMPL, rel, 'desktop.png');
-    try {
-      await readFile(file);
-      cards.push({ file, caption });
-    } catch {
-      console.log(`   storyboard: missing ${rel}`);
-    }
-  }
-  if (cards.length) {
-    const html = `<!doctype html><meta charset="utf-8"><style>
-      body{margin:0;padding:26px;background:#eef1f6;font-family:Segoe UI,Arial,sans-serif;width:1560px}
-      h1{margin:0 0 4px;font-size:21px;color:#12233d}
-      p.sub{margin:0 0 18px;font-size:13.5px;color:#4a5a72}
-      .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-      .card{background:#fff;border:1px solid #d3dae6;border-radius:10px;overflow:hidden}
-      .cap{padding:9px 12px;background:#1f2a3c;color:#fff;font-size:13px;font-weight:600}
-      .win{height:300px;overflow:hidden}
-      img{width:100%;display:block}
-    </style><body>
-      <h1>Page navigation storyboard - the event proposal journey</h1>
-      <p class="sub">Draft, submit, approve, fan out to departments, then track - the path a proposal takes through the system.</p>
-      <div class="grid">${cards
-        .map((c) => `<div class="card"><div class="cap">${c.caption}</div><div class="win"><img src="${pathToFileURL(c.file).href}"></div></div>`)
-        .join('')}</div>
-    </body>`;
-    const htmlFile = path.join(OUT, '_storyboard.html');
-    await writeFile(htmlFile, html, 'utf8');
-    const ctx = await browser.newContext({ viewport: { width: 1620, height: 900 }, deviceScaleFactor: 2 });
-    const page = await ctx.newPage();
-    await page.goto(pathToFileURL(htmlFile).href, { waitUntil: 'networkidle' });
-    const dir = path.join(OUT, '4.4.10 Page Navigation Storyboard');
-    await mkdir(dir, { recursive: true });
-    const file = path.join(dir, 'storyboard.png');
-    await page.locator('body').screenshot({ path: file });
-    await shot('4.4.10', 'Page Navigation Storyboard', file);
-    await ctx.close();
-  }
-}
-
-// ---------------------------------------------------------------- 4.4.11
 // The same page at three widths, proving the layout genuinely reflows.
 {
   const widths = [
@@ -443,11 +445,11 @@ const measure = async (page, spec) => {
   const ctx = await browser.newContext({ viewport: { width: 1560, height: 760 }, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
   await page.goto(pathToFileURL(htmlFile).href, { waitUntil: 'networkidle' });
-  const dir = path.join(OUT, '4.4.11 Responsive Breakpoint Strategy');
+  const dir = path.join(OUT, '4.4.10 Responsive Breakpoint Strategy');
   await mkdir(dir, { recursive: true });
   const file = path.join(dir, 'breakpoints.png');
   await page.locator('body').screenshot({ path: file });
-  await shot('4.4.11', 'Responsive Breakpoint Strategy', file);
+  await shot('4.4.10', 'Responsive Breakpoint Strategy', file);
   await ctx.close();
 }
 
