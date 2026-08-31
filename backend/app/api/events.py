@@ -46,6 +46,7 @@ from ..security.principal import current_principal
 from ..services import workflow as wf
 from ..services.email import dispatch
 from ._helpers import body, date_order, flag, paged, pagination, required
+from .uploads import sign_upload_url
 
 bp = Blueprint("events", __name__, url_prefix="/events")
 
@@ -752,7 +753,7 @@ def my_registration(event_id: int):
         return jsonify(None)
     record = dict(row[0])
     record["status"] = _STATUS_TO_REGISTRATION_STATUS.get(record["status"], record["status"])
-    return jsonify(record)
+    return jsonify(_sign_proofs([record])[0])
 
 
 @bp.get("/me/registration-statuses")
@@ -825,7 +826,7 @@ def list_registrations(event_id: int):
         )
     for row in rows:
         row["status"] = _STATUS_TO_REGISTRATION_STATUS.get(row["status"], row["status"])
-    return jsonify(rows)
+    return jsonify(_sign_proofs(rows))
 
 
 REGISTRATION_DECISIONS = ("approve", "reject")
@@ -877,6 +878,23 @@ def decide_registration(event_id: int, registration_id: int):
                 approved=approve,
             )
     return jsonify(dict(row))
+
+
+def _sign_proofs(rows):
+    """Replace each row's stored payment-proof URL with a short-lived signed one.
+
+    Every caller of this is an endpoint that has ALREADY decided the reader may
+    see these registrations - their own, or ones they organise. This does not add
+    an authorisation check; it makes the link honour the one that just happened,
+    so a receipt URL stops working the moment it leaves the reader who earned it.
+
+    Applied on the way out rather than in SQL because the signature is
+    time-based: it has to be minted per response, not stored.
+    """
+    for row in rows:
+        if row.get("paymentProofUrl"):
+            row["paymentProofUrl"] = sign_upload_url(row["paymentProofUrl"])
+    return rows
 
 
 def _my_registration_exists(status_sql: str) -> str:
@@ -1035,7 +1053,7 @@ def pending_approvals():
             f"ORDER BY {date_order('er.registered_at', 'asc')}, er.event_registration_id ASC LIMIT %s OFFSET %s",
             [*params, limit, offset],
         )
-    return jsonify(paged(rows, total))
+    return jsonify(paged(_sign_proofs(rows), total))
 
 
 @bp.get("/me/pending-approvals/events")
@@ -1103,7 +1121,7 @@ def decided_registrations():
     )
     for row in rows:
         row["status"] = _STATUS_TO_REGISTRATION_STATUS.get(row["status"], row["status"])
-    return jsonify(rows)
+    return jsonify(_sign_proofs(rows))
 
 
 # Requester bucket: 'me' when the viewer is the person who registered (their own request, whether or
