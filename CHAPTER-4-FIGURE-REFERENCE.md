@@ -42,6 +42,7 @@ Two top-level folders, both under `C:\Users\natsu\Desktop\Osama\`:
 | Folder | Holds | Report section |
 |---|---|---|
 | `digrams/png/` | 13 UML / architecture diagrams | 4.2 Design, 4.3 Database Design |
+| `digrams/example/` | 12 reference images from other systems | **none — do not use** |
 | `ui png/Interface Design/` | 10 interface-design artefacts | 4.4 Interface Design |
 | `ui png/Implementation/` | 80 product screens, each at two sizes | 4.5 Implementation |
 | `ui png/Sample Codes/` | 12 syntax-highlighted code listings | 4.6 Sample codes |
@@ -89,6 +90,30 @@ Best placed in **4.2 Design** and **4.3 Database Design**.
 > **Note on a stray file:** `digrams/png/` also contains a file named literally
 > `.png` (no basename). It is byte-identical to `04-usecase-proposal.png` — an
 > accidental duplicate export. Ignore it; it is not a fourteenth diagram.
+
+### `digrams/example/` — reference material, NOT report figures
+
+Twelve further images sit in `digrams/example/`, two in each of six subfolders:
+
+| Subfolder | Files |
+|---|---|
+| `Activity diagram/` | `adsad.png`, `image.png` |
+| `ERD/` | `SDGF.png`, `image.png` |
+| `Navigation site map/` | `dsd.png`, `image.png` |
+| `Sequence diagram/` | `image.png`, `sd.png` |
+| `System architecture/` | `1.png`, `image.png` |
+| `Use case diagram/` | `12.png`, `image.png` |
+
+**Do not place any of these in the report.** They are style references collected
+from unrelated systems, kept to guide how the real diagrams should look. Spot
+checks confirm it: the ERD example is a *College Library Management System*
+schema (Student, Book, Borrowing, Transaction), and the use case example is a
+*Project Management System* saved from a web page, complete with the page's own
+"Visit site" button. Neither has anything to do with APU EMS.
+
+The genuine, project-specific diagrams are the thirteen in `digrams/png/` listed
+above. Those are the only ones generated from this codebase and database.
+
 
 ---
 
