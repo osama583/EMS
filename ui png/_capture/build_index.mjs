@@ -49,6 +49,23 @@ const ROLE_LABEL = {
   cafstaff: 'Cafeteria Staff - cafeteria.staff2@demo.apu.edu.my',
   clubadmin: 'Club Admin - club.admin@demo.apu.edu.my',
   sysadmin: 'System Admin - system.admin@demo.apu.edu.my',
+  organiser: 'Student organiser - student.computing2@demo.apu.edu.my',
+};
+
+// A tab strip is captured ONCE, with the sibling tabs visible but unopened, and
+// the caption carries the rest. That is the whole point of the consolidation:
+// the report should not hold seven near-identical images of one shell. Paste
+// these into the figure caption so the reader knows the other tabs exist and
+// what each one holds.
+const COVERS = {
+  "4.5.12": "Shows the **Saved** tab. The same page carries **Registered** (confirmed places on events still to come) and **Conducted** (events actually attended - a confirmed place on an event that has since finished). All three render the same card list; the server decides which registrations belong to each.",
+  "4.5.13": "The external-user shell, which is a different layout from the internal one in 4.5.12 and has four tabs of its own: **Saved**, **Pending** (manual-approval sign-ups still awaiting the organiser), **Registered**, and **History** (sign-ups that were turned down, plus events already attended).",
+  "4.5.35": "Shows the **Proposals** queue. The Inbox is one shell whose tab strip is computed per role, and it holds everything waiting on this person to act: **Proposals** (awaiting their approve / reject / send-back decision), **Requests** (department-service requests routed to the unit they head), **Events** (event registrations awaiting the organiser's decision - 4.5.62), **Tasks** (the shared-pool work queue for department staff, and the claim / prepare / fulfil queue for cafeteria staff - 4.5.42), **Clubs** (join requests awaiting a club President - 4.5.52) and **President Change Requests** (handovers awaiting a Club Admin - 4.5.53). No single role holds all six; the strip in this figure is HOD Logistics's.",
+  "4.5.39": "Shows the **Proposals** tab. Ongoing is the same records shell as the Inbox but holds what is in flight rather than what needs a decision now: **Proposals** (submitted and still moving through approval), **Events** (the viewer's own event registrations still awaiting an organiser's decision) and, for a student, **Clubs** (join requests still pending).",
+  "4.5.40": "Shows the **Proposals** tab. History is the settled counterpart of Ongoing: **Proposals** (approved, rejected or cancelled), **Events** (registrations confirmed and since finished, or turned down), **Tasks** (completed department work, for staff), **Clubs** (decided join requests, for a student) and **President Change Requests** (decided handovers, for a Club Admin).",
+  "4.5.56": "The dashboard is one page whose KPI tiles and charts are computed for the viewer own unit. The identical screen serves HOD Logistics (shown here), HOD Food & Beverage, HOD Audio Visual and HOD Transport - only the unit name and the numbers change. The CFO and Cafeteria Manager variants read genuinely different measures and are kept as separate figures (4.5.60, 4.5.61).",
+  "4.5.69": "Shows the **Approval Policies** tab. System Configuration is one page with three: **Approval Policies** (high-pax threshold, cancellation deadline, minimum lead time, maximum event categories), **Event Categories** and **Event Formats** - the last two being the same add / edit / deactivate / delete catalogue table pointed at different lists.",
+  "4.5.72": "Shows the **Logistics** catalogue. One component serves every option list a proposal picks from - Transportation, Sound & Light, Photography and Videography, Campus Tour, Funding, Dietary Information and Serving Units - each owned by the department answerable for it. Venue Management (4.5.76) is kept separate because it carries capacity and location fields the others do not.",
 };
 
 // Collapse the desktop and mobile rows for a page into one entry.
@@ -97,6 +114,11 @@ for (const [group, rows] of byGroup) {
   for (const r of rows) {
     md += `| ${r.id} | ${r.title} | ${ROLE_LABEL[String(r.as)] ?? r.as} | \`${r.path}\` |\n`;
   }
+  const covered = rows.filter((r) => COVERS[r.id]);
+  if (covered.length) {
+    md += `\n**Covers more than one tab - say so in the caption:**\n\n`;
+    for (const r of covered) md += `- **${r.id} ${r.title}** - ${COVERS[r.id]}\n`;
+  }
   const flagged = rows.filter((r) => r.notes.length);
   if (flagged.length) {
     md += `\n**Check before use:**\n\n`;
@@ -104,14 +126,15 @@ for (const [group, rows] of byGroup) {
   }
 }
 
-md += `\n\n## Known empty states\n\n`;
-md += `Verified against the live database: these pages have no rows to show for any\n`;
-md += `account, so the figure is the application's empty state. That is a real screen\n`;
-md += `rather than a capture failure, but caption it accordingly.\n\n`;
-md += `| # | Figure | Why it is empty |\n|---|---|---|\n`;
-md += `| 4.5.62 | Event Registrations Hub | No registration in the database is in "pending" status, so nothing awaits approval. |\n`;
-md += `| 4.5.63 | Ongoing Events | Same cause - the pending-registration queue is empty. |\n`;
-
+md += `\n\n## Consolidation\n\n`;
+md += `Tab strips are captured once. Where a page differs from a sibling only by\n`;
+md += `which tab is open, whose data it renders, or which catalogue it points at,\n`;
+md += `one figure carries it and the caption names the rest - see the "Covers more\n`;
+md += `than one tab" notes above. That retired 17 near-duplicate figures without\n`;
+md += `dropping a single screen from the coverage.\n\n`;
+md += `The registration queue (4.5.62) is captured as a student who organises events\n`;
+md += `with sign-ups awaiting a decision. It was previously taken as a Head of School,\n`;
+md += `who organises none - which is why it used to record an empty state.\n`;
 md += `\n\n## Note keys\n\n`;
 md += `- \`EMPTY-STATE\` - the page rendered its "nothing here yet" state; correct behaviour, but pick a different account if you want a populated figure.\n`;
 md += `- \`PREP-MISSED\` - the scripted interaction (open a modal, switch a tab) found no matching control, so the figure shows the page beneath it.\n`;

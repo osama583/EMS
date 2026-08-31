@@ -15,7 +15,7 @@
   },
   {
     "id": "4.5.03",
-    "title": "Landing Page - Explore Events with Filters",
+    "title": "Landing Page - Explore Events",
     "group": "A - Public and Authentication",
     "as": null,
     "path": "/"
@@ -78,31 +78,17 @@
   },
   {
     "id": "4.5.12",
-    "title": "My Events - Saved",
+    "title": "My Events",
     "group": "B - External and Student User",
     "as": "student",
     "path": "/app/events/my-events/saved"
   },
   {
     "id": "4.5.13",
-    "title": "My Events - Registered",
+    "title": "My Events - External User",
     "group": "B - External and Student User",
     "as": "external",
-    "path": "/my-events/registered"
-  },
-  {
-    "id": "4.5.14",
-    "title": "My Events - Pending Approval",
-    "group": "B - External and Student User",
-    "as": "external",
-    "path": "/my-events/pending"
-  },
-  {
-    "id": "4.5.15",
-    "title": "My Events - History",
-    "group": "B - External and Student User",
-    "as": "external",
-    "path": "/my-events/history"
+    "path": "/my-events/saved"
   },
   {
     "id": "4.5.16",
@@ -239,24 +225,10 @@
   },
   {
     "id": "4.5.35",
-    "title": "Inbox - Pending Proposals",
-    "group": "F - Department Task Handling",
-    "as": "hos",
-    "path": "/app/inbox/proposals"
-  },
-  {
-    "id": "4.5.36",
-    "title": "Inbox - Department Tasks",
-    "group": "F - Department Task Handling",
-    "as": "logstaff",
-    "path": "/app/inbox/tasks"
-  },
-  {
-    "id": "4.5.37",
-    "title": "Inbox - Incoming Requests",
+    "title": "Inbox - Action Queues",
     "group": "F - Department Task Handling",
     "as": "logistics",
-    "path": "/app/inbox/requests"
+    "path": "/app/inbox/proposals"
   },
   {
     "id": "4.5.38",
@@ -278,13 +250,6 @@
     "group": "F - Department Task Handling",
     "as": "hos",
     "path": "/app/history/proposals"
-  },
-  {
-    "id": "4.5.41",
-    "title": "Task History",
-    "group": "F - Department Task Handling",
-    "as": "logstaff",
-    "path": "/app/history/tasks"
   },
   {
     "id": "4.5.42",
@@ -392,27 +357,6 @@
     "path": "/app/dashboard"
   },
   {
-    "id": "4.5.57",
-    "title": "Dashboard - HOD Food and Beverage",
-    "group": "I - Dashboards",
-    "as": "fmb",
-    "path": "/app/dashboard"
-  },
-  {
-    "id": "4.5.58",
-    "title": "Dashboard - HOD Audio Visual",
-    "group": "I - Dashboards",
-    "as": "av",
-    "path": "/app/dashboard"
-  },
-  {
-    "id": "4.5.59",
-    "title": "Dashboard - HOD Transport",
-    "group": "I - Dashboards",
-    "as": "transport",
-    "path": "/app/dashboard"
-  },
-  {
     "id": "4.5.60",
     "title": "Dashboard - CFO Finance",
     "group": "I - Dashboards",
@@ -430,22 +374,8 @@
     "id": "4.5.62",
     "title": "Event Registrations Hub",
     "group": "J - Events and Registrations",
-    "as": "hos",
+    "as": "organiser",
     "path": "/app/inbox/registrations"
-  },
-  {
-    "id": "4.5.63",
-    "title": "Ongoing Events",
-    "group": "J - Events and Registrations",
-    "as": "hos",
-    "path": "/app/ongoing/events"
-  },
-  {
-    "id": "4.5.64",
-    "title": "Event History",
-    "group": "J - Events and Registrations",
-    "as": "hos",
-    "path": "/app/history/events"
   },
   {
     "id": "4.5.65",
@@ -483,20 +413,6 @@
     "path": "/app/admin/settings/policies"
   },
   {
-    "id": "4.5.70",
-    "title": "System Configuration - Event Categories",
-    "group": "K - System Administration",
-    "as": "sysadmin",
-    "path": "/app/admin/settings/categories"
-  },
-  {
-    "id": "4.5.71",
-    "title": "System Configuration - Event Formats",
-    "group": "K - System Administration",
-    "as": "sysadmin",
-    "path": "/app/admin/settings/formats"
-  },
-  {
     "id": "4.5.72",
     "title": "Option Catalogue - Logistics Items",
     "group": "K - System Administration",
@@ -504,39 +420,11 @@
     "path": "/app/dropdown-options/logistics"
   },
   {
-    "id": "4.5.73",
-    "title": "Option Catalogue - Transportation Types",
-    "group": "K - System Administration",
-    "as": "transport",
-    "path": "/app/dropdown-options/transportation"
-  },
-  {
-    "id": "4.5.74",
-    "title": "Option Catalogue - Sound and Light",
-    "group": "K - System Administration",
-    "as": "av",
-    "path": "/app/dropdown-options/soundLight"
-  },
-  {
-    "id": "4.5.75",
-    "title": "Option Catalogue - Dietary Information",
-    "group": "K - System Administration",
-    "as": "fmb",
-    "path": "/app/dropdown-options/dietaryInformation"
-  },
-  {
     "id": "4.5.76",
     "title": "Option Catalogue - Venue Management",
     "group": "K - System Administration",
     "as": "cfo",
     "path": "/app/dropdown-options/venue"
-  },
-  {
-    "id": "4.5.77",
-    "title": "Option Catalogue - Funding Items",
-    "group": "K - System Administration",
-    "as": "cfo",
-    "path": "/app/dropdown-options/fundingMain"
   },
   {
     "id": "4.5.78",

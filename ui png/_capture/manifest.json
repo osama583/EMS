@@ -1,23 +1,23 @@
 [
   {
-    "id": "4.5.20",
-    "title": "Internal Explore Events",
-    "group": "C - Internal Shell and Onboarding",
-    "as": "student",
-    "path": "/app/events/explore-events",
+    "id": "4.5.03",
+    "title": "Landing Page - Explore Events",
+    "group": "A - Public and Authentication",
+    "as": null,
+    "path": "/",
     "profile": "desktop",
-    "file": "C:\\Users\\natsu\\Desktop\\Osama\\ui png\\Implementation\\C - Internal Shell and Onboarding\\4.5.20 Internal Explore Events\\desktop.png",
+    "file": "C:\\Users\\natsu\\Desktop\\Osama\\ui png\\Implementation\\A - Public and Authentication\\4.5.03 Landing Page - Explore Events\\desktop.png",
     "status": "ok",
     "note": ""
   },
   {
-    "id": "4.5.20",
-    "title": "Internal Explore Events",
-    "group": "C - Internal Shell and Onboarding",
-    "as": "student",
-    "path": "/app/events/explore-events",
+    "id": "4.5.03",
+    "title": "Landing Page - Explore Events",
+    "group": "A - Public and Authentication",
+    "as": null,
+    "path": "/",
     "profile": "mobile",
-    "file": "C:\\Users\\natsu\\Desktop\\Osama\\ui png\\Implementation\\C - Internal Shell and Onboarding\\4.5.20 Internal Explore Events\\mobile.png",
+    "file": "C:\\Users\\natsu\\Desktop\\Osama\\ui png\\Implementation\\A - Public and Authentication\\4.5.03 Landing Page - Explore Events\\mobile.png",
     "status": "ok",
     "note": ""
   }

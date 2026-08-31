@@ -29,6 +29,10 @@ const USERS = {
   cafstaff: 'cafeteria.staff2@demo.apu.edu.my',
   clubadmin: 'club.admin@demo.apu.edu.my',
   sysadmin: 'system.admin@demo.apu.edu.my',
+  // Organises events that have registrations awaiting a decision - the
+  // Registrations queue is empty for every reviewer role, because reviewers
+  // decide proposals, not sign-ups.
+  organiser: 'student.computing2@demo.apu.edu.my',
 };
 
 // ---------- helpers used by shot `prep` functions ----------
@@ -155,7 +159,7 @@ const SHOTS = [
   // ===== A. Public and Authentication =====
   { id: '4.5.01', group: 'A - Public and Authentication', title: 'Landing Page - Hero', as: null, path: '/' },
   { id: '4.5.02', group: 'A - Public and Authentication', title: 'Landing Page - Happening Soon Carousel', as: null, path: '/', scrollTo: 'app-happening-soon' },
-  { id: '4.5.03', group: 'A - Public and Authentication', title: 'Landing Page - Explore Events with Filters', as: null, path: '/', scrollTo: 'app-explore-events' },
+  { id: '4.5.03', group: 'A - Public and Authentication', title: 'Landing Page - Explore Events', as: null, path: '/', scrollTo: 'app-explore-events' },
   { id: '4.5.04', group: 'A - Public and Authentication', title: 'Landing Page - Campus Life', as: null, path: '/', scrollTo: 'app-campus-life' },
   { id: '4.5.05', group: 'A - Public and Authentication', title: 'Landing Page - Public Event Calendar', as: null, path: '/', scrollTo: 'app-event-calendar' },
   { id: '4.5.06', group: 'A - Public and Authentication', title: 'Event Details Modal', keepOpen: true, as: null, path: '/',
@@ -181,10 +185,8 @@ const SHOTS = [
   { id: '4.5.11', group: 'A - Public and Authentication', title: 'Reset Password Page', as: null, path: '/reset-password' },
 
   // ===== B. External and Student User =====
-  { id: '4.5.12', group: 'B - External and Student User', title: 'My Events - Saved', as: 'student', path: '/app/events/my-events/saved' },
-  { id: '4.5.13', group: 'B - External and Student User', title: 'My Events - Registered', as: 'external', path: '/my-events/registered' },
-  { id: '4.5.14', group: 'B - External and Student User', title: 'My Events - Pending Approval', as: 'external', path: '/my-events/pending' },
-  { id: '4.5.15', group: 'B - External and Student User', title: 'My Events - History', as: 'external', path: '/my-events/history' },
+  { id: '4.5.12', group: 'B - External and Student User', title: 'My Events', as: 'student', path: '/app/events/my-events/saved' },
+  { id: '4.5.13', group: 'B - External and Student User', title: 'My Events - External User', as: 'external', path: '/my-events/saved' },
   { id: '4.5.16', group: 'B - External and Student User', title: 'User Profile', as: 'student', path: '/app/profile' },
 
   // ===== C. Internal Shell and Onboarding =====
@@ -234,9 +236,7 @@ const SHOTS = [
     scrollTo: '.prv-panel-card--actions' },
 
   // ===== F. Department Task Handling =====
-  { id: '4.5.35', group: 'F - Department Task Handling', title: 'Inbox - Pending Proposals', as: 'hos', path: '/app/inbox/proposals' },
-  { id: '4.5.36', group: 'F - Department Task Handling', title: 'Inbox - Department Tasks', as: 'logstaff', path: '/app/inbox/tasks', prep: pickTaskRange },
-  { id: '4.5.37', group: 'F - Department Task Handling', title: 'Inbox - Incoming Requests', as: 'logistics', path: '/app/inbox/requests' },
+  { id: '4.5.35', group: 'F - Department Task Handling', title: 'Inbox - Action Queues', as: 'logistics', path: '/app/inbox/proposals' },
   // Assignment is not a task-inbox action: the department view of the proposal
   // review page is where a manager names who does the work (approving IS
   // assigning - see proposal-department-view.ts).
@@ -245,7 +245,6 @@ const SHOTS = [
     prep: (p) => click(p, ['button.prv-btn--approve', 'button:has-text("Approve")']) },
   { id: '4.5.39', group: 'F - Department Task Handling', title: 'Ongoing Records Hub', as: 'hos', path: '/app/ongoing/proposals' },
   { id: '4.5.40', group: 'F - Department Task Handling', title: 'History Records Hub', as: 'hos', path: '/app/history/proposals' },
-  { id: '4.5.41', group: 'F - Department Task Handling', title: 'Task History', as: 'logstaff', path: '/app/history/tasks', prep: pickTaskRange },
 
   // ===== G. Cafeteria Module =====
   { id: '4.5.42', group: 'G - Cafeteria Module', title: 'Cafeteria Staff Tasks', as: 'cafstaff', path: '/app/inbox/cafeteria-tasks', prep: pickTaskRange },
@@ -268,16 +267,12 @@ const SHOTS = [
 
   // ===== I. Dashboards (the six roles that actually hold one) =====
   { id: '4.5.56', group: 'I - Dashboards', title: 'Dashboard - HOD Logistics', as: 'logistics', path: '/app/dashboard' },
-  { id: '4.5.57', group: 'I - Dashboards', title: 'Dashboard - HOD Food and Beverage', as: 'fmb', path: '/app/dashboard' },
-  { id: '4.5.58', group: 'I - Dashboards', title: 'Dashboard - HOD Audio Visual', as: 'av', path: '/app/dashboard' },
-  { id: '4.5.59', group: 'I - Dashboards', title: 'Dashboard - HOD Transport', as: 'transport', path: '/app/dashboard' },
   { id: '4.5.60', group: 'I - Dashboards', title: 'Dashboard - CFO Finance', as: 'cfo', path: '/app/dashboard' },
   { id: '4.5.61', group: 'I - Dashboards', title: 'Dashboard - Cafeteria Manager', as: 'cafmgr', path: '/app/dashboard' },
 
+
   // ===== J. Events and Registrations =====
-  { id: '4.5.62', group: 'J - Events and Registrations', title: 'Event Registrations Hub', as: 'hos', path: '/app/inbox/registrations' },
-  { id: '4.5.63', group: 'J - Events and Registrations', title: 'Ongoing Events', as: 'hos', path: '/app/ongoing/events' },
-  { id: '4.5.64', group: 'J - Events and Registrations', title: 'Event History', as: 'hos', path: '/app/history/events' },
+  { id: '4.5.62', group: 'J - Events and Registrations', title: 'Event Registrations Hub', as: 'organiser', path: '/app/inbox/registrations' },
 
   // ===== K. System Administration and Option Catalogues =====
   { id: '4.5.65', group: 'K - System Administration', title: 'Users Directory', as: 'sysadmin', path: '/app/users' },
@@ -285,14 +280,8 @@ const SHOTS = [
   { id: '4.5.67', group: 'K - System Administration', title: 'Roles Management', as: 'sysadmin', path: '/app/roles' },
   { id: '4.5.68', group: 'K - System Administration', title: 'Page Visibility', as: 'sysadmin', path: '/app/admin/page-visibility' },
   { id: '4.5.69', group: 'K - System Administration', title: 'System Configuration - Approval Policies', as: 'sysadmin', path: '/app/admin/settings/policies' },
-  { id: '4.5.70', group: 'K - System Administration', title: 'System Configuration - Event Categories', as: 'sysadmin', path: '/app/admin/settings/categories' },
-  { id: '4.5.71', group: 'K - System Administration', title: 'System Configuration - Event Formats', as: 'sysadmin', path: '/app/admin/settings/formats' },
   { id: '4.5.72', group: 'K - System Administration', title: 'Option Catalogue - Logistics Items', as: 'logistics', path: '/app/dropdown-options/logistics' },
-  { id: '4.5.73', group: 'K - System Administration', title: 'Option Catalogue - Transportation Types', as: 'transport', path: '/app/dropdown-options/transportation' },
-  { id: '4.5.74', group: 'K - System Administration', title: 'Option Catalogue - Sound and Light', as: 'av', path: '/app/dropdown-options/soundLight' },
-  { id: '4.5.75', group: 'K - System Administration', title: 'Option Catalogue - Dietary Information', as: 'fmb', path: '/app/dropdown-options/dietaryInformation' },
   { id: '4.5.76', group: 'K - System Administration', title: 'Option Catalogue - Venue Management', as: 'cfo', path: '/app/dropdown-options/venue' },
-  { id: '4.5.77', group: 'K - System Administration', title: 'Option Catalogue - Funding Items', as: 'cfo', path: '/app/dropdown-options/fundingMain' },
 
   // ===== L. AI Assistant =====
   { id: '4.5.78', group: 'L - AI Assistant', title: 'AI Assistant Dock', keepOpen: true, as: 'logistics', path: '/app/dashboard',
