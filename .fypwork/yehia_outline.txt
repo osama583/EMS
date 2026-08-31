@@ -1,0 +1,118 @@
+   45 [Heading 1] ACKNOWLEDGEMENT
+   55 [Heading 1] ABSTRACT
+   74 [Heading 4] SDG Goal 3: Ensure healthy lives and promote well-being for all at all ages
+   79 [Heading 1] LIST OF FIGURES
+  212 [Heading 1] LIST OF TABLES
+  250 [Heading 1] CHAPTER 1: INTRODUCTION
+  251 [Heading 3] Introduction
+  267 [Heading 3] Problem Context
+  280 [Heading 3] Project Aim
+  284 [Heading 3] Objectives
+  293 [Heading 3] Scope
+  317 [Heading 3] Potential Benefit
+  341 [Heading 3] Overview of the IR
+  367 [Heading 3] Project Plan
+  377 [Heading 2] CHAPTER 2: LITERATURE REVIEW
+  378 [Heading 3] Introduction
+  387 [Heading 3] Domain Research
+  437 [Heading 3] Similar Works
+  456 [Heading 3] Technical Research
+  516 [Heading 3] Summary
+  518 [Heading 1] CHAPTER 3: METHODOLOGY
+  519 [Heading 3] Introduction
+  526 [Heading 3] System Development Methodology
+  605 [Heading 3] Data Gathering Design
+  643 [Heading 3] Data Analysis
+  766 [Heading 3] Summary
+  773 [Heading 1] CHAPTER 4: DESIGN AND IMPLEMENTATION
+  774 [Heading 3] Introduction
+  779 [Heading 3] Design
+  780 [Heading 3] 4.2.1 Design Overview and Design Rationale
+  785 [Heading 3] 4.2.2 System Functional Interaction (Use Case Diagram)
+  823 [Heading 3] 4.2.3 System Architecture (Component Diagram)
+  827 [Heading 3] 4.2.4 System Workflow (Activity Diagram)
+  831 [Heading 3] 4.2.5 Interaction Design (Sequence Diagram)
+  835 [Heading 3] 4.2.6 Deployment View (Deployment Diagram)
+  839 [Heading 3] Database Design
+  840 [Heading 3] 4.3.1 Entity Relationship Diagram (ERD Diagram)
+  843 [Heading 3] 4.3.2 Data Dictionary
+  855 [Heading 3] Interface Design (Storyboard Diagrams)
+  888 [Heading 3] Implementation
+  890 [Heading 3] 4.5.1 Website Implementation
+  891 [Heading 3] 4.5.1.1 Registered Users Home Page
+  912 [Heading 3] 4.5.1.2 Anonymous Users Home Page
+  933 [Heading 3] 4.5.1.3 Create Account Page
+  946 [Heading 3] 4.5.1.4 Account Sign In Page
+  961 [Heading 3] 4.5.1.5 Registered Users Feature Page
+ 1008 [Heading 3] 4.5.1.6 Anonymous Users Feature Page
+ 1025 [Heading 3] 4.5.1.7 Users Image Uploading Feature Page
+ 1066 [Heading 3] 4.5.1.8 Camera Scan Feature Page
+ 1077 [Heading 3] 4.5.1.9 Paste Ingredients Scan Feature Page
+ 1087 [Heading 3] 4.5.1.10 Registered Users Profile Page
+ 1103 [Heading 3] 4.5.1.11 Registered Users Scan History Page
+ 1117 [Heading 3] 4.5.1.12 Footer Feature Button Documentation Page
+ 1131 [Heading 3] 4.5.1.13 Footer Privacy Policy Button Page
+ 1147 [Heading 3] 4.5.1.14 Footer FAQ Button Page
+ 1162 [Heading 3] 4.5.2 Model Implementation
+ 1212 [Heading 3] Sample codes
+ 1215 [Heading 3] 4.6.1 Registered Users Home Page
+ 1220 [Heading 3] 4.6.1 Registered Users Home Page
+ 1225 [Heading 3] 4.6.2 Anonymous Users Home Page
+ 1230 [Heading 3] 4.6.3 Create Account Page
+ 1235 [Heading 3] 4.6.4 Account Sign In Page
+ 1240 [Heading 3] 4.6.5 Registered Users Feature Page (Dashboard)
+ 1245 [Heading 3] 4.6.6 Anonymous Users Feature Page
+ 1252 [Heading 3] 4.6.7 Users Image Uploading Feature Page
+ 1257 [Heading 3] 4.6.8 Camera Scan Feature Page
+ 1262 [Heading 3] 4.6.8 Paste Ingredients Text Feature Page
+ 1267 [Heading 3] 4.6.9 Result Presentation (Shared across Upload/Camera/Text)
+ 1272 [Heading 3] 4.6.10 Camera Control Widget (supporting Figure 72)
+ 1279 [Heading 3] 4.6.11 Profile Loading & Authentication
+ 1284 [Heading 3] 4.6.12 User Info Display
+ 1289 [Heading 3] 4.6.13 Allergen List Display with Delete
+ 1294 [Heading 3] 4.6.14 Add Allergen Form
+ 1299 [Heading 3] 4.6.15 Add Allergen API Call
+ 1304 [Heading 3] 4.6.16 History Loading & Display
+ 1309 [Heading 3] 4.6.17 Scan History Cards
+ 1314 [Heading 3] 4.6.18 Clear History Action
+ 1319 [Heading 3] 4.6.19 Empty History State
+ 1326 [Heading 3] 4.6.20 Scanning Methods Grid
+ 1331 [Heading 3] 4.6.21 Technology Features Grid
+ 1336 [Heading 3] 4.6.22 Privacy Section
+ 1341 [Heading 3] 4.6.23 Policy Header & Introduction
+ 1346 [Heading 3] 4.6.24 Information Collection & Use
+ 1351 [Heading 3] 4.6.25 Disclosure, Security & User Rights
+ 1356 [Heading 3] 4.6.26 Medical Disclaimer
+ 1361 [Heading 3] 4.6.27 FAQ Data Structure
+ 1366 [Heading 3] 4.6.28 Collapsible FAQ Items
+ 1371 [Heading 3] 4.6.29 FAQ CTA Section
+ 1379 [Heading 3] 4.6.30 Lazy Module Loading & Startup Optimization
+ 1384 [Heading 3] 4.6.31 Startup Event: Load Models Once
+ 1389 [Heading 3] 4.6.32 Image Detection Endpoint
+ 1394 [Heading 3] 4.6.33 Text-Only Detection Endpoint
+ 1399 [Heading 3] 4.6.34 NER Prediction Function
+ 1404 [Heading 3] 4.6.35 Allergen Keyword Mappings
+ 1409 [Heading 3] 4.6.36 Strict Detection Logic
+ 1414 [Heading 3] 4.6.37 Evidence Extraction
+ 1419 [Heading 3] 4.6.38 Service Health Check
+ 1424 [Heading 3] 4.6.39 Image Inference Call
+ 1429 [Heading 3] 4.6.40 Request Handler with Personalization
+ 1434 [Heading 3] 4.6.41 ML Detection with Fallback
+ 1439 [Heading 3] 4.6.42 Keyword Fallback Scanner
+ 1444 [Heading 3] 4.6.43 Main Route Handler with Merge Logic
+ 1450 [Heading 3] Summary
+ 1457 [Heading 1] CHAPTER 5: RESULTS AND DISCUSSIONS
+ 1585 [Heading 1] CHAPTER 6: CONCLUSION
+ 1586 [Heading 3] Critical Evaluation
+ 1598 [Heading 3] Limitations
+ 1619 [Heading 3] Recommendation
+ 1642 [Heading 1] REFERENCES
+ 1714 [Heading 1] APPENDICES
+ 1715 [Heading 3] Appendix A: Project Proposal Form (PPF)
+ 1721 [Heading 3] Appendix B: Ethics Forms (Fast Track)
+ 1734 [Heading 3] Appendix C: Log Sheets
+ 1796 [Heading 3] Appendix D: Poster
+ 1808 [Heading 3] Appendix E: Gantt Chart
+ 1819 [Heading 3] Appendix F: Sample Code Implementation (GitHub Link For Source Code)
+ 1828 [Heading 3] Appendix G: Respondent Demographic Profile
+ 1835 [Heading 3] Appendix H: Turnitin Similarity Report

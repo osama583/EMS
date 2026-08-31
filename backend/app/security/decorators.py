@@ -56,7 +56,7 @@ def authenticate_optional() -> None:
 
     On /ai/ask that surfaced as a wrong authorization answer, not just missing personalisation: a
     guest holds no assignments, so ai/topic_access.py denied `clubs` (and kept `events`, its one
-    GUEST_OPEN_TOPIC) and the assistant told a signed-in student "an administrator has not granted
+    a guest-open topic, now ai/scope.py's VISITOR areas) and the assistant told a signed-in student "an administrator has not granted
     your role" about pages their role is in fact granted - see tests/test_auth_wiring.py.
 
     Unauthorized from decode_token/load_principal therefore propagates: expired, malformed, wrong

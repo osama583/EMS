@@ -25,11 +25,13 @@ sync, nothing stale.
 
 AUTHORIZATION IS UNCHANGED AND DETERMINISTIC. It was already correct and is reused as-is:
 
-    1. Page Visibility  ai/topic_access.py - nav_page_grants, the same table the sidebar and
-                        require_page() use. A topic is askable iff the caller is granted one of the
-                        pages its data lives behind. Revoking a page in /app/admin/page-visibility
-                        stops the assistant answering about it on the very next request. No admin
-                        bypass; no hardcoded role names anywhere.
+    1. Scope + reach    ai/scope.py defines it, ai/topic_access.py enforces it. Every topic names
+                        the AREAS that own its data, and a topic is askable iff the caller can
+                        stand in one of them: an internal page is nav_page_grants (Page Visibility,
+                        the same table the sidebar and require_page() use), the public landing
+                        sections are the visitor tier, /my-events is the external tier. Revoking a
+                        page in /app/admin/page-visibility stops the assistant answering about it
+                        on the very next request. No admin bypass; no hardcoded role names.
     2. Privacy scope    ai/subject_scope.py - a self-scoped topic asked about someone ELSE is a
                         privacy refusal, checked before the page gate (no grant could ever satisfy
                         it, and running the page check first produced a "contact an administrator"
@@ -56,8 +58,12 @@ catch the rare bad one, on a check that fails open anyway. It is a backstop behi
 deterministic layers above, never the thing protecting the data; see review_queue.py for what that
 trade-off gives up.
 
-Public - a guest browsing Explore Events can ask about Public/Club Only events with no token, same
-as the discovery endpoints in events.py. Clubs have no guest tier at all.
+THREE TIERS, not one. A GUEST (no token) may ask about the published events on the public landing
+page, the same tier the discovery endpoints in events.py serve. An EXTERNAL account (a
+self-registered visitor) adds its own saved events and registrations, and nothing else - it never
+enters the /app shell, holds no nav page, and that is by design rather than by permission. An
+INTERNAL account is gated page by page as above. Clubs and proposals have no visitor tier at all.
+Getting this wrong in both directions is what ai/scope.py was written to end: see its docstring.
 
 `history` is entirely client-supplied (the frontend keeps it in localStorage - see
 ai-assistant.ts), capped, and used only to resolve follow-up references; it is never a source of
@@ -79,6 +85,7 @@ from ..ai import (
     name_lookup,
     recommendation,
     review_queue,
+    scope,
     subject_scope,
     text_to_sql,
     topic_access,
@@ -135,33 +142,12 @@ def _clean_history(raw: object) -> list[dict]:
     return turns
 
 
-# Told to the model when the page gate refused one or more of a question's topics, so the answer says
-# plainly what it cannot cover instead of silently omitting it (an omission reads as "there is
-# nothing", which is a different and wrong answer).
-def _denied_document(denied_topics: list[str]) -> str:
-    labels = sorted({topic_access.TOPIC_LABEL.get(t, t) for t in denied_topics})
-    listed = labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + f" and {labels[-1]}"
-    return (
-        f"This asker does not have access to {listed} - an administrator has not granted their "
-        f"role the pages that information lives on (Page Visibility). Tell them plainly they do "
-        f"not have access to that, and do not answer that part of their question or invent, guess, "
-        f"or substitute any detail for it. If their question ALSO covers something they do have "
-        f"access to, answer that part normally."
-    )
-
-
-# The single scope statement for a question this assistant does not cover. Written as CONTEXT (the
-# same mechanism every other answer uses) rather than returned verbatim, so the model can decline
+# The refusal and scope documents used to be written here, one fixed paragraph each. Both now come
+# from ai/topic_access.py, because both have to be worded for the caller's TIER: "an administrator
+# has not granted your role that page" is true for a university account, misleading for a visitor
+# account (which is working exactly as designed) and meaningless to a guest (who has no account and
+# no administrator). Written as CONTEXT rather than returned verbatim, so the model declines
 # naturally and in the asker's own framing instead of emitting a canned sentence.
-_OUT_OF_SCOPE_DOCUMENT = (
-    "This question is outside what the assistant covers. It can help with: published EVENTS and the "
-    "asker's own registrations; CLUBS and the asker's own memberships; what the asker's account and "
-    "role let them do; and step-by-step guidance for actions they have access to. It does NOT answer "
-    "questions about cafeteria menus, food, system administration, user directories, or anything "
-    "outside this app. Say briefly and politely that this is outside what you can help with, name a "
-    "couple of things from the list above that you CAN help with, and do not attempt an answer, a "
-    "guess, or a general-knowledge response."
-)
 
 # What the asker is told when the SQL pipeline could not produce a query it was willing to run.
 # Deliberately vague to the USER (the real reason names tables and columns, which is exactly what a
@@ -243,25 +229,6 @@ def _navigation_cards(principal, data_classes: set[str], *, answered: bool, has_
     if not answered or has_entity_card:
         return []
     return topic_access.topic_cards(principal, data_classes)
-
-def _how_to_denied_document(guide_key: str) -> str:
-    """The refusal for a how-to whose ACTION page this caller cannot reach.
-
-    Deliberately distinct from _denied_document above: that one names a data TOPIC ("you cannot see
-    clubs"), which is the wrong explanation for a procedural question. Here the caller asked how to
-    DO something, and the honest reason is that the page the action happens on is not theirs - so
-    the message names the action, not a data domain."""
-    from ..ai.knowledge_base import HOW_TO_LABEL, HOW_TO_PAGES
-
-    label = HOW_TO_LABEL.get(guide_key, guide_key.replace("_", " "))
-    pages = ", ".join(HOW_TO_PAGES.get(guide_key, ())) or "the relevant page"
-    return (
-        f"This asker cannot reach the page where {label} happens - an administrator has not granted "
-        f"their role {pages} in Page Visibility. Tell them plainly that they do not have access to "
-        f"that part of the app, and do NOT give the steps, describe the screen, or suggest a "
-        f"workaround. Suggest they contact an administrator if they believe they should have it."
-    )
-
 
 # Best-effort "is there a person's name in this question" detector, feeding subject_scope's privacy
 # check - a capitalized two-or-more-word run ("Ahmad Firdaus"), the same shape full_name is stored in.
@@ -392,7 +359,10 @@ def ask():
             principal, question, reason="No topic matched - outside clubs, events, and app guidance"
         )
         answer = generate_answer(
-            question, [_refusal_document(question, _OUT_OF_SCOPE_DOCUMENT)], history, asker=principal
+            question,
+            [_refusal_document(question, topic_access.out_of_scope_document(principal))],
+            history,
+            asker=principal,
         )
         _review(
             question, answer, principal,
@@ -416,7 +386,7 @@ def ask():
         if "self_capability" in classes:
             # "What can I DO in the app" - role capabilities. A different question from what the
             # assistant can ANSWER (see "askable" below).
-            kb_chunks.append(self_capability_document(principal.assignments if principal else ()))
+            kb_chunks.append(self_capability_document(principal))
         if "greeting" in classes:
             # A bare "hey"/"hi" deserves a short, casual reply, not the full enumerated capability
             # list below - greeting_hint_document() only tells the model whether it's safe to casually
@@ -433,29 +403,58 @@ def ask():
             kb_chunks.append(role_capability_document(role))
         if "system_capability" in classes:
             kb_chunks.append(SYSTEM_CAPABILITY)
-        if "how_to" in classes:
-            # Three-way, because a how-to is gated on the page its ACTION happens on: no resolvable
-            # guide -> a general "how does this work" question, answered from the system overview.
-            topic = classifier.how_to_topic(question)
-            if topic is None:
-                kb_chunks.append(SYSTEM_CAPABILITY)
+        if "page_purpose" in classes:
+            # "What is the Event Calendar for" - answered from the app's own one-line definition of
+            # that area (ai/scope.py), never from whatever rows a data lookup happened to return.
+            # Improvising it is what produced a confident description of a "personal calendar" this
+            # app has never had, and what made the SAME question return a description for a guest
+            # and a flat "you don't have permission" for an external account.
+            #
+            # A page purpose is not anybody's data, so it is told to a caller who cannot open the
+            # page too - what is withheld is the page's CONTENTS. Refusing to describe the app to
+            # the person using it is what turned an external account's every question into a dead
+            # end. An unrecognised name gets a plain "no page by that name" rather than a plausible
+            # invention.
+            area = classifier.area_named(question)
+            if area is None:
+                kb_chunks.append(scope.unknown_area_document(question))
                 topic_access.log_unanswerable(
                     principal, question,
-                    reason="How-to question with no matching guide in HOW_TO_GUIDES",
+                    reason="Asked what a page is for, but the name matches no area in scope.AREAS",
+                    unsupported=True,
+                )
+            else:
+                kb_chunks.append(scope.area_purpose_document(principal, area))
+                card = topic_access.page_card(principal, area)
+                if card:
+                    navigation_cards.append(card)
+        if "how_to" in classes:
+            # Three-way, because a how-to is gated on where its ACTION happens. NO RESOLVABLE
+            # GUIDE NOW REFUSES. It used to fall through to SYSTEM_CAPABILITY - the whole platform
+            # overview - and let the model compose a procedure out of it, which is exactly how an
+            # external account that had just been refused every other question was handed working
+            # step-by-step instructions for saving an event. A guide that does not exist is a guide
+            # that does not exist; the log row (`unsupported`) names the one somebody should write.
+            topic = classifier.how_to_topic(question)
+            if topic is None:
+                kb_chunks.append(topic_access.unsupported_how_to_document(principal))
+                topic_access.log_unanswerable(
+                    principal, question,
+                    reason="How-to question with no matching guide in scope.GUIDES",
                     unsupported=True,
                 )
             elif topic_access.how_to_allowed(principal, topic):
                 kb_chunks.append(HOW_TO_GUIDES[topic])
                 navigation_cards.extend(topic_access.how_to_cards(principal, topic))
             else:
-                kb_chunks.append(_how_to_denied_document(topic))
+                kb_chunks.append(topic_access.how_to_denial_document(principal, topic))
                 topic_access.log_how_to_denial(principal, topic, question)
         if "admin_ai_denials" in classes:
             # Gated behind its own page (admin-ai-access-log) - reaching this line already means
             # step 5 passed the caller.
             kb_chunks.append(ai_denials_document())
         if denied:
-            kb_chunks.append(_denied_document(denied))
+            kb_chunks.append(topic_access.denial_document(principal, denied))
         if privacy_document:
             kb_chunks.append(privacy_document)
 
@@ -554,7 +553,7 @@ def ask():
     # allowed and a denied topic still has to explain the denied half.
     extra_chunks: list[str] = []
     if denied:
-        extra_chunks.append(_denied_document(denied))
+        extra_chunks.append(topic_access.denial_document(principal, denied))
     if privacy_document:
         extra_chunks.append(privacy_document)
     # A recommendation that reached here is stage "recommend": they have already told us what they
@@ -581,7 +580,7 @@ def ask():
             reason="On-domain question the assistant has no way to answer from the available data",
             unsupported=True,
         )
-        result_document = _refusal_document(question, _OUT_OF_SCOPE_DOCUMENT)
+        result_document = _refusal_document(question, topic_access.out_of_scope_document(principal))
         data_summary = "No data retrieved: the question could not be expressed against the available schema."
     else:
         # Generation or validation never converged. The precise reason (which can name tables and
@@ -647,9 +646,9 @@ def suggestions():
     these before any question exists, and the list is a function of the caller's
     page grants alone.
 
-    Open to guests (authenticate_optional), who get the guest-open subset - the
-    same tier topic_access.GUEST_OPEN_TOPICS describes. Never returns an empty
-    array; see suggestions_for().
+    Open to guests (authenticate_optional), who get the cards for the areas a
+    visitor can actually reach - the same scope.can_reach check that releases the
+    answer behind each card. Never returns an empty array; see suggestions_for().
     """
     authenticate_optional()
     principal = getattr(g, "principal", None)

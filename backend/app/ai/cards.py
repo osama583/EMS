@@ -111,13 +111,30 @@ def event_cards(answer: str, *, user_id: int | None) -> list[dict]:
                r.event_image AS "eventImageUrl",
                (SELECT string_agg(rc.category_name, ', ') FROM request_categories rc
                  WHERE rc.request_id = r.request_id) AS category,
-               (SELECT min(s.date)::text FROM event_schedule s WHERE s.request_id = r.request_id) AS "firstDate",
+               -- THE NEXT date on or after today, falling back to the earliest when the whole
+               -- event is in the past - not min(date) unconditionally.
+               --
+               -- WHY IT DIFFERS from api/events.py's own "firstDate" (a plain min). A card here
+               -- sits directly beneath a sentence the assistant just wrote about that event, and
+               -- the answer is virtually always about what is COMING UP - so a multi-day or
+               -- recurring event whose first sitting has passed produced a visible contradiction:
+               -- the text said "Beach Clean-Up on 2026-09-11" over a card reading 2026-04-05, and
+               -- "Deepavali Open House from 2026-09-06" over a card reading 2026-11-06. Same
+               -- event, same reply, two different dates, and nothing on screen to explain it.
+               -- A page of cards can afford a "starts on" convention; a card captioned by a
+               -- sentence cannot disagree with the sentence.
+               (SELECT s.date::text FROM event_schedule s
+                 WHERE s.request_id = r.request_id
+                 ORDER BY (s.date < CURRENT_DATE), s.date LIMIT 1) AS "firstDate",
                (SELECT string_agg(DISTINCT es.location, ', ') FROM event_schedule es
                  WHERE es.request_id = r.request_id) AS location,
+               -- Times come from the SAME sitting the date does, for the same reason.
                (SELECT es.start_time::text FROM event_schedule es
-                 WHERE es.request_id = r.request_id ORDER BY es.date LIMIT 1) AS "startTime",
+                 WHERE es.request_id = r.request_id
+                 ORDER BY (es.date < CURRENT_DATE), es.date LIMIT 1) AS "startTime",
                (SELECT es.end_time::text FROM event_schedule es
-                 WHERE es.request_id = r.request_id ORDER BY es.date LIMIT 1) AS "endTime"
+                 WHERE es.request_id = r.request_id
+                 ORDER BY (es.date < CURRENT_DATE), es.date LIMIT 1) AS "endTime"
           FROM request r
          WHERE r.status = 'completed_approved' AND {visibility}
         """,

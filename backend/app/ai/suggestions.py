@@ -10,13 +10,12 @@ straight into a refusal - the topics behind them are gated, so clicking one aske
 a question the assistant then declined and logged as an access denial.
 
 The fix is to build the list from the SAME rule that decides whether an answer is
-allowed. Every card names the nav page(s) its subject lives behind, and a card is
-offered only when Page Visibility grants the reader one of them
-(identity.has_page_access, exactly as topic_access.topic_allowed and
-topic_access.how_to_allowed do). So:
+allowed. Every card names the scope.py AREA(s) its subject lives in, and a card
+is offered only when the reader can actually reach one of them (scope.can_reach,
+exactly as topic_access.topic_allowed and topic_access.how_to_allowed do). So:
 
   - a card can never invite a question the assistant would refuse, because the
-    grant that releases the answer is the grant that shows the card;
+    check that releases the answer is the check that shows the card;
   - revoking a page in /app/admin/page-visibility removes its cards on the next
     open, with nothing to keep in sync by hand;
   - a new role needs no code here at all - it gets the cards its grants imply.
@@ -25,10 +24,13 @@ UNGATED cards carry `pages = ()` and are shown to everyone including signed-out
 guests: they ask about the app itself or about the reader's own access, which
 knowledge_base answers from static text and which exposes nobody's data.
 
-GUESTS see the ungated cards plus the guest-open ones (`guest_open=True`), which
-mirrors topic_access.GUEST_OPEN_TOPICS/GUEST_OPEN_HOW_TO - guest event browsing is
-a real, intended tier of this app, so a visitor is offered exactly what a visitor
-may ask.
+VISITORS - guests and external accounts alike - are served by the same mechanism
+rather than by a special case. Cards about browsing and saving events name both
+the internal page and the public landing section, so each tier matches the copy
+it can open. This replaced a `guest_open=True` flag, a hand-maintained second
+opinion about the guest tier that could drift from topic_access and that had no
+way to express an external account at all: those held no nav page, matched no
+card, and opened the panel on the three ungated cards and nothing else.
 
 A CARD IS NOT A ROLE CHECK. Several pages are granted far more widely than their
 name suggests (`inbox` reaches nine roles, not just reviewers), so a card gated on
@@ -40,7 +42,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..services import identity
+from . import scope
 
 # How many cards the panel asks for. Four to a page, two pages - matching the
 # panel's own pagination dots.
@@ -56,10 +58,8 @@ class Suggestion:
     title: str
     description: str
     prompt: str
-    # Nav pages that release this card. Empty = ungated (see module docstring).
+    # The scope.py AREAS that release this card. Empty = ungated (see module docstring).
     pages: tuple[str, ...] = ()
-    # Offered to a signed-out guest too. Only meaningful alongside `pages`.
-    guest_open: bool = False
 
     def as_json(self) -> dict:
         return {
@@ -70,11 +70,8 @@ class Suggestion:
         }
 
 
-def _card(icon, title, description, prompt, pages=(), guest_open=False) -> Suggestion:
-    return Suggestion(
-        icon=icon, title=title, description=description, prompt=prompt,
-        pages=pages, guest_open=guest_open,
-    )
+def _card(icon, title, description, prompt, pages=()) -> Suggestion:
+    return Suggestion(icon=icon, title=title, description=description, prompt=prompt, pages=pages)
 
 
 # --- The catalogue -----------------------------------------------------------
@@ -133,14 +130,19 @@ CATALOGUE: tuple[Suggestion, ...] = (
           "What clubs can I join?", ("clubs-discover",)),
 
     # --- Anyone who can create an event ------------------------------------
+    # `created-by-me` used to gate this card - a page_code seed/nav.py has never created, so the
+    # card was dead for every role in the app. The organiser's real grant is the proposal form.
     _card("how_to_reg", "Who Registered", "See who has signed up for the events you created.",
-          "Who has registered for the events I created?", ("created-by-me",)),
+          "Who has registered for the events I created?", ("proposal-form",)),
 
     # --- Anyone who attends events -----------------------------------------
+    # Two areas each, internal and visitor, so one card serves a student and a visitor account
+    # without either being offered the other's page.
     _card("bookmark", "My Events", "Check what you have registered for or saved.",
-          "Which events am I registered for?", ("my-events",)),
+          "Which events am I registered for?", ("my-events", "public-my-events")),
     _card("event", "What Is Coming Up", "See which events are happening soon.",
-          "What events are coming up?", ("explore-events", "event-calendar"), guest_open=True),
+          "What events are coming up?",
+          ("explore-events", "event-calendar", "public-happening-soon")),
 
     # --- Anyone who submits proposals --------------------------------------
     _card("chat", "Submit Through Chat", "Let the assistant walk you through creating a proposal.",
@@ -171,7 +173,9 @@ CATALOGUE: tuple[Suggestion, ...] = (
           "Which departments are involved in a proposal, and what is each responsible for?",
           ("my-requests", "proposal-form")),
     _card("confirmation_number", "How to Register", "Learn how registering for an event works.",
-          "How do I register for an event?", ("explore-events",), guest_open=True),
+          "How do I register for an event?", ("explore-events", "public-explore-events")),
+    _card("bookmark_add", "How to Save an Event", "Keep an event to come back to later.",
+          "How do I save an event?", ("my-events", "public-my-events")),
 
     # --- Ungated: the app itself, and the reader's own access ---------------
     _card("quiz", "What Can I Ask?", "See the topics you can ask about with your access.",
@@ -180,15 +184,22 @@ CATALOGUE: tuple[Suggestion, ...] = (
           "What can I do in this app with my account?"),
     _card("info", "About This App", "Understand what the platform is for.",
           "What is this app for and what can it do?"),
+    _card("help_center", "What Is This Page For?", "Ask what any part of the app does.",
+          "What is the Event Calendar for?"),
 )
 
 
 def _visible(suggestion: Suggestion, principal) -> bool:
+    """The SAME reachability check that releases the answer behind the card.
+
+    `guest_open` is gone. It was a hand-maintained second opinion about which cards a signed-out
+    visitor may see, kept in sync with topic_access by hand and therefore able to drift from it.
+    A guest now passes a card because they can actually reach the area behind it - which is also
+    what makes the visitor cards below work for an EXTERNAL account, a tier the old flag had no way
+    to express at all (it offered them nothing but the three ungated cards)."""
     if not suggestion.pages:
         return True
-    if principal is None:
-        return suggestion.guest_open
-    return any(identity.has_page_access(principal.assignments, page) for page in suggestion.pages)
+    return any(scope.can_reach(principal, area) for area in suggestion.pages)
 
 
 def suggestions_for(principal, *, limit: int = DEFAULT_LIMIT) -> list[dict]:

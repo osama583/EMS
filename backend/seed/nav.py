@@ -92,18 +92,23 @@ def nav_catalogue() -> list[dict]:
     # Cafeteria Manager gets Inbox/Ongoing/History for the per-order food
     # approval flow, but never Drafts or Forms - they review orders, they do not
     # submit proposals.
+    # club-admin holds Inbox and History (but never Ongoing, Drafts or Forms) because the
+    # president-change requests it decides are TABS inside those two hubs
+    # (records-hub.ts showPresidentChangeTab) - there is no separate page for them. The seed
+    # omitted the grant while the live database had been given it by hand in Page Visibility,
+    # which is the drift migration 042 closes in the other direction.
     page("inbox", "Inbox", "inbox", "/app/inbox", None, 2,
-         grants_for([*ALL_UNIT_ROLES, "cfo"]) + [cafeteria_manager_grant()])
+         grants_for([*ALL_UNIT_ROLES, "cfo", "club-admin"]) + [cafeteria_manager_grant()])
     page("reports", "Reports", "analytics", "/app/reports", None, 3,
          grants_for(["cafeteria-admin"]))
 
     # --- My Requests ------------------------------------------------------
     folder("my-requests", "My Requests", "assignment", 4,
-           grants_for([*ALL_UNIT_ROLES, "cfo"]) + [cafeteria_manager_grant()])
+           grants_for([*ALL_UNIT_ROLES, "cfo", "club-admin"]) + [cafeteria_manager_grant()])
     page("ongoing", "Ongoing", "schedule", "/app/ongoing", "my-requests", 0,
          grants_for([*ALL_UNIT_ROLES, "cfo"]) + [cafeteria_manager_grant()])
     page("history", "History", "history", "/app/history", "my-requests", 1,
-         grants_for([*ALL_UNIT_ROLES, "cfo"]) + [cafeteria_manager_grant()])
+         grants_for([*ALL_UNIT_ROLES, "cfo", "club-admin"]) + [cafeteria_manager_grant()])
     page("drafts", "Drafts", "draft", "/app/proposals/drafts", "my-requests", 2,
          grants_for(ALL_UNIT_ROLES))
 
@@ -203,10 +208,14 @@ def nav_catalogue() -> list[dict]:
          "manage-clubs", 0, grants_for(["club-admin"]))
     # Granted the hub's BASE path, not /app/clubs/my-clubs: the hub's three tabs
     # are one page, so granting a single tab's path would refuse the others.
+    # NOT club-admin. Discovering and joining a club is a MEMBER's action, and a Club Admin is an
+    # administrator of clubs rather than a member of them - presidency is student-only and so is
+    # membership. Granting these to club-admin was what let the assistant offer to help a Club
+    # Admin "find a club to join" and then recommend two it could never join.
     page("clubs-discover", "Discover Clubs", "explore", "/app/clubs/discover", "manage-clubs", 1,
-         grants_for(["club-admin", "student", "lecturer"]))
+         grants_for(["student", "lecturer"]))
     page("clubs-my", "My Clubs", "groups", "/app/clubs", "manage-clubs", 2,
-         grants_for(["club-admin", "student", "lecturer"]))
+         grants_for(["student", "lecturer"]))
     page("club-category", "Club Category", "category", "/app/club-category",
          "manage-clubs", 3, grants_for(["club-admin"]))
 

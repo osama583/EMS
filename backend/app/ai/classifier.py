@@ -40,11 +40,19 @@ import logging
 from google.genai import types
 
 from .gemini import GENERATION_MODEL, _generate_content
-from .query_router import CLASS_DESCRIPTIONS, how_to_topic, named_role  # noqa: F401 - re-exported
+from .query_router import (  # noqa: F401 - re-exported
+    CLASS_DESCRIPTIONS,
+    area_named,
+    how_to_topic,
+    named_role,
+)
 
 log = logging.getLogger(__name__)
 
-__all__ = ["CLASS_DESCRIPTIONS", "ClassificationUnavailable", "classify", "how_to_topic", "named_role"]
+__all__ = [
+    "CLASS_DESCRIPTIONS", "ClassificationUnavailable", "area_named", "classify", "how_to_topic",
+    "named_role",
+]
 
 
 class ClassificationUnavailable(RuntimeError):
@@ -75,6 +83,12 @@ def _system_instruction() -> str:
         "- A step-by-step 'how do I...' is how_to ALONE, even when it mentions clubs or events. "
         "'How do I join a club' wants instructions, not a list of clubs - do not also return the "
         "topic it happens to name.",
+        "- 'What is <page or section> FOR' is page_purpose ALONE, and it is not a data question. "
+        "'What is the Event Calendar for', 'what does Happening Soon do', 'what is the point of "
+        "Explore Events' all ask what part of the app that is - answer them from the app's own "
+        "description of the page, so do NOT also return `events` or `clubs` and send the question "
+        "to the database. The moment they ask what is ON the page ('what's on the calendar in "
+        "October') it becomes the data class instead.",
         "- WHO HOLDS A STAFF OR ORGANISATIONAL POSITION matches NO class - return an empty list. "
         "'Who is the head of logistics', 'who manages the IT department', 'who is in charge of "
         "facilities', 'who is the dean', staff or student directories, contact details, and user "
@@ -106,6 +120,7 @@ KNOWLEDGE_BASE_CLASSES: frozenset[str] = frozenset({
     "askable",
     "role_capability",
     "system_capability",
+    "page_purpose",
     "how_to",
     "greeting",
     "admin_ai_denials",
@@ -135,6 +150,23 @@ def _suppress_incidental_how_to_topics(question: str, classes: set[str]) -> set[
     if "how_to" not in classes or how_to_topic(question) is None:
         return classes
     return (classes - DATA_CLASSES) or {"how_to"}
+
+
+def _suppress_incidental_page_topics(question: str, classes: set[str]) -> set[str]:
+    """A resolved page_purpose answers from the page's DEFINITION, not from the database.
+
+    The same backstop, for the same reason: "what is the Event Calendar for" names events, so the
+    classifier returns {page_purpose, events} and the data path then answers a structural question
+    with a list of what happens to be on next week. Worse, it made the answer depend on data access
+    - which is why the identical question got a description for a guest and a flat refusal for an
+    external account, when neither should ever have touched an event row.
+
+    Applied ONLY when a real Area resolves. An unrecognised page name leaves the classes alone, so
+    a question that merely sounds structural still has its data classes to fall back on.
+    """
+    if "page_purpose" not in classes or area_named(question) is None:
+        return classes
+    return (classes - DATA_CLASSES) or {"page_purpose"}
 
 
 def classify(question: str, history: list[dict] | None = None) -> set[str]:
@@ -181,7 +213,8 @@ def classify(question: str, history: list[dict] | None = None) -> set[str]:
         # from schema on rare occasions, and an unrecognised class name would silently match nothing
         # downstream rather than erroring - masking the real problem.
         resolved = {c for c in classes if isinstance(c, str) and c in CLASS_DESCRIPTIONS}
-        return _suppress_incidental_how_to_topics(question, resolved)
+        resolved = _suppress_incidental_how_to_topics(question, resolved)
+        return _suppress_incidental_page_topics(question, resolved)
     except Exception as exc:  # noqa: BLE001 - see docstring: a classifier failure refuses, never guesses
         log.warning("ai.classify.failed", extra={"error": str(exc)})
         # Refusing is right; refusing with the WRONG REASON is not, and returning an empty set here

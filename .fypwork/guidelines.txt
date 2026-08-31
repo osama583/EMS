@@ -1,0 +1,1225 @@
+
+=========== PAGE 1 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+1 
+ 
+                                                                                               
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+SCHOOL OF COMPUTING (SOC) & SCHOOL OF TECHNOLOGY(SOT) 
+2023 
+ 
+ 
+ 
+
+=========== PAGE 2 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+2 
+FYP REPORT WRITING GUIDELINES (SOC & SOT) 
+ 
+COVER PAGE 
+Please follow the correct format for the cover page that has been prepared. You may find it in 
+the designated folder that has been prepared by your respective FYP managers.  
+ 
+Note:  
+• If you are doing a dual program degree, you MUST include the DMU logo and APU 
+logo on the cover page.  
+• If you are not doing a dual degree program, kindly ensure to include only the APU 
+logo on the cover page (put it on the right side). 
+• Do not add header and footer to the cover page. 
+ 
+Notes for Project title: 
+• The number of words should be no more than 15 words. 
+• Please ensure that the students lock down their FYP titles at the IR stage and there 
+should not be any changes of titles in their actual FYP itself.  
+• Please also make sure the titles chosen have the proper action verbs. While titles 
+should be concise and informative, they should also be informative enough to convey 
+the main focus of the study. It should avoid using abbreviations. 
+• Do not include abbreviation/acronym (must provide full name). 
+• Do not include special characters:; -? !, . / 
+• Try to limit max 15 words in your FYP Title. 
+• Write your FYP title with capitalized each word except conjunction words. 
+• The project title should at least contain an action verb – Investigating, Exploring, 
+Confirming, Designing, Developing, Defining, Identifying, Establishing – so on and 
+so forth. 
+• The title should describe the project area, outcomes, solutions, what the student has 
+achieved or discovered, and the methodology used. 
+• The project title should NOT contain the product name, game name, system name or 
+model name. There is no point in doing that. 
+• The project title should NOT contain an abbreviation or acronym without its full 
+name. 
+• It should NOT be something like – A Car Park Management System. It should be 
+something like An Artificial Intelligence (AI) Enabled System to Reduce the City 
+Centre Parking Problems During Peak Hours. 
+• It should NOT be something like – Xuria – A Rogue-Like Game. It should be 
+something like Exploring the Effects of Diminishing Gameplay Core Loop 
+Systems to Create Engaging Player Experience in Platform Games. 
+ 
+ 
+ 
+ 
+=========== PAGE 3 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+3 
+DECLARATION OF THESIS CONFIDENTIALITY PAGE 
+This form is used for the confidentiality of the FYP documentation. You may find it in the 
+designated folder that has been prepared by your respective FYP managers.  
+ 
+LIBRARY FORM 
+This form is used for the library purpose. You may find it in the designated folder that has 
+been prepared by your respective FYP managers.  
+ 
+ACKNOWLEDGEMENT PAGE 
+This section is written in one page to acknowledge gratitude to contributing persons/parties. 
+ 
+ 
+Figure 1: Acknowledgement Sample 
+ 
+ABSTRACT PAGE 
+An abstract section is a one-paragraph summary of a research project. An abstract may 
+contain the following information: 
+• The purpose of the project identifying the area of study to which it belongs. 
+• The research problem that motivates the project. 
+• The methods used to address this research problem, document, or evidence 
+analysed. 
+• The conclusion reached or, if the research is in progress, what the preliminary 
+result of the investigation suggests. 
+• The significance of the project. 
+• What are the mapping SDG components that can be related to the project?  
+• Maximum 6 keywords to be included at the bottom of the abstract. 
+• Note that the word limit is 200 words. 
+
+=========== PAGE 4 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+4 
+ 
+ 
+Figure 1: Abstract Sample 
+ 
+TABLE OF CONTENTS 
+Students may refer to the whole structure written in these guidelines to arrange the table of 
+contents. 
+ 
+LIST OF FIGURES 
+Figures include diagrams, photographs, screenshots, graphs, charts, code snippets, etc. Includes 
+the title of all figures and the page number where the figure can be found in the text. 
+ 
+LIST OF TABLES  
+Includes the title of all tables and the page number where the table can be found in the text. 
+ 
+Important notes: 
+Cover page, Acknowledgment page, Abstract page, Table of Contents page, List of Figures 
+page, and List of Table page – each of them must be started on a new fresh page.  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+=========== PAGE 5 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+5 
+MAIN CHAPTERS 
+ 
+ 
+CHAPTER 1: INTRODUCTION 
+ 
+Chapter 1 of the report is an important chapter since it describes the overall project and its 
+outcome. As this is the first chapter that the evaluators will read, it is essential to make a good 
+first impression. It is important to write a chapter that cle arly explains the project's flow. A 
+thorough understanding of the ground work is necessary in order to write a well-written chapter. 
+Table 1 shows the outline of Chapter 1. 
+ 
+ 
+CHAPTER 1 
+INTRODUCTION 
+ 
+1.1 Introduction  
+• Provide the chapter introduction, what you describe in Chapter 1.  
+1.2 Problem Background  
+• Example: Explain why current technology T is underperforming environment Z.  
+1.3 Project Aim  
+• A single-sentence statement.  
+• Explaining the key target of the project.  
+• Example: To develop a system X using technology Y to be employed in environment 
+Z.  
+1.4 Objectives  
+• A minimum of three objectives and a maximum of four.  
+• Must be measurable  
+• Start with ‘To..’  
+1.5 Scope  
+• Describe in detail the tasks to be executed.  
+• Constraints regarding any part of the project development (e.g. size of system and 
+technology).  
+• What will and will not be done as part of the project? 
+1.6 Potential Benefit  
+• Tangible benefits.  
+• Intangible benefits. 
+• Target user 
+1.7 Overview of the FYP Documentation 
+1.8 Project Plan 
+Table 1: Outline of Chapter 1 
+ 
+=========== PAGE 6 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+6 
+CHAPTER 2: LITERATURE REVIEW 
+ 
+In Chapter 2, all the results and findings of the review of literature are presented. Literature 
+review provides a sound basis for a good problem formulation and planning of project. From 
+the literature review, student will be able to build the basic understanding of the project. Table 
+2.1  shows the outline of Chapter 2 of the report. 
+ 
+CHAPTER 2 
+LITERATURE REVIEW 
+ 
+2.1 Introduction 
+• Provide the chapter introduction, what you describe in Chapter 2.  
+ 
+2.2 Domain Research 
+• Study of domain from general to specific 
+• Study of Related theories / technolog ies/ algorithm s that can contribute towards 
+solving the problems and others.   
+• Every sub-topic within the domain must have a comprehensive, critical and detailed 
+review. 
+ 
+2.3 Similar Works 
+• Characteristic of similar works/systems 
+• Strengths and weaknesses 
+• Conclusion 
+ 
+2.4 Technical Research 
+• Identify the hardware / software for the project and justify  
+• IDE (Interactive Development Environment) chosen – (this section is optional) 
+• Libraries chosen / Tools chosen – (this section is optional)         
+• Database Management System chosen – (this section is optional) 
+• Operating System chosen  
+• Web Server chosen - (this section is optional) 
+• Web browser chosen - (this section is optional) 
+ 
+2.5 Summary  
+• Provide chapter summary. 
+ 
+Table 2: Outline of Chapter 2 
+ 
+ 
+ 
+=========== PAGE 7 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+7 
+CHAPTER 3: METHODOLOGY  
+ 
+Methodology describes the overall approach and framework chosen for research and system 
+development. The content for the methodology chapter of the report can hold methods, 
+techniques or approach that is used or will be used during design and implementatio n of the 
+project.  
+In addition, this chapter also justifies the choice of methods or approach, as well as hardware 
+and software requirements. It must be noted that the primary objective is not to explain the 
+functions of each phase but rather the process that goes on within in. Table 3.1 shows the outline 
+of Chapter 3 of the report. This outline must be followed, although slight modifications that 
+enhance understanding of the project are accepted. 
+ 
+For CS and CSAI Students 
+CHAPTER 3 
+METHODOLOGY 
+ 
+3.1 Introduction 
+• Provide the chapter introduction, what you describe in Chapter 3.  
+ 
+3.2 System Development Methodology 
+• Introduction 
+• Methodology choice and justification 
+• Describe the activities and process in each phase towards the chosen methodology 
+(traditional or modern) 
+ 
+3.3 Data Gathering Design → you may take it from IR 
+• Describe the data gathering techniques choose for the project 
+o Surveys 
+o Interview 
+o Document analysis 
+o Observation 
+o Other relevant techniques 
+• Design the questions/event /activities base on the techniques chosen and get 
+verification from the supervisor, through the ethic forms.  
+• Minimum number or participant to be used: 
+o Survey = 30 participants 
+o Interview = 3 participants 
+• Note that this data gathering activities need to be conducted with the identified 
+target audience and not with your friends.  
+=========== PAGE 8 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+8 
+• Note that respondent demographic information are needed to be included in the 
+appendix  
+ 
+3.4 Analysis → you may take it from IR and add improvements on your analysis 
+discussions 
+ 
+• Analysis towards the data retrieve from the data gathering activities. 
+• Final list of user requirement summarized from the analysis. 
+ 
+3.5 Summary  
+• Provide chapter summary. 
+ 
+Table 3: Outline of Chapter 3 
+ 
+ 
+For CSDA students: 
+CSDA students are not mandatory to conduct survey s or interview s. CSDA students are 
+required to adopt a suitable methodology for data analytic projects. 
+CHAPTER 3 
+METHODOLOGY 
+ 
+3.1 Introduction 
+• Provide the chapter introduction, what you describe in Chapter 3.  
+ 
+3.2 Methodology 
+3.1.1 Introduction of methodology 
+3.1.2 Methodology choice and justification 
+3.1.3    Describe the activities, process, techniques in each phase towards the chosen      
+            Methodology in detail. 
+Note: methodology for data analysis such as: CRISP-DM, KDD, SEMMA 
+ 
+3.4 Summary 
+• Provide chapter summary. 
+Table 3a: Outline of Chapter 3 (for CSDA students) 
+Note: 
+You may take it from IR and add improvements on your methodology discussions. 
+ 
+ 
+ 
+ 
+=========== PAGE 9 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+9 
+CHAPTER 4: DESIGN AND IMPLEMENTATION 
+ 
+Design and implementation chapter reports the design of the completed end-products/system/ 
+applications. The content will include system design diagram , system architecture, interface 
+design, database design, storyboard, screenshot of end products  and other related/appropriate 
+techniques. This chapter will also contain Data Flow Diagram (DFD), use case diagram, 
+sequence diagram, class diagram, ERD and others, associated with the application development 
+model chosen (structured or object-oriented).  
+ 
+ 
+For CS and CSAI Students 
+ 
+CHAPTER 4 
+DESIGN AND IMPLEMENTATION 
+ 
+4.1 Introduction 
+• Provide the chapter introduction, what you describe in Chapter 4.  
+ 
+4.2 Design 
+• This may include system design diagram, system architecture such as activity 
+diagram, use case diagram, sequence diagram and others.  
+• This may include interaction design, assets definition and design, application 
+structure, animation design, level game design, game mechanic design, 3D models 
+design, multimedia assets design and others. 
+• It depends on what development model chosen (methodology) for the project.  
+ 
+4.3 Database Design  
+• Database design is optional where it’s depends on the methodology used for the 
+project development.  
+• Do not that if the project does not have any databases, there is no need to include 
+this inside the documentation.  
+ 
+4.4 Interface Design 
+• This may include menu and screen design, system navigation and content design, 
+page navigation design, storyboard and other related design on regards of the UI.  
+ 
+4.5 Implementation  
+• Include the screenshot of the complete end products/ application/ website/ systems 
+and provide justification/discussions for each of it. 
+• Note: If you have Data Analytics, Machine Learning analysis, Sentiment Analysis, 
+etc for your system – you may include the analysis steps in this section. The analysis 
+steps may include data collection, data preprocessing, data 
+understanding/exploration, model buildings, and model evaluation.  
+=========== PAGE 10 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+10 
+Examples: 
+ 
+     4.5.1 Login Page 
+ 
+ 
+Description here description here description here description here description here 
+description here description here description here description here description here 
+description here description here description here description here description here 
+description here description here description here description here description here. 
+ 
+      4.5.2 Forgot Password 
+ 
+ 
+Description here description here description here description here description here 
+description here description here description here description here description here 
+description here description here description here description here description here 
+description here description here description here description here description here. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+=========== PAGE 11 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+11 
+ 4.6 Sample codes 
+          4.6.1 Name of program: sign_in.cs 
+     
+  
+                      
+Description here description here description here description here description here 
+description here description here description here description here description here 
+description here description here description here description here description here 
+description here description here description here description here description here.                
+ 
+ 
+      4.6.2  Name of program: sign_up.cs 
+     
+  
+Description here description here description here description here description here 
+description here description here description here description here description here 
+description here description here description here description here description here 
+description here description here description here description here description here.                
+ 
+4.7 Summary  
+• Provide chapter summary.  
+Table 4: Outline of Chapter 4 
+=========== PAGE 12 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+12 
+For CSDA Students:  
+CHAPTER 4 
+DESIGN AND IMPLEMENTATION 
+ 
+4.1 Introduction 
+Provide the chapter introduction, what you describe in Chapter 4.  
+ 
+4.2 Data Collection → you may take it from IR and improve your data collection 
+discussions 
+      Data Collection – identify your dataset and explain the source of your   
+   dataset and provide the dataset source link. 
+ 
+4.3 Data Pre-processing → you may take it from IR and improve your data preprocessing 
+tasks and discussions 
+ Perform all data pre-processing steps for your dataset with any preferred tools. 
+4.3.1 Missing Values 
+4.3.2 Outliers 
+4.3.3 Data Transformation 
+4.3.4 Data Standardization  
+4.3.5 Data Normalization 
+4.3.6 Etc 
+Note: Perform data understanding and data pre-processing with any preferred tools. 
+ 
+4.4 Data Understanding → you may take it from IR and improve your data understanding 
+discussions 
+      Data Understanding – perform all data understanding steps for your dataset with any 
+preferred tools. 
+4.4.1 Variables – explain variables in your dataset 
+4.4.2 Observations – explain observations in your dataset 
+4.4.3 Histogram – create histograms or any other visualizations to understand further 
+your dataset. 
+4.4.4 Etc – add any other necessary sections for your ‘data understanding’ phase.  
+Note: Perform data understanding and data pre-processing with any preferred tools. 
+ 
+4.5 Model Building 
+       4.5.1 Model Building with Technique 1 
+       4.5.2 Model Building with Technique 2 
+       4.5.3 Model Building with Technique 3 
+       4.5.4 Model Building with Technique 4 
+       Etc – you may perform may experiments to build your models.  
+ 
+4.5 Summary  
+Provide chapter summary. 
+Table 4: Outline of Chapter 4 (For CSDA Students) 
+=========== PAGE 13 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+13 
+CHAPTER 5: RESULT AND DISCUSSION 
+ 
+An effective result and discussion chapter will successfully explain all the results achieved 
+through project coding, experiments, and testing. The results of the project implementation are 
+discussed in detail here. Documents and proof of correctness of the project must be attached. 
+Testing types and techniques, as well as testing results, must be stated. 
+ 
+For CS and CSAI Students 
+CHAPTER 5 
+RESULTS AND DISCUSSIONS 
+ 
+5.1 Introduction 
+Provide the chapter introduction, what you describe in Chapter 5.  
+ 
+5.2. Test Plan 
+        5.2.1 Unit Testing 
+       Name of program: login.php 
+TC
+-No 
+Username : Password  Expected 
+message/out
+put 
+Actual 
+message/out
+put 
+Status(Passed/Fail
+ed) 
+TC
+1 
+blank blank “Sorry, 
+please enter 
+a valid 
+username 
+and 
+password” 
+  
+TC
+2 
+blank 3434 “Sorry, 
+please enter 
+a valid 
+username 
+and 
+password” 
+  
+TC
+3 
+blank 123768(a 
+correct 
+password) 
+“Sorry, 
+please enter 
+a valid 
+username 
+and 
+password” 
+  
+TC
+4 
+blablauserna
+me 
+blank “Sorry, 
+please enter 
+a valid 
+username 
+  
+=========== PAGE 14 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+14 
+and 
+password” 
+TC
+5 
+dhason-
+Correct 
+username 
+blank “Sorry, 
+please enter 
+a valid 
+username 
+and 
+password” 
+  
+TC
+6 
+dhason-
+correct 
+username 
+blablapasswo
+rd 
+“Sorry, 
+please enter 
+a valid 
+username 
+and 
+password” 
+  
+TC
+7 
+dhason – a 
+valid 
+username 
+756dhason – 
+actual 
+password 
+Welcome to 
+School 
+Management 
+System 
+version 2.0 
+  
+Description: 
+2 – 5 Lines 
+ 
+Name of program: forgotpassword.php 
+TC-No Username Expected 
+message/output 
+Actual 
+message/output 
+Status(Passed/Failed) 
+TC1 blank “Please enter a 
+valid 
+username” 
+  
+TC2 blablapassword “Please enter a 
+valid 
+username” 
+  
+TC3 dhason0 – an 
+invalid 
+username 
+“Please enter a 
+valid 
+username” 
+  
+TC4 dhason – a 
+correct 
+username 
+“The system 
+sends the user a 
+link to enter 
+anew 
+password” 
+  
+ 
+Description: 
+3 – 5 Lines 
+ 
+=========== PAGE 15 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+15 
+      5.2.2 User Acceptance Testing (UAT) 
+ 
+    User Acceptance Testing 
+Tester demographic profile  
+Name xxxx 
+Age 40 
+Role in the system Parents 
+ 
+*The rating of the scale would be as below: 
+1: Strongly disagree. 
+2: Disagree. 
+3: Neutral 
+4: Agree. 
+5: Strongly agree. 
+ User interface criteria 1 2 3 4 5 
+I The design of the interface is decent and good looking.     / 
+II The animation between the webpage is smooth and 
+creative. 
+   /  
+III The colour scheme for the website is in decent looking 
+and smooth.  
+   /  
+IV The website is always clean and clear to be view.      / 
+ 
+ Functionality criteria Yes  No 
+I Website function without any error. /  
+II Users can reach their destinated pages without error. /  
+III Websites is function with using different platform.  /  
+ 
+Tester comment: 
+Test comments here 
+ 
+Tester’s Signature 
+ 
+Dewi 
+ 
+ 
+ 
+ 
+=========== PAGE 16 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+16 
+5.3 Testing Results and Discussion 
+ 
+       5.3.1 Unit Testing: 
+       
+       Name of program: login.php 
+ 
+TC
+-
+No 
+Username : Password  Expected 
+message/out
+put 
+Actual 
+message/out
+put 
+Status(Passed/Fail
+ed) 
+TC
+1 
+blank blank “Sorry, 
+please enter a 
+valid 
+username 
+and 
+password” 
+“Sorry, 
+please enter a 
+valid 
+username 
+and 
+password” 
+Passed 
+TC
+2 
+blank 3434 “Sorry, 
+please enter a 
+valid 
+username 
+and 
+password” 
+“Sorry, 
+please enter a 
+valid 
+username 
+and 
+password” 
+Passed 
+TC
+3 
+blank 123768(a 
+correct 
+password) 
+“Sorry, 
+please enter a 
+valid 
+username 
+and 
+password” 
+“Sorry, 
+please enter a 
+valid 
+username 
+and 
+password” 
+Passed 
+TC
+4 
+blablauserna
+me 
+blank “Sorry, 
+please enter a 
+valid 
+username 
+and 
+password” 
+The screen is 
+blank 
+Failed 
+TC
+5 
+blablauserna
+me 
+blank “Sorry, 
+please enter a 
+valid 
+username 
+and 
+password” 
+“Sorry, 
+please enter a 
+valid 
+username 
+and 
+password” 
+Passed 
+TC
+6 
+dhason-
+correct 
+username 
+blablapassw
+ord 
+“Sorry, 
+please enter a 
+valid 
+username 
+and 
+password” 
+  
+TC
+7 
+dhason – a 
+valid 
+username 
+756dhason – 
+actual 
+password 
+Welcome to 
+School 
+Management 
+  
+=========== PAGE 17 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+17 
+System 
+version 2.0 
+ 
+Name of program: forgotpassword.php 
+TC-No Username Expected 
+message/output 
+Actual 
+message/output 
+Status(Passed/Failed) 
+TC1 blank “Please enter a 
+valid 
+username” 
+  
+TC2 blablapassword “Please enter a 
+valid 
+username” 
+  
+TC3 dhason0 – an 
+invalid 
+username 
+“Please enter a 
+valid 
+username” 
+  
+TC4 dhason – a 
+correct 
+username 
+“The system 
+sends the user a 
+link to enter 
+anew 
+password” 
+  
+     
+     
+     
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+=========== PAGE 18 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+18 
+       5.3.2. User Acceptance Testing 
+User Acceptance Testing 
+Tester demographic profile  
+Name xxxx 
+Age 40 
+Role in the system Parents 
+ 
+*The rating of the scale would be as below: 
+1: Strongly disagree. 
+2: Disagree. 
+3: Neutral 
+4: Agree. 
+5: Strongly agree. 
+ User interface criteria 1 2 3 4 5 
+I The design of the interface is decent and good looking.     / 
+II The animation between the webpage is smooth and 
+creative. 
+   /  
+III The colour scheme for the website is in decent looking 
+and smooth.  
+   /  
+IV The website is always clean and clear to be view.      / 
+ 
+ Functionality criteria Yes  No 
+I Website function without any error. /  
+II Users can reach their destinated pages without error. /  
+III Websites is function with using different platform.  /  
+ 
+Tester comment: 
+Test comments here 
+ 
+Tester’s Signature 
+ 
+Dewi 
+ 
+5.4 Summary  
+Provide chapter summary  
+ 
+Note: Minimum 3 testers which depends on the techniques used. 
+Table 5: Outline of Chapter 5 
+ 
+=========== PAGE 19 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+19 
+For CSDA Students 
+CHAPTER 5 
+RESULTS AND DISCUSSIONS 
+ 
+5.1 Introduction 
+Provide the chapter introduction, what you describe in Chapter 5.  
+ 
+5.2 Model Evaluations and Discussions 
+• Describe in detail  results of model evaluations, model comparisons (compare with 
+other similar works, model verifications in detail (can prepare the verification form). 
+      
+       5.2.1 Evaluation of Model ABC 
+       5.2.2 Evaluation of Model XYZ 
+       5.2.3 Evaluation of Model PQR 
+       5.2.4 Evaluation of Model… 
+ 
+5.3 Model Deployment  
+• Describe in detail results of model deployment , include screenshots of your model 
+deployment with detailed discussions, etc.  
+ 
+5.4 Summary 
+• Provide chapter summary. 
+ 
+Table 5: Outline of Chapter 5 (for CSDA students) 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+=========== PAGE 20 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+20 
+CHAPTER 6: CONCLUSION 
+ 
+This chapter summarizes the whole project undertaken by a student. It discusses results and 
+achievements of the project as well as suggestions and future works. Project strength, 
+weaknesses, and suggestions to improve must be stated clearly and concisely 
+ 
+CHAPTER 6 
+CONCLUSION 
+ 
+4.1 Critical Evaluation  
+• Discuss in detailed the achievement of the overall project achievement 
+• Justify in detailed  were the contributions of the project towards community/ 
+industries and others. 
+• Discuss in detailed the strengths of the project.  
+ 
+4.2 Limitation 
+• Discuss in detailed the limitations of the project. 
+ 
+4.3 Recommendation 
+• Discuss in detailed the suggestions for future improvement. 
+ 
+Table 6: Outline of Chapter 6 
+ 
+Note: Ensure to start each chapter on a new page. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+=========== PAGE 21 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+21 
+REFERENCES 
+ 
+References are detailed description of items from which information were obtained in 
+preparing the project report. Every data, information, quotation, figure, table, or anything taken 
+from another source must be cited in the report. Citation must be done within the report and in 
+the reference list at the end of the report. References shall come from sources such as journals, 
+articles, and books. References from internet (i.e., citations from websites) are not encouraged. 
+Student must you the APA style for the references (refer to Figure 1). 
+ 
+ 
+Figure 1: References Sample 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+=========== PAGE 22 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+22 
+APPENDICES 
+ 
+Appendices provide supporting materials that will strengthen the explanation and review of 
+the project. Following is the appendices’ structure that must be followed.: 
+ 
+• Appendix A: PPF – Title Registration Proposal 
+o Students need to include the screenshot of PPF submitted earlier during the 
+title registration inside the report (all pages).  
+ 
+ 
+Figure 2: PPF Sample 
+ 
+• Appendix B: Ethics Forms (Fast Track / Full Track) 
+o The ethics form submitted earlier in the Moodle for the use of acquiring 
+approval towards the data gathering design need to be included in the report.  
+ 
+
+=========== PAGE 23 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+23 
+ 
+Figure 3: Ethics Form – Fast Track Sample 
+ 
+• Appendix C: Log Sheets (6 log sheets) 
+o This logbook needs to be used by the student for the purpose in documenting 
+the meeting with the supervisor on regards of the project progress. 
+o It is the responsibility of the student that this logbook is kept up to date and that 
+the student complies with the Supervisor’s suggestions and recommendations 
+as noted by the student in the logbook and approved be signed by the Supervisor.   
+o Student MUST makes a regular meeting with a supervisor with a minimum 
+number of meetings are 3 meetings per semester, therefore for the FYP it will 
+be 6 meetings in total which include 3 meeting from the IR journey.  
+o This logbook must be submitted together with the report as well uploaded in the 
+required link inside the Moodle. Below is the example of the project log sheet.  
+ 
+
+=========== PAGE 24 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+24 
+ 
+Figure 4: Project Log Sheet Sample 
+ 
+ 
+• Appendix D: Poster  
+o Student should design a poster in demonstrating the project developed. The 
+size of the poster is A3 size and full colour.  
+ 
+Guidelines for Poster design 
+ 
+HEADER  
+• APU logo 
+• Title of the FYP project 
+• Student Name 
+• Student No. 
+• Programme 
+• Supervisor full name & Second Marker full name (include their title) 
+ 
+CONTENT IN POSTER  
+• It may include the following:  
+• Introduction 
+• Objective 
+• Problem statements 
+• Methodology 
+• App/ website/ game/model/ VR/AR features - screenshots 
+• Conclusion 
+ 
+Table 7: Outline of Poster Design 
+
+=========== PAGE 25 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+25 
+ 
+ 
+ 
+Figure 5: Poster Sample 
+ 
+ 
+• Appendix E: Gantt Chart 
+o Student should include the timeline of the semester in completing the project 
+part 1 (IR).  
+
+=========== PAGE 26 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+26 
+ 
+Figure 6: Gantt Chart Sample 
+ 
+• Appendix F: Sample Code Implementation 
+o Include sample code of the project development here. 
+ 
+ 
+Figure 7: Code Sample 
+
+=========== PAGE 27 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+27 
+ 
+• Appendix G: Respondence Demographic Profile  
+o This section provides information about the respondents (participants) who 
+participate in the data collection process, as well as all system testers or expert 
+verifications.  
+ 
+ 
+Participant Gender Age Occupation  
+Joanne Female 30 - 45 Admin  
+Simon Male 25 - 30 Unemployed 
+John Male 30 - 45 IT Executive 
+Jacqueline Female 45 - 54 Programmer 
+Maria Female 30 - 45 Housewife 
+Note: the name of the participant can be pseudonyms and not the actual name in protecting the 
+confidentiality 
+ 
+Table 8: Respondence Demographic Profile Example 
+ 
+ 
+ 
+Participant Gender Age Occupation  
+Katie Female 30 - 45 Admin  
+Barbara Male 25 - 30 Unemployed 
+Daniel Male 30 - 45 IT Executive 
+Jan V olta Female 45 - 54 Programmer 
+Andrew Female 30 - 45 Housewife 
+Note: the name of the participant can be pseudonyms and not the actual name in protecting the 
+confidentiality 
+ 
+Table 9: System Testers 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+=========== PAGE 28 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+28 
+• Appendix H: Turnitin Similarity Report 
+o  First two (2) pages of Turnitin report (ensure the maximum Turnitin similarity 
+20%) 
+ 
+ 
+ 
+
+=========== PAGE 29 ===========
+Asia Pacific University of Technology and Innovation 
+V1-AUGUST2023 
+ 
+29 
+ 
+ 

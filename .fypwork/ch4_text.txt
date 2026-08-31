@@ -1,0 +1,275 @@
+[Normal] Figure 29 presents the deployment and layering of the system. The browser tier holds the Angular application together with the routing, the authentication interceptor and the token store that manage the session on the client side. Communication with the server is exclusively over HTTPS using JSON, addressed to a single versioned API path, and every request carries the caller's access token in an Authorization header together with a correlation identifier used for log tracing. Cross-origin access is restricted to an explicit list of permitted origins rather than left open.
+
+[Normal] The application server is divided into three internal layers with a deliberate restriction on what each may do. The outermost layer holds the API blueprints, one per resource family, which parse and validate the request and format the response. Beneath it sits the domain layer, which contains the workflow state machine, the task and food-and-beverage services, the authorisation rules, the dashboard aggregations, the email templates and the soft-delete lifecycle. The innermost layer is the data access module, which owns the connection pool and the transaction helper, and which binds every value as a query parameter rather than interpolating it into a statement. The constraint annotated on the diagram is that a blueprint never issues SQL directly; a route that needs to change a request must go through the workflow service, which is where the audit record is written alongside the change.
+
+[Normal] A set of concerns is applied uniformly to every inbound request rather than being repeated per route. These include the cross-origin check, per-user rate limiting that falls back to the caller's address when no user is identified, the security headers, a structured log entry carrying the request identifier and timing, the single error envelope that returns a user-safe message while the internal detail is logged rather than disclosed, and a cap on request body size.
+
+[Normal] The assistant is shown as a parallel stack because it is not a route family in the ordinary sense. It holds its own classifier, topic access rules, scope rules, schema catalogue, generation step, guard and runner, and it reaches the database through the same data access layer as everything else, which is what prevents it from becoming a second and less careful path to the same records. The Gemini model and the SMTP relay are drawn with dashed borders to mark them as outside the system boundary; the model is reached with two credentials configured for automatic failover, and mail is dispatched only after a database transaction has committed.
+
+[Normal] The database is a managed PostgreSQL instance reached over a pooled connection. Its schema is applied by an ordered set of migration files rather than by manual changes, which means the database can be rebuilt from an empty state into a known configuration. This is the arrangement described and justified in Section 2.4.6 of this report, shown here in the detail that the design of the application depends on.
+
+[Heading 3] 4.2.3 Security and Identity Design
+
+[Caption] Figure 1: Identity model and the three authorisation tiers
+
+[Normal] Figure 30 presents the identity model on the left and the enforcement path on the right. The identity model is the design decision that most distinguishes this system from the systems reviewed in Chapter 2. A role is not held by a user globally; it is held by a user within an organisational unit, recorded as a row in a junction table that pairs a user, a role and a unit. The same person may therefore be a member of staff in one department and hold no standing at all in another, and a Head of Department carries authority only over the unit named on their own assignment. A small number of roles are deliberately unit-independent, such as the CFO, the System Admin, the Club Admin, the Cafeteria Admin and the external guest account, and these are stored with no unit attached. A supporting table records which roles are legal to pair with which units, so an administrator cannot create a nonsensical assignment such as a Head of School over a cafeteria.
+
+[Normal] The enforcement path shows what happens to every request that reaches the server. The access token is decoded and its type verified, so that a refresh token cannot be presented in place of an access token. The caller's roles are then loaded from the database rather than read from the claims inside the token. This is a deliberate cost: reading the roles on every request is more work than trusting the token, but it means that when an administrator revokes a role the revocation takes effect immediately rather than when the user's current token happens to expire.
+
+[Normal] Authorisation is then applied in three tiers, each answering a different question. The first tier is a coarse, role-shaped decorator on the route itself, which answers whether this kind of actor may call this endpoint at all; at this point no record has been loaded. The second tier is applied after the record is loaded and answers a question that only the record can settle, such as whether this caller is the named reviewer for this particular request at its current stage, or whether this caller owns the proposal they are trying to cancel. The third tier applies to list endpoints, where the caller's scope is added to the query as a filtering condition so that records outside their scope are never retrieved at all, rather than being retrieved and then hidden. The same scope rules are the ones applied to the assistant, which is why the assistant cannot be used to reach records the interface would refuse to show.
+
+[Normal] Two supporting behaviours complete the picture. Endpoints that serve both public and signed-in visitors use an optional authentication path, where the absence of a credential is treated as a guest and the public tier of the content is served, while a credential that is present but does not verify still returns an authentication failure so that the client can refresh its session and retry. Passwords are stored only as bcrypt hashes, and password reset is performed through a hashed, expiring token rather than by transmitting a password.
+
+[Heading 3] 4.2.4 Use Case Design
+
+[Normal] The capabilities of the system are documented across three use case diagrams rather than one. A single diagram covering twelve roles and the full functional surface of the platform would be dense to the point of being unreadable, and the three natural groupings in the system are sufficiently distinct to be modelled separately: the capabilities available for access, discovery and community participation; the capabilities that make up the event request, approval and fulfilment cycle; and the capabilities reserved for administration, configuration and oversight. Each diagram is presented with the system boundary drawn explicitly, so that what is inside the delivered platform and what is outside it remains unambiguous.
+
+[Caption] Figure 1: Use case diagram — access, events and community
+
+[Normal] Figure 31 models the capabilities available to visitors, self-registered external users, and the internal population of students, lecturers and staff. The three internal roles are drawn as specialisations of a generalisation parent because they share an identical capability set at this level; the differences between them appear later, in the request cycle and in the pages the navigation grants make available. A guest who has not signed in can browse and search published events, view the master calendar, register an account and ask the assistant, which reflects the deliberate decision recorded in Chapter 1 to give the platform a genuine public face rather than confining it entirely behind the login.
+
+[Normal] Account creation is modelled with an included verification step, because the design does not create a user record at the point the registration form is submitted. A verification code is issued and only a successfully verified attempt becomes an account, which prevents abandoned or automated registrations from accumulating as real users. Registering for an event carries an extension rather than an inclusion, because uploading payment proof applies only when the event actually carries a cost; the conditional nature of that step is what the extension notation is intended to express.
+
+[Normal] The community half of the diagram introduces two actors that are defined by circumstance rather than by an assigned role. An event organiser is the person whose approved event has been published, and it is that circumstance that gives them the ability to decide a registration and review payment proof. A club president is similarly the current president of a particular club, and it is that position that lets them decide join requests and request a change of president. Distinguishing these from the twelve assigned roles matters, because they are authorised by a relationship to a record rather than by an entry in the role table, and that is exactly the distinction the second authorisation tier described in Section 4.2.3 exists to enforce.
+
+[Caption] Figure 1: Use case diagram — request submission, review and fulfilment
+
+[Normal] Figure 32 models the core of the system: the creation, review and fulfilment of an event request. The applicant, who may be a student, a lecturer or a member of staff, can save a draft, submit it, cancel it, view its approval history, and resubmit it. Two distinct forms of resubmission are modelled because two genuinely different situations exist. A request sent back by one of the reviewer stages returns to the applicant as a whole; a request sent back by a single department returns only that department's section, and the other departments retain the progress they have already made.
+
+[Normal] The review group carries the most important asymmetry in the design, and it is annotated on the diagram so that it cannot be missed. Only the three single-actor reviewer stages, held by the Head of School or Head of Department, the Food and Beverage head, and the CFO, are able to reject a request outright and end it. A service department reviewing its own task can approve it or send it back for correction, and nothing more. This is a deliberate choice: a department is being asked whether it can deliver its own portion of the work, not whether the event should take place, and giving a single service department the power to cancel an event on behalf of the whole institution would misrepresent where the decision authority actually sits.
+
+[Normal] The fulfilment group divides the work between the Head of Department, who approves the department's task and decides who will carry it out, and the department staff, who perform it. Assignment is modelled at two levels because the system supports both: a task may be assigned as a whole, or, for the five requirement types that are itemised row by row, individual rows of the task may be assigned to different staff members. The cafeteria pathway is modelled separately because its shape genuinely differs; the manager reviews and approves the order and it then enters a pool visible to that outlet's staff, from which a staff member claims it, prepares it, marks it ready and records its delivery.
+
+[Caption] Figure 1: Use case diagram — administration, configuration and oversight
+
+[Normal] Figure 33 models administration, configuration and oversight. The System Admin holds the flat, unit-independent role that maintains the directory of users, organisational units and roles, assigns a role to a user within a unit, and controls which pages each role can reach. The deletion pathway is modelled with an included dependency check because deletion in this system is not immediate: a record is first checked for dependants, then archived and recoverable, and only later purged. The same three-step lifecycle applies uniformly across users, units, roles, navigation pages, clubs, cafeterias and every dropdown option list, which is why it appears once in the model rather than being repeated for each resource.
+
+[Normal] The configuration group shows a deliberate distribution of authority. Each Head of Department maintains the option list belonging to their own department and no other, so the Logistics head curates the logistics catalogue while the A/V head curates sound and light. The CFO owns the venue catalogue and the funding option lists, which is consistent with the CFO's role as the financial reviewer. The System Admin owns the institution-wide settings: the event categories and formats, and the numeric thresholds that govern approval routing and escalation. These thresholds are read at the moment they are used rather than compiled into the application, so a change takes effect on the next request.
+
+[Normal] The oversight group covers the role-scoped dashboards, which are available to every role that has operational responsibility and which present only the measures relevant to that role, together with the export of any panel for reporting. The AI access log and the assistant's schema refresh are reserved to the System Admin, which reflects the position taken in Section 4.2.3 that the assistant is a privileged component and its use must be reviewable.
+
+[Normal] Use case specification tables for five representative use cases are presented below.
+
+[Caption] Table 1: Use Case Specification — Submit an Event Request
+
+[Caption] Table 1: Use Case Specification — Review a Request at a Stage
+
+[Caption] Table 1: Use Case Specification — Assign Staff to a Department Task
+
+[Caption] Table 1: Use Case Specification — Register to Attend a Published Event
+
+[Caption] Table 1: Use Case Specification — Ask the AI Assistant
+
+[Heading 3] 4.2.5 Workflow Design (Activity Diagrams)
+
+[Normal] The behaviour of the system is documented across three activity diagrams, each owning one lifecycle. The first covers the request itself from creation to a terminal state, the second covers what happens inside a department once a request reaches it, and the third covers the attendance registration that follows publication. Splitting them in this way keeps each diagram legible and avoids restating the same routing rules in three places.
+
+[Caption] Figure 1: Activity diagram — event request lifecycle
+
+[Normal] Figure 34 models the full lifecycle of an event request across six swimlanes. A request begins as a draft owned by the applicant and enters the workflow on submission. The first decision the system makes is whether a Head of School or Head of Department review is meaningful at all: where the applicant is themselves the head of the unit the request would be routed to, or is the CFO or the Food and Beverage head, or holds no unit at all, no impartial reviewer exists and the stage is skipped rather than allowed to deadlock. This is a small piece of design that prevents a common institutional failure, in which a request waits indefinitely for an approval that can only be given by the person who raised it.
+
+[Normal] The request is then evaluated against the configured attendance threshold. Requests at or below the threshold pass directly to departmental review; requests above it are routed through the Food and Beverage head and then the CFO, which is where the financial oversight described in Chapter 1 is applied. The threshold itself is a configuration value rather than a constant, so the institution can raise or lower the point at which financial review becomes mandatory without a change to the system.
+
+[Normal] Three reviewer stages can each approve, reject or send back. A rejection is terminal and ends the request. A send-back returns the request to the applicant with a comment and records the stage it was sent back from, so that when the applicant corrects and resubmits, the request resumes at that stage rather than beginning the approval sequence again. This is the structured revision loop identified as a gap in Chapter 2, and the recorded resume point is what makes it work without discarding approvals already given.
+
+[Normal] Once the reviewer stages are satisfied, the request forks into one flow per selected requirement, and each department works its own task in parallel and independently. The join condition is that when every sibling task reaches a terminal state the parent request completes automatically; no further human action is required to close it. A separate path allows the applicant to request cancellation, which is permitted only while the event remains far enough away to satisfy the configured cancellation deadline. The annotation at the foot of the diagram records the invariant that every transition shown writes its history row inside the same transaction as the status change it represents.
+
+[Caption] Figure 1: Activity diagram — department task and cafeteria order fulfilment
+
+[Normal] Figure 35 models what happens inside a department once a task arrives, and it is presented in two bands because the ordinary department pathway and the cafeteria pathway genuinely differ. In the upper band, a task arrives pending, the Head of Department reviews it and either approves it or sends it back to the applicant with a comment. A department cannot reject a request outright, and the annotation states this explicitly; that capability belongs only to the three reviewer stages in the preceding diagram.
+
+[Normal] Where the requirement type is itemised, the head may assign staff to individual rows rather than to the task as a whole. Five of the seven routed requirement types permit this, and transportation is capped at a single assignee because a single vehicle movement cannot sensibly be shared. The task then moves to preparing while the assigned staff carry it out, and to completed when the work is done. Sibling tasks belonging to other departments continue throughout, including while this task is sitting with the applicant for correction.
+
+[Normal] In the lower band, a food and beverage requirement fans out into one order per cafeteria named in the request, and each cafeteria decides only its own order. A manager who sends an order back does not stall the other outlets, which is why the pushback comment is stored against the individual selection rather than against the request. An approved order enters a pool visible to that outlet's staff, and the claim is resolved by a database row lock so that when several staff open the same order at once exactly one succeeds and the others are told the order has already been taken. The order then moves through ready to fulfilled, with delivery evidence recorded against it.
+
+[Caption] Figure 1: Activity diagram — event publication and attendance registration
+
+[Normal] Figure 36 models what happens after a request completes and its event is published. A visitor may discover the event by browsing, searching or through the calendar, and may either save it for later or register to attend. Saving an event places it in the user's own list and enrols them in the reminder schedule, subject to the preferences they control themselves.
+
+[Normal] Registration is governed by two independent status columns, and the diagram shows why both are needed. The first records whether the person holds a place, and it depends on whether the event registers attendees automatically or requires the organiser to decide each request. The second records the state of payment, and it applies only where the event carries a cost, in which case the attendee uploads proof and the organiser approves or rejects it. A place is confirmed only when both conditions are satisfied. Keeping the two columns separate avoids conflating an organiser's decision about who may attend with a finance decision about whether payment has been received.
+
+[Normal] A registration that is cancelled frees the place, and the uniqueness rule that prevents duplicate registrations deliberately excludes cancelled rows, so a person who cancels is able to register for the same event again later. This is a small behaviour, but it is the kind of detail that determines whether a system feels usable in practice.
+
+[Heading 3] 4.2.6 Interaction Design (Sequence Diagrams)
+
+[Normal] The three sequence diagrams that follow document the ordering of messages between components for the interactions where ordering is itself part of the design. They are selected rather than exhaustive: authentication, because the session behaviour it defines applies to every other interaction in the system; the write path, because the ordering of the transaction and the notification is a deliberate design decision; and the assistant, because the order in which authorisation, generation and validation occur is what makes the feature safe.
+
+[Caption] Figure 1: Sequence diagram — registration, login and silent session recovery
+
+[Normal] Figure 37 documents three related interactions. In guest self-registration, the account does not exist at the moment the form is submitted. A verification challenge is stored with the code hashed, an attempt counter and an expiry, and the code is emailed. Only when the code is verified is a user record created. The annotation marks the exact message at which the account first exists, and the consequence is that an abandoned or automated registration attempt never becomes a real user.
+
+[Normal] In login, the submitted credentials are verified against the stored bcrypt hash and the caller receives two tokens: a short-lived access token and a longer-lived refresh token. The separation exists so that the credential presented on every request has a small exposure window, while the user is not forced to sign in again every half hour.
+
+[Normal] The third interaction is silent session recovery, and it is the reason the separation is worth the additional complexity. When an access token expires, the interceptor on the client receives the authentication failure, exchanges the refresh token for a new access token and replays the original request unchanged, so the user never sees the interruption. Only when the refresh token has itself expired are the stored tokens cleared and the user returned to the login page. This behaviour is important in a workflow system, where a reviewer may leave a long request open while reading it and would otherwise lose their work to a session timeout.
+
+[Caption] Figure 1: Sequence diagram — transactional write path and post-commit notification
+
+[Normal] Figure 38 documents the write path taken by every state-changing operation in the system, using the creation of a request as the example. The ordering shown is the design, not an implementation accident, and it has three distinct phases.
+
+[Normal] Validation happens before a transaction is opened. The caller is authenticated and their principal loaded, and the submitted form is validated; a payload that fails validation never reaches the database at all. Opening a transaction and then discovering the input was invalid would hold a connection and produce a rollback for a fault that could have been detected earlier.
+
+[Normal] The write itself takes place inside a single transaction covering the request row, the requirement child rows and the history entry. The annotation records the reason: because the audit row is written in the same transaction as the state change it describes, the two cannot disagree. Any exception at any point rolls the whole transaction back and nothing is persisted.
+
+[Normal] Notification is dispatched only after the transaction has committed, and the response to the client does not wait for the mail to be sent. The lower annotation gives the two reasons. Sending inside the transaction would email a reviewer about a request that a later exception then rolled back, so a reviewer could be notified about work that does not exist. Raising an exception on a mail failure would turn a healthy write into a server error, so an approval would appear to fail because the mail server was unavailable. The send therefore returns a result that is logged rather than raised.
+
+[Caption] Figure 1: Sequence diagram — AI assistant question-answering pipeline
+
+[Normal] Figure 39 documents the assistant's question-answering pipeline, and the order of its four phases is the whole of its security design. In the first phase the question, together with the recent conversation, is classified into a topic by the model itself rather than by pattern matching, which is what allows a bare follow-up question to be resolved against what was asked before it.
+
+[Normal] The second phase performs authorisation before anything is described to the model. The classified topic is checked against the topics this caller is permitted to ask about, and topics they may not reach are dropped. The caller's row-level scope is derived, and only the tables that scope permits are then described to the model. The annotation states the consequence plainly: because scope precedes schema, a table the caller may not read is never named to the model in the first place, and the model cannot generate a query against a structure it was never shown.
+
+[Normal] The third phase generates a query and then validates it, never the reverse. A repairable fault, such as an unknown column, a missing filter or a syntax error, is returned to the model with the exact reason appended so that the next attempt corrects a stated problem rather than guessing again, and this loop is bounded by a fixed attempt limit. An authorisation violation is treated entirely differently: it breaks out of the loop, is refused, and is written to the denial log without a retry. The annotation gives the reason, which is that re-asking a model that has just attempted to read another user's records is precisely the loop an attacker would want to drive.
+
+[Normal] The fourth phase executes only the statement the guard has already passed, and returns one of three distinct replies: an answer, an explicit statement that no rows matched, or an acknowledgement that the question cannot be answered. Distinguishing an empty result from an inability to answer matters, because presenting the two identically would allow a user to mistake a system limitation for a factual absence of records.
+
+[Heading 2] 4.3 Database Design
+
+[Normal] The database is the authoritative record of everything the system knows, and its design is therefore inseparable from the design of the workflow described in the previous section. The deployed schema contains sixty-eight tables joined by one hundred and eleven foreign key relationships, applied through an ordered sequence of migration files rather than by manual alteration, and hosted as a managed PostgreSQL instance. This section presents the entity relationship diagram of the schema as deployed, followed by a data dictionary describing the purpose of every table.
+
+[Heading 3] 4.3.1 Entity Relationship Diagram
+
+[Caption] Figure 1: Entity relationship diagram of the deployed database
+
+[Normal] Figure 40 presents the entity relationship diagram of the deployed database. It is generated directly from an introspection of the live schema rather than drawn by hand, which means it cannot disagree with the database that is actually running; a table added by a later migration appears in the diagram automatically rather than being forgotten. The tables are arranged into eight clusters that correspond to the functional areas of the system, and the same eight clusters organise the data dictionary that follows. Because the schema is large, the figure is presented as an overview of structure rather than as a readable listing of columns; it is embedded at full resolution and can be magnified in the electronic copy of this report, and the detail of every table is set out in the data dictionary in Section 4.3.2.
+
+[Normal] Three characteristics of the design are visible in the diagram and are worth stating explicitly. The first is that the request is a genuine aggregate rather than a single wide table. The core request row holds the information common to every event, while each requirement type the applicant selects has its own detail table with the columns that requirement actually needs, and the participant, schedule and agenda information is held in child tables that permit any number of rows. This avoids the alternative of a single table carrying dozens of mostly empty columns, and it means adding a new service requirement later is a matter of adding a table rather than altering an existing one.
+
+[Normal] The second is that the workflow and its evidence are modelled separately from the request. The task table records what each department was asked to do and where it has reached, the assignment tables record who is carrying it out, and the history table records every transition that has ever occurred. Because history is a table in its own right rather than a set of columns on the request, the full sequence of decisions survives even after the request reaches a terminal state.
+
+[Normal] The third is that the catalogue cluster is not incidental. Sixteen tables exist purely to hold the option lists offered on the request form, and every requirement detail row references the catalogue entry it was chosen from rather than storing free text. This is what makes the analytics in Chapter 4 possible at all: a report on the most requested logistics items is only meaningful if two people asking for the same item recorded it the same way.
+
+[Normal] Soft deletion is applied consistently across the schema. Records that participate in the deletion lifecycle carry an archive timestamp, so a deleted record is withdrawn from view but remains recoverable for a configured period before it is purged. This is a deliberate trade-off in favour of recoverability, on the reasoning that an administrator removing a unit or a user in a live institutional system is more likely to want that action reversible than immediate.
+
+[Heading 3] 4.3.2 Data Dictionary
+
+[Normal] The data dictionary below describes every table in the deployed schema, organised into the same eight clusters used in Figure 40. For each table the dictionary gives its purpose within the system and the columns that carry its identity and its principal relationships. Columns present purely for record keeping, such as creation timestamps and archive markers, are omitted from the key column list where they do not affect the meaning of the table.
+
+[Normal] The tables of the identity and access cluster are described below.
+
+[Caption] Table 1: Data Dictionary — Identity and Access
+
+[Normal] The tables of the navigation and page visibility cluster are described below.
+
+[Caption] Table 1: Data Dictionary — Navigation and Page Visibility
+
+[Normal] The tables of the request core cluster are described below.
+
+[Caption] Table 1: Data Dictionary — Request Core
+
+[Normal] The tables of the requirement detail cluster are described below.
+
+[Caption] Table 1: Data Dictionary — Requirement Detail
+
+[Normal] The tables of the workflow and assignment cluster are described below.
+
+[Caption] Table 1: Data Dictionary — Workflow and Assignment
+
+[Normal] The tables of the events and community cluster are described below.
+
+[Caption] Table 1: Data Dictionary — Events and Community
+
+[Normal] The tables of the catalogue and dropdown options cluster are described below.
+
+[Caption] Table 1: Data Dictionary — Catalogue and Dropdown Options
+
+[Normal] The tables of the platform and audit cluster are described below.
+
+[Caption] Table 1: Data Dictionary — Platform and Audit
+
+[Heading 2] 4.4 Interface Design
+
+[Normal] The interface design translates the structural decisions of the preceding sections into something a user can operate. Its central problem is stated by the role model itself: twelve roles, held per organisational unit, cannot be served by twelve separate applications, and neither can they be served by one interface that shows everybody everything. The approach taken is a single application shell whose contents are assembled per user from the access grants the server issues, supported by a shared component library and a token-based visual system that keep the result coherent no matter which combination of pages a given user sees.
+
+[Heading 3] 4.4.1 System Navigation Site Map
+
+[Caption] Figure 1: System navigation site map
+
+[Normal] Figure 41 presents the navigation structure of the system. The public tier, drawn with dashed borders, is reachable with no credential at all and comprises the landing page, event browsing and detail, login, registration, password reset and the assistant. Everything below the authenticated boundary is organised into eight top-level areas, each of which is either a single page or a folder that gates the pages beneath it.
+
+[Normal] The role tokens on each entry record which roles reach it, and they show the design working in practice. The Inbox is a single page carrying tabs that differ by role, so a Head of Department, a student and a cafeteria manager all open the same route and are presented with the queues that concern them, rather than each having a separate inbox page to maintain. The Ongoing and History areas repeat the same tabbed shape, which keeps the mental model consistent as a user moves between what is in progress and what is finished.
+
+[Normal] The two annotations at the foot of the figure record the mechanism and give evidence that it is genuine rather than cosmetic. Nothing in the structure is hard-coded in the client: each entry is a row in the page catalogue, and it appears for a caller only if one of its grants matches, either by role or by a role within a specific unit. A folder carries grants of its own that gate all of its children as a group. Two grants demonstrate that the mechanism is real: the Logistics head sees only the Logistics option list and not Sound and Light, because each catalogue is granted to the department that owns it, and a Cafeteria Manager holds Inbox, Ongoing and History but not Drafts or Forms, because they review food orders and never submit requests. That second distinction is the same one the workflow itself enforces, expressed here as navigation.
+
+[Heading 3] 4.4.2 Screen Layout Anatomy
+
+[Caption] Figure 1: Screen layout anatomy on desktop and mobile
+
+[Normal] Figure 42 presents the anatomy of an internal screen at both viewports. On the desktop the layout is a persistent left sidebar carrying the role-filtered page menu, a top bar carrying the breadcrumb trail, a workspace holding the active page, and a persistent assistant launcher anchored to the lower right. The sidebar can be pinned or collapsed, which allows a user working on a wide data table to reclaim the horizontal space without losing their place in the navigation.
+
+[Normal] On the mobile viewport the same four elements are present but rearranged. The sidebar becomes a drawer opened from a compact top bar, the workspace stacks into a single column, and the assistant launcher remains anchored in the same position. Keeping the launcher in a constant position across both viewports is deliberate: it is the one control that is available on every page in the system, and a control that moves depending on the device is a control users stop looking for.
+
+[Normal] The breadcrumb trail is more than decoration in a system with this many pages. Because the sidebar contents differ per role, a user cannot rely on a shared mental map of the application learned from a colleague; the breadcrumb gives every screen an unambiguous position within the structure regardless of which subset of that structure the user can see.
+
+[Heading 3] 4.4.3 Role-Based Menu Design
+
+[Caption] Figure 1: Role-based menu design across four roles
+
+[Normal] Figure 43 places four sidebars side by side, captured from a Student, a Head of Department, the CFO and the System Admin. The differences between them are not styling variations of one menu; they are four different menus, each assembled at run time from the grants the server issued for that signed-in role.
+
+[Normal] The comparison makes the access model visible. The Student opens on How It Works and holds Forms and Clubs but no Dashboard, because a student raises requests and joins clubs but has no operational figures to review. The Head of Department opens on the Dashboard and holds Forms and the Dropdown Settings for their own department. The CFO holds the Dashboard and Dropdown Settings but not Forms, because the CFO reviews requests and owns the venue and funding catalogues but does not submit event requests. The System Admin holds neither Dashboard nor Forms, and instead holds the Internal Directory and System Configuration together with the maintenance actions for purging deleted records and dispatching reminders.
+
+[Normal] The practical consequence of assembling the menu this way is that adding a page, renaming it, reordering it or granting it to a different role is an administrative action taken in the running system rather than a development task. The sidebar is data, not code, which is what allows the access model described in Section 4.2.3 to be adjusted as university procedure changes.
+
+[Heading 3] 4.4.4 Design System Tokens
+
+[Caption] Figure 1: Design system tokens read from the running application
+
+[Normal] Figure 44 presents the design tokens read from the running application's computed styles. These are the custom properties every component consumes, and they are the mechanism by which visual consistency is maintained across an interface that is assembled differently for each user.
+
+[Normal] The colour set is organised by purpose rather than by appearance. The institutional blues and navies establish the identity, a small set of semantic colours carries meaning that must never vary by context, and a separate visualisation palette supplies sequential ramps, divergent pairs and categorical slots for the dashboard charts. Separating the visualisation palette from the interface palette prevents a common failure in which a chart series accidentally adopts the same colour the interface uses for an error, and a reader misreads a neutral data point as a warning.
+
+[Normal] Typography and spacing are expressed as scales rather than as fixed values. The type scale is defined with fluid clamping so that a heading has a minimum size, a preferred size proportional to the viewport, and a maximum size, which allows the same page to remain readable from a phone to a wide monitor without a separate set of mobile type rules. Spacing and radius are defined as a small numbered scale, so that a developer adding a new panel chooses a step on an existing scale rather than inventing a new measurement, and the result stays visually aligned with everything already built.
+
+[Heading 3] 4.4.5 Shared Component Library
+
+[Normal] The shared component library is a private development reference route within the application itself, listing twenty-nine reusable components and global classes with their selector, purpose, available states and responsive behaviour. It is shown across six figures because the catalogue is longer than one screen. Presenting it as a live route rather than as a static specification document has a practical advantage: the catalogue renders the real components, so it cannot fall out of step with what the application actually does.
+
+[Caption] Figure 1: Shared component library (part 1 of 6)
+
+[Caption] Figure 1: Shared component library (part 2 of 6)
+
+[Caption] Figure 1: Shared component library (part 3 of 6)
+
+[Caption] Figure 1: Shared component library (part 4 of 6)
+
+[Caption] Figure 1: Shared component library (part 5 of 6)
+
+[Caption] Figure 1: Shared component library (part 6 of 6)
+
+[Normal] Each entry documents four things. The selector and class name identify the component, a short description states what it is for, the state list enumerates the conditions it must handle, and a note records how it behaves on a narrow viewport. The state lists are the most valuable part of the catalogue, because they force the empty, loading, invalid and disabled conditions to be designed rather than discovered. A form field, for example, is documented with default, filled, hover, focus, read-only, disabled and invalid states, and a validation message is documented with hidden, required, invalid and focused-field states.
+
+[Normal] The catalogue also covers behaviour that is not strictly visual. The role navigation entry documents the single configuration that feeds both the desktop sidebar and the mobile drawer and is also consulted by the route guards, which is what keeps the menu a user sees and the routes they may open from ever disagreeing. The authentication state entry documents the persisted session shared by every layout in the application. Recording these alongside the visual components is deliberate, because they are shared in exactly the same way and are subject to exactly the same risk of being reimplemented inconsistently.
+
+[Heading 3] 4.4.6 Storyboards
+
+[Normal] Three storyboards document the principal user journeys through the system as a sequence of real screens rather than as an abstract flow. They are drawn from the running application, so each panel is a screen a user actually encounters in the order they encounter it.
+
+[Caption] Figure 1: Storyboard — event proposal lifecycle
+
+[Normal] Figure 51 follows an event request from creation to tracking in six steps. The applicant completes the form, which is presented as a six-step wizard rather than a single long page; selects the service requirements needed, which is the step that determines which departments the request will later be routed to; and reviews a live summary before submitting. The reviewer then opens the request and is presented with the event summary alongside a workflow actions panel offering approve, resubmit and reject. Departments act on the tasks that have been created for them, and the applicant tracks the outcome from a page listing the events they have raised.
+
+[Normal] The storyboard makes one design decision particularly visible. The requirement selection step comes third, before the detailed request information, and only the requirements selected there appear in the following step. An applicant who needs only logistics is therefore never shown the transport, photography, sound and campus tour sections at all. This keeps a form that must cover seven service departments from presenting every applicant with the union of all of them.
+
+[Caption] Figure 1: Storyboard — event registration lifecycle
+
+[Normal] Figure 52 follows a visitor from discovering a published event to holding a confirmed place. The visitor browses the public event listing, opens the event detail, and creates a guest account if they do not already hold one. The registration then waits in the pending queue where the event is set to manual approval, the organiser reviews it, and the confirmed registration appears in the visitor's own event list together with the reminder preferences they control.
+
+[Normal] The account creation panel shows the design decision that makes the public tier usable. A visitor is not asked to create an account in order to browse; the account is requested at the point it becomes necessary, which is when they want the system to remember something on their behalf. Deferring registration to the moment of genuine need is what allows the platform to serve as a public event portal rather than only as an internal tool with a login page.
+
+[Caption] Figure 1: Storyboard — club joining lifecycle
+
+[Normal] Figure 53 follows a student from discovering a club to appearing on its roster, in four steps. The student browses the club directory, filtered by category, and sends a request to join with a stated reason. The request lands in the president's inbox alongside the reasons given by other applicants, which allows the president to decide the queue as a set rather than one message at a time. Once approved, the member appears on the club roster and the club appears under the student's own club list with their role shown.
+
+[Normal] The reason field carries more weight than its size suggests. Without it a president receives a list of names and no basis on which to decide, which in practice means every request is approved or none are. Collecting a short statement of intent at the point of request is what turns the decision into a real one, and it is the same reasoning that places a reason for attending on the event registration.
+
+[Heading 3] 4.4.7 Responsive Breakpoint Strategy
+
+[Caption] Figure 1: Responsive breakpoint strategy at three viewport widths
+
+[Normal] Figure 54 presents one page rendered at three widths: a desktop viewport, a tablet viewport at the breakpoint itself, and a phone viewport. The strategy is a single breakpoint below which the sidebar collapses into a drawer and the content reflows from a multi-column grid into a single stacked column.
+
+[Normal] Choosing one breakpoint rather than several is a deliberate simplification. A system with as many pages as this one cannot realistically be verified at four or five separate widths for every screen, and a responsive design that is only partly tested is worse than a simpler one that holds everywhere. The single-column phone layout also preserves the reading order of the desktop layout, so the summary figures appear before the detail panels at every width, and a user moving between devices encounters the same information in the same sequence.
+
+[Normal] The comparison also shows what is deliberately not changed. The page title, the period selector, the summary figures and the panels are all present at every width; nothing is hidden on the phone. This matters for the accessibility objective stated in Chapter 1, because a coordination platform whose mobile version omits functionality would fail precisely the users it is most intended to help, namely staff who are away from a desk while an event is being prepared.
+
+[Heading 1] REFERENCE:

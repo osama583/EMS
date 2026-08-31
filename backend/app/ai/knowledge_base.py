@@ -36,108 +36,64 @@ that silently drops a second role's real capabilities.
 """
 from __future__ import annotations
 
+from . import scope
+from .scope import (  # noqa: F401 - re-exported: defined in scope.py, imported from here
+    HOW_TO_GUIDES,
+    HOW_TO_LABEL,
+    HOW_TO_PAGES,
+)
 from ..services import identity
 
 # --- system_capability: what the platform itself does, independent of caller --
+#
+# WHO IT IS FOR is deliberately part of the text. The old version described four internal areas and
+# never mentioned that most of the app is reachable only by a university account - so a visitor
+# reading "you can join clubs and submit proposals" was being described somebody else's app.
 
-SYSTEM_CAPABILITY = """This platform (APU Events) has four areas:
+SYSTEM_CAPABILITY = """This platform (APU Events) serves two kinds of user, and the difference
+decides what any given person sees:
+  VISITORS (not signed in, or signed in with a self-registered visitor account) use the public
+  landing page: Happening Soon, Explore Events and the Event Calendar, all showing published
+  Public events, plus each event's details dialog with its Register button. A signed-in visitor
+  also has My Events, holding the events they saved and registered for. Visitors have no access to
+  clubs, proposals, or any internal university page - by design, not by permission.
+  UNIVERSITY ACCOUNTS (students, lecturers, staff, heads, admins) additionally reach the internal
+  app, and which parts depends on the role each account holds.
+The internal app has four areas:
 1. EVENTS - browse/search published events (Explore Events), see event details, save events,
-   register to attend (guests can register too, no account needed for a Public event).
+   register to attend, and the university-wide Event Calendar.
 2. PROPOSALS - internal staff/students/lecturers submit a proposal to run an event; it is
    reviewed through a workflow (Head of School/Department, then F&B and/or CFO for high-pax or
    paid events, then the departments providing logistics/transport/sound/photography/campus
    tours/catering), and becomes a published event once fully approved.
 3. CLUBS - students and lecturers can discover clubs, join them, and (students only) become a
    club President; a President reviews join requests for their own club and can hand the role
-   to another student via a president-change request, decided by a Club Admin.
+   to another student via a president-change request, decided by a Club Admin. A Club Admin
+   creates and administers the clubs themselves.
 4. CAFETERIAS - each cafeteria has a menu, staff, and an order queue for catering requests tied
    to approved events; a Cafeteria Admin runs the whole cafeteria system, a Cafeteria Manager
    runs one outlet, and Cafeteria Staff fulfil that outlet's orders.
-Every account also has "My Requests" (Ongoing/History/Drafts) to track their own proposals, and
-an Inbox for whatever currently needs their action (a reviewer's pending decision, a manual-
-approval registration awaiting the organiser, etc.)."""
+Every university account also has "My Requests" (Ongoing/History/Drafts) to track its own
+proposals, and an Inbox for whatever currently needs its action."""
 
 
-# --- how_to_guides: step-by-step procedures, independent of caller -------------
-
-HOW_TO_GUIDES: dict[str, str] = {
-    "submit_proposal": (
-        "How to submit an event proposal: open Forms > Proposal, fill in the event details "
-        "(title, description, schedule, expected attendance, visibility) and choose which "
-        "department services you need (logistics, transport, sound/light, photography, campus "
-        "tour, catering). Submitting routes it to your Head of School/Department first; large "
-        "(high-pax) or paid events also go through F&B and/or the CFO before reaching the "
-        "departments providing the services you asked for. You can track it under My Requests > "
-        "Ongoing, and it lands in History once approved, rejected, or cancelled. If a reviewer "
-        "sends it back for changes, it appears in your Inbox for you to resubmit."
-    ),
-    "join_club": (
-        "How to join a club: open Clubs > Discover Clubs, find one you're interested in, and "
-        "submit a join request. The club's President reviews it and approves or rejects it - "
-        "you can see the outcome under Clubs > My Clubs. Only students and lecturers can join "
-        "clubs; only a student who is already a member can be promoted to President."
-    ),
-    "become_president": (
-        "How to become a club President: presidency is student-only, and is not something you "
-        "apply for directly. A Club Admin assigns the first President when a club is created, "
-        "or a sitting President can request to hand the role to another eligible student member "
-        "via a president-change request - a Club Admin then approves or rejects that request."
-    ),
-    "register_event": (
-        "How to register for an event: open Explore Events, pick an event, and register from its "
-        "details. If the event's registration is Automatic, you're confirmed immediately; if it's "
-        "Manual approval, your request goes to the event's organiser and you'll see the outcome "
-        "under My Events. Guests can register for Public events without an account."
-    ),
-    "review_proposal": (
-        "How to review a proposal you're responsible for: it appears in your Inbox once it "
-        "reaches your stage (Head of School/Department, F&B, CFO, or your department's task "
-        "queue). Open it to approve, reject, or send it back to the applicant with a comment "
-        "explaining what needs to change."
-    ),
-    "resubmit_proposal": (
-        "How to resubmit a proposal sent back for changes: it shows up in your Inbox with the "
-        "reviewer's comment explaining what to fix. Open it, make the changes, and resubmit - it "
-        "resumes the workflow from where it left off, it does not restart from the beginning."
-    ),
-    "cancel_proposal": (
-        "How to cancel a proposal or published event: open it from My Requests (Ongoing) or your "
-        "organiser view and choose Cancel. This is only available up to a configured number of "
-        "days before the event date, and cancels any in-progress department tasks/cafeteria "
-        "orders tied to it too."
-    ),
-}
-
-
-# The PAGE each how-to's action actually happens on - the machine-readable half of the prose above
-# ("open Forms > Proposal" -> "proposal-form"), and the thing that makes a how-to answer subject to
-# Page Visibility like every other answer.
-HOW_TO_PAGES: dict[str, tuple[str, ...]] = {
-    "submit_proposal": ("proposal-form",),
-    "join_club": ("clubs-discover",),
-    "become_president": ("clubs-my",),
-    "register_event": ("explore-events",),
-    "review_proposal": ("inbox",),
-    "resubmit_proposal": ("inbox",),
-    "cancel_proposal": ("ongoing",),
-}
-
-# How a guide is NAMED in a refusal message and in the ai_access_denial row - "you cannot reach the
-# page where submitting an event proposal happens" reads as an explanation; the raw key does not.
-HOW_TO_LABEL: dict[str, str] = {
-    "submit_proposal": "submitting an event proposal",
-    "join_club": "joining a club",
-    "become_president": "becoming a club President",
-    "register_event": "registering for an event",
-    "review_proposal": "reviewing a proposal",
-    "resubmit_proposal": "resubmitting a proposal",
-    "cancel_proposal": "cancelling a proposal or event",
-}
+# --- how_to_guides: step-by-step procedures, and where each action happens -----
+#
+# DEFINED IN ai/scope.py, alongside the areas that release them, and re-exported here because this
+# module has been their import site for a long time. They moved because a guide and the topic it
+# belongs to were being maintained in two files that could disagree - and did: `save_event` had no
+# guide at all, so "how do I save an event" resolved nothing and api/ai.py answered it from the
+# system overview instead, handing an account with no event access a working procedure.
 
 
 # --- self_capability: per-role facts, unioned per caller -----------------------
 
-# One entry per role_code: (capability text, backing page_code).
+# One entry per role_code: (capability text, the scope.py AREA that backs it).
+#
+# AREA, not page_code, since 2026-09-01. Every line used to name a nav page, which silently made
+# "what can I do here" answerable only for accounts that hold nav pages - i.e. not for the two
+# tiers (guest and external) that hold none. An Area covers the public landing sections and the
+# visitor's own My Events as well, so a capability can be stated, and checked, for every tier.
 _ROLE_CAPABILITIES: dict[str, list[tuple[str, str]]] = {
     "student": [
         ("submit an event proposal", "proposal-form"),
@@ -151,7 +107,8 @@ _ROLE_CAPABILITIES: dict[str, list[tuple[str, str]]] = {
         ("browse and register for published events", "explore-events"),
         ("see the events you saved, registered for, or are awaiting approval on (My Events)",
          "my-events"),
-        ("see the events you created", "created-by-me"),
+        ("see who has registered for the events you organise, and decide the registrations "
+         "that need manual approval", "proposal-form"),
     ],
     "lecturer": [
         ("submit an event proposal", "proposal-form"),
@@ -161,7 +118,8 @@ _ROLE_CAPABILITIES: dict[str, list[tuple[str, str]]] = {
         ("browse and register for published events", "explore-events"),
         ("see the events you saved, registered for, or are awaiting approval on (My Events)",
          "my-events"),
-        ("see the events you created", "created-by-me"),
+        ("see who has registered for the events you organise, and decide the registrations "
+         "that need manual approval", "proposal-form"),
         ("read the How It Works guide", "how-it-works"),
     ],
     "staff": [
@@ -182,7 +140,8 @@ _ROLE_CAPABILITIES: dict[str, list[tuple[str, str]]] = {
         ("browse and register for published events", "explore-events"),
         ("see the events you saved, registered for, or are awaiting approval on (My Events)",
          "my-events"),
-        ("see the events you created", "created-by-me"),
+        ("see who has registered for the events you organise, and decide the registrations "
+         "that need manual approval", "proposal-form"),
     ],
     "head-of-department": [
         ("submit an event proposal", "proposal-form"),
@@ -196,7 +155,8 @@ _ROLE_CAPABILITIES: dict[str, list[tuple[str, str]]] = {
         ("browse and register for published events", "explore-events"),
         ("see the events you saved, registered for, or are awaiting approval on (My Events)",
          "my-events"),
-        ("see the events you created", "created-by-me"),
+        ("see who has registered for the events you organise, and decide the registrations "
+         "that need manual approval", "proposal-form"),
     ],
     "cfo": [
         ("review and decide high-pax or paid proposals at the CFO stage, from your Inbox",
@@ -245,10 +205,21 @@ _ROLE_CAPABILITIES: dict[str, list[tuple[str, str]]] = {
         ("approve or reject president-change requests, from your Inbox", "inbox"),
         ("look back at decided club requests (History)", "history"),
     ],
+    # A self-registered visitor account. It holds NO nav pages, which is correct and permanent -
+    # external accounts never enter the /app shell (fyp-ui's externalUserGuard) - and used to leave
+    # this list empty, so the assistant told a working external account that it "doesn't have any
+    # assigned roles" and sent it to an administrator. Its capabilities are real; they just live on
+    # the visitor surface, which is why these lines name scope.py Areas rather than nav pages.
     "external-user": [
-        # External accounts hold no nav grants at all (verified against the live grant table), so
-        # there is no page-backed capability to list. self_capability_document() falls back to its
-        # "no capabilities" message for them rather than asserting anything.
+        ("browse the published events on the landing page - Happening Soon, Explore Events and "
+         "the Event Calendar", "public-explore-events"),
+        ("open any published event to see its full details, schedule and venue",
+         "public-event-details"),
+        ("register for a published event, uploading proof of payment when it charges a fee",
+         "public-event-details"),
+        ("save events you are interested in, and see them under My Events", "public-my-events"),
+        ("track your registrations - pending, confirmed and past - and cancel one",
+         "public-my-events"),
     ],
 }
 
@@ -266,34 +237,29 @@ _ROLE_LABEL: dict[str, str] = {
 }
 
 
-def self_capability_document(assignments: tuple[tuple[str, str | None], ...]) -> str:
+def self_capability_document(principal) -> str:
     """Assembles ONE caller's real capabilities from every role they actually hold - never a
-    single role's answer for a multi-role account. `assignments` is Principal.assignments
-    verbatim ((role_code, unit_code) pairs, exactly as held - unit-scoping doesn't change WHICH
-    capabilities apply, but is needed here to run the live has_page_access() check below).
+    single role's answer for a multi-role account.
 
-    EVERY capability is checked LIVE against nav_page_grants (via identity.has_page_access) before
-    being included - there are no ungated lines any more. That check also enforces folder gating, so
-    a capability whose page sits inside a folder the caller cannot see is correctly dropped even
-    though the page's own grant would pass.
+    EVERY capability is checked LIVE (scope.can_reach) before being included, so there are no
+    ungated lines: a Page Visibility edit is reflected in the very next answer rather than at the
+    next deploy, and the check enforces folder gating too, so a capability whose page sits inside a
+    folder the caller cannot see is correctly dropped even though the page's own grant would pass.
 
-    Returns a "no capabilities" message when nothing survives the check, rather than a header
-    followed by an empty list - a role whose every page has been revoked genuinely has nothing to
-    state, and printing the promise without the content reads as though the answer was truncated."""
-    if not assignments:
-        return (
-            "The asker is a GUEST - not signed in, holds no account in this system at all. This is "
-            "the ordinary, expected state for a visitor, not a broken or misconfigured account: say "
-            "plainly that they're not signed in, and never suggest contacting an administrator or "
-            "imply anything is wrong with an account - they don't have one to be wrong. If sign-up/"
-            "sign-in is something you can point them to, do that instead."
-        )
+    A GUEST gets the visitor capability list rather than a bare "you are not signed in". Being
+    signed out is not the absence of capabilities - a guest can browse every published event and
+    register for a Public one - and answering "what can I do here" with only what they cannot do is
+    how a visitor was told their perfectly ordinary session was a problem to report.
+    """
+    if principal is None:
+        return _guest_capability_document()
+    assignments = principal.assignments or ()
     role_codes = [role_code for role_code, _ in assignments]
     known = [r for r in dict.fromkeys(role_codes) if r in _ROLE_CAPABILITIES]
     granted: list[str] = []
     for role in known:
-        for capability, page_code in _ROLE_CAPABILITIES[role]:
-            if identity.has_page_access(assignments, page_code):
+        for capability, area_code in _ROLE_CAPABILITIES[role]:
+            if scope.can_reach(principal, area_code):
                 granted.append(f"- As {_ROLE_LABEL[role]}: {capability}")
     if not granted:
         return (
@@ -303,11 +269,49 @@ def self_capability_document(assignments: tuple[tuple[str, str | None], ...]) ->
         )
     header = (
         "This asker's roles and what each one lets them do. This list is computed from their LIVE "
-        "page access and is COMPLETE - state only what is listed, and never add, generalise, or "
-        "imply any other capability (anything missing is something they genuinely cannot do). A "
+        "access and is COMPLETE - state only what is listed, and never add, generalise, or imply "
+        "any other capability (anything missing is something they genuinely cannot do). A "
         "multi-role account holds the UNION of every line below, all at once:"
     )
     return "\n".join([header, *granted])
+
+
+def _guest_capability_document() -> str:
+    """What a signed-out visitor can actually do, listed rather than described as an absence.
+
+    Built from the same Area table every other answer reads, so it cannot offer a section that is
+    not on the landing page, and cannot miss one that is."""
+    lines = [f"- {area.label}: {area.purpose}" for area in scope.AREAS.values()
+             if area.reach == scope.VISITOR]
+    return "\n".join([
+        "The asker is a GUEST - not signed in, and holding no account in this system. That is the "
+        "ordinary, expected state for a visitor, NOT a broken or misconfigured account: never "
+        "suggest contacting an administrator and never imply anything is wrong, because they have "
+        "no account for anything to be wrong with.",
+        "What they can do right now, without signing in - this list is complete:",
+        *lines,
+        "- Register for a published Public event, straight from that event's details, with no "
+        "account needed.",
+        "Signing in or creating an account additionally lets them save events and keep track of "
+        "their registrations under My Events. They have no access to clubs, proposals, or any "
+        "internal university page, and no personal data of any kind exists for them here.",
+    ])
+
+
+def _role_reaches(role_code: str, area_code: str) -> bool:
+    """Can a role, in the abstract, reach an Area? The role-level counterpart of scope.can_reach,
+    which needs a specific principal.
+
+    An internal page is answered by the grant table (any grant naming this role, in any unit - this
+    is an overview of what the role is designed to reach, not one account's unit-scoped reality).
+    The visitor areas belong to whoever is NOT in the internal shell, which among real roles is
+    external-user alone: publicLandingGuard redirects every other role away from them."""
+    area = scope.AREAS.get(area_code)
+    if area is None:
+        return False
+    if area.reach == scope.PAGE:
+        return identity.role_has_page_grant(role_code, area_code)
+    return role_code == "external-user"
 
 
 def resolve_role_name(text: str) -> str | None:
@@ -344,8 +348,8 @@ def role_capability_document(role_code: str) -> str:
         return f"'{role_code}' is not a recognised role in this app."
     granted = [
         f"- {capability}"
-        for capability, page_code in _ROLE_CAPABILITIES[role_code]
-        if identity.role_has_page_grant(role_code, page_code)
+        for capability, area_code in _ROLE_CAPABILITIES[role_code]
+        if _role_reaches(role_code, area_code)
     ]
     if not granted:
         return (

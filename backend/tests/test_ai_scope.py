@@ -55,12 +55,13 @@ def _representative_unit(role_code: str) -> str | None:
 
 
 class _FakePrincipal:
-    """Minimal stand-in - topic_access and scope_rules only read .assignments, .user_id and
-    .has_role() off a principal."""
+    """Minimal stand-in - topic_access, scope and scope_rules read .assignments, .user_id,
+    .is_external and .has_role() off a principal."""
 
-    def __init__(self, assignments, user_id: int = 1):
+    def __init__(self, assignments, user_id: int = 1, *, is_external: bool = False):
         self.assignments = assignments
         self.user_id = user_id
+        self.is_external = is_external
         self.full_name = "Test Caller"
         self.email = "test@example.com"
 
@@ -140,9 +141,12 @@ def test_guest_gets_only_the_public_how_to():
     assert topic_access.how_to_allowed(None, "submit_proposal") is False
 
 
-def test_unknown_guide_is_not_refused():
-    """An unmapped key is a coding gap (caught above), not a reason to refuse a real caller."""
-    assert topic_access.how_to_allowed(None, "no_such_guide") is True
+def test_unknown_guide_is_refused():
+    """An unmapped key USED to be allowed, on the reasoning that a coding gap should not withhold a
+    real answer. It withheld nothing - api/ai.py answered from the whole platform overview instead,
+    and an external account that had just been refused every topic was handed working steps for
+    saving an event. A guide nobody has written has no steps to give."""
+    assert topic_access.how_to_allowed(None, "no_such_guide") is False
 
 
 # --- the removed scope stays removed --------------------------------------------------------------
@@ -986,7 +990,11 @@ def test_no_refusal_document_invites_a_rephrasing():
     documents = (
         ai_api._SQL_FAILED_DOCUMENT,
         ai_api._NO_ACCESS_DOCUMENT,
-        ai_api._OUT_OF_SCOPE_DOCUMENT,
+        # Now built per tier, so all three are checked - a guest, a visitor account and an
+        # internal one each get their own wording.
+        topic_access.out_of_scope_document(None),
+        topic_access.out_of_scope_document(_FakePrincipal((("external-user", None),), is_external=True)),
+        topic_access.out_of_scope_document(_FakePrincipal((("student", _representative_unit("student")),))),
     )
     for document in documents:
         lowered = document.lower()

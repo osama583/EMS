@@ -1,0 +1,276 @@
+1479 P [Heading 1] img=0 CHAPTER 5: RESULTS AND DISCUSSIONS
+1480 P [Body Text] img=0 Introduction
+1481 P [Body Text] img=0 This chapter presents the evaluation and testing of the SafeEats allergen detection system to determine its functional correctness, technical performance, and user-oriented effectiveness. The purpose of this chapter is to assess whether the implemented system meets the project objectives by examining the reliability of the allergen detection pipeline, the accuracy of extracted information, and the
+1482 P [Body Text] img=0 
+1483 P [Body Text] img=0 Chapter 5 documents the systematic testing procedures applied throughout development, including functional testing, validation of core modules, and user acceptance testing. The chapter further analyses the outcomes of these tests, discussing how the system performs in terms of detection accuracy, response behaviour, explainability of results, and overall safety support. Identified strengths, limit
+1484 P [Body Text] img=0 
+1485 P [Body Text] img=0 Through structured test cases, result interpretation, and discussion of findings, this chapter demonstrates how SafeEats satisfies its intended role as a real-time, AI-based allergen detection solution and establishes the foundation for the conclusions and future improvements presented in the subsequent chapter.
+1486 P [Body Text] img=0 
+1487 P [Body Text] img=0 Test Plan
+1488 P [Body Text] img=0 This section outlines the structured testing plan adopted to evaluate the SafeEats system. The test plan defines the testing scope, testing levels, test objectives, and validation approach used to ensure the system meets its functional, technical, and user-oriented requirements. Testing was conducted across multiple levels, including unit testing, functional integration testing, and user acceptanc
+1489 P [Body Text] img=0 
+1490 P [Body Text] img=0 The primary objectives of the test plan were to validate the correctness of core modules, ensure accurate allergen detection outcomes, verify system stability under real usage conditions, and assess whether the implemented features align with the project objectives. Test cases were designed based on system requirements and real food label scenarios, and were executed iteratively throughout develop
+1491 P [Body Text] img=0 
+1492 P [Body Text] img=0 Unit Testing
+1493 P [Body Text] img=0 Unit testing was performed to verify the correctness and robustness of individual system components before full system integration. Each functional module of SafeEats was tested in isolation to ensure it produced consistent and reliable outputs under controlled conditions. This included testing of the image input handler, OCR extraction service, text preprocessing and normalization module, allerge
+1494 P [Body Text] img=0 
+1495 P [Body Text] img=0 For the image processing pipeline, unit tests validated file type handling, size constraints, image conversion routines, and OCR extraction accuracy on controlled label samples. The text preprocessing module was tested to confirm proper normalization, noise removal, and token standardization. The allergen detection module was unit tested using curated ingredient datasets to verify correct entity r
+1496 P [Body Text] img=0 
+1497 P [Body Text] img=0 Backend service units were further tested to verify API endpoint behaviour, error handling, and response formatting. Database units were validated to ensure correct creation, retrieval, and storage of user profiles, allergen lists, and scan records. Collectively, unit testing established a stable foundation for higher-level integration and user acceptance testing.
+1498 P [Caption] img=0 Table : Unit Testing Sample
+1499 TBL 9x7
+      | Test Scenario ID | Module / Feature | Test Procedures | Test Data | Expected Result | Actual Result | Status (Pass/Fail)
+      | UT-1.1 |  |  |  |  |  | 
+      | UT-1.2 |  |  |  |  |  | 
+      | UT-1.3 |  |  |  |  |  | 
+      | UT-1.4 |  |  |  |  |  | 
+      | UT-2.1 |  |  |  |  |  | 
+1500 P [Body Text] img=0 
+1501 P [Body Text] img=0 User Acceptance Testing (UAT)
+1502 P [Body Text] img=0 User Acceptance Testing (UAT) was conducted to evaluate the SafeEats system from an end-user perspective and to determine whether the implemented functionalities satisfy usability, clarity, and practical effectiveness requirements. The UAT phase focused on validating the system under realistic usage scenarios, including scanning food packages, interpreting allergen results, and navigating the web 
+1503 P [Body Text] img=0 
+1504 P [Body Text] img=0 Test participants were provided with a set of representative food label images and ingredient lists and were instructed to perform typical tasks such as uploading images, using camera-based scanning, reviewing allergen reports, and managing allergen profiles. Evaluation criteria included ease of use, interface clarity, response time, trust in detection results, and overall satisfaction. Feedback w
+1505 P [Body Text] img=0 
+1506 P [Body Text] img=0 The outcomes of UAT were used to assess the accessibility and safety-oriented design of the system. Observations related to navigation flow, result comprehension, and interaction simplicity were analysed and used to refine interface layouts, messaging clarity, and feedback mechanisms. This ensured that the final system not only functioned correctly but also delivered an effective and user-centred 
+1507 P [Normal] img=0 User Acceptance Testing
+1508 P [Normal] img=0 
+1509 P [Caption] img=0 Table : User Acceptance of Tester Sample
+1510 TBL 4x2
+      | Tester demographic profile | Tester demographic profile
+      | Name | 
+      | Age | 
+      | Role in the system | 
+1511 P [Normal] img=0 
+1512 P [Normal] img=0 *The rating of the scale would be as below: 1: Strongly disagree.
+1513 P [Normal] img=0 2: Disagree.
+1514 P [Normal] img=0 3: Neutral
+1515 P [Normal] img=0 4: Agree.
+1516 P [Normal] img=0 5: Strongly agree.
+1517 TBL 5x7
+      |  | User interface criteria | 1 | 2 | 3 | 4 | 5
+      | I | The design of the interface is dec |  |  |  |  | 
+      | II | The animation between the webpage  |  |  |  |  | 
+      | III | The colour scheme for the website  |  |  |  |  | 
+      | IV | The website is always clean and cl |  |  |  |  | 
+1518 P [Normal] img=0 
+1519 TBL 4x4
+      |  | Functionality criteria | Yes | No
+      | I | Website function without any error |  | 
+      | II | Users can reach their destinated p |  | 
+      | III | Websites is function with using di |  | 
+1520 P [Normal] img=0 
+1521 TBL 2x1
+      | Tester comment:
+      | Test comments here
+1522 P [Normal] img=0 Tester’s Signature
+1523 P [Body Text] img=0 
+1524 P [Body Text] img=0 Testing Results and Discussion
+1525 P [Body Text] img=0 This section presents the outcomes of the executed test cases and critically discusses system performance across different testing levels. The analysis focuses on evaluating whether SafeEats meets its functional objectives, supports reliable allergen detection, and delivers a usable and trustworthy interface. Testing results are interpreted in relation to system accuracy, processing reliability, e
+1526 P [Body Text] img=0 
+1527 P [Body Text] img=0 The discussion integrates quantitative and qualitative observations derived from unit testing and user acceptance testing. Detected strengths, observed limitations, and system behaviour patterns are examined to provide an objective assessment of the overall system effectiveness.
+1528 P [Body Text] img=0 
+1529 P [Body Text] img=0 Unit Testing
+1530 P [Body Text] img=0 
+1531 P [Body Text] img=0 Part 1 – Authentication & User Management
+1532 P [Caption] img=0 Table : Authentication & User Management Table
+1533 TBL 5x7
+      | Test Scenario ID | Module / Feature | Test Procedures | Test Data | Expected Result | Actual Result | Status
+      | UT-AUTH-1.1 | User Registration | Register new user | Valid email & strong password | Account created | User stored, hashed password | Pass
+      | UT-AUTH-2.1 | User Login | Login with correct credentials | Valid account | JWT issued, login success | JWT generated | Pass
+      | UT-AUTH-3.2 | JWT Validation | Validate expired token | Expired JWT | Token rejected | 401 returned | Pass
+      | UT-AUTH-4.1 | Logout | Logout user | Valid token | Session destroyed | Cookie cleared | Pass
+1534 P [Body Text] img=0 Part 2 – ML API Core Endpoints
+1535 P [Caption] img=0 Table : ML API Core Endpoints Table
+1536 TBL 5x7
+      | Test Scenario ID | Module / Feature | Test Procedures | Test Data | Expected Result | Actual Result | Status
+      | UT-ML-2.1 | Image Detection | Upload product label | JPEG image | OCR + allergen detection | Allergens detected | Pass
+      | UT-ML-3.1 | Text Detection | Submit ingredients text | "milk, eggs, wheat" | Correct allergens | GLUTEN, MILK, EGG | Pass
+      | UT-ML-3.3 | May contain logic | Submit warning text | "May contain peanuts" | Peanut in may_contain | Correctly classified | Pass
+      | UT-ML-5.1 | Confidence scoring | Dictionary match | "whole milk" | Confidence 1.0 | 1.0 returned | Pass
+1537 P [Body Text] img=0 Part 3 – OCR & Text Processing
+1538 P [Caption] img=0 Table : OCR & Text Processing Table
+1539 TBL 5x7
+      | Test Scenario ID | Module / Feature | Test Procedures | Test Data | Expected Result | Actual Result | Status
+      | UT-OCR-1.1 | OCR Extraction | Extract clear label | High-quality image | High accuracy text | 95% quality | Pass
+      | UT-OCR-2.1 | Noise cleaning | Clean OCR text | "mIk peatats" | Normalized text | "milk peanuts" | Pass
+      | UT-OCR-3.2 | Quality scoring | Low quality input | Noisy string | Low score | 0.45 score | Pass
+      | UT-OCR-4.2 | Usability check | Reject unusable text | "##@$" | Rejected | False returned | Pass
+1540 P [Body Text] img=0 Part 4 – Allergen Detection Logic
+1541 P [Caption] img=0 Table : Allergen Detection Logic Table
+1542 TBL 5x7
+      | Test Scenario ID | Module / Feature | Test Procedures | Test Data | Expected Result | Actual Result | Status
+      | UT-AD-1.1 | Strict detector | Detect allergens | "milk, eggs" | Allergens found | Correct matches | Pass
+      | UT-AD-1.6 | Negation handling | Detect "peanut-free" | "peanut-free" | No detection | Correctly ignored | Pass
+      | UT-AD-2.1 | Evidence extraction | Extract match context | "whole milk powder" | Evidence snippet | Snippet extracted | Pass
+      | UT-AD-8.1 | Classification | Unsafe product | User allergic + detected | UNSAFE | UNSAFE | Pass
+1543 P [Body Text] img=0 Part 5 – Web API Routes
+1544 P [Caption] img=0 Table : Web API Routes Table
+1545 TBL 5x7
+      | Test Scenario ID | Module / Feature | Test Procedures | Test Data | Expected Result | Actual Result | Status
+      | UT-WEB-1.1 | Image API | POST image | Multipart image | Detection results | JSON returned | Pass
+      | UT-WEB-3.1 | Text API | POST ingredients | "milk peanuts" | Detected | Matches returned | Pass
+      | UT-WEB-5.1 | History | Save scan | Scan payload | Saved to DB | Record created | Pass
+      | UT-WEB-6.1 | Rate limiting | Spam requests | 100 requests | 429 returned | Blocked | Pass
+1546 P [Body Text] img=0 Part 6 – Database Operations
+1547 P [Caption] img=0 Table : Database Operations Table
+1548 TBL 4x7
+      | Test Scenario ID | Module / Feature | Test Procedures | Test Data | Expected Result | Actual Result | Status
+      | UT-DB-1.1 | User CRUD | Create user | User object | Inserted | Record stored | Pass
+      | UT-DB-2.1 | Allergen profile | Save allergen | MILK | Associated | Linked to user | Pass
+      | UT-DB-3.1 | Scan history | Insert scan | UNSAFE scan | Saved | Stored with timestamp | Pass
+1549 P [Body Text] img=0 Part 7 – Utilities & Helpers
+1550 P [Caption] img=0 Table : Utilities & Helpers Table
+1551 TBL 4x7
+      | Test Scenario ID | Module / Feature | Test Procedures | Test Data | Expected Result | Actual Result | Status
+      | UT-UTIL-1.1 | Password hashing | Hash password | Plain password | Secure hash | Argon2 hash | Pass
+      | UT-UTIL-2.1 | JWT generation | Generate token | User payload | JWT returned | Token issued | Pass
+      | UT-UTIL-3.2 | Rate limiter | Exceed limit | 15 reqs | Blocked | 429 returned | Pass
+1552 P [Body Text] img=0 Part 8 – Integration & End-to-End Tests
+1553 P [Caption] img=0 Table : Integration & End-to-End Tests Table
+1554 TBL 4x7
+      | Test Scenario ID | Module / Feature | Test Procedures | Test Data | Expected Result | Actual Result | Status
+      | UT-E2E-1.1 | Full pipeline | Image scan flow | Product image | All stages pass | Allergens detected | Pass
+      | UT-E2E-2.1 | User journey | Register → Scan | New user | Unsafe result | Displayed correctly | Pass
+      | UT-E2E-4.1 | Concurrency | Multi-user scans | 10 users | All succeed | All completed | Pass
+1555 P [Body Text] img=0 
+1556 P [Body Text] img=0 User Acceptance Testing
+1557 P [Normal] img=0 User Acceptance Testing
+1558 P [Normal] img=0 
+1559 P [Caption] img=0 Table : Tester 1 (Allergic)
+1560 TBL 4x2
+      | Tester demographic profile | Tester demographic profile
+      | Name | Mohammed
+      | Age | 22
+      | Role in the system | Allergic
+1561 P [Normal] img=0 
+1562 P [Normal] img=0 *The rating of the scale would be as below: 1: Strongly disagree.
+1563 P [Normal] img=0 2: Disagree.
+1564 P [Normal] img=0 3: Neutral
+1565 P [Normal] img=0 4: Agree.
+1566 P [Normal] img=0 5: Strongly agree.
+1567 TBL 5x7
+      |  | User interface criteria | 1 | 2 | 3 | 4 | 5
+      | I | The design of the interface is dec |  |  |  | / | 
+      | II | The animation between the webpage  |  |  |  | / | 
+      | III | The colour scheme for the website  |  |  |  | / | 
+      | IV | The website is always clean and cl |  |  |  |  | /
+1568 P [Normal] img=0 
+1569 TBL 4x4
+      |  | Functionality criteria | Yes | No
+      | I | Website function without any error | / | 
+      | II | Users can reach their destinated p | / | 
+      | III | Websites is function with using di | / | 
+1570 P [Normal] img=0 
+1571 TBL 2x1
+      | Tester comment:
+      | The system is very clear and well 
+1572 P [Normal] img=0 Tester’s Signature
+1573 P [Body Text] img=1 
+1574 P [Body Text] img=0 
+1575 P [Normal] img=0 User Acceptance Testing
+1576 P [Normal] img=0 
+1577 P [Caption] img=0 Table : Tester 2 (Allergic)
+1578 TBL 4x2
+      | Tester demographic profile | Tester demographic profile
+      | Name | Talha
+      | Age | 25
+      | Role in the system | Allergic
+1579 P [Normal] img=0 
+1580 P [Normal] img=0 *The rating of the scale would be as below: 1: Strongly disagree.
+1581 P [Normal] img=0 2: Disagree.
+1582 P [Normal] img=0 3: Neutral
+1583 P [Normal] img=0 4: Agree.
+1584 P [Normal] img=0 5: Strongly agree.
+1585 TBL 5x7
+      |  | User interface criteria | 1 | 2 | 3 | 4 | 5
+      | I | The design of the interface is dec |  |  |  | / | 
+      | II | The animation between the webpage  |  |  |  |  | /
+      | III | The colour scheme for the website  |  |  |  | / | 
+      | IV | The website is always clean and cl |  |  |  | / | 
+1586 P [Normal] img=0 
+1587 TBL 4x4
+      |  | Functionality criteria | Yes | No
+      | I | Website function without any error | / | 
+      | II | Users can reach their destinated p | / | 
+      | III | Websites is function with using di | / | 
+1588 P [Normal] img=0 
+1589 TBL 2x1
+      | Tester comment:
+      | The system works well and loads qu
+1590 P [Normal] img=0 Tester’s Signature
+1591 P [Normal] img=0 
+1592 P [Body Text] img=1 
+1593 P [Body Text] img=0 
+1594 P [Normal] img=0 User Acceptance Testing
+1595 P [Normal] img=0 
+1596 P [Caption] img=0 Table : Tester 3 (Parent)
+1597 TBL 4x2
+      | Tester demographic profile | Tester demographic profile
+      | Name | Zaman
+      | Age | 37
+      | Role in the system | Parents
+1598 P [Normal] img=0 
+1599 P [Normal] img=0 *The rating of the scale would be as below: 1: Strongly disagree.
+1600 P [Normal] img=0 2: Disagree.
+1601 P [Normal] img=0 3: Neutral
+1602 P [Normal] img=0 4: Agree.
+1603 P [Normal] img=0 5: Strongly agree.
+1604 TBL 5x7
+      |  | User interface criteria | 1 | 2 | 3 | 4 | 5
+      | I | The design of the interface is dec |  |  |  | / | 
+      | II | The animation between the webpage  |  |  |  | / | 
+      | III | The colour scheme for the website  |  |  |  | / | 
+      | IV | The website is always clean and cl |  |  |  |  | /
+1605 P [Normal] img=0 
+1606 TBL 4x4
+      |  | Functionality criteria | Yes | No
+      | I | Website function without any error | / | 
+      | II | Users can reach their destinated p | / | 
+      | III | Websites is function with using di | / | 
+1607 P [Normal] img=0 
+1608 TBL 2x1
+      | Tester comment:
+      | The system is easy to understand a
+1609 P [Normal] img=0 Tester’s Signature
+1610 P [Body Text] img=1 
+1611 P [Normal] img=0 User Acceptance Testing
+1612 P [Normal] img=0 
+1613 P [Caption] img=0 Table : Tester 4 (Allergic)
+1614 TBL 4x2
+      | Tester demographic profile | Tester demographic profile
+      | Name | Ahmed
+      | Age | 20
+      | Role in the system | Allergic
+1615 P [Normal] img=0 
+1616 P [Normal] img=0 *The rating of the scale would be as below: 1: Strongly disagree.
+1617 P [Normal] img=0 2: Disagree.
+1618 P [Normal] img=0 3: Neutral
+1619 P [Normal] img=0 4: Agree.
+1620 P [Normal] img=0 5: Strongly agree.
+1621 TBL 5x7
+      |  | User interface criteria | 1 | 2 | 3 | 4 | 5
+      | I | The design of the interface is dec |  |  |  |  | /
+      | II | The animation between the webpage  |  |  |  |  | /
+      | III | The colour scheme for the website  |  |  |  | / | 
+      | IV | The website is always clean and cl |  |  |  |  | /
+1622 P [Normal] img=0 
+1623 TBL 4x4
+      |  | Functionality criteria | Yes | No
+      | I | Website function without any error | / | 
+      | II | Users can reach their destinated p | / | 
+      | III | Websites is function with using di | / | 
+1624 P [Normal] img=0 
+1625 TBL 2x1
+      | Tester comment:
+      | The website is modern and easy to 
+1626 P [Normal] img=0 Tester’s Signature
+1627 P [Body Text] img=1 
+1628 P [Body Text] img=0 Summary
+1629 P [Body Text] img=0 This chapter presented a comprehensive evaluation of the SafeEats allergen detection system through structured testing and result analysis. A systematic test plan was implemented to validate both individual system components and complete end-to-end workflows. Unit testing confirmed the correctness and stability of core modules, including image handling, OCR extraction, text preprocessing, allergen
+1630 P [Body Text] img=0 
+1631 P [Body Text] img=0 User Acceptance Testing further validated the system from an end-user perspective. Participants successfully completed typical tasks such as scanning food labels, reviewing allergen results, and navigating the web interface. Feedback indicated that the system was clear, easy to use, and effective in communicating allergen risks. The high agreement ratings across interface clarity, visual design, a
+1632 P [Body Text] img=0 
+1633 P [Body Text] img=0 When compared conceptually with existing allergen detection approaches reported in the literature, the proposed system demonstrates a distinct emphasis on safety and explainability rather than solely on detection speed or visual recognition accuracy. Vision-based models achieve strong performance when allergens are visually identifiable; however, they are unsuitable for packaged food products wher
+1634 P [Body Text] img=0 
+1635 P [Body Text] img=0 Overall, the testing outcomes indicate that SafeEats meets its functional objectives and performs effectively as a real-time, AI-based allergen detection platform. The system demonstrates strong technical reliability, explainable detection outputs, and positive user reception. These results provide a solid foundation for the conclusions and future enhancement directions discussed in the following 
+1636 P [Heading 1] img=0 CHAPTER 6: CONCLUSION
