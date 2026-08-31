@@ -1,12 +1,14 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { finalize } from 'rxjs';
+import { catchError, finalize, forkJoin, map, of } from 'rxjs';
 import { DepartmentRequestKind } from '../../../core/departments/department-workflow.config';
 import { ProposalConversation } from '../../../core/proposals/proposal-conversation.models';
 import { cancellationWindowFor, earliestScheduleDate, parseScheduleDate } from '../../../core/proposals/cancellation-window';
 import { ProposalReviewRecord } from '../../../core/proposals/proposal-review.models';
 import { DEPARTMENT_LABELS, ProposalStage, ReviewerCommentEntry, initialsFor, reviewerCommentEntry, stageLabel } from '../../../core/proposals/proposal-status.models';
 import { ProposalWorkflowService } from '../../../core/proposals/proposal-workflow.service';
+import { PublishedEventService } from '../../../core/events/published-event.service';
+import { VenueBooking } from '../../../core/events/published-event.models';
 import { ConversationThreadComponent } from '../conversation-thread/conversation-thread';
 import { EditableRow } from '../form-controls/form-controls.models';
 import { FormModalComponent } from '../form-modal/form-modal';
@@ -170,6 +172,13 @@ export class ProposalReviewerViewComponent {
         next: (conversations) => this.conversations.set(conversations),
         error: () => this.conversations.set([]),
       });
+    });
+
+    // Re-checked per proposal opened, not cached: the answer changes as other proposals are
+    // approved into the same room.
+    effect(() => {
+      this.proposal();
+      this.loadVenueClashes();
     });
   }
 
@@ -349,6 +358,59 @@ export class ProposalReviewerViewComponent {
   readonly guestColumns: readonly ProposalTableColumn[] = [
     { key: 'guestType', label: 'Guest Type' }, { key: 'count', label: 'Count' }, { key: 'notes', label: 'Notes' },
   ];
+  // --- Venue conflicts ------------------------------------------------------
+  // Same question the applicant was asked at drafting time, asked again here against live data:
+  // by the time a proposal reaches an approver the room may have been booked by somebody else, so
+  // re-checking is not a duplicate of the form's warning but the only version that is current.
+  private readonly events = inject(PublishedEventService);
+  readonly venueClashes = signal<readonly string[]>([]);
+
+  private loadVenueClashes(): void {
+    const proposal = this.proposal();
+    const rows = proposal?.scheduleRows ?? [];
+    this.venueClashes.set([]);
+    if (!proposal || rows.length === 0) return;
+
+    const checks = rows
+      .map((row) => ({
+        venueId: String(row['venueId'] ?? ''),
+        date: String(row['date'] ?? ''),
+        start: String(row['start'] ?? ''),
+        end: String(row['end'] ?? ''),
+        location: String(row['location'] ?? ''),
+        inside: String(row['locationKind'] ?? 'inside') === 'inside',
+      }))
+      // Outside University has no venue to be double-booked in, and a row missing a time cannot
+      // be compared against one.
+      .filter((row) => row.inside && row.venueId && row.date && row.start && row.end);
+    if (checks.length === 0) return;
+
+    forkJoin(checks.map((check) => this.events
+      // Excluding this proposal: its own schedule rows are in the same table and would otherwise
+      // report every row as clashing with itself.
+      .getVenueBookings(check.venueId, check.date, String(proposal.id))
+      .pipe(
+        map((response) => ({ check, bookings: response.bookings })),
+        // One unreachable venue must not blank the warnings for the others.
+        catchError(() => of({ check, bookings: [] as readonly VenueBooking[] })),
+      )))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((results) => {
+        const messages: string[] = [];
+        for (const { check, bookings } of results) {
+          const clashes = bookings.filter((booking) =>
+            check.start < booking.endTime && booking.startTime < check.end);
+          if (clashes.length === 0) continue;
+          const windows = clashes.map((booking) => `${booking.startTime}-${booking.endTime}`).join(', ');
+          messages.push(
+            `${check.date}, ${check.start}-${check.end} at ${check.location || 'this venue'} `
+            + `overlaps an existing booking (${windows}).`,
+          );
+        }
+        this.venueClashes.set(messages);
+      });
+  }
+
   readonly scheduleColumns: readonly ProposalTableColumn[] = [
     { key: 'date', label: 'Date' }, { key: 'start', label: 'Start' }, { key: 'end', label: 'End' }, { key: 'location', label: 'Location' },
   ];

@@ -22,7 +22,7 @@ import { OptionPickerItem } from '../../../../shared/components/option-picker-gr
 import { ReviewerCommentsDrawerComponent } from '../../../../shared/components/reviewer-comments-drawer/reviewer-comments-drawer';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { ClubService } from '../../../../core/clubs/club.service';
-import { EventImageAsset, EventVisibility, RegistrationMode } from '../../../../core/events/published-event.models';
+import { EventImageAsset, EventVisibility, RegistrationMode, VenueBooking } from '../../../../core/events/published-event.models';
 import { ProposalWorkflowService } from '../../../../core/proposals/proposal-workflow.service';
 import { ProposalConversation } from '../../../../core/proposals/proposal-conversation.models';
 import { ProposalReviewRecord } from '../../../../core/proposals/proposal-review.models';
@@ -106,6 +106,18 @@ export class EventProposalComponent implements OnDestroy {
   /** Count of events already on the currently-drafted schedule date, or null when unknown. */
   readonly dateConflictCount = signal<number | null>(null);
   readonly dateConflictDate = signal('');
+
+  // --- Venue booking conflicts ---------------------------------------------
+  // The same debounce/token shape as the date count above, keyed on (venue, date) rather than
+  // date alone: what the organiser needs to know is not "is this day busy" but "is this ROOM
+  // taken while I want it".
+  private venueBookingTimer: ReturnType<typeof setTimeout> | undefined;
+  private venueBookingSubscription: Subscription | undefined;
+  private venueBookingRequestToken = 0;
+
+  readonly venueBookings = signal<readonly VenueBooking[] | null>(null);
+  /** The (venue, date) the loaded bookings belong TO — never assume they match the draft. */
+  readonly venueBookingKey = signal('');
   private nextRowId = 100;
   readonly currentStep = signal(0);
   readonly status = signal<'Draft' | 'Draft saved' | 'Submitted'>('Draft');
@@ -765,7 +777,12 @@ export class EventProposalComponent implements OnDestroy {
     this.tableDraft.set(row);
     this.tableModalOpen.set(true);
     this.resetDateConflict();
-    if (collection === 'schedule') this.scheduleDateConflictCheck();
+    if (collection === 'schedule') {
+      this.scheduleDateConflictCheck();
+      // An existing row already names a venue and a date, so the summary belongs on screen from
+      // the moment the popup opens rather than after the first edit.
+      this.scheduleVenueBookingCheck();
+    }
   }
   closeTableModal(): void { this.tableModalOpen.set(false); this.tableEditorCollection.set(null); this.tableEditingIndex.set(null); this.tableDraft.set({}); this.resetDateConflict(); }
   tableModalTitle(): string { const collection = this.tableEditorCollection(); return collection ? `Add ${this.tableTitle(collection)} row` : 'Add table row'; }
@@ -796,6 +813,12 @@ export class EventProposalComponent implements OnDestroy {
     // Re-check congestion whenever the schedule row's date changes, so the warning appears
     // immediately on selection and updates itself if the organiser picks a different date.
     if (collection === 'schedule' && key === 'date') this.scheduleDateConflictCheck();
+    // The venue's own bookings depend on (venue, date), and whether the drafted TIME lands inside
+    // one of them depends on start/end — but those two need no refetch, only a re-read of what is
+    // already loaded, which the template gets for free from the draft signal.
+    if (collection === 'schedule' && (key === 'date' || key === 'venueId' || key === 'locationKind')) {
+      this.scheduleVenueBookingCheck();
+    }
   }
   tableFieldMin(column: EditableTableColumn): string { return column.type === 'date' && this.tableEditorCollection() === 'schedule' ? this.earliestEventIso() : String(column.min ?? ''); }
   // Staff options for a `staff`-type table column, excluding anyone already picked in another row
@@ -863,6 +886,107 @@ export class EventProposalComponent implements OnDestroy {
     this.dateConflictSubscription?.unsubscribe();
     this.dateConflictCount.set(null);
     this.dateConflictDate.set('');
+    this.resetVenueBookings();
+  }
+
+  private resetVenueBookings(): void {
+    if (this.venueBookingTimer) clearTimeout(this.venueBookingTimer);
+    this.venueBookingSubscription?.unsubscribe();
+    this.venueBookings.set(null);
+    this.venueBookingKey.set('');
+  }
+
+  private scheduleVenueBookingCheck(): void {
+    if (this.venueBookingTimer) clearTimeout(this.venueBookingTimer);
+    this.venueBookingTimer = setTimeout(() => this.runVenueBookingCheck(), 300);
+  }
+
+  private runVenueBookingCheck(): void {
+    const draft = this.tableDraft();
+    const date = String(draft['date'] ?? '');
+    const venueId = String(draft['venueId'] ?? '');
+    // Outside University has no venue to be double-booked in.
+    const inside = String(draft['locationKind'] ?? INSIDE_UNIVERSITY) === INSIDE_UNIVERSITY;
+    if (this.tableEditorCollection() !== 'schedule' || !date || !venueId || !inside) {
+      this.venueBookings.set(null);
+      this.venueBookingKey.set('');
+      return;
+    }
+    const key = `${venueId}|${date}`;
+    const token = ++this.venueBookingRequestToken;
+    this.venueBookingSubscription?.unsubscribe();
+    this.venueBookingSubscription = this.publishedEventService
+      // An edit re-checking its own dates must not report itself as a clash with itself.
+      .getVenueBookings(venueId, date, this.editingProposalId())
+      .subscribe({
+        next: (response) => {
+          if (token !== this.venueBookingRequestToken) return;
+          this.venueBookings.set(response.bookings);
+          this.venueBookingKey.set(key);
+        },
+        // Advisory, like the date count: a failed lookup shows no warning rather than an error,
+        // since the organiser can still legitimately submit either way.
+        error: () => {
+          if (token !== this.venueBookingRequestToken) return;
+          this.venueBookings.set(null);
+          this.venueBookingKey.set('');
+        },
+      });
+  }
+
+  /**
+   * The proposal this form is editing, if any — a draft being resumed or a returned proposal
+   * being resubmitted. Passed to the bookings lookup so an edit does not report its own existing
+   * schedule rows as a clash with itself.
+   */
+  private editingProposalId(): string | undefined {
+    const id = this.draftRequestId() ?? this.resubmitProposalId();
+    return id === null || id === undefined ? undefined : String(id);
+  }
+
+  /** The bookings currently loaded, but only if they belong to what is being drafted right now. */
+  private currentVenueBookings(): readonly VenueBooking[] | null {
+    const draft = this.tableDraft();
+    const key = `${String(draft['venueId'] ?? '')}|${String(draft['date'] ?? '')}`;
+    return this.venueBookingKey() === key ? this.venueBookings() : null;
+  }
+
+  /**
+   * "Today, the venue is booked from X to Y" — what the room already has on the chosen date,
+   * shown as soon as a venue and date are picked and before any time is entered. Informational,
+   * not a warning: knowing the room is busy 09:00-11:00 is what lets the organiser pick 14:00 in
+   * the first place.
+   */
+  venueBookingSummary(): string {
+    if (this.tableEditorCollection() !== 'schedule') return '';
+    const bookings = this.currentVenueBookings();
+    if (!bookings || bookings.length === 0) return '';
+    const windows = bookings.map((booking) => `${booking.startTime} to ${booking.endTime}`).join(', ');
+    const venue = this.venueCatalog().find((option) => option.id === String(this.tableDraft()['venueId'] ?? ''))?.label
+      ?? 'This venue';
+    return bookings.length === 1
+      ? `On this date, ${venue} is booked from ${windows}.`
+      : `On this date, ${venue} is booked from ${windows}.`;
+  }
+
+  /**
+   * The yellow one: the drafted time actually lands inside a window the room is already taken
+   * for. Non-blocking by design — an organiser may know the earlier booking is being moved, and
+   * a proposal is reviewed by people who can see the same clash on the approval screen.
+   */
+  venueConflictWarning(): string {
+    if (this.tableEditorCollection() !== 'schedule') return '';
+    const bookings = this.currentVenueBookings();
+    if (!bookings || bookings.length === 0) return '';
+    const draft = this.tableDraft();
+    const start = String(draft['start'] ?? '');
+    const end = String(draft['end'] ?? '');
+    if (!start || !end) return '';
+    const clashes = bookings.filter((booking) => this.overlaps(start, end, booking.startTime, booking.endTime));
+    if (clashes.length === 0) return '';
+    const windows = clashes.map((booking) => `${booking.startTime}-${booking.endTime}`).join(', ');
+    return `This time overlaps an existing booking for this venue (${windows}). `
+      + 'You can still submit, but the approver will see the clash and may ask you to move it.';
   }
 
   private scheduleDateConflictCheck(): void {
@@ -1451,6 +1575,12 @@ export class EventProposalComponent implements OnDestroy {
   }
   private isPastDate(date: string): boolean { return !!date && date < this.todayIso(); }
   private isTimeAfter(start: string, end: string): boolean { return !start || !end || end > start; }
+  // Half-open comparison: a session ending exactly when the next begins does NOT overlap, which
+  // is how back-to-back bookings in one room are meant to work. Times are zero-padded HH:MM from
+  // both the form and the server, so string comparison is ordering comparison.
+  private overlaps(startA: string, endA: string, startB: string, endB: string): boolean {
+    return startA < endB && startB < endA;
+  }
   // Earliest/latest dates across the Event Schedule rows — request items (logistics, food,
   // transportation, etc.) are allowed from up to 2 days before the first session, for setup/prep,
   // through the last session's date.

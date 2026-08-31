@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, map, of, shareReplay } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { MasterCalendarDay, MasterCalendarEventDetail, MasterCalendarSummary } from './master-calendar.models';
-import { EventRegistration, EventSearchParams, EventSearchResponse, PendingEventRegistration, PendingEventRegistrationPage, PublishedEvent, RegistrationResult } from './published-event.models';
+import { EventRegistration, EventSearchParams, EventSearchResponse, PendingEventRegistration, PendingEventRegistrationPage, PublishedEvent, RegistrationResult, VenueBookingsResponse } from './published-event.models';
 import { eventSearchHttpParams } from './event-search-params';
 import { EventRegistrationApi, RegisteredEventsResponse, RegistrationHistoryPage, RegistrationHistoryQuery, SavedEventsResponse } from './event-engagement.models';
 
@@ -94,6 +94,15 @@ export class PublishedEventService implements EventRegistrationApi {
     let params = new HttpParams();
     for (const date of dates) params = params.append('dates', date);
     return this.http.get<Record<string, number>>(`${this.baseUrl}/date-counts`, { params });
+  }
+
+  // What else is booked into this venue on this date. Advisory: the proposal form warns on an
+  // overlap but never blocks one, since a room can legitimately host two things back to back and
+  // the organiser may know something the calendar does not.
+  getVenueBookings(venueId: string, date: string, excludeRequestId?: string): Observable<VenueBookingsResponse> {
+    let params = new HttpParams().set('venueId', venueId).set('date', date);
+    if (excludeRequestId) params = params.set('excludeRequestId', excludeRequestId);
+    return this.http.get<VenueBookingsResponse>(`${this.baseUrl}/venue-bookings`, { params });
   }
 
   getEventDetails(id: string): Observable<PublishedEvent | undefined> { return this.http.get<PublishedEvent>(`${this.baseUrl}/${encodeURIComponent(id)}`); }

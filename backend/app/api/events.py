@@ -18,6 +18,7 @@
     GET  /events/me/registrations      my registrations, searched/filtered/paginated (?scope=active|pending|history)
     GET  /events/me/registration-history  resolved registrations, mine and decided-by-me (History > Events)
     GET  /events/me/pending-approvals  registrations awaiting my decision
+    GET  /events/venue-bookings        a venue's busy windows on one date
     GET  /events/me/organized          events I proposed that are now published, searched/filtered/paginated (Created by Me)
     GET/PUT /events/me/saved/{id}      save / unsave
     GET  /events/me/saved/search       my saved events, searched/filtered/paginated (My Events > Saved)
@@ -1877,6 +1878,65 @@ def master_calendar_event(event_id: int):
         row["isFree"] = not row["cost"]
         row["confirmedRegistrationCount"] = int(row["confirmedRegistrationCount"] or 0)
         return jsonify(row)
+
+
+@bp.get("/venue-bookings")
+@require_auth
+def venue_bookings():
+    """Which time windows an internal venue is already spoken for on one date.
+
+    ?venueId=<id>&date=YYYY-MM-DD -> {"venueId", "date", "bookings": [...]}.
+
+    Times only, plus a title. Like date-counts above, this deliberately reports on
+    the whole master-calendar population rather than only what the caller may see:
+    a room being occupied is a fact about the room, and an organiser cannot avoid
+    a clash they are not allowed to know about. What it withholds is everything
+    else - no organiser, no audience, no request code - so a Private event on the
+    master calendar contributes a busy window and nothing more. `isRestricted`
+    says which rows those are, so the client can label them rather than name them.
+
+    Ordered by start time so the client can render the day in reading order
+    without sorting it again.
+    """
+    venue_id = (request.args.get("venueId") or "").strip()
+    date = (request.args.get("date") or "").strip()
+    if not venue_id or not date:
+        raise BadRequest("venueId and date are required.")
+    try:
+        venue_id_int = int(venue_id)
+    except ValueError:
+        raise BadRequest("venueId must be numeric.")
+
+    # A Private event's title is not the caller's business, but its hours are.
+    exclude_request = (request.args.get("excludeRequestId") or "").strip()
+    params: dict = {
+        "venue": venue_id_int,
+        "date": date,
+        "statuses": list(_MASTER_CALENDAR_STATUSES),
+        "exclude": int(exclude_request) if exclude_request.isdigit() else None,
+    }
+
+    with transaction() as cur:
+        rows = fetch_all(
+            cur,
+            """SELECT to_char(s.start_time, 'HH24:MI') AS "startTime",
+                      to_char(s.end_time, 'HH24:MI') AS "endTime",
+                      CASE WHEN r.event_visibility = 'Private' THEN NULL
+                           ELSE r.event_title END AS "eventTitle",
+                      (r.event_visibility = 'Private') AS "isRestricted"
+                 FROM event_schedule s
+                 JOIN request r ON r.request_id = s.request_id
+                WHERE s.venue_option_id = %(venue)s
+                  AND s."date" = %(date)s::date
+                  AND s.location_kind = 'inside'
+                  AND r.status = ANY(%(statuses)s)
+                  -- An edit re-checking its own dates must not report itself as a
+                  -- clash with itself.
+                  AND (%(exclude)s::bigint IS NULL OR r.request_id <> %(exclude)s::bigint)
+                ORDER BY s.start_time, s.end_time""",
+            params,
+        )
+    return jsonify({"venueId": venue_id, "date": date, "bookings": rows})
 
 
 @bp.get("/date-counts")

@@ -818,3 +818,26 @@
   background: #fff8e9;
   color: #8a5b00;
 }
+
+// Venue booking clash, shown under the Schedule table. Yellow, matching the same warning the
+// applicant saw on the proposal form — advisory, never a blocked state.
+.prv-venue-clash {
+  margin-top: var(--space-3);
+  padding: .625rem .75rem;
+  border: 1px solid #f0d59a;
+  border-radius: .5rem;
+  background: #fff8e9;
+  color: #8a5b00;
+  font-size: .82rem;
+  line-height: 1.45;
+}
+.prv-venue-clash__lead {
+  display: flex;
+  align-items: flex-start;
+  gap: .4rem;
+  margin: 0;
+  font-weight: 600;
+}
+.prv-venue-clash__lead .material-symbols-rounded { flex: 0 0 auto; font-size: 1rem; }
+.prv-venue-clash ul { margin: .35rem 0 0; padding-left: 1.65rem; }
+.prv-venue-clash li + li { margin-top: .2rem; }

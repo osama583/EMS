@@ -343,6 +343,17 @@
            saving the row or submitting the proposal. -->
       <p class="request-field-context request-field-context--warn" role="status" aria-live="polite"><span class="material-symbols-rounded" aria-hidden="true">event_busy</span>{{ tableDateConflictWarning() }}</p>
     }
+    @if (venueBookingSummary()) {
+      <!-- Neutral, not a warning: this is what the room already has on the chosen date, shown as
+           soon as a venue and date are picked so the organiser can pick a free time rather than
+           be told off for picking a taken one. -->
+      <p class="request-field-context" role="status" aria-live="polite"><span class="material-symbols-rounded" aria-hidden="true">meeting_room</span>{{ venueBookingSummary() }}</p>
+    }
+    @if (venueConflictWarning()) {
+      <!-- Yellow, and still advisory: the organiser may know the earlier booking is moving, and
+           the approver sees the same clash on the approval screen either way. -->
+      <p class="request-field-context request-field-context--warn" role="status" aria-live="polite"><span class="material-symbols-rounded" aria-hidden="true">warning</span>{{ venueConflictWarning() }}</p>
+    }
   </div>
 </app-form-modal>
 

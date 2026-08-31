@@ -58,6 +58,20 @@
             <div class="prv-table-wrap">
               <h4 class="prv-table-wrap__label">Schedule</h4>
               <app-proposal-table tableId="prv-schedule" [columns]="scheduleColumns" [rows]="item.scheduleRows ?? []" [readOnly]="true" emptyIcon="event" emptyMessage="No schedule rows were added." />
+              @if (venueClashes().length) {
+                <!-- Directly under the timing table so the clash is read against the rows it is
+                     about. Advisory: the approver decides whether it matters, and the applicant
+                     saw the same warning while drafting. -->
+                <div class="prv-venue-clash" role="status" aria-live="polite">
+                  <p class="prv-venue-clash__lead">
+                    <span class="material-symbols-rounded" aria-hidden="true">warning</span>
+                    This proposal's timing conflicts with a venue booking that already exists.
+                  </p>
+                  <ul>
+                    @for (clash of venueClashes(); track clash) { <li>{{ clash }}</li> }
+                  </ul>
+                </div>
+              }
             </div>
           }
           @if (item.agenda?.length) {

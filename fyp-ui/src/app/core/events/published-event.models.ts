@@ -153,3 +153,22 @@ export const EVENT_FIELD_MAPPING = {
   details: ['shortIntroduction', 'goals', 'expectedBenefits', 'eventVisibility', 'eventFormat', 'totalExpectedPax', 'registrationMode'],
   registration: ['id', 'registrationMode', 'confirmedRegistrationCount', 'pendingRegistrationCount'],
 } as const;
+
+/**
+ * One window an internal venue is already spoken for, from GET /events/venue-bookings.
+ * Times only — a Private event contributes its hours with `eventTitle` null and
+ * `isRestricted` true, because a room being occupied is a fact about the room even when the
+ * event in it is not the reader's business.
+ */
+export interface VenueBooking {
+  readonly startTime: string;
+  readonly endTime: string;
+  readonly eventTitle: string | null;
+  readonly isRestricted: boolean;
+}
+
+export interface VenueBookingsResponse {
+  readonly venueId: string;
+  readonly date: string;
+  readonly bookings: readonly VenueBooking[];
+}
