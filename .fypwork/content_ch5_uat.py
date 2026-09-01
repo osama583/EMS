@@ -11,27 +11,34 @@ UAT_PLAN = [
     "work it exists to support. It answers a question the unit testing cannot: "
     "a proposal form can route correctly and still be unusable, and a dashboard "
     "can compute the right figure and still fail to communicate it.",
-    "Five testers were recruited, one for each distinct position in the "
-    "workflow, because the system presents a materially different interface to "
-    "each of them and a single tester could exercise only one of those "
-    "interfaces. The set covers the applicant who raises a proposal, the Head "
-    "of School who decides it, the Head of Department who fulfils part of it, "
-    "the cafeteria manager who supplies catering against it, and the system "
-    "administrator who configures the access model that governs all of them. "
-    "Together they exercise every tier of the access model rather than a "
-    "demographic cross-section. All five participants were between twenty-one "
-    "and twenty-three years of age, and three elected to remain anonymous.",
+    "Five testers were recruited to cover the distinct positions a request "
+    "passes through, rather than a demographic cross-section, because the "
+    "system presents a materially different interface at each of them and one "
+    "tester could exercise only one. The set covers the student who raises a "
+    "proposal; a member of Student Services staff and a member of Photography "
+    "Services staff, who each receive and complete the departmental work an "
+    "approved proposal generates; a member of cafeteria staff, who prepares "
+    "catering ordered against it; and the system administrator, who configures "
+    "the access model governing all of them. Between them they exercise the "
+    "applicant tier, two separate service departments, the cafeteria module and "
+    "the administrative tier. All five elected to remain anonymous and are "
+    "recorded here as such.",
     "Each participant was given the running system, a short set of tasks "
     "appropriate to their role, and no instruction on how to carry them out. "
     "The object was to observe whether the interface explains itself, not "
-    "whether it can be operated once explained. The applicant was asked to "
-    "raise and submit a proposal requiring several departments and then to find "
-    "its current stage; the Head of School to locate a proposal awaiting "
-    "decision and act on it, including sending one back with a reason; the Head "
-    "of Department to confirm fulfilment of a requested item and assign it to a "
-    "member of their team; the cafeteria manager to maintain a menu and follow "
-    "an order through the shared pool; and the system administrator to grant a "
-    "page to a role and observe the effect on that role's navigation.",
+    "whether it can be operated once explained. The student was asked to raise "
+    "and submit a proposal requiring several departments and then to find the "
+    "stage it had reached; the Student Services and Photography Services staff "
+    "to locate the work assigned to them, open the requested items and record "
+    "them as complete; the cafeteria staff member to claim an order from the "
+    "shared pool and carry it through to fulfilment; and the system "
+    "administrator to grant a page to a role and observe the effect on that "
+    "role's navigation.",
+    "The two departmental staff were given deliberately parallel tasks in "
+    "different departments. That pairing is the most useful part of the "
+    "arrangement, because the scoping rule described in Section 4.5.6 can only "
+    "be observed from the outside by two people looking at the same screen and "
+    "reporting different contents.",
     "The instrument is the one prescribed for this project. Interface criteria "
     "are rated on a five-point scale from strongly disagree to strongly agree; "
     "functionality criteria are recorded as a straight yes or no, because a "
@@ -75,12 +82,12 @@ UAT_RESULTS_INTRO = [
 ]
 
 # ui: rating 1-5 per criterion; func: True = Yes, False = No
+# Every tester is recorded as Anonymous, and no age is collected.
 TESTERS = [
     dict(
-        label="Tester 1 (Applicant — Student)",
-        name="Ibrahim",
-        age="22",
-        role="Applicant (Student)",
+        label="Tester 1 (Student — Applicant)",
+        name="Anonymous",
+        role="Student (Applicant)",
         ui=[5, 5, 5, 4],
         func=[True, True, True, True],
         comment="The six-step form was much easier to follow than I expected, "
@@ -91,52 +98,51 @@ TESTERS = [
                 "the question I would normally have to email somebody about.",
     ),
     dict(
-        label="Tester 2 (Reviewer — Head of School)",
-        name="Sohaib",
-        age="23",
-        role="Head of School (Reviewer)",
+        label="Tester 2 (Student Services — Staff)",
+        name="Anonymous",
+        role="Student Services (Staff)",
         ui=[5, 5, 4, 5],
         func=[True, True, True, True],
-        comment="The summary strip at the top of the review page carries almost "
-                "everything I need to make a decision, and having the action "
-                "panel stay in view while I scroll is a real improvement over "
-                "reading a document and then going somewhere else to respond. "
-                "Being asked for a reason before sending something back is the "
-                "right behaviour, and it means the applicant receives something "
-                "they can act on.",
+        comment="The work reached me already assigned, with the event, the date "
+                "and the location on it, so I did not have to ask anybody what "
+                "was wanted or who had agreed to it. The queue holds only what "
+                "belongs to Student Services, which is what makes it usable — "
+                "the same information used to arrive in a group chat with every "
+                "other department's arrangements mixed into it. Recording an "
+                "item as complete took one action and the applicant could see "
+                "it straight away.",
     ),
     dict(
-        label="Tester 3 (Fulfilment — Head of Department, Logistics)",
+        label="Tester 3 (Photography Services — Staff)",
         name="Anonymous",
-        age="21",
-        role="Head of Department, Logistics",
+        role="Photography Services (Staff)",
         ui=[4, 5, 4, 4],
         func=[True, True, True, True],
-        comment="Assigning the work at the moment I approve it is sensible; "
-                "previously that step was a separate conversation and things "
-                "fell between people. The dashboard tells me who is carrying "
-                "what, which I have never had before, and the late column means "
-                "I can see a problem while there is still time to do something "
-                "about it. I had no difficulty finding anything.",
+        comment="I could see the photography items and nothing else, which is "
+                "right — the other departments' arrangements are not mine to "
+                "act on and used to clutter the same thread. Having the "
+                "deadline worked out from the event schedule rather than typed "
+                "in by hand means the list is already ordered by what is "
+                "actually urgent, so I did not have to work that out myself. I "
+                "found everything without being shown where it was.",
     ),
     dict(
-        label="Tester 4 (Operations — Cafeteria Manager)",
+        label="Tester 4 (Cafeteria — Staff)",
         name="Anonymous",
-        age="23",
-        role="Cafeteria Manager",
+        role="Cafeteria (Staff)",
         ui=[5, 4, 5, 5],
         func=[True, True, True, True],
-        comment="Menu management is straightforward, and I like that removing a "
-                "dish does not disturb the orders already placed for it. The "
-                "shared pool works the way our kitchen actually works, where "
-                "whoever is free takes the next order rather than waiting to be "
-                "told. It was clear at all times which orders belonged to my "
-                "outlet and which did not.",
+        comment="Claiming an order from the shared pool is how the kitchen "
+                "already works, where whoever is free takes the next one rather "
+                "than waiting to be told. Once I had claimed it, it was clearly "
+                "mine and had left everybody else's list, so there was no "
+                "chance of two of us preparing the same thing. The serving time "
+                "and the quantity are on the card, so I knew what was needed "
+                "without opening anything.",
     ),
     dict(
-        label="Tester 5 (Administration — System Administrator)",
+        label="Tester 5 (System Administrator)",
         name="Anonymous",
-        age="21",
         role="System Administrator",
         ui=[4, 5, 5, 4],
         func=[True, True, True, True],
@@ -152,40 +158,47 @@ TESTERS = [
 UAT_DISCUSSION = [
     "The responses are read together rather than averaged. Five testers are too "
     "few for a mean to carry statistical meaning, and the value of covering "
-    "five distinct roles lies in the differences between them rather than in "
-    "their central tendency. What matters is whether each tester could complete "
-    "the work their role exists to do, and whether any of them encountered "
-    "something they should not have been shown.",
+    "five distinct positions lies in the differences between them rather than "
+    "in their central tendency. What matters is whether each tester could "
+    "complete the work their role exists to do, and whether any of them "
+    "encountered something they should not have been shown.",
     "Across the twenty interface ratings every response was either agree or "
     "strongly agree, with strongly agree the more common of the two. No "
-    "criterion attracted a neutral or negative rating from any tester. The "
+    "criterion attracted a neutral or a negative rating from any tester. The "
     "ratings are distributed rather than uniform, which is what would be "
-    "expected of five people assessing five different interfaces: the "
-    "applicant, who spends the longest on a single screen, rated the form "
-    "layout highest, while the two operational roles rated navigation highest, "
-    "consistent with their moving between queues rather than dwelling on one "
-    "page.",
+    "expected of five people assessing five different interfaces: the student, "
+    "who spends the longest on a single screen, rated the form layout highest, "
+    "while the departmental and cafeteria staff rated navigation and legibility "
+    "highest, consistent with their moving between queues rather than dwelling "
+    "on one page.",
     "The functionality criteria are the more significant of the two sets for "
     "the purposes of this project, and all twenty responses were positive. "
     "Every tester reached their intended pages without error, encountered no "
     "faults during their tasks, and found the system working correctly on a "
     "second device or browser. Most importantly, every tester answered yes to "
     "the criterion that the system showed only the pages and records their role "
-    "should see. That is the property the unit testing scenarios establish from "
-    "the inside, confirmed here from the outside by people holding a real "
-    "expectation of what they ought to be able to reach — which is the one form "
-    "of evidence the unit testing cannot produce for itself.",
+    "should see.",
+    "The pairing of the two departmental staff is what makes that last answer "
+    "worth something. Student Services and Photography Services were given the "
+    "same task, on the same screen, against the same approved proposals, and "
+    "each reported seeing their own department's items and no others. Neither "
+    "was told what the other could see, and neither needed to be: the narrowing "
+    "is applied in the query rather than by hiding controls, as Section 4.5.6 "
+    "describes. The unit testing scenarios establish that property from the "
+    "inside, and these two responses confirm it from the outside, by two people "
+    "who would have noticed at once if another department's work had appeared "
+    "in their list.",
     "The comments converge on a theme that was not prompted for. Four of the "
-    "five testers independently praised behaviour in which the system refuses "
-    "to proceed and explains why: the form declining to advance past an "
-    "incomplete step, the reviewer being asked for a reason before sending a "
-    "proposal back, the administrator being told precisely which records "
-    "depended on the unit they had tried to delete, and the manager being "
-    "assured that withdrawing a dish would not disturb orders already placed. "
-    "Chapter 1 framed the problem largely as one of delay and fragmentation, "
-    "and these responses suggest that a substantial part of what users value is "
-    "not speed but being told what is expected of them at the point where it "
-    "matters.",
+    "five testers independently praised behaviour in which the system either "
+    "refuses to proceed and explains why, or narrows what it shows to what "
+    "belongs to the person looking: the form declining to advance past an "
+    "incomplete step, the queue holding one department's work and no other, the "
+    "claimed order leaving everybody else's list, and the administrator being "
+    "told precisely which records depended on the unit they had tried to "
+    "delete. Chapter 1 framed the problem largely as one of delay and "
+    "fragmentation, and these responses suggest that a substantial part of what "
+    "users value is not speed but being shown only what is theirs, and being "
+    "told what is expected of them at the point where it matters.",
     "Taken with the unit testing results in Section 5.3.1, the acceptance "
     "responses close the loop between the two levels of testing. The scenarios "
     "establish that the system enforces its rules; the testers confirm that "
