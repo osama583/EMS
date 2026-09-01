@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import date
 
 from ..db import query
 
@@ -90,6 +91,52 @@ def _names_in(answer: str, titles: dict[str, int]) -> list[int]:
     return [entity_id for _length, entity_id in sorted(found, key=lambda pair: -pair[0])][:MAX_CARDS]
 
 
+def _occurrence_rank(row: dict, today: date) -> tuple[int, int, int]:
+    """Sort key putting the occurrence an ANSWER means first: soonest upcoming, then most recent
+    past, then anything with no schedule at all. request_id breaks ties so the order is total.
+
+    `firstDate` already encodes the same convention WITHIN one event (next sitting on or after
+    today, else the earliest), so a row whose firstDate is in the past is an event that is over."""
+    raw = row.get("firstDate")
+    if not raw:
+        return (2, 0, row["request_id"])
+    when = date.fromisoformat(raw)
+    if when >= today:
+        return (0, when.toordinal(), row["request_id"])
+    return (1, -when.toordinal(), row["request_id"])
+
+
+def _best_row_per_title(rows: list[dict]) -> dict[str, int]:
+    """title -> the request_id a card for that title should point at.
+
+    TITLES ARE NOT UNIQUE, and this used to be a dict comprehension that pretended they were: two
+    published events both called "APU Hackathon 2026" collapsed to whichever the database happened
+    to return last, with no ORDER BY anywhere to make even that repeatable. The assistant answered
+    "the APU Hackathon 2026... thirty-six hours, three sponsor challenge tracks" about the 25
+    September one, correctly, and the card underneath it read 10 June - a different event, already
+    past, that the reply had never mentioned. Clicking it opened the wrong event.
+
+    Matching on the answer TEXT cannot disambiguate this (the text names a title, and both rows
+    have it), so the tie is broken the way the rest of this module already breaks it: an answer
+    recommending an event means a FUTURE one. Same rule as `firstDate`, applied across same-titled
+    events rather than within one.
+
+    A dropped duplicate is logged rather than silently discarded - two published events sharing a
+    title is a data problem, and it is the thing to look at first if a card ever looks wrong."""
+    today = date.today()
+    by_title: dict[str, int] = {}
+    for row in sorted(rows, key=lambda r: _occurrence_rank(r, today)):
+        title = row["event_title"]
+        if title in by_title:
+            log.info(
+                "ai.cards.duplicate_title",
+                extra={"title": title, "kept": by_title[title], "dropped": row["request_id"]},
+            )
+            continue
+        by_title[title] = row["request_id"]
+    return by_title
+
+
 def event_cards(answer: str, *, user_id: int | None) -> list[dict]:
     """Card data for every published event the answer names, re-read live and re-checked against
     the same visibility rule the discovery endpoints apply."""
@@ -140,7 +187,7 @@ def event_cards(answer: str, *, user_id: int | None) -> list[dict]:
         """,
         {"user_id": user_id} if user_id is not None else {},
     )
-    by_title = {row["event_title"]: row["request_id"] for row in rows}
+    by_title = _best_row_per_title(rows)
     named = set(_names_in(answer, by_title))
     return [
         {
@@ -196,9 +243,9 @@ def build(answer: str, topics: set[str], *, user_id: int | None) -> tuple[list[d
     events: list[dict] = []
     clubs: list[dict] = []
     try:
-        if topics & {"events", "my_registrations", "event_organiser", "event_organiser_decisions"}:
+        if "events" in topics:
             events = event_cards(answer, user_id=user_id)
-        if topics & {"clubs", "clubs_mine", "clubs_admin", "president_change"}:
+        if "clubs" in topics:
             clubs = club_cards(answer)
     except Exception as exc:  # noqa: BLE001 - decoration must never break a correct answer
         log.warning("ai.cards.failed", extra={"error": str(exc)})

@@ -104,6 +104,14 @@ export class EventFilterState {
    */
   readonly draftPreviewCount = signal<number | null>(null);
 
+  /**
+   * Groups this list cannot meaningfully offer, dropped from groups(). Explore Events' public
+   * (landing-page) variant hides 'visibility': that surface is only ever served Public events
+   * (see explore-events.ts's buildSearchParams), so the group could only offer a choice between
+   * "Public" and an option that always comes back empty.
+   */
+  readonly hiddenGroups = signal<readonly EventFilterKey[]>([]);
+
   private readonly schools = signal<readonly string[]>([]);
   private readonly categories = signal<readonly string[]>([]);
   private readonly formats = signal<readonly string[]>([]);
@@ -153,7 +161,7 @@ export class EventFilterState {
     [...this.schools()].filter((name): name is string => !!name).sort((a, b) => a.localeCompare(b)),
   );
 
-  readonly groups = computed<readonly EventFilterGroup[]>(() => [
+  private readonly allGroups = computed<readonly EventFilterGroup[]>(() => [
     {
       key: 'visibility' as const,
       label: 'Event Visibility',
@@ -181,6 +189,10 @@ export class EventFilterState {
       ? [{ key: 'club' as const, label: 'Club', options: ['My Clubs'] }]
       : []),
   ]);
+
+  readonly groups = computed<readonly EventFilterGroup[]>(() =>
+    this.allGroups().filter((group) => !this.hiddenGroups().includes(group.key)),
+  );
 
   /**
    * Loads the category/format/school option lists. Called on first open rather than on

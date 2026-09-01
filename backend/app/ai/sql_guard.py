@@ -20,7 +20,18 @@ WHAT IS CHECKED, and why each one exists:
      asking the database to describe itself is either confused or probing).
   4. TABLE ALLOW-LIST. Every table referenced must be in the set this QUESTION's topics allow
      (schema_catalog.tables_for_topics) - narrower than the global allow-list, so a club
-     question cannot read event registrations.
+     question cannot read event registrations - PLUS the tables scope_rules.py's own required
+     predicates name (_predicate_tables). That union is not a loosening, it is the only
+     self-consistent set: rule 7 below REQUIRES those predicates verbatim, so a table this rule
+     forbade while rule 7 demanded it made the query unsatisfiable in both directions at once.
+     That is not hypothetical - it is what shipped. Migration 029 gave 'Club Only' events a real
+     audience, so the mandated `request` predicate grew an
+     `EXISTS (SELECT 1 FROM request_clubs JOIN club_members ...)` membership test, and nobody
+     added those two tables to schema_catalog's events group. Every event question from every
+     signed-in user then failed: copy the predicate and rule 4 rejected it, drop it and rule 7
+     rejected it, three attempts, "I don't have that information available right now" - for
+     "show me all events". Guests never saw it, their predicate having no such clause.
+     Deriving the set here means a predicate can never again name a table the guard forbids.
   5. COLUMN ALLOW-LIST. Every `table.column` reference must exist in the introspected catalog,
      which already has EXCLUDED_COLUMNS (users.password) stripped. Bare, unqualified columns
      are not checked here - they cannot be resolved without a full parser, which is exactly why
@@ -81,12 +92,17 @@ _NEUTRALISING_CONSTRUCTS = (
     (re.compile(r"\bor\s+'[^']*'\s*=\s*'[^']*'", re.IGNORECASE), "a constant string comparison in an OR"),
 )
 
-# The marker scope_rules emits for "counting registrations is public, identifying registrants is not"
-# (see its event_registration block).
+# The marker scope_rules emits for "counting these rows is public, identifying the people in them
+# is not". It is the ONLY condition either people-table gets, for every caller - see scope_rules.
 _COUNT_ONLY_MARKER = "PUBLIC_COUNT_ONLY"
 
-# Columns that turn a count into a disclosure. A registration COUNT is on every event card already;
-# these say WHO, which is the part that is actually private.
+# Columns that turn a count into a disclosure. "N registered" is on every event card and "N members"
+# on every club card; these say WHO, which is the part the assistant does not answer for anybody.
+#
+# `full_name` is in the list, which costs one legitimate query shape: a club's president cannot be
+# named in the same query as a member count. That is the right trade - grouping a count by a name
+# is a roster with a COUNT(*) column bolted on - and the president is still answerable in a query
+# that does not carry the marker, since `clubs` itself has no count-only restriction.
 _IDENTIFYING_REGISTRATION_COLUMNS = (
     "registrant_name", "registrant_email", "reason_for_attending",
     "payment_proof_url", "payment_proof_file_name", "payment_status",
@@ -110,6 +126,13 @@ _QUALIFIED_COLUMN = re.compile(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-
 # before the column check runs. Without this every aliased query would fail rule 5.
 _ALIAS = re.compile(
     r"\b(?:from|join)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+(?:as\s+)?([a-zA-Z_][a-zA-Z0-9_]*)",
+    re.IGNORECASE,
+)
+# The same shape with the clause keyword captured, so _drop_alias_declarations can rebuild
+# `FROM <table>` without it. Kept separate rather than adding a group to _ALIAS, whose two-group
+# findall() shape (table, alias) _alias_map depends on.
+_ALIAS_DECLARATION = re.compile(
+    r"\b(from|join)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+(?:as\s+)?([a-zA-Z_][a-zA-Z0-9_]*)",
     re.IGNORECASE,
 )
 # Words that follow a table name but are clauses, not aliases.
@@ -178,6 +201,49 @@ def _expand_aliases(sql: str, aliases: dict[str, str]) -> str:
     return re.sub(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\.", replace, sql)
 
 
+def _drop_alias_declarations(sql: str) -> str:
+    """`FROM request_clubs rc_request` -> `FROM request_clubs`, for comparison only.
+
+    _expand_aliases rewrites where an alias is USED; this removes where it is DECLARED. Rule 7
+    needs both, because the declaration is text too: once uses are expanded, a predicate saying
+    `FROM request_clubs rc_request` and a query saying `FROM request_clubs rc_sub` read the same
+    tables and the same columns and differ in nothing but the name the model picked - yet compared
+    as raw strings they still fail.
+
+    Comparison only. The executed SQL keeps every alias exactly as written."""
+    def replace(match: re.Match) -> str:
+        clause, table, alias = match.group(1), match.group(2), match.group(3)
+        return match.group(0) if alias.lower() in _NOT_AN_ALIAS else f"{clause} {table}"
+
+    return _ALIAS_DECLARATION.sub(replace, sql)
+
+
+def _comparable(text: str, aliases: dict[str, str]) -> str:
+    """The form rule 7 compares: real table names, no alias declarations, whitespace collapsed.
+
+    Both sides go through this, so what is compared is which tables and columns the condition
+    actually reads - not which single letters the model happened to reach for."""
+    return _normalise(_expand_aliases(_drop_alias_declarations(text), aliases))
+
+
+def _predicate_tables(scope) -> set[str]:
+    """Every table named inside the scope's own required predicates.
+
+    Rule 4 has to admit these, because rule 7 demands the predicate that names them - see the
+    module docstring for the outage that proved it. Read off the predicate TEXT rather than
+    maintained as a second list, so a predicate that grows a new join (which is exactly how this
+    broke) carries its own permission with it and cannot drift again.
+
+    This admits a table to the allow-list ONLY. It grants no rows: a table reachable this way is
+    still subject to rule 7's own required predicate and rule 8's forbidden check, and
+    scope_rules.py gives club_members an own-row condition for precisely that reason."""
+    tables: set[str] = set()
+    for predicates in scope.required_predicates.values():
+        for predicate in predicates:
+            tables |= {name.lower() for name in _TABLE_REF.findall(predicate)}
+    return tables
+
+
 def validate(sql: str, *, allowed_tables: tuple[str, ...], scope) -> str:
     """Returns the cleaned, single-statement SQL, or raises SqlRejected.
 
@@ -229,7 +295,8 @@ def validate(sql: str, *, allowed_tables: tuple[str, ...], scope) -> str:
     # table clause.
     structural = _blank_function_from(structural)
 
-    allowed = {t.lower() for t in allowed_tables}
+    # The question's tables, plus the ones its own mandatory conditions reach through (rule 4).
+    allowed = {t.lower() for t in allowed_tables} | _predicate_tables(scope)
     aliases = _alias_map(structural)
 
     # 4. table allow-list. A name that is a CTE defined in this same query is fine; collect those
@@ -269,7 +336,7 @@ def validate(sql: str, *, allowed_tables: tuple[str, ...], scope) -> str:
 
     # 7. required scope predicates - the row-level authorization check Compared against an ALIAS-
     # EXPANDED form of the query, not the raw text.
-    normalised_sql = _normalise(_expand_aliases(cleaned, aliases))
+    normalised_sql = _comparable(cleaned, aliases)
     for table, predicates in scope.required_predicates.items():
         if not predicates:
             continue  # handled by rule 8
@@ -278,9 +345,25 @@ def validate(sql: str, *, allowed_tables: tuple[str, ...], scope) -> str:
         # actually reads.
         if not re.search(rf"\b{re.escape(table)}\b", structural_lower):
             continue  # table not used by this query
-        # The PREDICATE is alias-expanded too, with the same map.
+        # The PREDICATE is alias-expanded too - but with ITS OWN aliases taking precedence over the
+        # query's, which is the only way the comparison can survive a rename the model was forced
+        # into.
+        #
+        # A predicate that opens a subquery defines aliases of its own ("FROM request_clubs
+        # rc_request"), and the model may legitimately have to rename one: if the outer query
+        # already uses that letter-pair for a different table, keeping it would be invalid SQL. It
+        # does exactly that. The events visibility predicate used to say `FROM request_clubs rc`,
+        # and a recommendation query joins request_categories - the natural alias for which is also
+        # `rc` - so the model renamed the inner one to `rc_sub` and wrote a semantically IDENTICAL
+        # condition. Expanding the predicate with the query's map alone then rewrote the
+        # predicate's own `rc.` into `request_categories.`, compared it against the query's
+        # `request_clubs.`, and rejected a correct query three times over.
+        #
+        # Expanding each side to real TABLE names - the query by its map, the predicate by its own -
+        # compares what both actually read rather than what they happened to call it. This loosens
+        # nothing: an alias is a local name, and a predicate reading a different TABLE still fails.
         if not any(
-            _normalise(_expand_aliases(predicate, aliases)) in normalised_sql
+            _comparable(predicate, {**aliases, **_alias_map(predicate)}) in normalised_sql
             for predicate in predicates
         ):
             raise SqlRejected(
@@ -294,15 +377,15 @@ def validate(sql: str, *, allowed_tables: tuple[str, ...], scope) -> str:
     if _COUNT_ONLY_MARKER.lower() in normalised_sql:
         if not re.search(r"\bcount\s*\(", structural_lower):
             raise SqlRejected(
-                f"{_COUNT_ONLY_MARKER} may only be used on an aggregate query. Use COUNT(*), or "
-                "query only the registrations you are otherwise authorised to read.",
+                f"{_COUNT_ONLY_MARKER} may only be used on an aggregate query. Use COUNT(*) - "
+                "there is no per-person read of this table available to anyone.",
                 repairable=True,
             )
         for column in _IDENTIFYING_REGISTRATION_COLUMNS:
             if re.search(rf"\b{re.escape(column)}\b", structural_lower):
                 raise SqlRejected(
-                    f"A {_COUNT_ONLY_MARKER} query may not reference '{column}' - registration "
-                    "COUNTS are public, but who registered is not.",
+                    f"A {_COUNT_ONLY_MARKER} query may not reference '{column}' - the COUNT is "
+                    "public, but who those people are is not answerable at all.",
                     repairable=True,
                 )
 

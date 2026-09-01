@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, HostListene
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
 import { Subscription, filter } from 'rxjs';
-import { AiAssistantClub, AiAssistantProposal, AiAssistantRegistrantsTable, AiAssistantService, AiAssistantSource } from '../../../core/ai-assistant/ai-assistant.service';
+import { AiAssistantClub, AiAssistantService, AiAssistantSource } from '../../../core/ai-assistant/ai-assistant.service';
 import { AiChatMessage, AiConversation, AiConversationStore } from '../../../core/ai-assistant/ai-conversation-store.service';
 import { PublishedEvent, RegistrationResult } from '../../../core/events/published-event.models';
 import { PublishedEventService } from '../../../core/events/published-event.service';
@@ -12,16 +12,19 @@ import { AiOrbAwarenessService } from './ai-orb-awareness.service';
 
 interface SuggestionCard { readonly icon: string; readonly title: string; readonly description: string; readonly prompt: string; }
 
-const PROMPTS = ['Need help?', 'Have a question?', 'Want to create a request?', 'Questions about the process?'] as const;
-const GREETING = 'Hi! I can help you understand events, proposals, and the APU request process.';
+const PROMPTS = ['Need help?', 'Have a question?', 'Looking for an event?', 'Not sure where something lives?'] as const;
+// Deliberately vague about clubs and events. This banner is rendered before GET /ai/suggestions has
+// answered, so nothing here knows whether this reader can reach either — and naming a topic they
+// would then be refused is the exact broken promise the server-driven list exists to prevent.
+const GREETING = 'Hi! Ask me to find something, explain a page, or walk you through how to do it.';
 
-// Shown only when GET /ai/suggestions cannot be reached. Deliberately the three questions that
-// need no access at all to answer — anything role-specific would be a guess about a reader whose
-// grants we just failed to load, and guessing is what the server-driven list exists to stop.
+// Shown only when GET /ai/suggestions cannot be reached. Deliberately the three questions that need
+// no access at all to answer — anything topic-specific would be a guess about a reader whose grants
+// we just failed to load. They match the ungated tail of the server's own catalogue.
 const FALLBACK_SUGGESTION_CARDS: readonly SuggestionCard[] = [
-  { icon: 'quiz', title: 'What Can I Ask?', description: 'See the topics you can ask about with your access.', prompt: 'What can I ask you about?' },
-  { icon: 'account_circle', title: 'What Can I Do Here?', description: 'Find out what your account lets you do.', prompt: 'What can I do in this app with my account?' },
-  { icon: 'info', title: 'About This App', description: 'Understand what the platform is for.', prompt: 'What is this app for and what can it do?' },
+  { icon: 'help_center', title: 'What Is This Page For?', description: 'Ask what any part of the app does.', prompt: 'What is Explore Events for?' },
+  { icon: 'account_circle', title: 'Who Am I?', description: 'Check your account, your role and what you can reach.', prompt: 'Who am I and what can I access?' },
+  { icon: 'quiz', title: 'What Can You Do?', description: 'See what I can help you with.', prompt: 'What can you help me with?' },
 ];
 
 // Phone-width screens open the full-page assistant with its standing sidebar already collapsed to
@@ -136,9 +139,10 @@ export class AiAssistantComponent implements OnDestroy {
   readonly error = signal('');
   readonly eyeX = signal(0);
   readonly eyeY = signal(0);
-  // Loaded from the server on first open (see loadSuggestions()) — what a reader may usefully ask
-  // depends on their role, and the panel used to offer everyone the same eight proposal questions
-  // regardless of whether they could submit a proposal at all.
+  // Loaded from the server on first open (see loadSuggestions()) — a card is a promise, and only
+  // the server knows which questions this particular reader can actually have answered. The list
+  // used to be fixed and proposal-shaped, so most readers were offered questions that would then
+  // be refused.
   readonly suggestionCards = signal<readonly SuggestionCard[]>(FALLBACK_SUGGESTION_CARDS);
   readonly cardPages = computed(() => paginateCards(this.suggestionCards()));
   private suggestionsRequested = false;
@@ -430,8 +434,7 @@ export class AiAssistantComponent implements OnDestroy {
         this.recoveringQuestion = false;
         this.store.appendMessage(conversationId, {
           id: newMessageId(), sender: 'assistant', text: response.answer, sources: response.sources,
-          registrantsTable: response.registrantsTable, clubs: response.clubs, proposals: response.proposals,
-          navigation: response.navigation, createdAt: Date.now(),
+          clubs: response.clubs, navigation: response.navigation, createdAt: Date.now(),
         });
         this.typing.set(false); this.scrollMessages();
         // No-op while the panel is open (already fully visible with idle suspended) — kept
@@ -476,21 +479,6 @@ export class AiAssistantComponent implements OnDestroy {
     });
     this.closePanel();
   }
-  // Same route/query shape hub-proposals.ts's own row click uses: readOnly is true for any bucket
-  // other than 'inbox' (the only bucket where the reviewer/applicant can actually act) — see that
-  // file's onRowClick().
-  openProposalFromCard(proposal: AiAssistantProposal): void {
-    const underApp = this.router.url.startsWith('/app');
-    if (!underApp) { void this.router.navigate(['/login']); this.closePanel(); return; }
-    if (proposal.bucket === 'drafts') {
-      void this.router.navigate(['/app/forms/event-proposal'], { queryParams: { proposalId: proposal.requestId } });
-    } else {
-      void this.router.navigate(['/app/proposals/review', proposal.requestId], {
-        queryParams: { returnTo: this.router.url, readOnly: proposal.bucket !== 'inbox' },
-      });
-    }
-    this.closePanel();
-  }
   // Seed/demo event images are frequently an external placeholder URL (placehold.co) that a browser
   // extension, ad-blocker, or offline network can fail to load — same risk EventCardComponent guards
   // against for a MISSING image (see EVENT_IMAGE_PLACEHOLDER); this additionally covers a present-but-
@@ -509,10 +497,6 @@ export class AiAssistantComponent implements OnDestroy {
     const twelveHour = hours % 12 === 0 ? 12 : hours % 12;
     return `${twelveHour}:${minutesStr} ${period}`;
   }
-  registrantStatusLabel(status: AiAssistantRegistrantsTable['registrants'][number]['status']): string {
-    return status === 'registered' ? 'Confirmed' : status === 'pending_approval' ? 'Pending' : 'Rejected';
-  }
-
   openEventFromCard(eventId: string): void {
     this.publishedEventService.getEventDetails(eventId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (event) => { if (event) this.selectedCardEvent.set(event); },

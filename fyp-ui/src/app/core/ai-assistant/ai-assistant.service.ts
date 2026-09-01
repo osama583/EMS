@@ -18,18 +18,6 @@ export interface AiAssistantSource {
   readonly category?: string;
 }
 
-export interface AiAssistantRegistrant {
-  readonly name: string;
-  readonly status: 'registered' | 'pending_approval' | 'rejected';
-  readonly registeredAt: string;
-}
-
-export interface AiAssistantRegistrantsTable {
-  readonly eventId: string;
-  readonly eventTitle: string;
-  readonly registrants: readonly AiAssistantRegistrant[];
-}
-
 export interface AiAssistantClub {
   readonly clubId: string;
   readonly clubName: string;
@@ -38,23 +26,9 @@ export interface AiAssistantClub {
   readonly categories?: string | null;
 }
 
-// requestId/bucket let the frontend link straight to the same page the equivalent records-hub row
-// would open (see hub-proposals.ts's row click: /app/proposals/review/{id} with a readOnly flag
-// derived from bucket) — bucket is 'inbox' | 'ongoing' | 'history' | 'drafts', computed server-side
-// (see backend's proposal_retrieval.bucket_for_status) so "pending"/"ongoing"/"in my inbox" all
-// resolve to the one real bucket a proposal is actually in, never a fixed status word.
-export interface AiAssistantProposal {
-  readonly requestId: string;
-  readonly requestCode: string;
-  readonly eventTitle: string;
-  readonly status: string;
-  readonly statusLabel: string;
-  readonly bucket: 'inbox' | 'ongoing' | 'history' | 'drafts';
-}
-
-// A "take me there" card that accompanies a how-to answer. Only ever present when Page Visibility
-// actually grants the asker that page (the backend builds it from the same grant check that
-// released the instructions), so it can never link somewhere the user would be bounced out of.
+// A "take me there" card that accompanies a how-to or a page answer. Only ever present when Page
+// Visibility actually grants the asker that page (the backend builds it from the same grant check
+// that released the instructions), so it can never link somewhere the user would be bounced out of.
 export interface AiAssistantNavigation {
   readonly pageCode: string;
   readonly label: string;
@@ -62,12 +36,18 @@ export interface AiAssistantNavigation {
   readonly icon?: string | null;
 }
 
+// THE ANSWER CARRIES EVENTS AND CLUBS ONLY. It used to carry a registrants table and proposal
+// cards too; the assistant no longer answers about either — who registered for an event and what
+// state a proposal is in are outside what it covers for anybody now — so the backend cannot emit
+// them and the rendering for them is gone rather than left waiting for data that never arrives.
+//
+// `registrantsTable` survives as a permanently-null key because the server still sends it; it is
+// read by nothing.
 export interface AiAssistantAnswer {
   readonly answer: string;
   readonly sources: readonly AiAssistantSource[];
-  readonly registrantsTable?: AiAssistantRegistrantsTable | null;
+  readonly registrantsTable?: null;
   readonly clubs?: readonly AiAssistantClub[];
-  readonly proposals?: readonly AiAssistantProposal[];
   readonly navigation?: readonly AiAssistantNavigation[];
 }
 

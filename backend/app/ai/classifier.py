@@ -1,223 +1,274 @@
-"""Intent/topic classification, by the model rather than by regex.
+"""INTENT HANDLING AND CONVERSATION MEMORY - one reading of the turn, produced by the model.
 
-WHAT REPLACED WHAT. query_router.py's classify() was ~450 lines of hand-tuned regex plus a fuzzy
-typo fallback, with gemini.classify_llm() as a rescue path for the cases regex missed or matched
-too weakly. That arrangement had a structural problem the patterns themselves could not fix: every
-new phrasing needed a new pattern, and the recurring failure was never "matched nothing" (safe -
-an empty CONTEXT produces "I don't have that") but "a BROAD pattern caught a question a SPECIFIC
-one missed", which loads the wrong domain's data and answers confidently from it. The regexes'
-own comments record several of those. So the ordering is inverted here: the model classifies, and
-the parts of query_router.py that are genuinely lookups rather than guesses are kept.
+WHAT A "READING" IS. Every turn is resolved into three things at once, because they are the same
+question asked three ways and answering them separately is what let them disagree:
 
-KEPT FROM query_router.py, unchanged and imported (not copied):
-  CLASS_DESCRIPTIONS  the class vocabulary. It is the contract shared by topic_access.TOPIC_PAGES,
-                      schema_catalog._TOPIC_GROUPS and this module, and it was already written as
-                      prose descriptions - exactly what a classifier prompt needs.
-  named_role()        which ROLE a "what can {role} do" question names. A dictionary lookup
-                      against knowledge_base's real role table, not a guess - asking the model to
-                      re-derive a role_code it could get subtly wrong would be strictly worse.
-  how_to_topic()      which HOW_TO_GUIDES key a procedural question is about. Same reasoning: the
-                      guide keys are a fixed, small, known set.
+    intents      which of the nine things (query_router.INTENT_DESCRIPTIONS) this turn is
+    subject      WHICH event or club it is about, resolved through the conversation
+    preferences  what the asker has said, across the whole conversation, about what they like
 
-WHAT IS NEW: history-aware classification is now the model's job rather than a separate
-inheritance pass. api/ai.py used to re-classify the previous turn's question with regex and union
-the result in, because a bare follow-up ("is it active", "what about that one") carries no topic
-words. The model is given the recent turns directly and resolves the reference itself, which is
-the thing it is actually good at.
+`subject` is the conversation memory. "Suggest an event" -> "when is it?" carries no event name of
+its own; the reading resolves `it` against what was actually being discussed and hands the name
+forward, so the retrieval step looks up the right row rather than a fresh search for the word "it".
+The same turn is what SWITCHES the subject: the moment the asker names something else, the model
+returns the new name, and nothing sticky has to be expired by hand. A question about neither
+returns null, which is how a topic change out of the events/clubs domain reads.
 
-FAILURE MODE: an outage refuses rather than guesses - but it refuses AS AN OUTAGE. Returning an
-empty set on an API error used to conflate "the classifier could not run" with "the classifier ran
-and matched nothing"; api/ai.py can only read the latter, so a rate-limited call told the asker
-their ordinary question was outside what the assistant covers, and filed it in the AI access log as
-an unsupported capability gap. Failure now raises ClassificationUnavailable; only a real empty
-result returns an empty set.
+`preferences` is the other half of memory, and it is what stops the assistant asking the same
+question twice. A suggestion is a two-part flow - ask what they enjoy, then suggest - and the
+second part needs everything they have said, not just this turn's words. Accumulating it here
+(rather than re-deriving "have they told us yet" from keyword-matching the assistant's own previous
+sentences, which is what this replaces) means an answer given four turns ago still counts.
+
+WHY THE MODEL AND NOT REGEX. The previous router was ~700 lines of per-class patterns. Failing to
+match was always safe - no match means out of scope - but the recurring bug was the other
+direction: a SPECIFIC pattern missed, a BROAD one caught the question instead, and real data for
+the wrong domain was answered from confidently. Every new phrasing needed a new pattern, and each
+broad pattern made that failure likelier rather than rarer.
+
+WHAT IS STILL DETERMINISTIC, because these are lookups and not judgements: which page a
+"what is X for" names, and which function a "how do I X" names, both matched against the real
+tables in scope.py. And the two suppressions below, which stop a resolved how-to or page question
+from ALSO dragging in a data intent - a rule crisp enough that it should not depend on prompt
+adherence.
+
+A CLASSIFIER FAILURE IS NOT AN EMPTY RESULT. "The classifier ran and matched nothing" means the
+question is out of scope; "the classifier could not run" is an outage. Conflating them reported an
+infrastructure fault to the asker as a judgement about their question, so the second raises.
 """
 from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
 
 from google.genai import types
 
 from .gemini import GENERATION_MODEL, _generate_content
-from .query_router import (  # noqa: F401 - re-exported
-    CLASS_DESCRIPTIONS,
-    area_named,
-    how_to_topic,
-    named_role,
+from .query_router import (  # noqa: F401 - re-exported: this module is their import site
+    ALL_INTENTS,
+    CLUB_INTENTS,
+    DATA_INTENTS,
+    EVENT_INTENTS,
+    INTENT_DESCRIPTIONS,
+    INTENT_DOMAIN,
+    INTENT_TOPIC,
+    KNOWLEDGE_INTENTS,
+    function_named,
+    page_named,
 )
 
 log = logging.getLogger(__name__)
 
 __all__ = [
-    "CLASS_DESCRIPTIONS", "ClassificationUnavailable", "area_named", "classify", "how_to_topic",
-    "named_role",
+    "ClassificationUnavailable", "Reading", "read",
+    "ALL_INTENTS", "CLUB_INTENTS", "DATA_INTENTS", "EVENT_INTENTS", "INTENT_DESCRIPTIONS",
+    "INTENT_DOMAIN", "INTENT_TOPIC", "KNOWLEDGE_INTENTS", "function_named", "page_named",
 ]
+
+# How many prior turns the reading is resolved against. Enough for a real thread; short enough that
+# an abandoned subject from twenty turns ago cannot be dragged back in.
+HISTORY_TURNS = 6
 
 
 class ClassificationUnavailable(RuntimeError):
-    """The classifier could not run at all - a rate limit, a network fault, a malformed response.
+    """The reading could not be produced at all - a rate limit, a network fault, a malformed
+    response. Distinct from "it ran and matched nothing", which is a real, in-scope answer."""
 
-    Distinct from "the classifier ran and matched nothing", which is a real answer meaning the
-    question is out of scope. Conflating the two reported an infrastructure outage to the user as
-    a judgement about their question."""
+
+@dataclass(frozen=True)
+class Reading:
+    """One turn, fully resolved: what is being asked, about what, and what we already know."""
+
+    intents: frozenset[str]
+    subject: str | None = None
+    preferences: str | None = None
+
+    @property
+    def data_intents(self) -> frozenset[str]:
+        return self.intents & DATA_INTENTS
+
+    @property
+    def knowledge_intents(self) -> frozenset[str]:
+        return self.intents & KNOWLEDGE_INTENTS
+
+    @property
+    def topics(self) -> set[str]:
+        """The scope.TOPICS keys this turn needs page access to."""
+        return {INTENT_TOPIC[intent] for intent in self.intents if intent in INTENT_TOPIC}
+
+    @property
+    def domain(self) -> str | None:
+        """'events', 'clubs', or None when the turn touches both or neither."""
+        domains = {INTENT_DOMAIN[i] for i in self.intents if i in INTENT_DOMAIN}
+        return domains.pop() if len(domains) == 1 else None
+
+    @property
+    def is_suggestion(self) -> bool:
+        return bool(self.intents & {"event_suggestion", "club_suggestion"})
+
+    def without(self, intents: set[str]) -> "Reading":
+        return Reading(intents=self.intents - intents, subject=self.subject,
+                       preferences=self.preferences)
 
 
 def _system_instruction() -> str:
-    lines = [
-        "You are the intent classifier for a university event and club management app's chat "
-        "assistant. Given a QUESTION, decide which topic classes it touches.",
+    return "\n".join([
+        "You read one turn of a chat with the assistant embedded in a university event and club "
+        "app, and return three things: the INTENTS it carries, the SUBJECT it is about, and every "
+        "PREFERENCE the asker has expressed so far.",
         "",
-        "A question can touch MORE THAN ONE class - return every class that genuinely applies. "
-        "Return an EMPTY list when none apply: small talk unrelated to the app, general knowledge, "
-        "or anything this app has nothing to do with. Never invent a class outside this list.",
+        "INTENTS. Return every intent that genuinely applies - a turn can carry more than one - and "
+        "an EMPTY list when none do. An empty list is a real answer meaning the question is outside "
+        "everything this assistant covers; never stretch to the nearest intent to avoid returning "
+        "nothing. Be precise rather than generous: an extra intent makes the assistant load and "
+        "answer from the wrong kind of thing.",
         "",
-        "Be precise rather than generous. Returning an extra class is not harmless - it makes the "
-        "assistant load and answer from the wrong kind of data. In particular:",
-        "- A question about the asker's OWN registrations is my_registrations, NOT events. "
-        "'events' is for browsing the public catalogue.",
-        "- A question about the asker's OWN clubs/memberships is clubs_mine, NOT clubs_admin. "
-        "clubs_admin is only for system-wide club administration and analytics.",
-        "- 'What can I do here' is self_capability; 'what can you help me with' is askable; "
-        "'what can {some named role} do' is role_capability. These are three different questions.",
-        "- A step-by-step 'how do I...' is how_to ALONE, even when it mentions clubs or events. "
-        "'How do I join a club' wants instructions, not a list of clubs - do not also return the "
-        "topic it happens to name.",
-        "- 'What is <page or section> FOR' is page_purpose ALONE, and it is not a data question. "
-        "'What is the Event Calendar for', 'what does Happening Soon do', 'what is the point of "
-        "Explore Events' all ask what part of the app that is - answer them from the app's own "
-        "description of the page, so do NOT also return `events` or `clubs` and send the question "
-        "to the database. The moment they ask what is ON the page ('what's on the calendar in "
-        "October') it becomes the data class instead.",
-        "- WHO HOLDS A STAFF OR ORGANISATIONAL POSITION matches NO class - return an empty list. "
-        "'Who is the head of logistics', 'who manages the IT department', 'who is in charge of "
-        "facilities', 'who is the dean', staff or student directories, contact details, and user "
-        "headcounts are all the university's org chart and people directory, which this app does "
-        "not hold and this assistant does not expose. Returning a club/event class for one of "
-        "these is the specific mistake to avoid: it sends an unanswerable question down the "
-        "database path, which then fails and tells the asker to rephrase - so they rephrase a "
-        "question that has no answer here, and the loop repeats. An empty list gets them a "
-        "straight 'you don't have access to that' instead.",
-        "  THE TWO EXCEPTIONS, because these are club/event facts rather than org-chart facts: a "
-        "club's PRESIDENT ('who is the president of the Photography Club') is clubs/clubs_mine, "
-        "and an event's ORGANISER ('who is running the hackathon') is events. Both are real "
-        "columns in this app and stay answerable.",
+        "RETURN AN EMPTY LIST for anything outside the list below. That explicitly includes: who is "
+        "registered for an event, who joined a club, anyone else's registration or membership, "
+        "event administration, proposal or approval status, analytics, reports, internal system "
+        "data, cafeteria menus and food, user directories, who holds a staff position, and every "
+        "subject outside this app - general knowledge, maths, coding, current affairs, "
+        "translation, definitions, opinions and advice. Returning a club or event intent for one "
+        "of these is the specific mistake to avoid: it sends an unanswerable question down the "
+        "retrieval path, which fails and asks the person to rephrase a question that has no answer "
+        "here. An empty list gets them a straight, honest 'that is not something I cover'.",
+        "  A club's PRESIDENT and an event's ORGANISER are the two exceptions: both are printed on "
+        "the card, so 'who is the president of the Photography Club' is club_info and 'who is "
+        "running the hackathon' is event_info.",
         "",
-        "If the question is a short follow-up that carries no topic of its own ('is it active', "
-        "'what about that one', 'yes', 'show me the list'), classify it against what the RECENT "
-        "CONVERSATION was actually about.",
+        "A QUESTION NAMING A PAGE OF THIS APP IS NEVER OUT OF SCOPE, whoever is asking. The page "
+        "list is finite and several entries read as ordinary concepts - Page Visibility, Reports, "
+        "Users, Roles, Inbox, Drafts, Ongoing, History, Proposal. 'What is Page Visibility?' is a "
+        "question about a page, so it is page_purpose. Do not read it as a permissions question, "
+        "and do not return an empty list because the asker probably cannot open the page - what "
+        "they may open is decided after you, and describing what a page is FOR is never gated.",
         "",
-        "CLASSES:",
-    ]
-    lines += [f"- {name}: {description}" for name, description in CLASS_DESCRIPTIONS.items()]
-    return "\n".join(lines)
+        "SUGGESTION vs INFORMATION. 'Suggest an event' has no criterion and wants the assistant to "
+        "choose - that is event_suggestion. 'Which event has the most registrations' states exactly "
+        "how to pick, so nothing needs asking - that is event_info. Words like 'suggest' and "
+        "'recommend' do not decide this; whether the asker has already said how to choose does.",
+        "",
+        "SHORT FOLLOW-UPS carry no topic of their own ('when is it', 'is it free', 'tell me more', "
+        "'what about the venue', 'what do they do'). Read them against the RECENT CONVERSATION and "
+        "give them the intent of what was actually being discussed. A question ABOUT THE REPLY you "
+        "just gave ('are you sure', 'is that everything', 'so you can't find it?') is also a "
+        "follow-up and keeps the previous turn's intent.",
+        "",
+        "SUBJECT. If this turn is about ONE specific named event or club, return its name. Resolve "
+        "pronouns and references against the RECENT CONVERSATION: after the assistant suggested "
+        "the Annual Hackathon, 'when is it' has subject 'Annual Hackathon'. Return the name exactly "
+        "as it appeared, not a paraphrase. Return null when the turn is about no particular one - a "
+        "browse, a suggestion request, a how-to, a page question - and return the NEW name the "
+        "moment the asker names something else, which is how the subject changes.",
+        "",
+        "PREFERENCES. Return everything the ASKER has said, in this whole conversation, about what "
+        "they like, want, are free for, or are looking for - interests, activity types, timing, "
+        "cost, size. Combine it into one short phrase ('likes competitive tech events, free, this "
+        "month'). Include what they said in earlier turns, not just this one. Return null only if "
+        "they have never said anything of the kind. Never infer a preference from their name, their "
+        "school, or from something the assistant said - only from their own words.",
+        "",
+        "INTENTS:",
+        *(f"- {name}: {description}" for name, description in INTENT_DESCRIPTIONS.items()),
+    ])
 
 
-# Classes answered entirely from knowledge_base.py's hand-written content - no database query, no SQL
-# generation.
-KNOWLEDGE_BASE_CLASSES: frozenset[str] = frozenset({
-    "self_capability",
-    "askable",
-    "role_capability",
-    "system_capability",
-    "page_purpose",
-    "how_to",
-    "greeting",
-    "admin_ai_denials",
-})
-
-# Classes answered by querying the database (Text-to-SQL). Everything with real rows behind it.
-DATA_CLASSES: frozenset[str] = frozenset(CLASS_DESCRIPTIONS) - KNOWLEDGE_BASE_CLASSES
+_RESPONSE_SCHEMA = types.Schema(
+    type=types.Type.OBJECT,
+    properties={
+        "intents": types.Schema(
+            type=types.Type.ARRAY,
+            items=types.Schema(type=types.Type.STRING, enum=sorted(ALL_INTENTS)),
+        ),
+        "subject": types.Schema(type=types.Type.STRING, nullable=True),
+        "preferences": types.Schema(type=types.Type.STRING, nullable=True),
+    },
+    required=["intents"],
+)
 
 
-def _suppress_incidental_how_to_topics(question: str, classes: set[str]) -> set[str]:
-    """A resolved how-to answers from its GUIDE, not from the database.
+def _suppress_incidental_data_intents(question: str, reading: Reading) -> Reading:
+    """A resolved how-to or page question answers from its DEFINITION, never from the database.
 
-    "How do I join a club" names clubs, so the classifier returns {how_to, clubs} - both defensible
-    in isolation, but the question wants instructions and the data class turns it into a list of
-    clubs instead (observed exactly that way through the finished endpoint). The old regex router
-    had a dedicated fix for this; the model needs the same one, because "which classes does this
-    touch" and "what does the asker actually want" are different questions and only the first is
-    the classifier's job.
+    "How do I join a club" names clubs, so a reading of {how_to, club_info} is defensible in
+    isolation - but the question wants instructions, and the data intent turns it into a list of
+    clubs instead. "What is the Event Calendar for" has the same shape and was worse: it made a
+    structural question depend on data access, which is why the identical question once returned a
+    description for a guest and a flat refusal for a visitor account when neither should have
+    touched an event row.
 
-    Applied ONLY when a specific guide resolves. A generic "how does the approval process work"
-    (how_to_topic returns None) has no steps to give, so its data classes are the only thing that
-    could answer it and are deliberately left alone.
-
-    The prompt asks for this too. This is the deterministic backstop, because the consequence of
-    the model not complying is a wrong-shaped answer on a common question, and a rule this crisp
-    should not depend on prompt adherence."""
-    if "how_to" not in classes or how_to_topic(question) is None:
-        return classes
-    return (classes - DATA_CLASSES) or {"how_to"}
-
-
-def _suppress_incidental_page_topics(question: str, classes: set[str]) -> set[str]:
-    """A resolved page_purpose answers from the page's DEFINITION, not from the database.
-
-    The same backstop, for the same reason: "what is the Event Calendar for" names events, so the
-    classifier returns {page_purpose, events} and the data path then answers a structural question
-    with a list of what happens to be on next week. Worse, it made the answer depend on data access
-    - which is why the identical question got a description for a guest and a flat refusal for an
-    external account, when neither should ever have touched an event row.
-
-    Applied ONLY when a real Area resolves. An unrecognised page name leaves the classes alone, so
-    a question that merely sounds structural still has its data classes to fall back on.
+    Applied ONLY when a specific function or page actually resolves. A generic "how does approval
+    work" resolves no function, so its data intents are the only thing that could answer it and are
+    left alone. The prompt asks for this too; this is the deterministic backstop, because a rule
+    this crisp should not depend on prompt adherence.
     """
-    if "page_purpose" not in classes or area_named(question) is None:
-        return classes
-    return (classes - DATA_CLASSES) or {"page_purpose"}
+    resolved_how_to = "how_to" in reading.intents and function_named(question) is not None
+    resolved_page = "page_purpose" in reading.intents and page_named(question) is not None
+    if not (resolved_how_to or resolved_page):
+        return reading
+    kept = reading.intents - DATA_INTENTS
+    return Reading(
+        intents=kept or frozenset({"how_to" if resolved_how_to else "page_purpose"}),
+        subject=None,
+        preferences=reading.preferences,
+    )
 
 
-def classify(question: str, history: list[dict] | None = None) -> set[str]:
-    """Every class this question touches, resolved against the recent conversation.
-
-    An empty set means the classifier RAN and nothing matched - the honest out-of-scope path.
-    Raises ClassificationUnavailable when it could not run at all, so the caller can say so instead
-    of blaming the question. Never guesses in either case."""
+def read(question: str, history: list[dict] | None = None) -> Reading:
+    """The complete reading of one turn. Never guesses; raises rather than inventing a fallback."""
     prior = ""
     if history:
+        # The ANSWERS are included, truncated. Questions alone cannot show WHAT the assistant just
+        # suggested, so "when is it" would have nothing to resolve against - and cannot show that
+        # the last reply was a refusal, so "so you can't find it?" was read as a fresh topic.
         prior = (
-            "RECENT CONVERSATION (for resolving what a vague follow-up refers to - never a source "
-            "of facts):\n"
-            + "\n".join(f"- Q: {turn['question']}" for turn in history[-3:])
+            "RECENT CONVERSATION (for resolving what this turn refers to, and for the preferences "
+            "the asker has already stated - never a source of facts):\n"
+            + "\n".join(
+                f"- Asker: {turn['question']}\n  Assistant: {turn['answer'][:300]}"
+                for turn in history[-HISTORY_TURNS:]
+            )
             + "\n\n"
         )
-    valid = list(CLASS_DESCRIPTIONS.keys())
     try:
         response = _generate_content(
             model=GENERATION_MODEL,
-            contents=[types.Content(role="user", parts=[types.Part(text=f"{prior}QUESTION:\n{question}")])],
+            contents=[types.Content(role="user", parts=[types.Part(text=f"{prior}THIS TURN:\n{question}")])],
             config=types.GenerateContentConfig(
                 system_instruction=_system_instruction(),
                 temperature=0.0,
-                max_output_tokens=200,
+                max_output_tokens=300,
                 response_mime_type="application/json",
-                response_schema=types.Schema(
-                    type=types.Type.OBJECT,
-                    properties={
-                        "classes": types.Schema(
-                            type=types.Type.ARRAY,
-                            items=types.Schema(type=types.Type.STRING, enum=valid),
-                        ),
-                    },
-                    required=["classes"],
-                ),
+                response_schema=_RESPONSE_SCHEMA,
             ),
         )
         parsed = json.loads(response.text or "{}")
-        classes = parsed.get("classes") or []
-        if not isinstance(classes, list):
-            return set()
-        # Defence in depth: response_schema's enum already constrains this, but a model can deviate
-        # from schema on rare occasions, and an unrecognised class name would silently match nothing
-        # downstream rather than erroring - masking the real problem.
-        resolved = {c for c in classes if isinstance(c, str) and c in CLASS_DESCRIPTIONS}
-        resolved = _suppress_incidental_how_to_topics(question, resolved)
-        return _suppress_incidental_page_topics(question, resolved)
-    except Exception as exc:  # noqa: BLE001 - see docstring: a classifier failure refuses, never guesses
-        log.warning("ai.classify.failed", extra={"error": str(exc)})
-        # Refusing is right; refusing with the WRONG REASON is not, and returning an empty set here
-        # said "no class matched", which api/ai.py can only read as "genuinely outside what this
-        # assistant covers".
+    except Exception as exc:  # noqa: BLE001 - see the docstring: a failure refuses, never guesses
+        log.warning("ai.read.failed", extra={"error": str(exc)})
         raise ClassificationUnavailable(str(exc)) from exc
+
+    raw = parsed.get("intents")
+    # Defence in depth: the response schema's enum already constrains this, but a model can deviate
+    # on rare occasions, and an unrecognised intent would silently match nothing downstream rather
+    # than erroring - masking the real problem.
+    intents = frozenset(
+        i for i in (raw if isinstance(raw, list) else []) if isinstance(i, str) and i in ALL_INTENTS
+    )
+    reading = Reading(
+        intents=intents,
+        subject=_text(parsed.get("subject")),
+        preferences=_text(parsed.get("preferences")),
+    )
+    return _suppress_incidental_data_intents(question, reading)
+
+
+def _text(value: object) -> str | None:
+    """A non-empty trimmed string, or None. The model returns "", "null" and "none" for absent
+    values often enough that treating them as real subjects produced searches for the word "none"."""
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    if not cleaned or cleaned.lower() in {"null", "none", "n/a", "unknown"}:
+        return None
+    return cleaned[:200]

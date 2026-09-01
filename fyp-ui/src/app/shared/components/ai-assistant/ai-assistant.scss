@@ -130,21 +130,6 @@
 .ai-event-card__meta .material-symbols-rounded { font-size: .85rem; }
 .ai-event-card__go { color: var(--apu-blue-600); font-size: 1.1rem; }
 
-/* Registrants table card — a live attendee list rendered as an actual table under the assistant's
-   reply, same "answer + concrete UI, not just text" pattern as the event cards above. */
-.ai-registrants-card { display: grid; gap: .5rem; width: fit-content; max-width: 92%; padding: .7rem .75rem; border: 1px solid var(--apu-border); border-radius: .85rem; background: var(--apu-white); }
-.ai-registrants-card__title { margin: 0; color: var(--apu-navy-950); font-size: .78rem; font-weight: 700; }
-.ai-registrants-card__empty { margin: 0; color: var(--apu-text-muted); font-size: .74rem; }
-.ai-registrants-card__table-wrap { max-height: 12rem; overflow: auto; }
-.ai-registrants-card__table { width: 100%; min-width: 14rem; border-collapse: collapse; font-size: .74rem; }
-.ai-registrants-card__table th { position: sticky; top: 0; padding: .3rem .5rem; border-bottom: 1px solid var(--apu-border); background: var(--apu-white); color: var(--apu-text-muted); font-weight: 650; text-align: left; text-transform: uppercase; letter-spacing: .02em; font-size: .62rem; }
-.ai-registrants-card__table td { padding: .35rem .5rem; border-bottom: 1px solid var(--apu-surface-muted); color: var(--apu-navy-900); }
-.ai-registrants-card__table tr:last-child td { border-bottom: 0; }
-.ai-registrants-card__status { display: inline-block; padding: .1rem .5rem; border-radius: var(--radius-pill); font-size: .64rem; font-weight: 650; }
-.ai-registrants-card__status--registered { background: rgb(22 163 74 / 12%); color: #15803d; }
-.ai-registrants-card__status--pending_approval { background: rgb(217 119 6 / 12%); color: #b45309; }
-.ai-registrants-card__status--rejected { background: rgb(220 38 38 / 10%); color: #dc2626; }
-
 /* Suggestion cards — 4 per page, horizontal scroll-snap for the second page */
 .ai-suggestions { display: grid; gap: .6rem; margin-top: .2rem; animation: assistant-message-in var(--motion-hover) var(--ease-standard); }
 .ai-suggestions__label { margin: 0 .1rem; color: var(--apu-text-muted); font-size: .72rem; font-weight: 650; letter-spacing: .02em; text-transform: uppercase; }

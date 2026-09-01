@@ -175,11 +175,16 @@ def role_has_page_grant(role_code: str, page_code: str) -> bool:
     """Is `role_code` named in ANY active grant on `page_code`, whatever the unit?
 
     The ROLE-level counterpart to has_page_access(), which answers the same question for one
-    account. ai/knowledge_base.role_capability_document() needs this one because "what can a
-    Cafeteria Manager do" has no asker to resolve a unit-scoped grant against - there is no single
-    unit that question is about - so a capability counts as reachable when the role appears in a
-    grant for that page at all. That makes it an overview of what the role is DESIGNED to reach,
-    deliberately not a claim about any particular account's current, unit-scoped access.
+    account. It exists for questions with no asker to resolve a unit-scoped grant against - "what
+    can a Cafeteria Manager do" is about no single unit - so a page counts as reachable when the
+    role appears in a grant for it at all. That makes it an overview of what the role is DESIGNED
+    to reach, deliberately not a claim about any particular account's current, unit-scoped access.
+
+    The assistant no longer asks it: it answers "what can I access" from the caller's own live
+    grants (has_page_access, through ai/scope.can_reach) rather than from a role overview, so this
+    currently has no caller in the app. Kept because it is the honest answer to a question the
+    admin surfaces may yet need, and because deleting it would leave has_page_access looking like
+    the only shape this question comes in.
 
     A 'unit' grant is excluded on purpose: it names units and no roles, so it grants the page by
     where someone works rather than by what they are, and no role is "designed" to reach it.

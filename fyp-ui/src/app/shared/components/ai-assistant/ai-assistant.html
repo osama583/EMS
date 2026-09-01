@@ -143,21 +143,6 @@
                 }
               </div>
             }
-            @if (message.sender === 'assistant' && message.proposals?.length) {
-              <div class="ai-event-cards">
-                @for (proposal of message.proposals; track proposal.requestId) {
-                  <button type="button" class="ai-event-card" (click)="openProposalFromCard(proposal)">
-                    <span class="ai-event-card__image ai-event-card__image--placeholder material-symbols-rounded" aria-hidden="true">description</span>
-                    <span class="ai-event-card__body">
-                      <span class="ai-event-card__title">{{ proposal.eventTitle }}</span>
-                      <span class="ai-event-card__category">{{ proposal.statusLabel }}</span>
-                      <span class="ai-event-card__meta"><span>{{ proposal.requestCode }}</span></span>
-                    </span>
-                    <span class="material-symbols-rounded ai-event-card__go" aria-hidden="true">arrow_forward</span>
-                  </button>
-                }
-              </div>
-            }
             @if (message.sender === 'assistant' && message.navigation?.length) {
               <!-- "Take me there" cards for a how-to the asker can actually reach. The backend only
                    emits these when Page Visibility grants the page, so every card here is safe to
@@ -172,28 +157,6 @@
                     </span>
                     <span class="material-symbols-rounded ai-event-card__go" aria-hidden="true">arrow_forward</span>
                   </button>
-                }
-              </div>
-            }
-            @if (message.sender === 'assistant' && message.registrantsTable) {
-              <div class="ai-registrants-card">
-                <p class="ai-registrants-card__title">{{ message.registrantsTable.eventTitle }} &mdash; {{ message.registrantsTable.registrants.length }} registered</p>
-                @if (message.registrantsTable.registrants.length > 0) {
-                  <div class="ai-registrants-card__table-wrap">
-                    <table class="ai-registrants-card__table">
-                      <thead><tr><th>Name</th><th>Status</th></tr></thead>
-                      <tbody>
-                        @for (registrant of message.registrantsTable.registrants; track registrant.name + registrant.registeredAt) {
-                          <tr>
-                            <td>{{ registrant.name }}</td>
-                            <td><span class="ai-registrants-card__status" [class]="'ai-registrants-card__status--' + registrant.status">{{ registrantStatusLabel(registrant.status) }}</span></td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                  </div>
-                } @else {
-                  <p class="ai-registrants-card__empty">No one has registered yet.</p>
                 }
               </div>
             }

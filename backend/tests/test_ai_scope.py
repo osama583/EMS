@@ -1,44 +1,43 @@
-"""The AI assistant's scope and its authorization layers.
+"""The AI assistant's ENFORCEMENT layers.
 
-Scope is exactly what it claims: clubs, events, how the app works, and what the asker's own
-account can do - with every how-to gated on the page its action lives on, and every generated SQL
-query gated on the caller's real row-level scope.
+Scope is exactly what it claims: suggest and answer about events, suggest and answer about clubs,
+explain a page, explain how to do something, say who the asker is. Nothing else - and the tests
+here prove the layers underneath actually hold that line rather than merely describing it.
 
 WHAT THIS FILE COVERS, and why each part exists:
 
-  PAGE GATING (unchanged by the Text-to-SQL refactor, and the reason it survived it untouched)
-    topic_access maps a topic to the nav pages its data lives behind, and the answer is released
-    only if Page Visibility grants one of them. Two historical defects motivated these tests:
-    `how_to` was ungated, so "how do I join a club" also classified as {clubs, clubs_mine} and
-    wrote two spurious denial rows for a purely procedural question; and topic_access named a page
-    (`created-by-me`) that seed/nav.py never creates, which fails closed and so did nothing,
-    silently, forever.
+  PAGE GATING
+    Every answer is released by scope.can_reach, which resolves an internal page against Page
+    Visibility, live. Revoking a page must narrow the assistant on the very next request, in every
+    place at once - the steps, the navigation card, the topic and the capability sentence.
 
-  SQL GUARD (new)
-    The generated query is never trusted. These tests assert the guard actually rejects the things
-    it claims to - writes, multiple statements, unknown tables and columns, excluded columns, and
-    above all a query that omits its required scope predicate, which is the check that stops the
-    model retrieving broadly and filtering afterwards.
+  THE SQL GUARD
+    The generated query is never trusted. These tests assert the guard rejects what it claims to -
+    writes, multiple statements, unknown tables and columns, excluded columns, and above all a
+    query that omits its required scope predicate, which is the check that stops the model
+    retrieving broadly and filtering afterwards.
 
-  SCOPE RULES (new)
-    That the predicates handed to the guard actually encode the app's own rules: a guest gets the
-    guest visibility tier, a signed-in caller gets theirs plus their own events, and a non-admin
-    can only reach their own club rows.
+  ROW SCOPE
+    That the predicates handed to the guard encode the app's own rules: a guest gets the guest
+    visibility tier, a signed-in caller gets theirs, and the two people-tables carry the count-only
+    marker for everybody - because who registered and who is a member are not questions this
+    assistant answers for anyone.
 
-Tests that needed the deleted regex router (classify() returning an exact set for a fixed phrase)
-are gone: classification is now a model call, and asserting an LLM's exact output in a unit test
-would be asserting the weather. What replaced them is coverage of the DETERMINISTIC layers, which
-are the ones that actually enforce anything.
+  THE SCOPE BOUNDARY ITSELF
+    Regression tests for the shapes that used to slip through: the users table being enumerated, a
+    resolved how-to being answered with a list of clubs, a refusal offering something to click.
 
-Runs against the real seeded database, like tests/test_role_capabilities.py, and follows that
-file's patterns (parametrize over the map, monkeypatch has_page_access to prove revocation works).
+Tests asserting an LLM's exact output are absent by design - classification is a model call, and
+asserting the weather is not a test. What is covered here is the DETERMINISTIC half, which is the
+half that actually enforces anything.
+
+Runs against the real seeded database, like tests/test_scope_definition.py.
 """
 from __future__ import annotations
 
 import pytest
 
-from app.ai import query_router, schema_catalog, scope_rules, sql_guard, topic_access
-from app.ai.knowledge_base import HOW_TO_GUIDES, HOW_TO_LABEL, HOW_TO_PAGES
+from app.ai import cards, recommendation, schema_catalog, scope, scope_rules, sql_guard, topic_access
 from app.db import query
 from app.services import identity
 
@@ -69,121 +68,117 @@ class _FakePrincipal:
         return bool({role for role, _ in self.assignments} & set(role_codes))
 
 
-# --- the action -> page map is complete and real -------------------------------------------------
-
-def test_every_guide_has_a_backing_page():
-    """A guide with no page_code would be ungated - the exact hole this gating closed."""
-    assert set(HOW_TO_PAGES) == set(HOW_TO_GUIDES), (
-        f"guides without a page: {set(HOW_TO_GUIDES) - set(HOW_TO_PAGES)}; "
-        f"pages without a guide: {set(HOW_TO_PAGES) - set(HOW_TO_GUIDES)}"
-    )
+def _student():
+    return _FakePrincipal((("student", _representative_unit("student")),))
 
 
-def test_every_guide_has_a_label():
-    """The label is what a refusal message and the audit row say instead of the raw key."""
-    assert set(HOW_TO_LABEL) == set(HOW_TO_GUIDES)
+# --- gating is dynamic: revoking a page withholds everything behind it ----------------------------
 
-
-@pytest.mark.parametrize("guide_key", sorted(HOW_TO_PAGES))
-def test_every_how_to_page_exists(guide_key: str):
-    """A typo'd or unseeded page_code fails closed forever, silently withholding a guide from
-    everyone with no error - this is how `created-by-me` hid in topic_access for so long."""
-    live = _live_pages()
-    for page_code in HOW_TO_PAGES[guide_key]:
-        assert page_code in live, f"{guide_key} names unknown page '{page_code}'"
-
-
-def test_every_topic_page_exists():
-    """Same check for the data-topic map - a dead page_code there silently narrows a whole topic."""
-    live = _live_pages()
-    for topic, pages in topic_access.TOPIC_PAGES.items():
-        for page_code in pages:
-            assert page_code in live, f"TOPIC_PAGES[{topic!r}] names unknown page '{page_code}'"
-
-
-# --- gating is dynamic: revoking a page withholds the guide ---------------------------------------
-
-def test_guide_is_withheld_when_its_page_is_revoked(monkeypatch):
+def test_steps_are_withheld_when_their_page_is_revoked(monkeypatch):
     """The whole point: Page Visibility decides, live. Revoking Discover Clubs must stop the
-    join-a-club steps on the very next answer, and must not touch any other guide."""
-    principal = _FakePrincipal((("student", _representative_unit("student")),))
-    assert topic_access.how_to_allowed(principal, "join_club") is True
+    join-a-club steps on the very next answer, and must not touch any other function."""
+    principal = _student()
+    assert scope.can_use(principal, "join_club") is True
 
     real = identity.has_page_access
     monkeypatch.setattr(
         identity, "has_page_access",
         lambda a, page_code: False if page_code == "clubs-discover" else real(a, page_code),
     )
-    assert topic_access.how_to_allowed(principal, "join_club") is False
-    # Scoped, not a blanket wipe - an unrelated guide survives.
-    assert topic_access.how_to_allowed(principal, "register_event") is True
+    assert scope.can_use(principal, "join_club") is False
+    # Scoped, not a blanket wipe - an unrelated function survives.
+    assert scope.can_use(principal, "register_event") is True
+
+
+def test_the_topic_goes_with_the_page(monkeypatch):
+    """The same revocation must also stop the assistant ANSWERING about clubs, not merely explaining
+    how to join one. Those two used to be gated separately and could disagree."""
+    principal = _student()
+    assert topic_access.topic_allowed(principal, "clubs") is True
+
+    real = identity.has_page_access
+    monkeypatch.setattr(
+        identity, "has_page_access",
+        lambda a, page_code: False if page_code == "clubs-discover" else real(a, page_code),
+    )
+    assert topic_access.topic_allowed(principal, "clubs") is False
+    assert "find clubs" not in topic_access.capability_document(principal)
+    assert topic_access.denied_topics(principal, {"clubs", "events"}) == ["clubs"]
 
 
 def test_navigation_card_disappears_with_the_page(monkeypatch):
-    """A card must never point somewhere the caller cannot open, so it is built from the same
-    grant check that releases the steps."""
-    principal = _FakePrincipal((("student", _representative_unit("student")),))
-    assert topic_access.how_to_cards(principal, "join_club"), "expected a card while granted"
+    """A card must never point somewhere the caller cannot open, so it is built from the same grant
+    check that releases the steps."""
+    principal = _student()
+    assert topic_access.function_cards(principal, "join_club"), "expected a card while granted"
 
     real = identity.has_page_access
     monkeypatch.setattr(
         identity, "has_page_access",
         lambda a, page_code: False if page_code == "clubs-discover" else real(a, page_code),
     )
-    assert topic_access.how_to_cards(principal, "join_club") == []
+    assert topic_access.function_cards(principal, "join_club") == []
 
 
 def test_guest_gets_only_the_public_how_to():
-    """A guest holds no assignments, so every grant check fails by construction. Registering for a
-    Public event is genuinely open to them; everything else is behind a signed-in page."""
-    assert topic_access.how_to_allowed(None, "register_event") is True
-    assert topic_access.how_to_allowed(None, "join_club") is False
-    assert topic_access.how_to_allowed(None, "submit_proposal") is False
+    """A guest holds no assignments, so every internal grant check fails by construction.
+    Registering for a Public event is genuinely open to them; everything else is behind a page."""
+    assert scope.can_use(None, "register_event") is True
+    assert scope.can_use(None, "join_club") is False
+    assert scope.can_use(None, "submit_proposal") is False
 
 
-def test_unknown_guide_is_refused():
+def test_an_unknown_function_is_refused():
     """An unmapped key USED to be allowed, on the reasoning that a coding gap should not withhold a
-    real answer. It withheld nothing - api/ai.py answered from the whole platform overview instead,
-    and an external account that had just been refused every topic was handed working steps for
-    saving an event. A guide nobody has written has no steps to give."""
-    assert topic_access.how_to_allowed(None, "no_such_guide") is False
+    real answer. It withheld nothing - the endpoint answered from the whole platform overview
+    instead, and an external account that had just been refused every topic was handed working
+    steps for saving an event. A function nobody has written has no steps to give."""
+    assert scope.can_use(None, "no_such_function") is False
 
 
 # --- the removed scope stays removed --------------------------------------------------------------
 
-_REMOVED_CLASSES = ("cafeteria", "proposals_mine", "proposals_review", "admin_settings")
+_REMOVED_INTENTS = (
+    "cafeteria", "proposals_mine", "proposals_review", "admin_settings", "admin_ai_denials",
+    "my_registrations", "event_organiser", "event_organiser_decisions", "clubs_mine",
+    "clubs_admin", "president_change", "role_capability", "system_capability", "askable",
+    "self_capability",
+)
 
 
-@pytest.mark.parametrize("removed", _REMOVED_CLASSES)
-def test_removed_classes_are_gone(removed: str):
-    """Scope is Clubs + Events + how the app works. A class left half-deleted in one map but not
-    another is how the old drift started."""
-    assert removed not in query_router.CLASS_DESCRIPTIONS
-    assert removed not in topic_access.TOPIC_PAGES
+@pytest.mark.parametrize("removed", _REMOVED_INTENTS)
+def test_removed_intents_are_gone(removed: str):
+    """The assistant does seven things. An intent left half-deleted in one map but not another is
+    how the old drift started - and every name here was a real class that answered a question the
+    assistant no longer covers."""
+    from app.ai import query_router
+
+    assert removed not in query_router.INTENT_DESCRIPTIONS
+    assert removed not in scope.TOPICS
     assert removed not in topic_access.TOPIC_LABEL
-    assert removed not in topic_access.TOPIC_ASK_DESCRIPTION
 
 
-def test_every_class_is_routed_to_exactly_one_answer_path():
-    """A class in neither set is answered by nothing; a class in both is ambiguous. Either is a
-    silent gap, since api/ai.py picks its path by set membership."""
+def test_every_intent_is_routed_to_exactly_one_answer_path():
+    """An intent in neither set is answered by nothing; one in both is ambiguous. Either is a silent
+    gap, since api/ai.py picks its path by set membership."""
+    from app.ai import classifier, query_router
+
+    both = classifier.KNOWLEDGE_INTENTS & classifier.DATA_INTENTS
+    neither = set(query_router.INTENT_DESCRIPTIONS) - classifier.KNOWLEDGE_INTENTS - classifier.DATA_INTENTS
+    assert not both, f"intents in both answer paths: {sorted(both)}"
+    assert not neither, f"intents in neither answer path: {sorted(neither)}"
+
+
+def test_every_data_intent_has_tables_and_a_page_gate():
+    """A data intent the schema catalog cannot map to tables would generate SQL against an empty
+    allow-list (rejected every time); one with no topic would be UNGATED - answered from the
+    database with no page check at all, which is the serious direction of the two."""
     from app.ai import classifier
 
-    both = classifier.KNOWLEDGE_BASE_CLASSES & classifier.DATA_CLASSES
-    neither = set(query_router.CLASS_DESCRIPTIONS) - classifier.KNOWLEDGE_BASE_CLASSES - classifier.DATA_CLASSES
-    assert not both, f"classes in both answer paths: {sorted(both)}"
-    assert not neither, f"classes in neither answer path: {sorted(neither)}"
-
-
-def test_every_data_class_has_tables_and_a_page_gate():
-    """A data class the schema catalog cannot map to tables would generate SQL against an empty
-    allow-list (rejected every time); one absent from TOPIC_PAGES would be UNGATED - answered from
-    the database with no page check at all, which is the serious direction of the two."""
-    from app.ai import classifier
-
-    for cls in sorted(classifier.DATA_CLASSES):
-        assert schema_catalog.tables_for_topics({cls}), f"{cls} maps to no tables"
-        assert cls in topic_access.TOPIC_PAGES, f"{cls} reads the database but is not page-gated"
+    for intent in sorted(classifier.DATA_INTENTS):
+        topic = classifier.INTENT_TOPIC.get(intent)
+        assert topic in scope.TOPICS, f"{intent} reads the database but is not page-gated"
+        assert schema_catalog.tables_for_topics({topic}), f"{intent} maps to no tables"
 
 
 # --- the schema catalog exposes only what it should -----------------------------------------------
@@ -206,10 +201,38 @@ def test_out_of_scope_tables_are_not_described():
         assert table not in schema_catalog.ALLOWED_TABLES
 
 
+def test_the_private_activity_tables_are_gone_from_the_catalog():
+    """THE scope change, pinned at the level where it cannot be argued around.
+
+    Saved events, join requests and president-change requests are somebody's private activity, and
+    the assistant does not answer about that for anyone. They are not filtered out at answer time -
+    they are absent from the allow-list, so no generated query can name them however the question
+    is phrased."""
+    for table in ("saved_event", "club_join_requests", "club_president_change_requests", "co_owners"):
+        assert table not in schema_catalog.ALLOWED_TABLES, f"{table} is queryable again"
+    document = schema_catalog.document_for_topics({"events", "clubs"})
+    for table in ("saved_event", "club_join_requests"):
+        assert f"TABLE {table}" not in document
+
+
+def test_only_what_the_card_shows_is_describable():
+    """The assistant answers from the event card and the club card. `request` carries plenty the
+    card never prints - internal proposal fields, the organiser's cap, the bank details - and those
+    are excluded outright rather than left to the prompt to decline."""
+    columns = schema_catalog.allowed_columns()
+    for column in ("goals_objectives", "expected_benefits", "promotion_publicity_method",
+                   "max_pax", "bank_account_number"):
+        assert column not in columns["request"], f"request.{column} is not on the card"
+    # ...and the fields that ARE on it stay reachable.
+    for column in ("event_title", "short_introduction", "event_visibility", "total_pax",
+                   "cost_amount", "registration_approval", "event_format_snapshot"):
+        assert column in columns["request"], f"request.{column} is on the card and must be readable"
+
+
 def test_a_club_question_cannot_reach_event_tables():
     """Table selection is per-QUESTION, not per-app: both domains are individually in scope, but a
     club question must not be able to read event registrations."""
-    club_tables = schema_catalog.tables_for_topics({"clubs", "clubs_mine"})
+    club_tables = schema_catalog.tables_for_topics({"clubs"})
     assert "event_registration" not in club_tables
     assert "clubs" in club_tables
 
@@ -222,12 +245,12 @@ def _guest_scope():
 
 def _student_scope(user_id: int = 42):
     principal = _FakePrincipal((("student", _representative_unit("student")),), user_id=user_id)
-    return scope_rules.build_scope(principal, {"events", "clubs", "clubs_mine"})
+    return scope_rules.build_scope(principal, {"events", "clubs"})
 
 
-def _validate(sql: str, scope, topics=("events",)):
+def _validate(sql: str, scope_, topics=("events",)):
     return sql_guard.validate(
-        sql, allowed_tables=schema_catalog.tables_for_topics(set(topics)), scope=scope
+        sql, allowed_tables=schema_catalog.tables_for_topics(set(topics)), scope=scope_
     )
 
 
@@ -273,9 +296,18 @@ def test_guard_rejects_reading_the_catalog():
 
 def test_guard_rejects_an_excluded_column():
     """Qualified or bare, the credential column is rejected on the word alone."""
-    scope = _student_scope()
     with pytest.raises(sql_guard.SqlRejected):
-        _validate("SELECT users.password FROM users", scope, topics=("clubs",))
+        _validate("SELECT users.password FROM users", _student_scope(), topics=("clubs",))
+
+
+def test_guard_rejects_a_column_the_card_does_not_show():
+    """The same mechanism, applied to the scope boundary rather than to credentials: an internal
+    proposal field is rejected on the bare word, so "what are this event's objectives" cannot be
+    answered by reaching for a column the page never prints."""
+    scope_ = _guest_scope()
+    predicate = scope_.predicates_for("request")[0]
+    with pytest.raises(sql_guard.SqlRejected):
+        _validate(f"SELECT request.goals_objectives FROM request WHERE {predicate}", scope_)
 
 
 def test_guard_rejects_an_unknown_table():
@@ -288,7 +320,7 @@ def test_guard_rejects_an_unknown_column():
     with pytest.raises(sql_guard.SqlRejected) as excinfo:
         _validate(
             "SELECT request.nonexistent_column FROM request WHERE "
-            "request.status = 'completed_approved' AND request.event_visibility IN ('Public', 'Club Only')",
+            "request.status = 'completed_approved' AND request.event_visibility = 'Public'",
             _guest_scope(),
         )
     assert excinfo.value.repairable
@@ -307,44 +339,40 @@ def test_guard_rejects_a_query_missing_its_scope_predicate():
 
 def test_guard_accepts_a_query_carrying_its_scope_predicate():
     """The positive case - the guard must not be so strict that a correct query is unanswerable."""
-    scope = _guest_scope()
-    predicate = scope.predicates_for("request")[0]
+    scope_ = _guest_scope()
+    predicate = scope_.predicates_for("request")[0]
     sql = f"SELECT request.event_title FROM request WHERE {predicate} LIMIT 5"
-    assert _validate(sql, scope) == sql
+    assert _validate(sql, scope_) == sql
 
 
 def test_predicate_matching_survives_reformatting():
-    """The model reformatting a required predicate across lines is not a security event; matching
-    is whitespace-normalised so a valid query is not rejected over layout."""
-    scope = _guest_scope()
-    predicate = scope.predicates_for("request")[0]
+    """The model reformatting a required predicate across lines is not a security event; matching is
+    whitespace-normalised so a valid query is not rejected over layout."""
+    scope_ = _guest_scope()
+    predicate = scope_.predicates_for("request")[0]
     reflowed = predicate.replace(" AND ", "\n      AND\n   ")
     sql = f"SELECT request.event_title\n  FROM request\n WHERE {reflowed}"
-    assert _validate(sql, scope)
+    assert _validate(sql, scope_)
 
 
 def test_guard_rejects_a_forbidden_table_outright():
-    """A guest has no saved events at all, so scope_rules gives that table an EMPTY predicate tuple
-    - meaning "no query may touch this", not "any predicate will do".
-
-    event_registration is deliberately NOT the example here any more: a guest CAN ask how many
-    people registered for a published event, because that number is on the event's own card for
-    everyone (see the public-count tests below). saved_event has no such public half."""
-    scope = _guest_scope()
-    assert scope.predicates_for("saved_event") == ()
+    """A guest has no club access at all, so scope_rules gives those tables an EMPTY predicate tuple
+    - meaning "no query may touch this", not "any predicate will do"."""
+    scope_ = scope_rules.build_scope(None, {"events", "clubs"})
+    assert scope_.predicates_for("clubs") == ()
     with pytest.raises(sql_guard.SqlRejected) as excinfo:
-        _validate("SELECT saved_event.request_id FROM saved_event", scope)
+        _validate("SELECT clubs.club_name FROM clubs", scope_, topics=("events", "clubs"))
     assert not excinfo.value.repairable, "an authorization violation must never be retried"
 
 
 def test_a_guest_can_count_registrations_but_not_name_them():
     """The count is public to guests too - it is rendered on the Explore Events cards a signed-out
     visitor can already browse."""
-    scope = _guest_scope()
-    assert scope.predicates_for("event_registration") == ("PUBLIC_COUNT_ONLY",)
-    assert _validate("SELECT COUNT(*) FROM event_registration WHERE PUBLIC_COUNT_ONLY", scope)
+    scope_ = _guest_scope()
+    assert scope_.predicates_for("event_registration") == ("PUBLIC_COUNT_ONLY",)
+    assert _validate("SELECT COUNT(*) FROM event_registration WHERE PUBLIC_COUNT_ONLY", scope_)
     with pytest.raises(sql_guard.SqlRejected):
-        _validate("SELECT event_registration.registrant_name FROM event_registration", scope)
+        _validate("SELECT event_registration.registrant_name FROM event_registration", scope_)
 
 
 # --- the scope predicates encode the app's own rules ----------------------------------------------
@@ -352,7 +380,7 @@ def test_a_guest_can_count_registrations_but_not_name_them():
 def test_guest_visibility_matches_the_events_endpoint():
     """Mirrors api/events.py's _GUEST_VISIBLE exactly: Public only, published only. A guest must
     never reach Internal or Private - nor 'Club Only', which is addressed to specific clubs and
-    requires a membership a guest cannot have (migration 029)."""
+    requires a membership a guest cannot have."""
     predicate = _guest_scope().predicates_for("request")[0]
     assert "completed_approved" in predicate
     assert "'Public'" in predicate
@@ -361,76 +389,324 @@ def test_guest_visibility_matches_the_events_endpoint():
     assert "Private" not in predicate
 
 
-def test_signed_in_caller_gets_internal_plus_their_own_events():
-    """Mirrors _INTERNAL_VISIBLE plus my_organized_events' owner clause: the shared tiers, or their
-    OWN event at any visibility - which is the only way a Private event is ever reachable."""
+def test_a_signed_in_caller_gets_the_explore_events_tier_and_no_more():
+    """Mirrors _INTERNAL_VISIBLE: Public and Internal, plus a Club Only event addressed to a club
+    they belong to. NOT their own Private events - Explore Events does not show those either, and
+    the assistant answers about the catalogue, not about anyone's private copy of it."""
     predicate = _student_scope(user_id=42).predicates_for("request")[0]
     assert "'Public', 'Internal'" in predicate
-    assert "request.applicant_user_id = 42" in predicate
-    assert "co_owners" in predicate, "co-ownership is part of ownership (workflow.is_proposal_owner)"
+    assert "applicant_user_id" not in predicate, "the organiser's own-events branch is not the catalogue"
+    assert "co_owners" not in predicate
 
 
 def test_club_only_events_need_membership_not_just_a_login():
-    """'Club Only' is not a tier every signed-in user can read. Being logged in is not enough:
-    the predicate must resolve the asker's membership against the clubs the event actually
-    names, or the assistant answers questions about events the asker cannot see in the UI."""
+    """'Club Only' is not a tier every signed-in user can read. Being logged in is not enough: the
+    predicate must resolve the asker's membership against the clubs the event actually names, or
+    the assistant answers questions about events the asker cannot see in the UI."""
     predicate = _student_scope(user_id=42).predicates_for("request")[0]
     assert "'Club Only'" in predicate, "the tier is reachable - but only via membership"
     assert "request_clubs" in predicate, "the event's named audience"
     assert "club_members" in predicate, "the asker's actual membership"
-    assert "cm.user_id = 42" in predicate
+    # Asserted on the ALIAS the clause defines rather than a bare `cm`, because the short names are
+    # exactly the ones the outer query wants: a suggestion joins request_categories as `rc` and the
+    # model then has to rename the clause's own `rc`, which used to fail the guard. Suffixed
+    # aliases keep both halves collision-free.
+    assert "cm_request.user_id = 42" in predicate
 
 
-def test_a_non_admin_can_only_reach_their_own_club_rows():
-    """Page access to Clubs is not permission to read every club's membership. A non-admin's
-    predicates must be self-or-president-of-that-club, never club-wide."""
-    scope = _student_scope(user_id=42)
-    assert scope.is_club_admin is False
-    predicates = scope.predicates_for("club_members")
-    assert predicates, "club_members must be constrained for a non-admin"
-    assert any("club_members.user_id = 42" in p for p in predicates)
-    assert any("c_pres.user_id = 42" in p for p in predicates), "the president-of-this-club case"
+def test_nobody_can_read_a_roster_or_a_membership_list():
+    """The change that took rosters out of scope, asserted as an absence of any other path.
 
-
-def test_club_admin_scope_comes_from_the_page_grant_not_the_role_name():
-    """The clubs_admin TOPIC surviving the page gate is what makes someone an admin here - never
-    principal.has_role('club-admin'). That is the exact drift topic_access was written to remove:
-    a custom role granted Manage Clubs was refused, and a club-admin whose page was revoked was
-    still answered."""
-    student = _FakePrincipal((("student", _representative_unit("student")),), user_id=7)
-    assert scope_rules.build_scope(student, {"clubs", "clubs_mine"}).is_club_admin is False
-    # Same principal, same roles - only the topic differs, because the page gate already passed it.
-    assert scope_rules.build_scope(student, {"clubs", "clubs_admin"}).is_club_admin is True
+    There is no caller - not an organiser, not a president, not an administrator - for whom either
+    people-table gets a condition that returns rows about individuals. The ONLY predicate is the
+    count-only marker, which sql_guard proves means aggregate-and-no-identifying-columns."""
+    for principal in (None, _student(), _FakePrincipal((("club-admin", None),), user_id=8)):
+        scope_ = scope_rules.build_scope(principal, {"events", "clubs"})
+        registrations = scope_.predicates_for("event_registration")
+        assert registrations in ((), ("PUBLIC_COUNT_ONLY",)), registrations
+        for predicate in scope_.predicates_for("club_members"):
+            assert predicate == "PUBLIC_COUNT_ONLY" or predicate.endswith(
+                f"club_members.user_id = {getattr(principal, 'user_id', None)}"
+            ), f"club_members gained a non-count condition: {predicate}"
 
 
 def test_a_guest_has_no_club_access_at_all():
-    """Clubs have no public tier (api/ai.py's module docstring) - every club table is forbidden,
-    not merely filtered."""
-    scope = scope_rules.build_scope(None, {"clubs", "clubs_mine"})
-    for table in ("clubs", "club_members", "club_join_requests"):
-        assert scope.predicates_for(table) == (), f"{table} must be forbidden for a guest"
+    """Clubs have no public tier - Discover Clubs is an internal page - so every club table is
+    forbidden, not merely filtered."""
+    scope_ = scope_rules.build_scope(None, {"clubs"})
+    for table in ("clubs", "club_members"):
+        assert scope_.predicates_for(table) == (), f"{table} must be forbidden for a guest"
 
 
 def test_scope_document_states_its_conditions_verbatim():
-    """The model is given the exact text the guard will look for. If these two ever disagreed,
-    every query would be rejected for a reason nobody could see."""
-    scope = _guest_scope()
-    document = scope_rules.document(scope)
-    for predicate in scope.predicates_for("request"):
+    """The model is given the exact text the guard will look for. If these two ever disagreed, every
+    query would be rejected for a reason nobody could see."""
+    scope_ = _guest_scope()
+    document = scope_rules.document(scope_)
+    for predicate in scope_.predicates_for("request"):
         assert predicate in document
 
 
-# --- nothing imports a deleted module -------------------------------------------------------------
+# --- the guard cannot forbid what the guard requires ----------------------------------------------
+#
+# THE OUTAGE THESE COVER. Migration 029 gave 'Club Only' events a real audience, so the mandated
+# `request` visibility predicate grew an EXISTS over request_clubs JOIN club_members - and neither
+# table was in schema_catalog's events group. Rule 4 then forbade exactly what rule 7 demanded:
+# carry the predicate and the table allow-list rejected it, drop it and the predicate check rejected
+# it. Three attempts, then "I don't have that information available right now" - for EVERY event
+# question from EVERY signed-in user. Only guests were spared, their visibility predicate having no
+# membership branch, which is why the guest-based fixtures above never caught it.
+
+def test_every_table_a_required_predicate_names_is_queryable():
+    """A required predicate may never join through a table nobody has reasoned about.
+
+    Stated so it cannot be satisfied trivially: a table a predicate joins through must EITHER be in
+    the question's own table group, OR carry a scope entry of its own - a predicate saying which of
+    its rows may be read, or an empty tuple forbidding it."""
+    principal = _FakePrincipal((("student", _representative_unit("student")),), user_id=42)
+    for topics in ({"events"}, {"clubs"}, {"events", "clubs"}):
+        for caller in (None, principal):
+            scope_ = scope_rules.build_scope(caller, topics)
+            in_group = {t.lower() for t in schema_catalog.tables_for_topics(topics)}
+            declared = {t.lower() for t in scope_.required_predicates}
+            for table, predicates in scope_.required_predicates.items():
+                for predicate in predicates:
+                    for named in sql_guard._TABLE_REF.findall(predicate):
+                        assert named.lower() in in_group or named.lower() in declared, (
+                            f"the '{table}' predicate joins '{named}', which for {sorted(topics)} "
+                            "is neither queryable nor scoped - no query can satisfy rule 4 and rule 7"
+                        )
+
+
+def test_the_guard_accepts_the_event_queries_the_model_actually_writes():
+    """Three shapes, all rejected in production, all correct SQL.
+
+    The third is the subtle one: the predicate declares `FROM request_clubs rc_request`, and a
+    suggestion joins request_categories - naturally aliased `rc` - so the model must rename the
+    inner alias to keep the SQL valid. Rule 7 used to expand the PREDICATE's aliases using the
+    QUERY's map, turning its `rc.` into request_categories, and rejected a query reading exactly the
+    right tables. It now compares real table names on both sides."""
+    principal = _FakePrincipal((("student", _representative_unit("student")),), user_id=1065)
+    scope_ = scope_rules.build_scope(principal, {"events"})
+    predicate = scope_.predicates_for("request")[0]
+
+    # 1. plain, unaliased
+    assert _validate(
+        "SELECT request.event_title AS t, request.short_introduction AS about FROM request "
+        f"WHERE ({predicate}) LIMIT 20",
+        scope_,
+    )
+    # 2. the model aliases the outer tables
+    assert _validate(
+        "SELECT r.event_title AS t, es.date AS d FROM request r JOIN event_schedule es "
+        f"ON es.request_id = r.request_id WHERE ({predicate}) LIMIT 20",
+        scope_,
+    )
+    # 3. the model renames the predicate's OWN alias, because `rc` is taken
+    renamed = predicate.replace("rc_request", "rc_sub").replace("cm_request", "cm_alt")
+    assert renamed != predicate, "expected the clause to declare aliases of its own"
+    assert _validate(
+        "SELECT request.event_title AS t, rc.category_name AS cat FROM request "
+        "LEFT JOIN request_categories rc ON request.request_id = rc.request_id "
+        f"WHERE {renamed} LIMIT 20",
+        scope_,
+    )
+
+
+def test_the_event_audience_tables_grant_no_rows():
+    """Admitting a table to the allow-list must not admit its ROWS.
+
+    request_clubs and club_members are reachable from an events question ONLY because the visibility
+    condition joins through them, so each carries a condition of its own: the audience only as part
+    of a request already carrying its own condition, membership only as the asker's own row or a
+    bare count. Otherwise fixing the outage would have opened who-is-in-which-club to every events
+    question. A guest, whose predicate has no membership branch at all, is refused both outright."""
+    principal = _FakePrincipal((("student", _representative_unit("student")),), user_id=42)
+    scope_ = scope_rules.build_scope(principal, {"events"})
+    assert scope_.predicates_for("club_members") == ("club_members.user_id = 42", "PUBLIC_COUNT_ONLY")
+
+    with pytest.raises(sql_guard.SqlRejected):
+        _validate(
+            "SELECT club_members.user_id AS m FROM club_members WHERE club_members.club_id = 3",
+            scope_,
+        )
+    with pytest.raises(sql_guard.SqlRejected):
+        _validate("SELECT request_clubs.club_name AS c FROM request_clubs LIMIT 20", scope_)
+
+    guest = _guest_scope()
+    assert guest.predicates_for("request_clubs") == ()
+    assert guest.predicates_for("club_members") == ()
+    for table in ("request_clubs", "club_members"):
+        with pytest.raises(sql_guard.SqlRejected):
+            _validate(f"SELECT {table}.club_id AS c FROM {table} LIMIT 5", guest)
+
+
+def test_an_empty_catalogue_search_is_a_real_zero():
+    """Nothing the assistant reads is narrowed to one person any more, so "no rows" has exactly one
+    meaning: there are none. Reporting it as an access problem instead - which the old scoped-empty
+    branch did whenever the visibility clause dragged a personal table in - turned "what's on this
+    month" into "I can't see that information"."""
+    from app.ai.sql_runner import rows_to_document
+
+    principal = _FakePrincipal((("student", _representative_unit("student")),), user_id=1065)
+    scope_ = scope_rules.build_scope(principal, {"events"})
+    browse = (
+        "SELECT r.event_title AS t FROM request r JOIN event_schedule es "
+        f"ON es.request_id = r.request_id WHERE ({scope_.predicates_for('request')[0]})"
+    )
+    empty = rows_to_document([], sql=browse, scope=scope_)
+    assert "real, final, correct answer" in empty
+    assert "lack access" not in empty.lower().split("do not say")[0]
+
+
+def test_the_prompts_only_name_columns_that_exist():
+    """`request` has short_introduction, not description. Both the topical-search rule and the
+    suggestion rule once asked for `description` by name - a rejected query, one of only three
+    attempts spent, and on a suggestion a shortlist with titles and no blurb to reason from."""
+    import inspect
+
+    from app.ai import sql_llm, text_to_sql as t2s
+
+    columns = schema_catalog.allowed_columns()
+    assert "short_introduction" in columns["request"]
+    assert "description" not in columns["request"], "request grew a `description` - revisit the prompts"
+    assert "description" in columns["clubs"]
+
+    assert "request.short_introduction" in sql_llm._SQL_SYSTEM_INSTRUCTION
+    assert "`request` has NO column of that name" in sql_llm._SQL_SYSTEM_INSTRUCTION
+    assert "request.short_introduction for events" in inspect.getsource(t2s.run)
+
+
+# --- the assistant's own boundary, stated in its prompts ------------------------------------------
+
+def test_the_system_prompt_names_the_seven_capabilities_and_no_more():
+    """The prompt is the last line of defence when a question slips past classification. It must
+    describe the same seven things scope.py does, and must name the refusals explicitly - a generic
+    "stay in scope" is what let "who registered for this?" be attempted."""
+    from app.ai.gemini import _SYSTEM_INSTRUCTION
+
+    assert "WHAT YOU DO. Exactly seven things" in _SYSTEM_INSTRUCTION
+    for refusal in ("who registered for an event", "who joined a club", "approval workflows",
+                    "analytics, reports", "general knowledge"):
+        assert refusal in _SYSTEM_INSTRUCTION, f"the prompt does not name {refusal!r} as out of scope"
+    assert "THE CARD IS THE CEILING" in _SYSTEM_INSTRUCTION
+
+
+def test_both_prompts_hold_the_card_ceiling():
+    """The knowledge path and the data path answer different questions from different context, so
+    the ceiling has to be stated in both - a rule present in one prompt is a rule absent whenever
+    the other is used."""
+    from app.ai.gemini import _SYSTEM_INSTRUCTION
+    from app.ai.sql_llm import _SQL_ANSWER_SYSTEM_INSTRUCTION
+
+    for prompt in (_SYSTEM_INSTRUCTION, _SQL_ANSWER_SYSTEM_INSTRUCTION):
+        assert "CARD IS THE CEILING" in prompt
+
+
+def test_the_prompt_keeps_the_conversation_subject():
+    """"Suggest an event" then "when is it?" is the whole of the memory requirement. The prompt must
+    say the subject carries forward, and must say it moves when the asker changes topic - a sticky
+    subject is as wrong as no subject."""
+    from app.ai.gemini import _SYSTEM_INSTRUCTION
+
+    assert "KEEP THE SUBJECT until they change it" in _SYSTEM_INSTRUCTION
+    assert "NEVER ASK SOMETHING YOU HAVE ALREADY BEEN TOLD" in _SYSTEM_INSTRUCTION
+
+
+def test_the_sql_prompt_refuses_a_roster_rather_than_attempting_one():
+    """There is no permission tier that unlocks a roster, so the generation prompt must say
+    IMPOSSIBLE rather than trying and being rejected by the guard three times over."""
+    from app.ai.sql_llm import _SQL_SYSTEM_INSTRUCTION
+
+    assert "There is no query for \"who registered\"" in _SQL_SYSTEM_INSTRUCTION
+    assert "Return IMPOSSIBLE" in _SQL_SYSTEM_INSTRUCTION
+
+
+# --- the Gemini key chain is however many keys the environment carries ----------------------------
+
+def test_the_failover_chain_reads_every_numbered_key(monkeypatch):
+    """A third key must need an .env line and nothing else. The chain used to be two named fields,
+    so GEMINI_API_KEY_3 would have sat in .env doing nothing, silently."""
+    from app.config import config
+
+    for name in ("GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3", "GEMINI_API_KEY_4"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "one")
+    monkeypatch.setenv("GEMINI_API_KEY_2", "two")
+    monkeypatch.setenv("GEMINI_API_KEY_3", "three")
+    assert config.gemini_api_keys == ("one", "two", "three")
+
+    # A GAP stops the scan, so a commented-out _3 cannot silently orphan a live _4...
+    monkeypatch.delenv("GEMINI_API_KEY_3")
+    monkeypatch.setenv("GEMINI_API_KEY_4", "four")
+    assert config.gemini_api_keys == ("one", "two")
+
+    # ...while a DUPLICATE is merely dropped - one exhausted quota is not a failover - not a gap.
+    monkeypatch.setenv("GEMINI_API_KEY_3", "one")
+    assert config.gemini_api_keys == ("one", "two", "four")
+
+
+def test_failover_walks_the_chain_on_a_429_and_only_on_a_429(monkeypatch):
+    """It tries every remaining key, sticks to the working one for the rest of the process, and does
+    NOT burn the chain on a 503 - that is the model being busy rather than the key being spent, so
+    it would fail identically on every key and turn one slow request into N."""
+    from google.genai import errors as genai_errors
+
+    from app.ai import gemini
+
+    class _Key:
+        def __init__(self, name, error=None):
+            self.name, self.error, self.calls = name, error, 0
+
+        @property
+        def models(self):
+            owner = self
+
+            class _Models:
+                def generate_content(self, **_):
+                    owner.calls += 1
+                    if owner.error:
+                        raise owner.error
+                    return owner.name
+
+            return _Models()
+
+    def _quota():
+        return genai_errors.ClientError(429, {"error": {"message": "quota"}})
+
+    chain = [_Key("k1", _quota()), _Key("k2", _quota()), _Key("k3")]
+    monkeypatch.setattr(gemini, "_generation_clients_cache", chain)
+    monkeypatch.setattr(gemini, "_active_generation_client_index", 0)
+    assert gemini._generate_content() == "k3"
+    assert gemini._active_generation_client_index == 2, "the working key becomes the default"
+    assert gemini._generate_content() == "k3"
+    assert chain[0].calls == 1, "the exhausted key must not be retried on every later call"
+
+    # A busy MODEL is retried once on the same key and never spends the chain. Two consecutive turns
+    # of a real conversation died on a 503 because nothing retried it.
+    monkeypatch.setattr(gemini, "_BUSY_RETRY_DELAY_SECONDS", 0)
+    busy = genai_errors.ServerError(503, {"error": {"message": "high demand"}})
+    chain = [_Key("k1", busy), _Key("k2"), _Key("k3")]
+    monkeypatch.setattr(gemini, "_generation_clients_cache", chain)
+    monkeypatch.setattr(gemini, "_active_generation_client_index", 0)
+    with pytest.raises(Exception):
+        gemini._generate_content()
+    assert [k.calls for k in chain] == [2, 0, 0], "one retry on this key, and no key after it"
+
+
+# --- nothing imports a module the refactor removed -------------------------------------------------
 
 def test_no_module_imports_a_deleted_module():
-    """The vector store and its retrieval layer are gone (ai_db, sync, backfill, retrieval,
-    club_retrieval). An import left behind is an ImportError at request time, not at test time,
-    unless something asserts it here."""
+    """The vector store and its retrieval layer are gone, and so are the modules the narrowed scope
+    retired: the role-capability knowledge base, the third-party privacy check, the name lookup it
+    fed, and the admin analytics retrieval. An import left behind is an ImportError at request time,
+    not at test time, unless something asserts it here."""
     import app.ai.classifier as classifier_module
     import app.ai.text_to_sql as tts_module
     import app.api.ai as ai_module
 
-    banned = ("ai_db", "club_retrieval", "from .sync", "from .retrieval", "from .backfill")
+    banned = ("ai_db", "club_retrieval", "knowledge_base", "subject_scope", "name_lookup",
+              "admin_retrieval", "from .sync", "from .retrieval", "from .backfill")
     for module in (ai_module, classifier_module, tts_module):
         source = open(module.__file__, encoding="utf-8").read()
         # Only import STATEMENTS matter - prose in a docstring explaining what was removed is fine.
@@ -443,17 +719,18 @@ def test_no_module_imports_a_deleted_module():
                 assert name not in line, f"{module.__name__} still imports {name}: {line}"
 
 
-def test_the_vector_database_is_gone():
-    """The separate AI/vector database was deleted with this refactor: no second pool, no second
-    DSN, no embedding sync. A leftover config field would suggest a store that no longer exists."""
+def test_the_retired_modules_are_actually_gone():
+    """Deleted, not merely unimported. A file left on disk is a file the next person wires back in."""
     import os.path
 
     from app.config import config
 
     assert not hasattr(config, "ai_database_url")
     ai_dir = os.path.dirname(__import__("app.ai", fromlist=["_"]).__file__)
-    for removed in ("ai_db.py", "sync.py", "backfill.py", "retrieval.py", "club_retrieval.py"):
-        assert not os.path.exists(os.path.join(ai_dir, removed)), f"{removed} should have been deleted"
+    removed = ("ai_db.py", "sync.py", "backfill.py", "retrieval.py", "club_retrieval.py",
+               "knowledge_base.py", "subject_scope.py", "name_lookup.py", "admin_retrieval.py")
+    for name in removed:
+        assert not os.path.exists(os.path.join(ai_dir, name)), f"{name} should have been deleted"
 
 
 # --- the users table cannot be enumerated ---------------------------------------------------------
@@ -473,9 +750,9 @@ def test_the_vector_database_is_gone():
 def test_the_user_directory_cannot_be_enumerated(sql: str, signed_in: bool):
     """A bare read of `users` is the admin directory, which this assistant does not cover - for a
     signed-in caller exactly as much as for a guest."""
-    scope = _student_scope() if signed_in else _guest_scope()
+    scope_ = _student_scope() if signed_in else _guest_scope()
     with pytest.raises(sql_guard.SqlRejected):
-        _validate(sql, scope, topics=("events",) if not signed_in else ("events", "clubs"))
+        _validate(sql, scope_, topics=("events", "clubs") if signed_in else ("events",))
 
 
 def test_email_is_never_readable():
@@ -484,21 +761,20 @@ def test_email_is_never_readable():
     stronger guarantee than instructing the model not to select it."""
     assert "email" in schema_catalog.EXCLUDED_COLUMNS["users"]
     assert "email" not in schema_catalog.allowed_columns()["users"]
-    assert "email" not in schema_catalog.document_for_topics({"events"}).lower().split("users")[-1][:400]
 
 
 def test_a_name_can_still_be_resolved_through_an_authorised_row():
     """The guard must stop enumeration WITHOUT breaking the ordinary question it was never meant to
     touch. "Who organises this event" joins users to an event the caller may already see, and that
     join is itself the required condition."""
-    scope = _guest_scope()
-    predicate = scope.predicates_for("request")[0]
+    scope_ = _guest_scope()
+    predicate = scope_.predicates_for("request")[0]
     sql = (
         "SELECT request.event_title, users.full_name FROM request "
         "JOIN users ON users.user_id = request.applicant_user_id "
         f"WHERE {predicate}"
     )
-    assert _validate(sql, scope)
+    assert _validate(sql, scope_)
 
 
 def test_users_joins_are_offered_only_for_reachable_tables():
@@ -509,34 +785,14 @@ def test_users_joins_are_offered_only_for_reachable_tables():
 
 
 def test_no_scope_predicate_reads_an_excluded_column():
-    """A required condition that reads an excluded column would be rejected by the guard on the
-    bare word - making every valid query unrunnable, since the condition is mandatory. The caller's
-    own email is substituted as a literal for exactly this reason."""
-    scope = _student_scope()
-    for table, predicates in scope.required_predicates.items():
+    """A required condition that reads an excluded column would be rejected by the guard on the bare
+    word - making every valid query unrunnable, since the condition is mandatory."""
+    scope_ = _student_scope()
+    for table, predicates in scope_.required_predicates.items():
         for predicate in predicates:
             for column in schema_catalog.EXCLUDED_COLUMNS.get("users", ()):
                 assert f"users.{column}" not in predicate, f"{table} predicate reads users.{column}"
-            # `(SELECT ... email ... FROM users)` would trip the guard's bare-word check too.
             assert "FROM users" not in predicate, f"{table} predicate sub-selects from users"
-
-
-def test_scope_predicates_escape_a_quote_in_the_email():
-    """The caller's email is interpolated into a predicate as a literal. It comes from the
-    authenticated principal, never from the question - but a predicate built by concatenation is
-    the one place this design could reintroduce injection, so the quoting is asserted rather than
-    assumed."""
-    class _Odd:
-        user_id = 9
-        full_name = "O'Brien"
-        email = "o'brien@example.com"
-        assignments = (("student", None),)
-
-        def has_role(self, *codes):
-            return "student" in codes
-
-    predicate = scope_rules.build_scope(_Odd(), {"events"}).predicates_for("request")[0]
-    assert "''brien" in predicate, "a single quote must be doubled, not left to terminate the literal"
 
 
 # --- string literals are not identifiers ----------------------------------------------------------
@@ -544,46 +800,48 @@ def test_scope_predicates_escape_a_quote_in_the_email():
 def test_a_dotted_string_literal_is_not_read_as_a_column():
     """Regression: the column rule read `'student.computing@demo.apu.edu.my'` as student.computing
     and rejected the query for a column "computing" on table "student". Two of the first real
-    questions put through the pipeline burned all three retry attempts on this, so it was a live
-    false rejection rather than a hypothetical one."""
-    scope = _guest_scope()
-    predicate = scope.predicates_for("request")[0]
+    questions put through the pipeline burned all three retry attempts on this."""
+    scope_ = _guest_scope()
+    predicate = scope_.predicates_for("request")[0]
     sql = (
         "SELECT request.event_title FROM request "
         f"WHERE {predicate} AND request.applicant_email = 'student.computing@demo.apu.edu.my'"
     )
-    assert _validate(sql, scope)
+    assert _validate(sql, scope_)
 
 
 def test_a_table_name_inside_a_literal_does_not_demand_a_predicate():
     """The other half of the same rule: a table NAME mentioned in a string must not make the guard
     demand that table's access condition for a query that never reads it."""
-    scope = _guest_scope()
-    predicate = scope.predicates_for("request")[0]
-    sql = f"SELECT request.event_title FROM request WHERE {predicate} AND request.event_title LIKE '%club_members%'"
-    assert _validate(sql, scope)
+    scope_ = _guest_scope()
+    predicate = scope_.predicates_for("request")[0]
+    sql = (f"SELECT request.event_title FROM request WHERE {predicate} "
+           "AND request.event_title LIKE '%club_members%'")
+    assert _validate(sql, scope_)
 
 
 def test_a_write_keyword_inside_a_literal_is_still_rejected():
-    """The keyword rule deliberately keeps seeing literals. Nothing legitimate hides DROP TABLE in
-    a string, so rejecting it costs nothing and closes an obvious evasion."""
-    scope = _guest_scope()
+    """The keyword rule deliberately keeps seeing literals. Nothing legitimate hides DROP TABLE in a
+    string, so rejecting it costs nothing and closes an obvious evasion."""
+    scope_ = _guest_scope()
     with pytest.raises(sql_guard.SqlRejected):
-        _validate("SELECT request.event_title FROM request WHERE request.event_title = 'DROP TABLE users'", scope)
+        _validate(
+            "SELECT request.event_title FROM request WHERE request.event_title = 'DROP TABLE users'",
+            scope_,
+        )
 
 
 # --- aliases -------------------------------------------------------------------------------------
-# Required predicates are written with real table names, but models naturally alias (`FROM request r
-# ...
+# Required predicates are written with real table names, but models naturally alias.
 
 def test_an_aliased_query_still_satisfies_its_predicate():
-    scope = _guest_scope()
-    predicate = scope.predicates_for("request")[0]
-    aliased_predicate = predicate.replace("request.request_id", "r.request_id").replace(
-        "request.status", "r.status"
-    ).replace("request.event_visibility", "r.event_visibility")
-    sql = f"SELECT r.event_title FROM request r WHERE {aliased_predicate}"
-    assert _validate(sql, scope), "aliasing a table must not be read as omitting its access condition"
+    scope_ = _guest_scope()
+    predicate = scope_.predicates_for("request")[0]
+    aliased = (predicate.replace("request.request_id", "r.request_id")
+                        .replace("request.status", "r.status")
+                        .replace("request.event_visibility", "r.event_visibility"))
+    sql = f"SELECT r.event_title FROM request r WHERE {aliased}"
+    assert _validate(sql, scope_), "aliasing a table must not be read as omitting its access condition"
 
 
 def test_aliasing_does_not_let_a_query_skip_its_predicate():
@@ -598,47 +856,61 @@ def test_an_aliased_users_dump_is_still_rejected():
         _validate("SELECT u.full_name FROM users u", _student_scope(), topics=("events", "clubs"))
 
 
-# --- a resolved how-to answers from its guide, not the database -----------------------------------
+# --- a resolved how-to answers from its definition, not the database -------------------------------
 
 @pytest.mark.parametrize(
-    "question,guide",
+    "question,function_key",
     [
         ("how do I join a club", "join_club"),
         ("how do I register for an event", "register_event"),
-        ("how do I submit a proposal", "submit_proposal"),
+        ("how do I submit an event proposal", "submit_proposal"),
     ],
 )
-def test_a_resolved_how_to_drops_incidental_data_classes(question: str, guide: str):
-    """THE regression test, in its Text-to-SQL form. "How do I join a club" names clubs, so the
-    classifier legitimately returns {how_to, clubs} - and api/ai.py routes to the SQL path whenever
-    any data class is present, so the asker got a LIST OF CLUBS instead of the instructions they
-    asked for. Observed exactly that way through the finished endpoint.
+def test_a_resolved_how_to_drops_incidental_data_intents(question: str, function_key: str):
+    """THE regression test. "How do I join a club" names clubs, so a reading of {how_to, club_info}
+    is defensible - and the endpoint routes to the retrieval path whenever any data intent is
+    present, so the asker got a LIST OF CLUBS instead of the instructions they asked for. Observed
+    exactly that way through the finished endpoint.
 
     Asserts the deterministic suppression, not the model: this calls the pure function directly, so
     it tests the backstop rather than whether the prompt happened to be obeyed on the day."""
-    from app.ai.classifier import _suppress_incidental_how_to_topics
+    from app.ai.classifier import Reading, _suppress_incidental_data_intents
 
-    assert query_router.how_to_topic(question) == guide
-    assert _suppress_incidental_how_to_topics(question, {"how_to", "clubs", "events"}) == {"how_to"}
+    assert scope.function_named(question) == function_key
+    reading = Reading(intents=frozenset({"how_to", "club_info", "event_info"}))
+    assert _suppress_incidental_data_intents(question, reading).intents == frozenset({"how_to"})
 
 
-def test_a_generic_how_to_keeps_its_data_classes():
-    """The guard on the guard: only a RESOLVED guide is confidently procedural. "How does the
-    approval process work" has no steps behind it, so its data classes are the only thing that
-    could answer it and must survive."""
-    from app.ai.classifier import _suppress_incidental_how_to_topics
+def test_a_resolved_page_question_drops_incidental_data_intents():
+    """The same backstop for "what is Explore Events for", which made a structural question depend
+    on data access - the identical question returned a description for a guest and a flat refusal
+    for a visitor account, when neither should have touched an event row."""
+    from app.ai.classifier import Reading, _suppress_incidental_data_intents
+
+    question = "what is Explore Events for"
+    reading = Reading(intents=frozenset({"page_purpose", "event_info"}))
+    assert _suppress_incidental_data_intents(question, reading).intents == frozenset({"page_purpose"})
+
+
+def test_a_generic_how_to_keeps_its_data_intents():
+    """The guard on the guard: only a RESOLVED function is confidently procedural. "How does the
+    approval process work" has no steps behind it, so its data intents are the only thing that could
+    answer it and must survive."""
+    from app.ai.classifier import Reading, _suppress_incidental_data_intents
 
     question = "how does the approval process work"
-    assert query_router.how_to_topic(question) is None
-    assert _suppress_incidental_how_to_topics(question, {"how_to", "events"}) == {"how_to", "events"}
+    assert scope.function_named(question) is None
+    reading = Reading(intents=frozenset({"how_to", "event_info"}))
+    assert _suppress_incidental_data_intents(question, reading).intents == frozenset({"how_to", "event_info"})
 
 
-def test_suppression_never_empties_the_class_set():
-    """Dropping every class would send a real how-to down the out-of-scope path - refused and
+def test_suppression_never_empties_the_intent_set():
+    """Dropping every intent would send a real how-to down the out-of-scope path - refused and
     logged as unsupported, which is the opposite of the intent."""
-    from app.ai.classifier import _suppress_incidental_how_to_topics
+    from app.ai.classifier import Reading, _suppress_incidental_data_intents
 
-    assert _suppress_incidental_how_to_topics("how do I join a club", {"how_to"}) == {"how_to"}
+    reading = Reading(intents=frozenset({"how_to"}))
+    assert _suppress_incidental_data_intents("how do I join a club", reading).intents == frozenset({"how_to"})
 
 
 # --- a predicate that is present but inert -------------------------------------------------------
@@ -654,432 +926,152 @@ def test_suppression_never_empties_the_class_set():
     ],
 )
 def test_a_neutralised_predicate_is_rejected(template: str):
-    scope = _guest_scope()
-    sql = template.format(pred=scope.predicates_for("request")[0])
+    scope_ = _guest_scope()
+    sql = template.format(pred=scope_.predicates_for("request")[0])
     with pytest.raises(sql_guard.SqlRejected) as excinfo:
-        _validate(sql, scope)
+        _validate(sql, scope_)
     assert not excinfo.value.repairable, (
         "defeating an access condition is an authorization violation, not a mistake to retry"
     )
 
 
 def test_ordinary_queries_are_not_caught_by_the_neutralisation_rules():
-    """The rules must not become a tax on normal SQL - a date comparison, a join and a LIMIT are
-    what almost every real query looks like."""
-    scope = _guest_scope()
-    predicate = scope.predicates_for("request")[0]
+    """The rules must not become a tax on normal SQL - a date comparison, a join and a LIMIT are what
+    almost every real query looks like."""
+    scope_ = _guest_scope()
+    predicate = scope_.predicates_for("request")[0]
     sql = (
         "SELECT request.event_title, event_schedule.date FROM request "
         "JOIN event_schedule ON event_schedule.request_id = request.request_id "
         f"WHERE {predicate} AND event_schedule.date >= CURRENT_DATE "
         "ORDER BY event_schedule.date LIMIT 10"
     )
-    assert _validate(sql, scope)
+    assert _validate(sql, scope_)
 
 
 def test_a_union_cannot_smuggle_in_another_table():
-    """UNION is the classic way to append a second result set. It does not escape rule 7: the
-    second branch reads `users`, and users has its own required condition."""
-    scope = _guest_scope()
-    predicate = scope.predicates_for("request")[0]
+    """UNION is the classic way to append a second result set. It does not escape rule 7: the second
+    branch reads `users`, and users has its own required condition."""
+    scope_ = _guest_scope()
+    predicate = scope_.predicates_for("request")[0]
     with pytest.raises(sql_guard.SqlRejected):
         _validate(
             f"SELECT request.event_title FROM request WHERE {predicate} "
             "UNION SELECT users.full_name FROM users",
-            scope,
+            scope_,
         )
 
 
 def test_a_scalar_subquery_cannot_leak_another_table():
     """A subselect in the column list is still a read of that table, and is checked as one."""
-    scope = _guest_scope()
-    predicate = scope.predicates_for("request")[0]
+    scope_ = _guest_scope()
+    predicate = scope_.predicates_for("request")[0]
     with pytest.raises(sql_guard.SqlRejected):
         _validate(
             "SELECT request.event_title, (SELECT users.full_name FROM users LIMIT 1) "
             f"FROM request WHERE {predicate}",
-            scope,
+            scope_,
         )
 
 
-# --- recommendations ask before they suggest ------------------------------------------------------
+# --- suggestions ask before they suggest ----------------------------------------------------------
 # From a real session: "can u suggest event for me" returned five events, no reason, no question, and
 # the same five for every asker.
 
-@pytest.mark.parametrize(
-    "question",
-    [
-        "can u suggest event for me",
-        "what can you suggest for me",
-        "what event is best fits me",
-        "recommend a club",
-        "what should I join",
-        "anything good coming up",
-    ],
-)
-def test_recommendation_questions_are_recognised(question: str):
-    from app.ai import recommendation
+class _Reading:
+    """The three fields recommendation.stage_for reads. Built by hand rather than by calling the
+    model, so this tests the flow rather than the weather."""
 
-    assert recommendation.is_recommendation(question)
+    def __init__(self, domain, preferences=None):
+        self.domain = domain
+        self.preferences = preferences
 
 
-@pytest.mark.parametrize(
-    "question",
-    ["how many events am I registered for", "who organises the hackathon", "what clubs exist"],
-)
-def test_plain_lookups_are_not_recommendations(question: str):
-    """A false positive costs one clarifying question on a factual lookup, which is worse than
-    unhelpful - it makes the assistant look like it did not understand."""
-    from app.ai import recommendation
-
-    assert not recommendation.is_recommendation(question)
+def test_a_first_suggestion_request_asks_about_interests():
+    """Nobody has said what they like, so there is nothing to suggest FROM. The question is the
+    entire reply."""
+    assert recommendation.stage_for(_Reading("events")) == recommendation.ASK
+    assert recommendation.stage_for(_Reading("clubs")) == recommendation.ASK
 
 
-def test_an_ambiguous_recommendation_asks_which_domain():
+def test_a_suggestion_naming_neither_domain_asks_which():
     """"What can you suggest for me" names neither events nor clubs. The old behaviour guessed
     events and committed silently."""
-    from app.ai import recommendation
-
-    assert recommendation.named_domain("what can you suggest for me") is None
-    assert recommendation.stage_for("what can you suggest for me", []) == "clarify"
+    assert recommendation.stage_for(_Reading(None)) == recommendation.CLARIFY
 
 
-def test_a_domain_specific_first_request_asks_about_interests():
-    from app.ai import recommendation
-
-    assert recommendation.named_domain("suggest an event for me") == "events"
-    assert recommendation.stage_for("suggest an event for me", []) == "ask"
-
-
-def test_a_recommendation_after_the_interest_question_recommends():
-    """Once the assistant has asked and they have answered, asking again is not listening."""
-    from app.ai import recommendation
-
-    history = [{"question": "suggest an event", "answer": "What kind of activities do you enjoy?"}]
-    assert recommendation.stage_for("suggest an event for me", history) == "recommend"
+def test_stated_preferences_skip_the_question():
+    """Once they have said what they are after - in this turn or four turns ago - asking again is not
+    listening. This is why preferences are accumulated across the whole conversation rather than
+    re-derived from the assistant's own last sentence."""
+    reading = _Reading("events", preferences="likes competitive tech events, free, this month")
+    assert recommendation.stage_for(reading) == recommendation.RECOMMEND
 
 
-def test_the_answer_to_the_interest_question_stays_in_the_thread():
-    """"I like coding and building things" carries no recommendation wording, but it is exactly the
-    turn where broad candidate retrieval matters. Without this it ran a narrow query, matched the
-    literal word "coding" against nothing, and reported there were no events while a hackathon sat
-    in the table."""
-    from app.ai import recommendation
-
-    history = [{"question": "suggest an event", "answer": "What kind of activities do you enjoy?"}]
-    assert recommendation.in_recommendation_thread("I like coding and hands-on stuff", history)
-    assert not recommendation.in_recommendation_thread("I like coding and hands-on stuff", [])
-
-
-def test_a_recommendation_is_a_shortlist():
-    """A recommendation is a shortlist with reasons; a list of nine is a search result."""
-    from app.ai import recommendation
-
+def test_a_suggestion_is_a_shortlist():
+    """A suggestion is a shortlist with reasons; a list of nine is a search result."""
     assert recommendation.MAX_SUGGESTIONS <= 3
+    document = recommendation.recommend_document("events", "likes sport")
+    assert "AT MOST 3" in document
+    assert "likes sport" in document, "what they told you must reach the answering step"
+    assert "NEVER INVENT A REASON" in document
+
+
+def test_the_ask_turn_forbids_a_preview():
+    """"But here are a few anyway" is how the ask-first flow quietly stops existing."""
+    document = recommendation.ask_document("clubs")
+    assert "ENTIRE REPLY" in document
+    assert "no list" in document.lower()
+    assert "here are a few anyway" in document.lower()
 
 
 # --- cards are built for what the answer NAMES ----------------------------------------------------
 
-def test_cards_match_only_what_the_answer_names():
-    """A query returns rows the reply never mentions - the model was given nine events and picked
-    three. Carding all nine would put six cards under an answer that never brought them up."""
-    from app.ai.cards import _names_in
+def test_two_events_sharing_a_title_card_the_upcoming_one():
+    """A card must not contradict the sentence above it.
 
+    Titles are not unique: two published events are both called "APU Hackathon 2026", on 25 September
+    and 10 June. The title map was a dict comprehension, so one silently overwrote the other - and
+    with no ORDER BY in the query, which one won was whatever the database returned last. The
+    assistant correctly suggested the September event and the card under it read 10 June, an event
+    already past that the reply had never mentioned; clicking it opened the wrong one."""
+    from datetime import date
+
+    today = date(2026, 9, 1)
+    rows = [
+        {"request_id": 4471, "event_title": "APU Hackathon 2026", "firstDate": "2026-06-10"},
+        {"request_id": 4272, "event_title": "APU Hackathon 2026", "firstDate": "2026-09-25"},
+        {"request_id": 9, "event_title": "Never Scheduled", "firstDate": None},
+    ]
+    assert cards._best_row_per_title(rows)["APU Hackathon 2026"] == 4272
+    # Order of arrival must not decide it - that was the whole defect.
+    assert cards._best_row_per_title(list(reversed(rows)))["APU Hackathon 2026"] == 4272
+    # All occurrences past: the most recent one is the least wrong card to show.
+    past = [
+        {"request_id": 1, "event_title": "Old Thing", "firstDate": "2026-01-05"},
+        {"request_id": 2, "event_title": "Old Thing", "firstDate": "2026-04-05"},
+    ]
+    assert cards._best_row_per_title(past)["Old Thing"] == 2
+    assert cards._occurrence_rank(rows[2], today)[0] == 2, "an unscheduled row sorts last"
+
+
+def test_cards_match_only_what_the_answer_names():
+    """A query returns rows the reply never mentions - the model was given twenty events and picked
+    three. Carding all twenty would put seventeen cards under an answer that never brought them up."""
     titles = {"Annual Hackathon Kickoff": 1, "APU Cultural Night": 2, "Case Competition Finals": 3}
-    named = _names_in("The Annual Hackathon Kickoff would suit you.", titles)
-    assert named == [1]
+    assert cards._names_in("The Annual Hackathon Kickoff would suit you.", titles) == [1]
 
 
 def test_a_one_character_title_never_matches():
     """The seed data contains a club literally named "1", which would otherwise match the digit in
     every date and time in a reply."""
-    from app.ai.cards import _names_in
-
-    assert _names_in("It runs on 1 October at 1pm", {"1": 99}) == []
+    assert cards._names_in("It runs on 1 October at 1pm", {"1": 99}) == []
 
 
 def test_a_longer_title_wins_over_a_substring():
     """Longest-first matching, so a club named "Coding" does not swallow "APU Coding Society"."""
-    from app.ai.cards import _names_in
+    assert cards._names_in("Try the APU Coding Society.", {"APU Coding Society": 1, "Coding": 2})[0] == 1
 
-    titles = {"APU Coding Society": 1, "Coding": 2}
-    assert _names_in("Try the APU Coding Society.", titles)[0] == 1
-
-
-# --- navigation cards for location questions ------------------------------------------------------
-
-def test_topic_cards_respect_page_visibility(monkeypatch):
-    """"Where can I find my registrations" classifies as DATA, resolves no how-to guide, and used to
-    get prose with nothing to click. The card must still come from the same grant check."""
-    principal = _FakePrincipal((("student", _representative_unit("student")),))
-    assert topic_access.topic_cards(principal, {"my_registrations"}), "expected a card while granted"
-
-    real = identity.has_page_access
-    monkeypatch.setattr(identity, "has_page_access", lambda a, page_code: False)
-    assert topic_access.topic_cards(principal, {"my_registrations"}) == []
-    monkeypatch.setattr(identity, "has_page_access", real)
-
-
-def test_topic_cards_are_capped():
-    principal = _FakePrincipal((("student", _representative_unit("student")),))
-    assert len(topic_access.topic_cards(principal, {"events", "clubs", "my_registrations"})) <= 2
-
-
-# --- registration COUNTS are public; registrant IDENTITIES are not --------------------------------
-# The whole event_registration table was originally treated as private, so "how many people registered
-# for the hackathon" answered 0 for a caller who organises nothing - while Explore Events displayed "5
-# registered" on that event's own card, to that same user.
-
-def _cafeteria_manager_scope():
-    """A caller who organises nothing and has registered for nothing - the account the bug was
-    found on. Every registration row is outside their private scope, so only the public count
-    exemption can answer a count question for them."""
-    class _P:
-        user_id = 7
-        full_name = "Siti Aminah"
-        email = "cafeteria.manager@demo.apu.edu.my"
-        assignments = (("cafeteria-manager", "cafeteria__atrium_cafeteria"),)
-
-        def has_role(self, *codes):
-            return "cafeteria-manager" in codes
-
-    return scope_rules.build_scope(_P(), {"events"})
-
-
-def test_a_public_count_query_is_allowed():
-    scope = _cafeteria_manager_scope()
-    sql = (
-        "SELECT COUNT(event_registration.event_registration_id) FROM event_registration "
-        "WHERE PUBLIC_COUNT_ONLY"
-    )
-    assert _validate(sql, scope)
-
-
-@pytest.mark.parametrize(
-    "column",
-    ["registrant_name", "registrant_email", "reason_for_attending", "payment_status"],
-)
-def test_the_count_exemption_cannot_return_identities(column: str):
-    """The marker must not become a way to read the attendee list of an event the caller has
-    nothing to do with. A predicate is a row filter and cannot express "aggregate but do not
-    project", so the guard enforces the column half."""
-    scope = _cafeteria_manager_scope()
-    sql = f"SELECT COUNT(*), event_registration.{column} FROM event_registration WHERE PUBLIC_COUNT_ONLY"
-    with pytest.raises(sql_guard.SqlRejected):
-        _validate(sql, scope)
-
-
-def test_the_count_exemption_requires_an_aggregate():
-    scope = _cafeteria_manager_scope()
-    with pytest.raises(sql_guard.SqlRejected):
-        _validate(
-            "SELECT event_registration.request_id FROM event_registration WHERE PUBLIC_COUNT_ONLY",
-            scope,
-        )
-
-
-def test_a_roster_read_without_the_marker_is_still_refused():
-    """The private half is unchanged: names still need ownership."""
-    scope = _cafeteria_manager_scope()
-    with pytest.raises(sql_guard.SqlRejected):
-        _validate("SELECT event_registration.registrant_name FROM event_registration", scope)
-
-
-def test_the_marker_is_stripped_before_execution():
-    """PUBLIC_COUNT_ONLY is an instruction to the guard, not SQL - Postgres has no idea what it
-    means, so it is rewritten to TRUE once the guard has proved the claim was honest."""
-    from app.ai.sql_runner import _strip_markers
-
-    stripped = _strip_markers("SELECT COUNT(*) FROM event_registration WHERE PUBLIC_COUNT_ONLY")
-    assert "PUBLIC_COUNT_ONLY" not in stripped
-    assert "TRUE" in stripped
-
-
-# --- an empty SCOPED result is not a statement about the world ------------------------------------
-
-def test_a_scoped_empty_result_never_claims_none_exist():
-    """"Who registered for the Career Fair?" returned no rows - correctly, that roster is not this
-    caller's to read - and the assistant answered "No one has registered", while the event's card
-    showed 5. An empty scoped result says something about the ASKER'S ACCESS, not about the world."""
-    from app.ai.sql_runner import rows_to_document
-
-    document = rows_to_document([], sql="SELECT x FROM event_registration WHERE user_id = 7")
-    assert "none exist" in document or "NOT 'none exist'" in document
-    assert "access" in document.lower()
-
-
-def test_a_genuinely_empty_public_result_still_states_zero():
-    """The guard on the guard: a real zero over public data is a complete, correct answer, and
-    refusing to state it is its own bug."""
-    from app.ai.sql_runner import rows_to_document
-
-    document = rows_to_document([], sql="SELECT COUNT(*) FROM request WHERE TRUE")
-    assert "real, final, correct answer" in document
-
-
-# =================================================================================================
-# REGRESSIONS FROM ONE OBSERVED CHAT SESSION
-#
-# Four defects, each in a different layer, found in a single transcript. They are grouped here
-# because that transcript is the evidence for all four:
-#
-#   > hey
-#   Hey Daniel, need a hand with any clubs or events today?        <- byte-identical every greeting
-#   > tell me who is the manger of head or logistic
-#   I wasn't able to retrieve that information at the moment. Could you try rephrasing your
-#   question or asking about something more specific?  [My Events] <- wrong reason, stray card
-#   > suggest the event that has the most registered people
-#   To help me suggest the right event for you, could you tell me what you enjoy...?
-#                                                                  <- the criterion was already given
-#   > what event that has the most people registered in
-#   The event with the highest number of registrations is the Annual Tech Symposium, which
-#   currently has 150 people signed up.  [Explore Events][My Events] <- page links, not the event
-
-# --- a question carrying its own ranking criterion is a lookup, not a preference question ---------
-
-@pytest.mark.parametrize(
-    "question",
-    [
-        "suggest the event that has the most registered people",
-        "suggest a club with the most members",
-        "recommend the most popular event",
-        "what club do you suggest that has the highest number of members",
-    ],
-)
-def test_a_ranked_lookup_never_enters_the_ask_first_flow(question: str):
-    """"Suggest the event that has the most registered people" says exactly how to pick. Asking
-    "what do you enjoy?" back is not a clarification, it is a failure to read the question - and the
-    asker proved it by retyping the same question without the word "suggest" and getting the answer
-    immediately.
-
-    The line is RANKABLE: if an ORDER BY over real columns can settle it, the asker has already
-    chosen and there is nothing left to ask them."""
-    from app.ai import recommendation
-
-    assert not recommendation.is_recommendation(question)
-    assert recommendation.stage_for(question, []) == "recommend"
-
-
-@pytest.mark.parametrize(
-    "question",
-    ["suggest an event for me", "recommend a club", "anything good for me", "anything fun this term"],
-)
-def test_a_genuine_preference_question_still_asks_first(question: str):
-    """The guard above must not eat the flow it is narrowing. "Good", "fun" and "interesting" sound
-    like criteria but rank nothing, so they stay preference questions.
-
-    Phrasings here must be ones _RECOMMENDATION already covers. "any good events for me" is NOT -
-    the pattern requires "anything good", so "any good ..." has never been treated as a
-    recommendation. That gap predates this guard and is untouched by it."""
-    from app.ai import recommendation
-
-    assert recommendation.is_recommendation(question)
-    assert recommendation.stage_for(question, []) in ("ask", "clarify")
-
-
-# --- a refusal says what is true, and never invites a rewrite that cannot help ---------------------
-
-def test_no_refusal_document_invites_a_rephrasing():
-    """"Could you try rephrasing your question or asking about something more specific?" is honest
-    advice only when the wording was the problem. For "who is the head of logistics" it never was -
-    the app holds no org chart, so no phrasing has an answer - and the asker rephrased, hit the same
-    wall, and rephrased again. Every refusal document now forbids the invitation rather than
-    issuing it, so the words may still appear, but only as a prohibition aimed at the model."""
-    from app.api import ai as ai_api
-
-    documents = (
-        ai_api._SQL_FAILED_DOCUMENT,
-        ai_api._NO_ACCESS_DOCUMENT,
-        # Now built per tier, so all three are checked - a guest, a visitor account and an
-        # internal one each get their own wording.
-        topic_access.out_of_scope_document(None),
-        topic_access.out_of_scope_document(_FakePrincipal((("external-user", None),), is_external=True)),
-        topic_access.out_of_scope_document(_FakePrincipal((("student", _representative_unit("student")),))),
-    )
-    for document in documents:
-        lowered = document.lower()
-        for phrase in ("rephras", "reword", "more specific"):
-            if phrase in lowered:
-                prohibition = lowered.split(phrase)[0].rsplit(".", 1)[-1]
-                assert "do not" in prohibition or "never" in prohibition, (
-                    f"{phrase!r} reads as advice to the asker, not a prohibition: {document}"
-                )
-
-
-@pytest.mark.parametrize(
-    "question",
-    [
-        "tell me who is the manger of head or logistic",  # the asker's own typos, verbatim
-        "who is the head of logistics",
-        "who manages the IT department",
-        "who is in charge of facilities",
-    ],
-)
-def test_a_directory_lookup_is_refused_as_no_access(question: str):
-    """A staff/org-chart lookup is told "you don't have access to that", not "I couldn't retrieve
-    it". The first is true and final; the second implies a transient fault and invites a retry."""
-    from app.api import ai as ai_api
-
-    assert ai_api._refusal_document(question, ai_api._SQL_FAILED_DOCUMENT) is ai_api._NO_ACCESS_DOCUMENT
-
-
-def test_a_lookup_the_app_can_answer_keeps_the_ordinary_wording():
-    """The no-access wording is for questions this app genuinely cannot answer for anyone. An
-    ordinary event or club question that merely failed keeps the generic refusal."""
-    from app.api import ai as ai_api
-
-    for question in ("what event has the most people registered in", "what clubs exist"):
-        assert ai_api._refusal_document(question, ai_api._SQL_FAILED_DOCUMENT) is ai_api._SQL_FAILED_DOCUMENT
-
-
-def test_the_person_lookup_pattern_only_ever_chooses_wording():
-    """_PERSON_LOOKUP is blunt on purpose, and is safe only because of WHERE it runs: every caller
-    has already established that no answer is coming, so it picks a sentence, never an outcome.
-
-    This pins that contract. "Who is the president of the Photography Club" trips the pattern, which
-    would be a real bug if the pattern gated anything - the clubs topic answers that question - and
-    is harmless here because reaching _refusal_document at all means it was refused already."""
-    import inspect
-
-    from app.api import ai as ai_api
-
-    assert ai_api._PERSON_LOOKUP.search("who is the president of the Photography Club")
-    body = inspect.getsource(ai_api._refusal_document).splitlines()
-    assert sum("_PERSON_LOOKUP" in line for line in body) == 1, (
-        "_PERSON_LOOKUP must stay a wording choice inside _refusal_document; using it as a gate "
-        "would refuse answerable questions such as 'who is the president of X club'."
-    )
-
-
-# --- a refusal offers nothing to click ------------------------------------------------------------
-
-def test_navigation_cards_never_appear_under_a_refusal():
-    """The stray "My Events" card under "I wasn't able to retrieve that". The absence of an entity
-    card used to be the only condition, and a refusal has no entity card either - so a failed
-    lookup, an impossible question, a page denial and a privacy refusal all picked one up. The card
-    does not merely add noise: it asserts the answer is on that page and sends someone to look for
-    something that was never there."""
-    from app.api import ai as ai_api
-
-    principal = _FakePrincipal((("student", _representative_unit("student")),))
-    topics = {"my_registrations"}
-
-    assert ai_api._navigation_cards(principal, topics, answered=True, has_entity_card=False), (
-        "a real location answer still deserves its page card"
-    )
-    assert ai_api._navigation_cards(principal, topics, answered=False, has_entity_card=False) == []
-
-
-def test_an_entity_card_still_beats_a_page_card():
-    """A specific event's card beats a link to the page listing every event, so the page card stays
-    suppressed whenever a real one was built."""
-    from app.api import ai as ai_api
-
-    principal = _FakePrincipal((("student", _representative_unit("student")),))
-    assert ai_api._navigation_cards(principal, {"events"}, answered=True, has_entity_card=True) == []
-
-
-# --- an event card survives the way a model actually writes a title -------------------------------
 
 @pytest.mark.parametrize(
     ("answer", "expected"),
@@ -1096,18 +1088,135 @@ def test_a_card_is_built_however_the_model_punctuates_the_title(answer: str, exp
     own card. The match required the reply to reproduce every apostrophe, hyphen and run of spaces
     exactly as stored, which models do not do - and a word-boundary anchor is undefined next to a
     non-word character, so a title ending in "!" or ")" could never match at all."""
-    from app.ai.cards import _names_in
-
-    assert _names_in(answer, {"Annual Tech Symposium": 7, "APU's Hackathon": 8}) == expected
+    assert cards._names_in(answer, {"Annual Tech Symposium": 7, "APU's Hackathon": 8}) == expected
 
 
-def test_normalising_a_title_does_not_weaken_the_existing_guards():
-    """The one-character-title and longest-first rules are load-bearing and must survive the
-    normalisation: a club named "1" would otherwise match the digit in every date in a reply."""
-    from app.ai.cards import _names_in
+def test_cards_are_built_only_for_the_topic_asked_about():
+    """A club answer must not sprout event cards because it happened to mention a word that matches
+    an event title."""
+    events, clubs = cards.build("nothing in particular", {"clubs"}, user_id=None)
+    assert events == []
 
-    assert _names_in("It runs on 1 October at 1pm", {"1": 99}) == []
-    assert _names_in("Try the APU Coding Society.", {"APU Coding Society": 1, "Coding": 2})[0] == 1
+
+# --- navigation cards for location questions ------------------------------------------------------
+
+def test_topic_cards_respect_page_visibility(monkeypatch):
+    """A location answer - "where do I find events" - is prose with nothing to click otherwise. The
+    card must still come from the same grant check."""
+    principal = _student()
+    assert topic_access.topic_cards(principal, {"events"}), "expected a card while granted"
+
+    real = identity.has_page_access
+    monkeypatch.setattr(identity, "has_page_access", lambda a, page_code: False)
+    assert topic_access.topic_cards(principal, {"events"}) == []
+    monkeypatch.setattr(identity, "has_page_access", real)
+
+
+def test_topic_cards_are_capped():
+    assert len(topic_access.topic_cards(_student(), {"events", "clubs"})) <= 2
+
+
+# --- registration and membership COUNTS are public; identities are not ----------------------------
+# The whole event_registration table was originally treated as private, so "how many people
+# registered for the hackathon" answered 0 for a caller who organises nothing - while Explore Events
+# displayed "5 registered" on that event's own card, to that same user.
+
+def _cafeteria_manager_scope(topics=("events",)):
+    """A caller who organises nothing and has registered for nothing. Every registration row is
+    outside any private scope, so only the public count exemption can answer a count question."""
+    class _P:
+        user_id = 7
+        full_name = "Siti Aminah"
+        email = "cafeteria.manager@demo.apu.edu.my"
+        assignments = (("cafeteria-manager", "cafeteria__atrium_cafeteria"),)
+
+        def has_role(self, *codes):
+            return "cafeteria-manager" in codes
+
+    return scope_rules.build_scope(_P(), set(topics))
+
+
+def test_a_public_count_query_is_allowed():
+    scope_ = _cafeteria_manager_scope()
+    sql = (
+        "SELECT COUNT(event_registration.event_registration_id) FROM event_registration "
+        "WHERE PUBLIC_COUNT_ONLY"
+    )
+    assert _validate(sql, scope_)
+
+
+@pytest.mark.parametrize(
+    "column",
+    ["registrant_name", "registrant_email", "reason_for_attending", "payment_status"],
+)
+def test_the_count_exemption_cannot_return_identities(column: str):
+    """The marker must not become a way to read the attendee list. A predicate is a row filter and
+    cannot express "aggregate but do not project", so the guard enforces the column half."""
+    scope_ = _cafeteria_manager_scope()
+    sql = f"SELECT COUNT(*), event_registration.{column} FROM event_registration WHERE PUBLIC_COUNT_ONLY"
+    with pytest.raises(sql_guard.SqlRejected):
+        _validate(sql, scope_)
+
+
+def test_the_count_exemption_requires_an_aggregate():
+    scope_ = _cafeteria_manager_scope()
+    with pytest.raises(sql_guard.SqlRejected):
+        _validate(
+            "SELECT event_registration.request_id FROM event_registration WHERE PUBLIC_COUNT_ONLY",
+            scope_,
+        )
+
+
+def test_a_roster_read_without_the_marker_is_refused():
+    """And there is no marker-free path either: the marker is the table's ONLY condition, so a
+    roster read fails whether or not it carries one."""
+    scope_ = _cafeteria_manager_scope()
+    with pytest.raises(sql_guard.SqlRejected):
+        _validate("SELECT event_registration.registrant_name FROM event_registration", scope_)
+
+
+def test_the_marker_is_stripped_before_execution():
+    """PUBLIC_COUNT_ONLY is an instruction to the guard, not SQL - Postgres has no idea what it
+    means, so it is rewritten to TRUE once the guard has proved the claim was honest."""
+    from app.ai.sql_runner import _strip_markers
+
+    stripped = _strip_markers("SELECT COUNT(*) FROM event_registration WHERE PUBLIC_COUNT_ONLY")
+    assert "PUBLIC_COUNT_ONLY" not in stripped
+    assert "TRUE" in stripped
+
+
+# --- a refusal says what is true, and offers nothing false ----------------------------------------
+
+def test_no_refusal_document_invites_a_rephrasing():
+    """"Could you try rephrasing your question or asking about something more specific?" is honest
+    advice only when the wording was the problem. For "who is the head of logistics" it never was -
+    the app holds no org chart, so no phrasing has an answer - and the asker rephrased, hit the same
+    wall, and rephrased again. Every refusal document now forbids the invitation rather than issuing
+    it, so the words may still appear, but only as a prohibition aimed at the model."""
+    documents = (
+        topic_access.unanswerable_document(),
+        topic_access.out_of_scope_document(None),
+        topic_access.out_of_scope_document(_FakePrincipal((("external-user", None),), is_external=True)),
+        topic_access.out_of_scope_document(_student()),
+        scope.unknown_function_document(_student()),
+    )
+    for document in documents:
+        lowered = document.lower()
+        for phrase in ("rephras", "reword", "more specific"):
+            if phrase in lowered:
+                prohibition = lowered.split(phrase)[0].rsplit(".", 1)[-1]
+                assert "do not" in prohibition or "never" in prohibition, (
+                    f"{phrase!r} reads as advice to the asker, not a prohibition: {document}"
+                )
+
+
+def test_an_out_of_scope_refusal_is_not_dressed_up_as_a_permission_problem():
+    """The distinction the narrowed scope makes load-bearing. "Who registered for this event" is not
+    gated - no grant unlocks it - so blaming permissions sends the asker to request something that
+    does not exist, and implying a retry might work sends them round a loop."""
+    document = topic_access.out_of_scope_document(_student())
+    assert "Not blocked, not a permissions problem" in document
+    assert "administrator" not in document.lower()
 
 
 # --- a greeting is written, not assembled ---------------------------------------------------------
@@ -1133,16 +1242,58 @@ def test_a_greeting_samples_hotter_than_a_fact():
 
 
 def test_the_greeting_hint_names_topics_without_supplying_wording(monkeypatch):
-    """The hint's job is to say which topics are safe to mention, computed live from page access.
-    It must not hand over a sentence - that is what produced the identical reply in the first
-    place - and it must still refuse to offer a topic the asker would then be denied."""
-    principal = _FakePrincipal((("student", _representative_unit("student")),))
+    """The hint's job is to say which topics are safe to mention, computed live from page access. It
+    must not hand over a sentence - that is what produced the identical reply in the first place -
+    and it must still refuse to offer a topic the asker would then be denied."""
+    principal = _student()
     hint = topic_access.greeting_hint_document(principal)
     assert "Word the reply differently" in hint
 
     real = identity.has_page_access
     monkeypatch.setattr(identity, "has_page_access", lambda a, page_code: False)
     starved = topic_access.greeting_hint_document(principal)
-    assert "not clubs or events" in starved
+    assert "neither clubs nor events" in starved
     monkeypatch.setattr(identity, "has_page_access", real)
 
+
+# --- the opening suggestion cards offer only answerable questions ---------------------------------
+
+def test_every_suggestion_card_is_a_question_the_assistant_answers(monkeypatch):
+    """The catalogue used to offer proposal tracking, cafeteria menus and registrant lists - none of
+    which the assistant does any more. A card is a promise, and an unanswerable one is a broken
+    promise made before the conversation has even started."""
+    from app.ai.suggestions import CATALOGUE
+
+    forbidden = ("who registered", "registrants", "my inbox", "proposal", "cafeteria", "report",
+                 "page visibility", "refused")
+    for card in CATALOGUE:
+        lowered = card.prompt.lower()
+        for word in forbidden:
+            assert word not in lowered, f"card {card.title!r} asks something out of scope: {card.prompt}"
+
+
+def test_a_suggestion_card_is_released_by_the_page_that_answers_it(monkeypatch):
+    """The same grant check that releases the answer. Revoking Discover Clubs must take the club
+    cards with it, or the panel offers a question the next click refuses."""
+    from app.ai.suggestions import suggestions_for
+
+    principal = _student()
+    granted = {card["prompt"] for card in suggestions_for(principal, limit=20)}
+    assert "Suggest a club for me." in granted
+
+    real = identity.has_page_access
+    monkeypatch.setattr(
+        identity, "has_page_access",
+        lambda a, page_code: False if page_code == "clubs-discover" else real(a, page_code),
+    )
+    revoked = {card["prompt"] for card in suggestions_for(principal, limit=20)}
+    assert "Suggest a club for me." not in revoked
+    monkeypatch.setattr(identity, "has_page_access", real)
+
+
+def test_the_suggestion_panel_is_never_empty():
+    """An account that reaches nothing still opens the panel on something real to click, because a
+    page explanation and a how-to have an answer for everyone."""
+    from app.ai.suggestions import suggestions_for
+
+    assert suggestions_for(None)

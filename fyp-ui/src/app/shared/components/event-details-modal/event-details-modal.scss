@@ -48,6 +48,11 @@
 .event-image-lightbox {
   position: fixed;
   z-index: 1300;
+  // Asserted for the same reason app-form-modal asserts it: this is a SIBLING of the modal, not a
+  // child, so it does not inherit the backdrop's re-enable. Opened from an AI chat card - inside
+  // <app-ai-assistant>, whose :host is `pointer-events: none` - the preview is dismissed by
+  // clicking it (cursor: zoom-out), which would have been the one thing it could not receive.
+  pointer-events: auto;
   inset: 0;
   display: grid;
   place-items: center;

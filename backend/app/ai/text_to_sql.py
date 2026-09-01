@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from . import schema_catalog, scope_rules, sql_guard, sql_llm, sql_runner
+from . import recommendation, schema_catalog, scope_rules, sql_guard, sql_llm, sql_runner
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +56,12 @@ class SqlOutcome:
     impossible: bool = False
     failure_reason: str | None = None
     attempts: int = 0
+    # The scope the query ran under. It used to decide how an EMPTY result was reported - "none of
+    # yours" versus "none exist" - which is a distinction the current scope cannot produce, since
+    # nothing the assistant reads is narrowed to one person any more. Carried out anyway because
+    # the caller passes it straight through and a log line naming the scope a query ran under is
+    # worth more than the field costs.
+    scope: object | None = None
 
 
 def run(
@@ -64,6 +70,7 @@ def run(
     topics: set[str],
     history: list[dict] | None = None,
     *,
+    subject: str | None = None,
     broad_candidates: bool = False,
 ) -> SqlOutcome:
     """Answer `question` from the database, within `principal`'s scope.
@@ -71,11 +78,15 @@ def run(
     `topics` must already have been filtered by topic_access.denied_topics() - this function
     assumes every topic in it is one the caller may reach, and narrows from there to which ROWS.
 
-    `broad_candidates` marks a RECOMMENDATION: retrieve the candidate set rather than trying to
-    match the asker's stated interests in SQL. "I like coding and hands-on things" matches no
-    literal column value, so a narrow query returns nothing and the assistant reports there is
-    nothing for them while a hackathon sits in the table - observed exactly that way. Matching
-    meaning is the answering step's job; this step's job is to fetch the candidates.
+    `subject` is the event or club this turn is about, already resolved from the conversation by
+    classifier.read(). It is what makes "when is it?" queryable: the question itself carries no
+    name, so without this the query searched for the literal word "it".
+
+    `broad_candidates` marks a SUGGESTION: retrieve the candidate set rather than trying to match
+    the asker's stated interests in SQL. "I like coding and hands-on things" matches no literal
+    column value, so a narrow query returns nothing and the assistant reports there is nothing for
+    them while a hackathon sits in the table - observed exactly that way. Matching meaning is the
+    answering step's job; this step's job is to fetch the candidates.
     """
     scope = scope_rules.build_scope(principal, topics)
     allowed_tables = schema_catalog.tables_for_topics(topics)
@@ -85,10 +96,13 @@ def run(
     scope_document = scope_rules.document(scope)
     if broad_candidates:
         scope_document += (
-            "\n\nTHIS IS A RECOMMENDATION QUESTION. Return the CANDIDATE SET, not a filtered "
-            "match: upcoming rows with their titles, dates, descriptions and categories, LIMIT 20. "
-            "Do NOT filter on the asker's stated interests with LIKE or a category condition - "
-            "their wording will not match any literal value, and the query would come back empty."
+            "\n\nTHIS IS A SUGGESTION QUESTION. Return the CANDIDATE SET, not a filtered match: "
+            "upcoming rows with their titles, dates, categories, and their DESCRIPTION column - "
+            "request.short_introduction for events, clubs.description for clubs (`request` has no "
+            f"column called `description`). LIMIT {recommendation.CANDIDATE_LIMIT}. The description "
+            "is what the answering step reasons from; without it a suggestion has no reason to "
+            "give. Do NOT filter on the asker's stated interests with LIKE or a category condition "
+            "- their wording will not match any literal value, and the query would come back empty."
         )
     previous_sql: str | None = None
     error: str | None = None
@@ -104,6 +118,7 @@ def run(
                 question,
                 schema_document=schema_document,
                 scope_document=scope_document,
+                subject=subject,
                 history=history,
                 previous_sql=previous_sql,
                 error=error,
@@ -147,7 +162,7 @@ def run(
             continue
 
         log.info("ai.text_to_sql.ok", extra={"attempt": attempt, "rows": len(rows)})
-        return SqlOutcome(ok=True, rows=rows, sql=validated, attempts=attempt)
+        return SqlOutcome(ok=True, rows=rows, sql=validated, attempts=attempt, scope=scope)
 
     return SqlOutcome(
         ok=False,

@@ -378,6 +378,7 @@ erDiagram
         varchar payment_status
         timestamp registered_at
         bigint decided_by_user_id FK
+        timestamp decided_at
     }
     saved_event {
         bigint user_id PK,FK
@@ -590,10 +591,14 @@ erDiagram
         varchar code PK
         numeric number
     }
-    schema_migrations {
-        varchar filename PK
-        varchar checksum
-        timestamp applied_at
+    club_membership_log {
+        bigint club_membership_log_id PK
+        bigint club_id FK
+        bigint subject_user_id FK
+        bigint actor_user_id FK
+        varchar action
+        varchar role_label
+        timestamp occurred_at
     }
     cafeteria_staff_audit_log {
         bigint cafeteria_staff_audit_log_id PK
@@ -630,6 +635,7 @@ erDiagram
     clubs ||--o{ club_category_links : "club_id"
     clubs ||--o{ club_join_requests : "club_id"
     clubs ||--o{ club_members : "club_id"
+    clubs ||--o{ club_membership_log : "club_id"
     clubs ||--o{ club_president_change_requests : "club_id"
     clubs ||--o{ request_clubs : "club_id"
     dietary_information_options ||--o{ fmb_option_dietary_information : "dietary_information_option_id"
@@ -707,6 +713,8 @@ erDiagram
     users ||--o{ club_join_requests : "requester_user_id"
     users |o--o{ club_join_requests : "resolved_by_user_id"
     users ||--o{ club_members : "user_id"
+    users |o--o{ club_membership_log : "actor_user_id"
+    users ||--o{ club_membership_log : "subject_user_id"
     users ||--o{ club_president_change_requests : "current_president_user_id"
     users ||--o{ club_president_change_requests : "requested_president_user_id"
     users |o--o{ club_president_change_requests : "resolved_by_user_id"

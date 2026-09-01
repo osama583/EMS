@@ -13,7 +13,6 @@
   <app-event-filter-bar
     [state]="filters"
     [resultCount]="resultCount()"
-    [showFilters]="variant() === 'internal'"
     [flushTop]="variant() === 'internal'"
     (queryChange)="goToPage(1)"
   />
@@ -56,10 +55,8 @@
     <div class="explore-empty" role="status">
       <span aria-hidden="true">⌕</span>
       <h3>No events found</h3>
-      <p>Try another search{{ variant() === 'internal' ? ' or remove a few filters' : '' }} to discover more events.</p>
-      @if (variant() === 'internal') {
-        <button type="button" (click)="clearAppliedFilters()">Reset filters</button>
-      }
+      <p>Try another search or remove a few filters to discover more events.</p>
+      <button type="button" (click)="clearAppliedFilters()">Reset filters</button>
     </div>
   }
   </div>
@@ -67,10 +64,8 @@
 
 <app-event-details-modal [open]="!!selectedPublishedEvent()" [event]="selectedPublishedEvent()" (close)="closeEvent()" (registered)="onModalRegistered($event)" />
 
-@if (variant() === 'internal') {
-  <app-event-filter-dialog
-    [state]="filters"
-    [draftResultCount]="draftResultCount()"
-    (applied)="goToPage(1)"
-  />
-}
+<app-event-filter-dialog
+  [state]="filters"
+  [draftResultCount]="draftResultCount()"
+  (applied)="goToPage(1)"
+/>

@@ -1,116 +1,92 @@
-"""The ONE place that decides whether a caller may ask about a given topic.
+"""VISIBILITY ENFORCEMENT, and every sentence the assistant says about what it can and cannot do.
 
-WHAT DECIDES: ai/scope.py's Area table. Every topic names the AREAS that own its data, and a caller
-may ask if they can stand in any of them - which for an internal page is Page Visibility
-(nav_page_grants, edited at /app/admin/page-visibility), exactly as before, and for the public
-landing page and the visitor's own My Events is the tier the app's route guards already enforce.
+ONE RULE, APPLIED EVERYWHERE: page visibility is the source of truth. scope.can_reach() answers it
+for a page; everything in this module is that answer applied to something the asker can see.
 
-WHY THE AREA TABLE REPLACED A PAGE LIST HERE. This module used to map a topic straight onto
-nav_page codes, with a hand-maintained GUEST_OPEN_TOPICS set bolted on the side for the one topic
-guests were allowed. That model has one surface where the app has three, and it produced the two
-opposite failures the 2026-09-01 sweep found:
+    a topic          may only be answered if the caller can stand on a page that owns it
+    a function       may only be explained if the caller can perform it
+    a page           may only be described in full if the caller can open it
+    a suggestion     may only name events or clubs from a topic the caller can reach
+    "what can you do" may only claim capabilities the caller actually has
 
-  TOO MUCH  `event_organiser_decisions` was mapped onto `history`, a shared hub nine roles hold for
-            nine different reasons. A Club Admin holds it to see decided president-change requests,
-            so the assistant offered them "the registration decisions you've made as an organiser"
-            - a role that cannot organise an event - and then had nothing to show. Every topic now
-            names the page that OWNS its data (organiser topics: `proposal-form`, the grant the UI
-            itself checks before showing the Registrations tab), never a hub that merely displays a
-            tab of it.
-  TOO LITTLE An external account holds NO nav pages, by design - external accounts never enter the
-            /app shell, they use the public landing page and /my-events. Keying everything off
-            nav_page therefore refused them every question, including questions about the very
-            sections they were looking at. Their surface is now described (scope.VISITOR /
-            scope.EXTERNAL_ONLY areas) instead of being absent.
+The last one is not a courtesy. Every capability sentence here is COMPUTED from the same live
+grants that gate the answers, so the assistant cannot offer something it would refuse a second
+later. A hand-written "I can help with clubs and events" paragraph was doing exactly that: it was
+told to a Club Admin who cannot browse clubs to join, and to a visitor account with no club access
+at all, and both went on to be refused the thing they had just been offered.
 
-STILL TRUE, and deliberately unchanged:
+A REFUSAL IS WORDED FOR THE TIER. "An administrator has not granted your role that page" is true
+for a university account, misleading for a visitor account (which is working exactly as designed)
+and meaningless to a guest, who has no account and no administrator. Every refusal document below
+branches on scope.tier_of() for that reason.
 
-  NO ADMIN BYPASS      a System Admin is checked exactly like everyone else. If system-admin is not
-                       on a page's grant list, the assistant refuses that topic for them too.
-  NO ROLE NAMES        nothing here reads has_role(). A CUSTOM role granted Manage Clubs in Page
-                       Visibility gets the club-admin answers with no code change, and revoking a
-                       page stops the answers on the very next request.
-  MULTI-ROLE           has_page_access() takes the whole assignment tuple, so a Student + Club
-                       Admin is allowed whatever EITHER role allows - the union, never the
-                       intersection.
-  UNGATED CLASSES      a class absent from scope.TOPICS is ungated deliberately, not by omission:
-                       greeting / self_capability / askable / system_capability / role_capability /
-                       page_purpose answer from static text about the app itself and expose no
-                       one's data. tests/test_ai_scope.py asserts every DATA class is gated.
+WHAT IS OUT OF SCOPE IS NOT "DENIED". A question about who registered for an event, an approval
+workflow, or a report is not something a grant could unlock - the assistant does not do it for
+anybody. Those get out_of_scope_document(), which says so plainly and does not send anyone to an
+administrator for a permission that would change nothing.
 
-REFUSALS ARE WORDED BY TIER, which is the other half of the same fix. "An administrator has not
-granted your role that page" is true for an internal account, misleading for an external one (whose
-account is working exactly as intended), and nonsense for a guest (who has no account and no
-administrator). All three sentences now come from the caller's tier - see denial_document().
+Everything refused is written to ai_access_denial, so /app/admin/ai-access-log can tell a
+permissions problem (fix a grant) from a capability gap (build the thing) at a glance.
 """
 from __future__ import annotations
 
 import logging
 
 from . import scope
-from .scope import (  # noqa: F401 - re-exported: these ARE the topic map, now derived from scope
-    TOPIC_ASK_DESCRIPTION,
-    TOPIC_LABEL,
-    TOPIC_PAGES,
-)
+from .scope import TOPICS
 
 log = logging.getLogger(__name__)
 
+TOPIC_LABEL: dict[str, str] = {key: topic.label for key, topic in TOPICS.items()}
+
+
+# --- The gate ----------------------------------------------------------------------------------
 
 def topic_allowed(principal, topic: str) -> bool:
-    """May this caller ask about `topic`? True for an ungated topic (one with no entry in
-    scope.TOPICS) and for any topic with an area this caller can actually stand in."""
-    areas = scope.topic_areas(topic)
-    if topic not in scope.TOPICS:
-        return True
-    return any(scope.can_reach(principal, area) for area in areas)
-
-
-def denied_topics(principal, classes: set[str]) -> list[str]:
-    """Every classified topic this caller may NOT ask about, in stable order so the log and the
-    denial message read the same way every time."""
-    return sorted(topic for topic in classes if not topic_allowed(principal, topic))
-
-
-def how_to_allowed(principal, guide_key: str) -> bool:
-    """May this caller be given the STEPS for `guide_key`?
-
-    The how-to half of the same Area rule topic_allowed() applies to data topics: a guide is gated
-    on where its action actually happens (scope.GUIDES[...].areas), so revoking that page stops the
-    instructions on the very next answer and re-granting it restores them.
-
-    An UNKNOWN key returns False, and that is a change. It used to return True so that a guide
-    missing from the map was not silently withheld - but api/ai.py then answered the question from
-    the general system overview, which is how an external account that had just been refused every
-    topic was handed working steps for saving an event. A key absent from scope.GUIDES is a guide
-    nobody has written; the honest answer is that the assistant has no instructions for it, and
-    tests/test_ai_scope.py fails on the coding gap rather than leaving it to leak at runtime.
-    """
-    guide = scope.GUIDES.get(guide_key)
-    if guide is None:
+    """May this caller ask about `topic`? True only if they can stand on a page that owns it."""
+    if topic not in TOPICS:
         return False
-    if not all(scope.can_reach(principal, area) for area in guide.requires):
-        return False
-    return any(scope.can_reach(principal, area) for area in guide.areas)
+    return scope.can_reach_topic(principal, topic)
 
 
-# --- Navigation cards -------------------------------------------------------------------------
+def denied_topics(principal, topics: set[str]) -> list[str]:
+    """Every requested topic this caller may NOT ask about, in stable order so the log and the
+    refusal read the same way every time."""
+    return sorted(topic for topic in topics if not topic_allowed(principal, topic))
 
-def page_card(principal, area_code: str) -> dict | None:
-    """A navigation card pointing at `area_code`, or None if this caller cannot reach it.
+
+def allowed_topics(principal) -> list[str]:
+    """Every topic this caller may ask about at all, in definition order."""
+    return [key for key in TOPICS if topic_allowed(principal, key)]
+
+
+def has_events(principal) -> bool:
+    return topic_allowed(principal, "events")
+
+
+def has_clubs(principal) -> bool:
+    return topic_allowed(principal, "clubs")
+
+
+# --- Navigation cards --------------------------------------------------------------------------
+
+def page_card(principal, page_code: str) -> dict | None:
+    """A navigation card pointing at `page_code`, or None if this caller cannot reach it.
 
     Built from the SAME reachability check that gates the answer, so a card can never offer
     somewhere the caller would be bounced out of.
 
     Internal pages read their label and route LIVE from nav_page, so renaming or re-routing a page
-    in the database is reflected without touching this module. Visitor areas have no nav_page row -
-    they are sections of the public landing page - so they card from the Area definition itself.
+    in the database is reflected without touching this module. Visitor pages have no nav_page row -
+    they are sections of the public landing page - so they card from the Page definition itself. A
+    page whose visibility comes from another page's grant (Created by Me) has no nav_page row
+    either, and cards from its definition for the same reason.
     """
-    if not scope.can_reach(principal, area_code):
+    if not scope.can_reach(principal, page_code):
         return None
-    area = scope.AREAS[area_code]
-    if area.reach != scope.PAGE:
-        return {"pageCode": area.code, "label": area.label, "routePath": area.route} if area.route else None
+    page = scope.PAGES[page_code]
+    if page.reach != scope.PAGE or page.gates != (page.code,):
+        return {"pageCode": page.code, "label": page.name, "routePath": page.route} if page.route else None
 
     from ..db import query_one
 
@@ -120,47 +96,38 @@ def page_card(principal, area_code: str) -> dict | None:
           FROM nav_page
          WHERE page_code = %s AND is_active AND archived_at IS NULL
         """,
-        (area_code,),
+        (page_code,),
     )
     if not row or not row.get("route_path"):
         return None
-    # nav_page.icon holds a full inline SVG document, not a Material Symbols ligature name, so it
-    # is deliberately NOT returned: the assistant's card renders an icon font, and handing it raw
-    # SVG markup would print the markup as text. The card uses its own fixed icon instead.
-    return {
-        "pageCode": row["page_code"],
-        "label": row["label"],
-        "routePath": row["route_path"],
-    }
+    # nav_page.icon holds a full inline SVG document, not a Material Symbols ligature name, so it is
+    # deliberately NOT returned: the assistant's card renders an icon font, and handing it raw SVG
+    # markup would print the markup as text. The card uses its own fixed icon instead.
+    return {"pageCode": row["page_code"], "label": row["label"], "routePath": row["route_path"]}
 
 
-def how_to_cards(principal, guide_key: str) -> list[dict]:
-    """Every reachable navigation card for a guide - the "take me there" half of a how-to answer.
-    Empty when the caller cannot reach the page, which is also when the steps are withheld."""
-    guide = scope.GUIDES.get(guide_key)
-    cards = [page_card(principal, area) for area in (guide.areas if guide else ())]
-    return [card for card in cards if card]
+def function_cards(principal, function_key: str) -> list[dict]:
+    """The "take me there" cards under a how-to answer - the page the steps happen on. Empty when
+    the caller cannot reach it, which is also when the steps are withheld."""
+    fn = scope.FUNCTIONS.get(function_key)
+    cards = [page_card(principal, page) for page in (fn.pages if fn else ())]
+    return [card for card in cards if card][:2]
 
 
 def topic_cards(principal, topics: set[str], limit: int = 2) -> list[dict]:
-    """"Take me there" cards for the areas a set of DATA topics lives in.
+    """"Take me there" cards for the pages a set of data topics lives on.
 
-    The how-to equivalent (how_to_cards) has always existed; this is the same idea for a data
-    answer, because "where can I find my registrations" classifies as DATA (my_registrations), not
-    a how-to, so it resolved no guide and got no card at all - a location question answered with
-    prose and nothing to click.
-
-    Capped, because a question touching three topics does not need three navigation cards under a
-    two-sentence reply.
+    A location answer - "where do I find events" - is prose with nothing to click otherwise. Capped,
+    because a two-sentence reply does not need three navigation cards under it.
     """
     seen: set[str] = set()
     out: list[dict] = []
     for topic in sorted(topics):
-        for area_code in scope.topic_areas(topic):
-            if area_code in seen:
+        for page_code in scope.topic_pages(topic):
+            if page_code in seen:
                 continue
-            seen.add(area_code)
-            card = page_card(principal, area_code)
+            seen.add(page_code)
+            card = page_card(principal, page_code)
             if card:
                 out.append(card)
                 if len(out) >= limit:
@@ -168,240 +135,232 @@ def topic_cards(principal, topics: set[str], limit: int = 2) -> list[dict]:
     return out
 
 
-# --- The documents handed to the model ---------------------------------------------------------
+# --- "What can you do?" ------------------------------------------------------------------------
 
-def askable_topics_document(principal) -> str:
-    """The CONTEXT block answering "what can I ask about?" - built live from the same reachability
-    check that gates every answer, so it can never promise something the assistant would then
-    refuse, nor omit something it would happily answer.
+# The four capability sentences, in the order they are offered. The first two are gated on live
+# topic access; the last two are ungated because a page definition and a function definition exist
+# for every caller - what varies is WHICH pages and functions, which the answer path already
+# filters. An account that reaches nothing at all still gets the last two, which is why this list
+# is never empty and the assistant never has to say it can do nothing.
+_CAPABILITY_CLUBS = "find clubs that match their interests, and answer questions about a club"
+_CAPABILITY_EVENTS = "suggest events that fit what they are looking for, and answer questions about an event"
+_CAPABILITY_PAGES = "explain what any page of this app is used for"
+_CAPABILITY_HOW_TO = "show them how to perform an action in the system, step by step"
+_CAPABILITY_SELF = "tell them who they are signed in as, what role they hold, and what they can access"
 
-    This is the block that mis-sold a Club Admin "registration decisions you've made as an
-    organiser". The list itself was always computed correctly; what was wrong was the topic map
-    underneath it, now fixed in scope.py.
+
+def capability_document(principal) -> str:
+    """The CONTEXT for "what can you do?" - computed from THIS caller's live access, never a fixed
+    paragraph.
+
+    The three cases the spec calls out fall straight out of the two topic checks: clubs and events,
+    events but not clubs, neither. There is no branch for them here because there does not need to
+    be - the list is assembled from whatever is true, and a capability the caller does not have is
+    simply not in it.
     """
-    seen: set[str] = set()
-    lines: list[str] = []
-    for topic, description in TOPIC_ASK_DESCRIPTION.items():
-        if description in seen or not topic_allowed(principal, topic):
-            continue
-        seen.add(description)
-        lines.append(f"- {description}")
-
-    if not lines:
-        return _no_topics_document(principal)
-    return (
-        "The topics THIS asker can ask about, computed live from what they can actually reach. "
-        "This is the complete list - do not add, invent, or imply any other topic, and do not "
-        "mention anything absent from it (they would be refused if they asked):\n"
-        + "\n".join(lines)
-        + "\nThey can also ask what any part of the app is for, and how to do the things they have "
-          "access to. Present this as a short, friendly list of what you can help with."
-    )
-
-
-def _no_topics_document(principal) -> str:
-    """"What can you help me with" from an account that reaches no data topic at all.
-
-    Three different truths, because the three tiers are in genuinely different situations, and
-    saying the internal one to the other two is how a guest was told to contact an administrator
-    about an account they do not have.
-    """
-    tier = scope.tier_of(principal)
-    if tier == scope.GUEST:
-        return (
-            "This asker is NOT SIGNED IN and reaches no personal data at all - the ordinary state "
-            "for a visitor, not a broken account. They can still ask what any part of this app is "
-            "for and how it works. Say what you can help with in that framing, and mention signing "
-            "in for anything personal. Never suggest contacting an administrator."
-        )
-    if tier == scope.EXTERNAL:
-        return (
-            "This asker holds a VISITOR ACCOUNT (external, not a university account). Their account "
-            "is working exactly as intended - it is for browsing published events, registering for "
-            "them, and keeping saved events - and it deliberately has no access to clubs, "
-            "proposals, or any internal university page. Say what you can help with, and never "
-            "suggest their account is misconfigured or that they should contact an administrator."
-        )
-    return (
-        "This asker's role has not been granted any data topic in this app, so the assistant can "
-        "only help with general questions about how the app works and what their account is for. "
-        "Say that plainly and suggest they contact an administrator if they expected more."
-    )
+    capabilities: list[str] = []
+    if has_clubs(principal):
+        capabilities.append(_CAPABILITY_CLUBS)
+    if has_events(principal):
+        capabilities.append(_CAPABILITY_EVENTS)
+    capabilities.append(_CAPABILITY_PAGES)
+    capabilities.append(_CAPABILITY_HOW_TO)
+    if principal is not None:
+        capabilities.append(_CAPABILITY_SELF)
+    return "\n".join([
+        "WHAT YOU CAN DO FOR THIS PARTICULAR ASKER. This list is computed from their live access "
+        "and is COMPLETE and EXHAUSTIVE:",
+        *(f"  - You can {line}." for line in capabilities),
+        "State these naturally, in one or two short sentences, as things you can help with. Do NOT "
+        "add, generalise, imply or hint at any capability that is not on this list - anything "
+        "missing would be refused the moment they asked for it, so offering it is a broken "
+        "promise. In particular, never offer to look up who is registered for an event, who is in "
+        "a club, anybody's requests or approvals, reports, or anything else about this app or the "
+        "world beyond the lines above.",
+    ])
 
 
 def greeting_hint_document(principal) -> str:
-    """The CONTEXT line for a BARE greeting ("hey", "hi") - a one-line steer, not the full
-    enumerated capability list askable_topics_document() returns. A greeting deserves a short,
-    casual reply, not a menu; this only tells the model which topics are safe to mention, computed
-    from the same live checks, so a greeting can never offer something the asker would be refused.
+    """The CONTEXT line for a BARE greeting ("hey", "hi") - a one-line steer, not the enumerated
+    capability list. A greeting deserves a short, casual reply, not a menu; this only says which
+    topics are safe to mention, from the same live checks, so a greeting can never offer something
+    the asker would then be refused.
+
+    It deliberately supplies no sentence to copy: a greeting arriving word-for-word identical on
+    every "hey" reads as a canned auto-reply, and the surest way to produce one is to hand the model
+    a phrase to reuse.
     """
-    # The hint names the permitted TOPICS and deliberately supplies no sentence to copy: a greeting
-    # arriving word-for-word identical on every "hey" reads as a canned auto-reply, and the surest
-    # way to produce one is to hand the model a phrase to reuse.
-    vary = " Word the reply differently from any greeting already in the conversation history."
-    has_clubs = any(topic_allowed(principal, t) for t in ("clubs", "clubs_mine", "clubs_admin"))
-    has_events = any(topic_allowed(principal, t) for t in ("events", "my_registrations", "event_organiser"))
-    if has_clubs and has_events:
+    vary = " Word the reply differently from any greeting already in this conversation."
+    clubs, events = has_clubs(principal), has_events(principal)
+    if clubs and events:
         return "This asker can ask about both clubs and events - casually offer help with either." + vary
-    if has_clubs:
+    if clubs:
         return "This asker can ask about clubs but not events - casually offer help with clubs only." + vary
-    if has_events:
+    if events:
         return "This asker can ask about events but not clubs - casually offer help with events only." + vary
     return (
-        "This asker has no clubs or events access - casually offer help with the app itself and "
-        "what their account is for, not clubs or events." + vary
+        "This asker can ask about neither clubs nor events - casually offer help with finding your "
+        "way around the app and how to do things in it, and mention nothing else." + vary
     )
 
 
-def denial_document(principal, denied: list[str]) -> str:
-    """Told to the model when the gate refused one or more of a question's topics, so the answer
-    says plainly what it cannot cover instead of silently omitting it - an omission reads as "there
-    is nothing", which is a different and wrong answer.
+# --- Refusals ----------------------------------------------------------------------------------
 
-    The REASON is chosen by tier. The old single sentence ("an administrator has not granted your
-    role the pages that information lives on") was told to a signed-out guest asking about saved
-    events, who was then advised to contact an administrator about an account they do not have.
+def denial_document(principal, denied: list[str]) -> str:
+    """A topic the caller could have asked about, but their role cannot reach.
+
+    Distinct from out_of_scope_document below: this one IS a permissions decision, so it is the one
+    place an administrator is the right thing to mention - and only for an internal account, where
+    a grant genuinely exists to be given.
     """
-    labels = sorted({TOPIC_LABEL.get(t, t) for t in denied})
-    listed = labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + f" and {labels[-1]}"
+    labels = " and ".join(TOPIC_LABEL.get(topic, topic) for topic in denied) or "that"
     tier = scope.tier_of(principal)
+    # THE WORD "ADMINISTRATOR" APPEARS IN EXACTLY ONE BRANCH, and the other two do not mention it
+    # even to forbid it. Naming a thing in order to prohibit it is how it ends up in the reply
+    # anyway; the branches where an administrator is the wrong answer simply say what IS true.
     if tier == scope.GUEST:
         reason = (
-            f"The asker is NOT SIGNED IN, so {listed} does not exist for them - there is no account "
-            "holding it. Tell them plainly that this needs an account and point them at signing in "
-            "or creating one. Do NOT say a page is unavailable 'for their role', do NOT suggest "
-            "contacting an administrator, and do NOT imply anything is wrong - a visitor without an "
-            "account is the ordinary case, not a fault."
+            f"The asker is NOT SIGNED IN, and {labels} is not available to a signed-out visitor. "
+            "Say so plainly and point them at signing in. They hold no account, so there is nobody "
+            "for them to ask about access and nothing to be fixed."
         )
     elif tier == scope.EXTERNAL:
         reason = (
-            f"The asker holds a VISITOR ACCOUNT, which does not include {listed} - that part of the "
-            "app is for university staff and students. Say so plainly as a fact about what a "
-            "visitor account is for. Do NOT frame it as a missing permission, do NOT suggest "
-            "contacting an administrator, and do NOT imply their account is misconfigured."
+            f"The asker holds a VISITOR ACCOUNT, which does not cover {labels} - that is what the "
+            "account is for, not a fault in it. Say so plainly, as a fact about the account rather "
+            "than a missing permission. Their account is working correctly and there is nobody for "
+            "them to ask to change it."
         )
     else:
         reason = (
-            f"This asker does not have access to {listed} - an administrator has not granted their "
-            "role the pages that information lives on (Page Visibility). Tell them plainly they do "
-            "not have access to that, and that an administrator would have to grant it."
+            f"The asker's role has not been granted the pages {labels} lives on, so the assistant "
+            "cannot cover it for them. Say plainly that they do not have access to that, and that "
+            "an administrator would have to grant it if they think that is wrong."
         )
     return (
         reason
-        + " Do not answer that part of their question, and do not invent, guess, or substitute any "
+        + " Do not answer that part of their question, and do not invent, guess or substitute any "
           "detail for it. If their question ALSO covers something they do have access to, answer "
-          "that part normally."
-    )
-
-
-def how_to_denial_document(principal, guide_key: str) -> str:
-    """The refusal for a how-to whose ACTION this caller cannot perform.
-
-    Deliberately distinct from denial_document above: that one names a data TOPIC ("you cannot see
-    clubs"), which is the wrong explanation for a procedural question. Here the caller asked how to
-    DO something, and the honest reason is that the action is not theirs to take.
-    """
-    guide = scope.GUIDES.get(guide_key)
-    label = guide.label if guide else guide_key.replace("_", " ")
-    tier = scope.tier_of(principal)
-    if tier == scope.GUEST:
-        why = ("That needs an account - point them at signing in or creating one, and never at an "
-               "administrator.")
-    elif tier == scope.EXTERNAL:
-        why = ("A visitor account cannot do that; it is for university staff and students. Say so "
-               "as a fact about the account, not as a missing permission, and never suggest "
-               "contacting an administrator.")
-    else:
-        why = ("Their role has not been granted the page that action happens on, so an "
-               "administrator would have to grant it.")
-    return (
-        f"This asker cannot do this: {label}. {why} Tell them plainly that this is not something "
-        "they can do, and do NOT give the steps, describe the screen, or suggest a workaround."
-    )
-
-
-def unsupported_how_to_document(principal) -> str:
-    """A "how do I..." this assistant has no guide for.
-
-    It used to fall through to the whole system overview, which is how an account with no access to
-    anything was handed real, working instructions for an action nobody had checked it could take.
-    A missing guide is a missing guide: say so, and offer the ones that exist for this caller.
-    """
-    available = sorted({
-        guide.label for guide in scope.GUIDES.values()
-        if any(scope.can_reach(principal, area) for area in guide.areas)
-    })
-    offer = (
-        "The things you CAN give step-by-step instructions for, for this asker: "
-        + "; ".join(available)
-        + ". Offer one or two of these if any of them is close to what they asked."
-        if available else
-        "There is nothing this asker can be given step-by-step instructions for."
-    )
-    return (
-        "The asker wants step-by-step instructions for something this assistant has no written "
-        "guide for. Say plainly that you don't have instructions for that. Do NOT improvise steps, "
-        "name buttons, describe screens, or infer a procedure from how similar apps work - a "
-        "made-up procedure sends someone looking for a control that does not exist. " + offer
+          "that part normally in the same reply."
     )
 
 
 def out_of_scope_document(principal) -> str:
-    """The single scope statement for a question this assistant does not cover.
+    """A question outside everything the assistant does - the ordinary refusal, and the one that
+    must NOT mention permissions.
 
-    Built from the caller's OWN reachable areas rather than from a fixed paragraph, so the "here is
-    what I can help with" half is true for the person reading it. The fixed paragraph named clubs
-    and registrations to every asker, including the two tiers that have neither.
+    Nothing here is gated: no grant would unlock who registered for an event, an approval workflow,
+    a report, or the capital of France. Telling someone to contact an administrator about a
+    capability the assistant does not have for anybody sends them to ask for something that cannot
+    be given, so this document says plainly that it is not something the assistant covers, and
+    offers what it does.
     """
-    can_do = sorted({
-        topic.ask_description for key, topic in scope.TOPICS.items() if topic_allowed(principal, key)
-    })
-    covered = ("\n".join(f"- {line}" for line in can_do) if can_do else
-               "- (no data topics: this asker can ask about the app itself and their own account only)")
+    can_do: list[str] = []
+    if has_events(principal):
+        can_do.append("- suggest events, and answer questions about an event")
+    if has_clubs(principal):
+        can_do.append("- suggest clubs, and answer questions about a club")
+    can_do.append("- explain what a page of this app is for")
+    can_do.append("- walk them through how to do something they have access to")
+    if principal is not None:
+        can_do.append("- tell them who they are signed in as and what they can access")
+    return "\n".join([
+        "This question is OUTSIDE what the assistant does. Not blocked, not a permissions problem - "
+        "simply not something it covers for anyone. So do NOT imply that a permission, a grant or "
+        "somebody's approval would unlock it, do NOT point them at anyone to ask, and do NOT invite "
+        "them to rephrase, since no wording of it has an answer here.",
+        "What the assistant CAN do for this particular asker:",
+        *can_do,
+        "Say briefly and politely that this is outside what you can help with, name one or two "
+        "things from the list above instead, and attempt no answer, no guess, and no "
+        "general-knowledge response - not even partially, and not 'just this once'.",
+    ])
+
+
+def unanswerable_document() -> str:
+    """The lookup ran and could not produce anything - a transient failure on the retrieval side.
+
+    Deliberately vague to the asker (the real reason names tables and columns, which is exactly what
+    a prober wants) while the precise reason goes to the log. It does NOT ask for a rewording: this
+    is reached for questions the retrieval step could not express, where the wording was not the
+    problem, and suggesting a fix that cannot work sends the asker round the same loop.
+    """
     return (
-        "This question is outside what the assistant covers. What it CAN help this particular "
-        f"asker with:\n{covered}\n"
-        "- what any part of this app is for, and how to do the things they have access to\n"
-        "It does NOT answer questions about cafeteria menus and food, system administration, user "
-        "directories, the university's staff or org chart, or anything outside this app. Say "
-        "briefly and politely that this is outside what you can help with, name a couple of things "
-        "from the list above that you CAN help with, and do not attempt an answer, a guess, or a "
-        "general-knowledge response."
+        "The assistant could not look this up. Say briefly and plainly that you don't have that "
+        "information available right now. Do NOT guess at an answer, do NOT state that they have "
+        "none of something, and do not mention databases, queries or errors. Do NOT suggest they "
+        "rephrase or reword - the wording was not the problem."
     )
 
 
-def user_context_document(principal, topics: set[str]) -> str:
-    """Who is asking, in the form the SQL generator and the reviewer both need.
+# --- Who is asking ------------------------------------------------------------------------------
 
-    Assembled from AUTHENTICATED backend data only - the token's principal and the live
-    reachability checks - never from anything the question claims about itself. That is the entire
-    point: "I am the manager" in a question changes nothing here, because nothing here reads the
-    question.
+def who_am_i_document(principal) -> str:
+    """The CONTEXT for "who am I / what role do I have / what can I access".
 
-    Shared by both callers deliberately. The reviewer judging an answer against a DIFFERENT account
-    summary than the one the SQL was generated under would be reviewing a fiction.
+    Every line comes from the AUTHENTICATED token and the live grant tables - never from anything
+    the question claims about itself. "I'm the manager" in a question changes nothing here, because
+    nothing here reads the question.
+
+    Pages and functions are listed as the ANSWER to "what can I access", so it is their real,
+    current access rather than a role description frozen at deploy time.
     """
-    tier = scope.tier_of(principal)
+    if principal is None:
+        return "\n".join([
+            "WHO IS ASKING: nobody signed in. They are a visitor browsing without an account - the "
+            "ordinary state, not a broken one - there is nothing wrong for anyone to fix.",
+            "What they can reach: " + ", ".join(
+                page.name for page in scope.reachable_pages(principal)
+            ) + ".",
+            "They hold no account, no name, no role and no personal data here. Signing in adds "
+            "saved events and their own registrations under My Events. Tell them plainly that they "
+            "are not signed in, say what they can still do, and offer signing in for the rest.",
+        ])
+    roles = sorted({code for code, _unit in principal.assignments or ()})
+    units = sorted({unit for _code, unit in principal.assignments or () if unit})
+    pages = [page.name for page in scope.reachable_pages(principal)]
+    functions = [fn.name for fn in scope.usable_functions(principal)]
+    lines = [
+        "WHO IS ASKING, from their signed-in account. Answer only from these lines, and only about "
+        "the parts they asked about - a 'who am I' does not need the whole list read out:",
+        f"Name: {principal.full_name}",
+        f"Email: {principal.email}",
+        f"Account type: {scope.TIER_LABEL[scope.tier_of(principal)]}",
+        f"Role(s) held: {', '.join(roles) or 'none'}",
+    ]
+    if units:
+        lines.append(f"Scoped to: {', '.join(units)}")
+    lines.append(f"Pages they can open ({len(pages)}): {', '.join(pages) or 'none'}")
+    lines.append(f"Actions they can perform: {', '.join(functions) or 'none'}")
+    lines.append(
+        "This list is their COMPLETE current access - anything absent is something they genuinely "
+        "cannot reach. Keep the reply short: answer what was asked, and offer to go through the "
+        "rest rather than listing everything at once."
+    )
+    return "\n".join(lines)
+
+
+def user_context_document(principal, intents: set[str]) -> str:
+    """Who is asking, in the form the retrieval step and the reviewer both need.
+
+    Shared by both deliberately: a reviewer judging an answer against a DIFFERENT account summary
+    than the one the retrieval ran under would be reviewing a fiction.
+    """
     if principal is None:
         return (
             "The asker is a GUEST (not signed in). They have no user_id, no roles and no account. "
-            "They browse the public landing page only: Happening Soon, Explore Events and the "
-            "Event Calendar, all of which show published Public events. They have no saved events, "
-            "no registrations they can look up, no clubs, no memberships, and no personal data of "
-            "any kind."
+            "They browse the public landing page only - Happening Soon, Explore Events and the "
+            "Event Calendar - which show published Public events. They have no clubs, no "
+            "memberships, no registrations to look up, and no personal data of any kind."
         )
     roles = sorted({code for code, _unit in principal.assignments or ()})
-    granted = sorted({topic for topic in scope.TOPICS if topic_allowed(principal, topic)})
-    reachable = [area.label for area in scope.reachable_areas(principal)]
-    lines = [
-        f"Asker: {principal.full_name} (user_id={principal.user_id}, email={principal.email}).",
-        f"Account type: {scope.TIER_LABEL[tier]}.",
+    return "\n".join([
+        f"Asker: {principal.full_name} (user_id={principal.user_id}).",
+        f"Account type: {scope.TIER_LABEL[scope.tier_of(principal)]}.",
         f"Roles: {', '.join(roles) or 'none'}.",
-        f"Areas of the app they can actually open: {', '.join(reachable) or 'none'}.",
-        f"Topics they may ask about: {', '.join(granted) or 'none'}.",
-        f"Topics this question was classified as: {', '.join(sorted(topics)) or 'none'}.",
-    ]
-    return "\n".join(lines)
+        f"Topics they may ask about: {', '.join(allowed_topics(principal)) or 'none'}.",
+        f"This turn was read as: {', '.join(sorted(intents)) or 'nothing in scope'}.",
+    ])
 
 
 # --- The audit log ------------------------------------------------------------------------------
@@ -440,15 +399,15 @@ def log_review_rejection(principal, question: str, answer: str, *, flag: str, re
 
 def _log_refusals(principal, rows: list[tuple[str, str | None, str | None, str | None, str | None]], question: str) -> None:
     """Write refusal rows to ai_access_denial - the shared body behind log_denials(),
-    log_how_to_denial() and log_unanswerable().
+    log_function_denial() and log_unanswerable().
 
     Each row is (outcome, topic, topic_label, required_pages, reason). `outcome` is what turns this
     from a pure page-denial log into the "why did the assistant not answer" log the admin page needs:
-      page_denied         - the caller cannot reach any area the topic's data lives in
+      page_denied         - the caller cannot reach any page the topic's data lives on
       how_to_page_denied  - the caller cannot perform the ACTION they asked how to perform
-      out_of_scope        - nothing matched; the question is outside clubs/events/system/how-to
-      unsupported         - a how-to shape the assistant has no guide for yet (the actionable one:
-                            it names the guide somebody should write)
+      out_of_scope        - the question is outside the seven things this assistant does
+      unsupported         - an in-scope shape with no definition behind it yet (the actionable one:
+                            it names the page or function somebody should write)
 
     Never raises: an audit-log write failing must not turn a correctly-refused question into a 500 -
     the refusal itself already happened and is what actually protects the data, so a lost log row is
@@ -461,9 +420,9 @@ def _log_refusals(principal, rows: list[tuple[str, str | None, str | None, str |
     user_id = getattr(principal, "user_id", None)
     email = getattr(principal, "email", None)
     try:
-        # One transaction for every topic this question was refused for - a
-        # write, so transaction() (which commits); query() runs in read_cursor()
-        # and rolls back, which would silently discard the row.
+        # One transaction for every topic this question was refused for - a write, so transaction()
+        # (which commits); query() runs in read_cursor() and rolls back, which would silently
+        # discard the row.
         with transaction() as cur:
             for outcome, topic, topic_label, required_pages, reason in rows:
                 cur.execute(
@@ -481,27 +440,27 @@ def _log_refusals(principal, rows: list[tuple[str, str | None, str | None, str |
 
 
 def log_denials(principal, topics: list[str], question: str) -> None:
-    """A data topic was refused because the caller can reach none of the areas it lives in."""
+    """A data topic was refused because the caller can reach none of the pages it lives on."""
     _log_refusals(
         principal,
         [
-            ("page_denied", t, TOPIC_LABEL.get(t, t), ", ".join(scope.topic_areas(t)), None)
+            ("page_denied", t, TOPIC_LABEL.get(t, t), ", ".join(scope.topic_pages(t)), None)
             for t in topics
         ],
         question,
     )
 
 
-def log_how_to_denial(principal, guide_key: str, question: str) -> None:
+def log_function_denial(principal, function_key: str, question: str) -> None:
     """The caller asked HOW to do something they cannot do."""
-    guide = scope.GUIDES.get(guide_key)
+    fn = scope.FUNCTIONS.get(function_key)
     _log_refusals(
         principal,
         [(
             "how_to_page_denied",
-            f"how_to:{guide_key}",
-            guide.label if guide else guide_key.replace("_", " "),
-            ", ".join(guide.areas) if guide else None,
+            f"how_to:{function_key}",
+            fn.name if fn else function_key.replace("_", " "),
+            ", ".join(fn.pages) if fn else None,
             None,
         )],
         question,

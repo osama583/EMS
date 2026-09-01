@@ -42,7 +42,7 @@ CLUSTERS = [
         "campus_tour_type_options", "funding_main_options", "funding_sub_options",
         "venue_options"]),
     ("Platform and audit", [
-        "config", "schema_migrations", "cafeteria_staff_audit_log", "ai_access_denial"]),
+        "config", "club_membership_log", "cafeteria_staff_audit_log", "ai_access_denial"]),
 ]
 
 # Mermaid attribute types must be a single bare token — no spaces, no parentheses.

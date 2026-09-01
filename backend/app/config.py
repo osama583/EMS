@@ -67,8 +67,14 @@ class Config:
     # --- AI assistant (the ai-orb widget, POST /ai/ask) ---
     # There is no AI_DATABASE_URL: the Text-to-SQL refactor removed the separate pgvector store, and
     # structured answers now come from the primary database through the normal pool.
+    # The failover chain, in the order it is tried: GEMINI_API_KEY, then _2, _3, _4, ... Numbered
+    # rather than comma-separated so a key can be rotated or dropped one line at a time, and read
+    # by DISCOVERY rather than by a fixed list of fields - adding GEMINI_API_KEY_4 to .env is the
+    # whole of the change, with nothing here or in ai/gemini.py to remember to widen. The scan
+    # stops at the first gap, so a commented-out _3 does not silently orphan a live _4.
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     gemini_api_key_2: str = os.getenv("GEMINI_API_KEY_2", "")
+    gemini_api_key_3: str = os.getenv("GEMINI_API_KEY_3", "")
 
     # --- Demo login picker (TESTING ONLY — DELETE BEFORE PRODUCTION (see backend config.demo_mode)) ---
     # Gates GET /auth/dev-users. Off by default; a deployed environment that never sets DEMO_MODE
@@ -79,6 +85,27 @@ class Config:
     @property
     def is_development(self) -> bool:
         return self.env == "development"
+
+    @property
+    def gemini_api_keys(self) -> tuple[str, ...]:
+        """Every configured key, primary first - the exact order ai/gemini.py fails over in.
+
+        Discovered from the environment rather than assembled from the fields above, so a fourth
+        key needs no code change at all. Blanks are skipped and the scan stops at the first gap, so
+        `GEMINI_API_KEY_3` commented out while `_4` is live reads as "two keys", not as a silent
+        third that nobody notices is missing. Duplicates are dropped: the same key twice is not a
+        failover, it is one exhausted quota tried twice."""
+        keys: list[str] = []
+        index = 1
+        while True:
+            suffix = "" if index == 1 else f"_{index}"
+            value = os.getenv(f"GEMINI_API_KEY{suffix}", "").strip()
+            if not value:
+                break
+            if value not in keys:
+                keys.append(value)
+            index += 1
+        return tuple(keys)
 
     @property
     def ai_enabled(self) -> bool:

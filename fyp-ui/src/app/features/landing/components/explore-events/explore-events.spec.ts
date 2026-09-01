@@ -9,10 +9,11 @@ import { AuthService } from '../../../../core/auth/auth.service';
 import { testRole, testTokens, testUser } from '../../../../core/auth/auth.test-fixtures';
 
 // Both variants (public landing page, internal Explore Events) are driven by the SAME server
-// search — GET /events/search — there is no separate client-side filtering path to keep in sync
-// with the backend's. See explore-events.ts's buildSearchParams()/load(). The internal-variant
-// suite lives in explore-events-internal.spec.ts (kept in a separate file: Angular's TestBed
-// cannot be reconfigured across a second describe() block in the same file).
+// search — GET /events/search — with the same filter groups, and there is no separate
+// client-side filtering path to keep in sync with the backend's. See explore-events.ts's
+// buildSearchParams()/load(). The internal-variant suite lives in
+// explore-events-internal.spec.ts (kept in a separate file: Angular's TestBed cannot be
+// reconfigured across a second describe() block in the same file).
 export const SEARCH_URL = `${environment.apiBaseUrl}/events/search`;
 
 export const MOCK_EVENT_FIXTURES: readonly { title: string; category: PublishedEvent['categories'][number]; school: string; isFree: boolean }[] = [
@@ -69,6 +70,10 @@ describe('ExploreEventsComponent (public variant)', () => {
     fixture = TestBed.createComponent(ExploreEventsComponent);
     httpMock = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
+    // The public variant loads its filter option lists too — every one of those endpoints is
+    // reachable without a token (events.py's list_event_schools, catalog.py's list_catalogue).
+    httpMock.expectOne((req) => req.url === `${environment.apiBaseUrl}/events/schools`).flush(['School of Technology', 'Student Affairs']);
+    httpMock.match((request) => request.url.startsWith(`${environment.apiBaseUrl}/catalog`)).forEach((request) => request.flush([]));
     httpMock.expectOne((req) => req.url === SEARCH_URL).flush(searchResponse(MOCK_PUBLISHED_EVENTS));
     fixture.detectChanges();
   });
@@ -80,17 +85,23 @@ describe('ExploreEventsComponent (public variant)', () => {
     document.body.classList.remove('filters-open');
   });
 
-  it('renders the discovery controls and no filter button (public has no filter UI)', () => {
+  it('renders the discovery controls, including the same filter button as Explore Events', () => {
     const element = fixture.nativeElement as HTMLElement;
     const cards = element.querySelectorAll('.explore-card');
 
     expect(element.querySelector('#explore-events-title')?.textContent).toContain('Discover Your Campus');
     expect(element.querySelector('input[type="search"]')).not.toBeNull();
-    expect(element.querySelector('app-filter-button button')).toBeNull();
+    expect(element.querySelector('app-filter-button button')).not.toBeNull();
     expect(cards).toHaveLength(6);
   });
 
-  it('scopes every search request to Public visibility only, with no other filters', () => {
+  it('offers every filter group except Visibility, which the landing page pins to Public', () => {
+    const groups = fixture.componentInstance.filterGroups().map((group) => group.key);
+
+    expect(groups).toEqual(['category', 'school', 'format', 'date', 'time', 'registration', 'cost']);
+  });
+
+  it('sends the search term as a server query param, scoped to Public visibility', () => {
     const input = fixture.nativeElement.querySelector('input[type="search"]') as HTMLInputElement;
     input.value = 'career';
     input.dispatchEvent(new Event('input'));
@@ -101,6 +112,41 @@ describe('ExploreEventsComponent (public variant)', () => {
     expect(request.request.params.get('q')).toBe('career');
     expect(request.request.params.has('category')).toBe(false);
     request.flush(searchResponse([MOCK_PUBLISHED_EVENTS[1]]));
+  });
+
+  // The whole point of the filter here: it narrows the query the SERVER runs, not the page of
+  // cards already on screen.
+  it('sends an applied filter as a query param on the next search, still scoped to Public', () => {
+    const component = fixture.componentInstance;
+    component.openFilters();
+    component.toggleDraftFilter('cost', 'Paid');
+    component.applyFilters();
+    fixture.detectChanges();
+
+    const request = httpMock.expectOne((req) => req.url === SEARCH_URL);
+    expect(request.request.params.getAll('cost')).toEqual(['Paid']);
+    expect(request.request.params.getAll('visibility')).toEqual(['Public']);
+    request.flush(searchResponse([]));
+    fixture.detectChanges();
+
+    expect(component.appliedFilterChips()).toEqual([{ group: 'cost', value: 'Paid' }]);
+  });
+
+  it('re-searches without a filter once its chip is removed', () => {
+    const component = fixture.componentInstance;
+    component.openFilters();
+    component.toggleDraftFilter('cost', 'Paid');
+    component.applyFilters();
+    fixture.detectChanges();
+    httpMock.expectOne((req) => req.url === SEARCH_URL).flush(searchResponse([]));
+    fixture.detectChanges();
+
+    component.removeAppliedFilter('cost', 'Paid');
+    fixture.detectChanges();
+
+    const request = httpMock.expectOne((req) => req.url === SEARCH_URL);
+    expect(request.request.params.has('cost')).toBe(false);
+    request.flush(searchResponse(MOCK_PUBLISHED_EVENTS));
   });
 
   it('turns the heart blue the instant it is clicked, before the PUT resolves', () => {

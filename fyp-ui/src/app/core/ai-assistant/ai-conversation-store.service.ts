@@ -1,15 +1,13 @@
 import { Injectable, effect, inject, signal } from '@angular/core';
 import { AuthService } from '../auth/auth.service';
-import { AiAssistantClub, AiAssistantNavigation, AiAssistantProposal, AiAssistantRegistrantsTable, AiAssistantSource } from './ai-assistant.service';
+import { AiAssistantClub, AiAssistantNavigation, AiAssistantSource } from './ai-assistant.service';
 
 export interface AiChatMessage {
   readonly id: string;
   readonly sender: 'assistant' | 'user';
   readonly text: string;
   readonly sources?: readonly AiAssistantSource[];
-  readonly registrantsTable?: AiAssistantRegistrantsTable | null;
   readonly clubs?: readonly AiAssistantClub[];
-  readonly proposals?: readonly AiAssistantProposal[];
   readonly navigation?: readonly AiAssistantNavigation[];
   readonly createdAt: number; // epoch ms
 }
@@ -37,6 +35,11 @@ function newId(): string {
 // Validates every message's shape too, not just the conversation wrapper — a message missing
 // `text`/`sender`, or with `sources`/`clubs` as something other than an array, would otherwise reach
 // the template unchanged and throw inside the @for/.length/.some() calls there.
+//
+// A message stored before the assistant's scope narrowed may still carry `proposals` or
+// `registrantsTable`. Nothing checks them and nothing renders them, so those keys are simply
+// ignored — rejecting the message over them would wipe a reader's whole history for a field the
+// template no longer looks at.
 function isValidMessage(value: unknown): value is AiChatMessage {
   if (!value || typeof value !== 'object') return false;
   const m = value as Record<string, unknown>;
@@ -45,9 +48,7 @@ function isValidMessage(value: unknown): value is AiChatMessage {
     && typeof m['createdAt'] === 'number'
     && (m['sources'] === undefined || Array.isArray(m['sources']))
     && (m['clubs'] === undefined || Array.isArray(m['clubs']))
-    && (m['proposals'] === undefined || Array.isArray(m['proposals']))
-    && (m['navigation'] === undefined || Array.isArray(m['navigation']))
-    && (m['registrantsTable'] === undefined || m['registrantsTable'] === null || typeof m['registrantsTable'] === 'object');
+    && (m['navigation'] === undefined || Array.isArray(m['navigation']));
 }
 
 function isConversationArray(value: unknown): value is AiConversation[] {

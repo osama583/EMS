@@ -1,0 +1,597 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - link "APU Events home" [ref=e6] [cursor=pointer]:
+          - /url: "#home"
+        - navigation "Primary navigation" [ref=e103]:
+          - generic [ref=e104]:
+            - link "Home" [ref=e105] [cursor=pointer]:
+              - /url: "#home"
+            - link "Life at APU" [ref=e106] [cursor=pointer]:
+              - /url: "#campus-life"
+            - link "Happening Soon" [ref=e107] [cursor=pointer]:
+              - /url: "#happening-soon"
+            - link "Explore Events" [ref=e108] [cursor=pointer]:
+              - /url: "#explore-events"
+            - link "Event Calendar" [ref=e109] [cursor=pointer]:
+              - /url: "#event-calendar"
+            - link "Saved Events" [ref=e110] [cursor=pointer]:
+              - /url: /my-events/saved
+          - generic [ref=e111]:
+            - link "Login" [ref=e112] [cursor=pointer]:
+              - /url: /login
+            - link "Request an Event" [ref=e114] [cursor=pointer]:
+              - /url: /login?returnUrl=%2Fapp%2Fhow-it-works
+              - generic [aria-hidden] [ref=e116]: ↗
+    - main [ref=e8]:
+      - region [ref=e117]:
+        - generic [ref=e17]:
+          - heading "There’s always something happening at APU" [level=1] [ref=e118]:
+            - generic [ref=e20]: There’s always
+            - generic [ref=e22]: something happening
+            - generic [ref=e24]: at APU
+          - paragraph [ref=e25]: Discover upcoming activities, celebrations and experiences across APU.
+          - link "Explore Events" [ref=e121] [cursor=pointer]:
+            - /url: "#explore-events"
+            - generic [aria-hidden] [ref=e123]: →
+      - region [ref=e27]:
+        - generic [ref=e28]:
+          - generic [ref=e29]:
+            - paragraph [ref=e30]: Life at APU
+            - heading "Study. Connect. Create." [level=2] [ref=e31]
+            - paragraph [ref=e33]: University life is more than lectures. It is where you discover new interests, meet people from around the world and become more of who you want to be.
+          - generic "The APU student experience" [ref=e34]:
+            - article [ref=e124]:
+              - generic [aria-hidden] [ref=e125]: "01"
+              - generic [ref=e126]:
+                - heading "Learn beyond lectures" [level=3] [ref=e127]
+                - paragraph [ref=e128]: Turn ideas into experiences through projects, workshops and real-world opportunities.
+            - article [ref=e129]:
+              - generic [aria-hidden] [ref=e130]: "02"
+              - generic [ref=e131]:
+                - heading "Meet the world" [level=3] [ref=e132]
+                - paragraph [ref=e133]: Build friendships in a diverse community shaped by cultures from across the globe.
+            - article [ref=e134]:
+              - generic [aria-hidden] [ref=e135]: "03"
+              - generic [ref=e136]:
+                - heading "Find what moves you" [level=3] [ref=e137]
+                - paragraph [ref=e138]: Explore societies, sports, performances and interests that make campus feel like yours.
+            - article [ref=e139]:
+              - generic [aria-hidden] [ref=e140]: "04"
+              - generic [ref=e141]:
+                - heading "Make it memorable" [level=3] [ref=e142]
+                - paragraph [ref=e143]: Create the moments, connections and stories that stay with you beyond graduation.
+        - paragraph [aria-hidden]: More to learn. More to live.
+      - region [ref=e144]:
+        - generic [ref=e149]:
+          - generic [ref=e150]:
+            - paragraph [ref=e151]:
+              - generic [ref=e152]: Happening soon
+              - generic [ref=e153]: Next 10 days
+            - generic [ref=e154]:
+              - generic [ref=e155]:
+                - time [ref=e156]: Friday, 4 September
+                - generic [ref=e158]: Workshops & Training
+              - heading "Data Visualisation Workshop" [level=2] [ref=e159]
+              - paragraph [ref=e160]: Practical session on turning messy datasets into defensible charts.
+              - paragraph [ref=e161]: 22 registered
+              - generic [ref=e162]:
+                - generic [ref=e163]:
+                  - term [ref=e164]: Time
+                  - definition [ref=e165]: 9:00 AM – 5:30 PM
+                - generic [ref=e166]:
+                  - term [ref=e167]: Venue
+                  - definition [ref=e168]: Campus Green
+              - button "Explore Event" [ref=e170] [cursor=pointer]:
+                - generic [aria-hidden] [ref=e172]: ↗
+          - generic [ref=e173]:
+            - generic "Choose an upcoming event" [ref=e174]:
+              - button "Show Deepavali Open House" [ref=e175] [cursor=pointer]:
+                - img "Deepavali Open House" [ref=e176]
+                - generic [ref=e178]:
+                  - generic [ref=e179]:
+                    - time [ref=e180]: 06 Sept•
+                    - generic [ref=e181]: Culture & Community
+                  - strong [ref=e182]: Deepavali Open House
+                  - generic [ref=e183]: Innovation Lab
+                - generic [aria-hidden] [ref=e184]: ↗
+              - button "Show Beach Clean-Up at Port Dickson" [ref=e185] [cursor=pointer]:
+                - img "Beach Clean-Up at Port Dickson" [ref=e186]
+                - generic [ref=e188]:
+                  - generic [ref=e189]:
+                    - time [ref=e190]: 11 Sept•
+                    - generic [ref=e191]: Volunteering
+                  - strong [ref=e192]: Beach Clean-Up at Port Dickson
+                  - generic [ref=e193]: Lecture Theatre 5
+                - generic [aria-hidden] [ref=e194]: ↗
+            - generic [ref=e195]:
+              - generic [ref=e196]:
+                - button "Previous event" [ref=e197] [cursor=pointer]: ←
+                - button "Next event" [ref=e198] [cursor=pointer]: →
+              - generic "Carousel position" [ref=e199]:
+                - generic [ref=e200]: "01"
+                - generic [ref=e203]: "03"
+      - region [ref=e204]:
+        - generic [ref=e39]:
+          - generic [ref=e205]:
+            - paragraph [ref=e206]: Explore Events
+            - heading "Discover Your Campus" [level=2] [ref=e207]
+            - paragraph [ref=e208]: Find activities, ideas and experiences that make every week at APU feel different.
+          - generic [ref=e40]:
+            - search [ref=e41]:
+              - generic [ref=e42]:
+                - button "Open event filters" [ref=e210] [cursor=pointer]:
+                  - generic [aria-hidden] [ref=e211]: tune
+                  - generic [ref=e212]: Filters
+                  - generic [ref=e742]: "1"
+                - generic [ref=e44]:
+                  - button "Search events, categories or venues" [ref=e213] [cursor=pointer]:
+                    - generic [aria-hidden] [ref=e46]: search
+                  - generic [ref=e47]:
+                    - generic [ref=e48]: Search events, categories or venues
+                    - searchbox "Search events, categories or venues" [ref=e214]
+              - generic [ref=e215]:
+                - paragraph [ref=e216]:
+                  - strong [ref=e217]: "5"
+                  - text: events found
+                - button "Reset" [ref=e218] [cursor=pointer]:
+                  - generic [aria-hidden] [ref=e219]: refresh
+                  - text: Reset
+            - generic "Applied filters" [ref=e743]:
+              - button "Remove Volunteering filter" [ref=e744] [cursor=pointer]:
+                - generic [ref=e745]: Volunteering
+                - generic [aria-hidden] [ref=e746]: ×
+              - button "Clear all" [ref=e747] [cursor=pointer]
+          - generic [ref=e220]:
+            - article [ref=e270]:
+              - img "Beach Clean-Up at Port Dickson" [ref=e271]
+              - button "Save Beach Clean-Up at Port Dickson" [ref=e273] [cursor=pointer]:
+                - generic [aria-hidden] [ref=e274]: ♡
+              - generic [ref=e275]:
+                - heading "Beach Clean-Up at Port Dickson" [level=3] [ref=e276]
+                - generic [ref=e277]: Volunteering
+                - generic [ref=e278]:
+                  - generic [ref=e279]:
+                    - term [ref=e280]: Date
+                    - definition [ref=e281]:
+                      - time [ref=e282]: Fri, 11 Sept
+                  - generic [ref=e283]:
+                    - term [ref=e284]: Time
+                    - definition [ref=e285]: 9:00 AM - 5:30 PM
+                  - generic [ref=e286]:
+                    - term [ref=e287]: Venue
+                    - definition [ref=e288]: Lecture Theatre 5
+                - paragraph [ref=e289]: 59 registered
+                - button "Explore Beach Clean-Up at Port Dickson" [ref=e291] [cursor=pointer]:
+                  - generic [ref=e292]: Explore Event
+            - article [ref=e342]:
+              - img "Blood Donation Drive" [ref=e343]
+              - button "Save Blood Donation Drive" [ref=e345] [cursor=pointer]:
+                - generic [aria-hidden] [ref=e346]: ♡
+              - generic [ref=e347]:
+                - heading "Blood Donation Drive" [level=3] [ref=e348]
+                - generic [ref=e349]: Sports & Wellness / Volunteering
+                - generic [ref=e350]:
+                  - generic [ref=e351]:
+                    - term [ref=e352]: Date
+                    - definition [ref=e353]:
+                      - time [ref=e354]: Sun, 27 Sept
+                  - generic [ref=e355]:
+                    - term [ref=e356]: Time
+                    - definition [ref=e357]: 9:00 AM - 5:30 PM
+                  - generic [ref=e358]:
+                    - term [ref=e359]: Venue
+                    - definition [ref=e360]: Innovation Lab
+                - paragraph [ref=e361]: 77 registered
+                - button "Explore Blood Donation Drive" [ref=e363] [cursor=pointer]:
+                  - generic [ref=e364]: Explore Event
+            - article [ref=e749]:
+              - img "Food Bank Packing Day" [ref=e750]
+              - button "Save Food Bank Packing Day" [ref=e752] [cursor=pointer]:
+                - generic [aria-hidden] [ref=e753]: ♡
+              - generic [ref=e754]:
+                - heading "Food Bank Packing Day" [level=3] [ref=e755]
+                - generic [ref=e756]: Volunteering
+                - generic [ref=e757]:
+                  - generic [ref=e758]:
+                    - term [ref=e759]: Date
+                    - definition [ref=e760]:
+                      - time [ref=e761]: Sun, 15 Nov
+                  - generic [ref=e762]:
+                    - term [ref=e763]: Time
+                    - definition [ref=e764]: 9:00 AM - 5:30 PM
+                  - generic [ref=e765]:
+                    - term [ref=e766]: Venue
+                    - definition [ref=e767]: Sports Complex
+                - paragraph [ref=e768]: 33 registered
+                - button "Explore Food Bank Packing Day" [ref=e770] [cursor=pointer]:
+                  - generic [ref=e771]: Explore Event
+            - article [ref=e773]:
+              - img "Volunteers Network Induction" [ref=e774]
+              - button "Save Volunteers Network Induction" [ref=e776] [cursor=pointer]:
+                - generic [aria-hidden] [ref=e777]: ♡
+              - generic [ref=e778]:
+                - heading "Volunteers Network Induction" [level=3] [ref=e779]
+                - generic [ref=e780]: Clubs & Societies / Volunteering
+                - generic [ref=e781]:
+                  - generic [ref=e782]:
+                    - term [ref=e783]: Date
+                    - definition [ref=e784]:
+                      - time [ref=e785]: Fri, 18 Dec
+                  - generic [ref=e786]:
+                    - term [ref=e787]: Time
+                    - definition [ref=e788]: 9:00 AM - 5:30 PM
+                  - generic [ref=e789]:
+                    - term [ref=e790]: Venue
+                    - definition [ref=e791]: Auditorium
+                - paragraph [ref=e792]: 21 registered
+                - button "Explore Volunteers Network Induction" [ref=e794] [cursor=pointer]:
+                  - generic [ref=e795]: Explore Event
+            - article [ref=e797]:
+              - img "Orphanage Visit and Learning Day" [ref=e798]
+              - button "Save Orphanage Visit and Learning Day" [ref=e800] [cursor=pointer]:
+                - generic [aria-hidden] [ref=e801]: ♡
+              - generic [ref=e802]:
+                - heading "Orphanage Visit and Learning Day" [level=3] [ref=e803]
+                - generic [ref=e804]: Volunteering
+                - generic [ref=e805]:
+                  - generic [ref=e806]:
+                    - term [ref=e807]: Date
+                    - definition [ref=e808]:
+                      - time [ref=e809]: Thu, 24 Dec
+                  - generic [ref=e810]:
+                    - term [ref=e811]: Time
+                    - definition [ref=e812]: 9:00 AM - 5:30 PM
+                  - generic [ref=e813]:
+                    - term [ref=e814]: Venue
+                    - definition [ref=e815]: Library Discussion Zone
+                - paragraph [ref=e816]: 26 registered
+                - button "Explore Orphanage Visit and Learning Day" [ref=e818] [cursor=pointer]:
+                  - generic [ref=e819]: Explore Event
+          - generic [ref=e366]:
+            - navigation "Pagination" [ref=e367]:
+              - button "Previous page" [disabled] [ref=e368]:
+                - generic [aria-hidden] [ref=e369]: chevron_left
+              - button "Page 1" [ref=e370] [cursor=pointer]: "1"
+              - button "Next page" [disabled] [ref=e376]:
+                - generic [aria-hidden] [ref=e377]: chevron_right
+            - generic [ref=e378]:
+              - generic [ref=e379]: Rows per page
+              - combobox "Rows per page" [ref=e380] [cursor=pointer]:
+                - option "5 per page" [selected]
+                - option "10 per page"
+                - option "15 per page"
+                - option "25 per page"
+              - generic [aria-hidden]: expand_more
+      - region [ref=e51]:
+        - generic [ref=e52]:
+          - generic [ref=e53]:
+            - paragraph [ref=e54]: Event Calendar
+            - heading "Plan Your APU Experience" [level=2] [ref=e55]
+          - paragraph [ref=e56]: See what is ahead, organise your month and make space for the experiences that matter.
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - generic [ref=e59]:
+              - generic "Calendar navigation" [ref=e60]:
+                - button "Previous period" [ref=e61] [cursor=pointer]: ‹
+                - button "Next period" [ref=e62] [cursor=pointer]: ›
+              - button "Today" [ref=e63] [cursor=pointer]
+              - generic [ref=e64]:
+                - generic [ref=e65]: Calendar view
+                - combobox "Calendar view" [ref=e66] [cursor=pointer]:
+                  - option "Month view" [selected]
+                  - option "Week view"
+                  - option "Agenda view"
+            - generic [ref=e472]:
+              - heading "September 2026" [level=3] [ref=e473]
+              - paragraph [ref=e474]: 30 Aug – 10 Oct 2026
+          - generic [ref=e67]:
+            - search [ref=e68]:
+              - button "Open calendar filters" [ref=e475] [cursor=pointer]:
+                - generic [aria-hidden] [ref=e71]: tune
+                - generic [ref=e476]: Filters
+              - generic [ref=e73]:
+                - button "Search calendar events" [ref=e477] [cursor=pointer]:
+                  - generic [aria-hidden] [ref=e75]: search
+                - generic [ref=e76]:
+                  - generic [ref=e77]: Search calendar events
+                  - searchbox "Search calendar events" [ref=e478]
+            - generic "Event category legend" [ref=e479]:
+              - generic [ref=e480]: Academic & Career
+              - generic [ref=e482]: Culture & Community
+              - generic [ref=e484]: Sports & Wellness
+              - generic [ref=e486]: Volunteering
+              - generic [ref=e488]: Workshops & Training
+          - generic [ref=e490]:
+            - generic [aria-hidden] [ref=e491]:
+              - generic [ref=e492]: Sunday
+              - generic [ref=e493]: Monday
+              - generic [ref=e494]: Tuesday
+              - generic [ref=e495]: Wednesday
+              - generic [ref=e496]: Thursday
+              - generic [ref=e497]: Friday
+              - generic [ref=e498]: Saturday
+            - grid "Monthly event calendar" [ref=e499]:
+              - gridcell "Sunday, 30 August 2026" [ref=e500]:
+                - time [ref=e501]: "30"
+                - generic [ref=e502]:
+                  - button "Merdeka Day Flag Ceremony 9:00 AM – 5:30 PM" [ref=e503] [cursor=pointer]:
+                    - generic [ref=e504]: Merdeka Day Flag Ceremony
+                    - generic [ref=e505]: 9:00 AM – 5:30 PM
+                  - button "Inter-School Case Competition 9:00 AM – 5:30 PM" [ref=e506] [cursor=pointer]:
+                    - generic [ref=e507]: Inter-School Case Competition
+                    - generic [ref=e508]: 9:00 AM – 5:30 PM
+                  - button "Engineering Facilities Tour 9:00 AM – 5:30 PM" [ref=e509] [cursor=pointer]:
+                    - generic [ref=e510]: Engineering Facilities Tour
+                    - generic [ref=e511]: 9:00 AM – 5:30 PM
+              - gridcell "Monday, 31 August 2026" [ref=e512]:
+                - time [ref=e513]: "31"
+              - gridcell "Tuesday, 1 September 2026" [ref=e514]:
+                - time [ref=e515]: "1"
+              - gridcell "Wednesday, 2 September 2026" [ref=e516]:
+                - time [ref=e517]: "2"
+              - gridcell "Thursday, 3 September 2026" [ref=e518]:
+                - time [ref=e519]: "3"
+              - gridcell "Friday, 4 September 2026" [ref=e520]:
+                - time [ref=e521]: "4"
+                - button "Data Visualisation Workshop 9:00 AM – 5:30 PM" [ref=e523] [cursor=pointer]:
+                  - generic [ref=e524]: Data Visualisation Workshop
+                  - generic [ref=e525]: 9:00 AM – 5:30 PM
+              - gridcell "Saturday, 5 September 2026" [ref=e526]:
+                - time [ref=e527]: "5"
+              - gridcell "Sunday, 6 September 2026" [ref=e528]:
+                - time [ref=e529]: "6"
+                - button "Deepavali Open House 9:00 AM – 5:30 PM" [ref=e531] [cursor=pointer]:
+                  - generic [ref=e532]: Deepavali Open House
+                  - generic [ref=e533]: 9:00 AM – 5:30 PM
+              - gridcell "Monday, 7 September 2026" [ref=e534]:
+                - time [ref=e535]: "7"
+                - button "Deepavali Open House 9:00 AM – 5:30 PM" [ref=e537] [cursor=pointer]:
+                  - generic [ref=e538]: Deepavali Open House
+                  - generic [ref=e539]: 9:00 AM – 5:30 PM
+              - gridcell "Tuesday, 8 September 2026" [ref=e540]:
+                - time [ref=e541]: "8"
+                - button "Deepavali Open House 9:00 AM – 5:30 PM" [ref=e543] [cursor=pointer]:
+                  - generic [ref=e544]: Deepavali Open House
+                  - generic [ref=e545]: 9:00 AM – 5:30 PM
+              - gridcell "Wednesday, 9 September 2026" [ref=e546]:
+                - time [ref=e547]: "9"
+              - gridcell "Thursday, 10 September 2026" [ref=e548]:
+                - time [ref=e549]: "10"
+              - gridcell "Friday, 11 September 2026" [ref=e550]:
+                - time [ref=e551]: "11"
+                - button "Beach Clean-Up at Port Dickson 9:00 AM – 5:30 PM" [ref=e553] [cursor=pointer]:
+                  - generic [ref=e554]: Beach Clean-Up at Port Dickson
+                  - generic [ref=e555]: 9:00 AM – 5:30 PM
+              - gridcell "Saturday, 12 September 2026" [ref=e556]:
+                - time [ref=e557]: "12"
+              - gridcell "Sunday, 13 September 2026" [ref=e558]:
+                - time [ref=e559]: "13"
+              - gridcell "Monday, 14 September 2026" [ref=e560]:
+                - time [ref=e561]: "14"
+              - gridcell "Tuesday, 15 September 2026" [ref=e562]:
+                - time [ref=e563]: "15"
+              - gridcell "Wednesday, 16 September 2026" [ref=e564]:
+                - time [ref=e565]: "16"
+              - gridcell "Thursday, 17 September 2026" [ref=e566]:
+                - time [ref=e567]: "17"
+              - gridcell "Friday, 18 September 2026" [ref=e568]:
+                - time [ref=e569]: "18"
+              - gridcell "Saturday, 19 September 2026" [ref=e570]:
+                - time [ref=e571]: "19"
+              - gridcell "Sunday, 20 September 2026" [ref=e572]:
+                - time [ref=e573]: "20"
+              - gridcell "Monday, 21 September 2026" [ref=e574]:
+                - time [ref=e575]: "21"
+                - button "Business Society Networking Lunch 12:00 PM – 2:00 PM" [ref=e577] [cursor=pointer]:
+                  - generic [ref=e578]: Business Society Networking Lunch
+                  - generic [ref=e579]: 12:00 PM – 2:00 PM
+              - gridcell "Tuesday, 22 September 2026" [ref=e580]:
+                - time [ref=e581]: "22"
+              - gridcell "Wednesday, 23 September 2026" [ref=e582]:
+                - time [ref=e583]: "23"
+              - gridcell "Thursday, 24 September 2026" [ref=e584]:
+                - time [ref=e585]: "24"
+              - gridcell "Friday, 25 September 2026" [ref=e586]:
+                - time [ref=e587]: "25"
+                - button "APU Hackathon 2026 9:00 AM – 5:30 PM" [ref=e589] [cursor=pointer]:
+                  - generic [ref=e590]: APU Hackathon 2026
+                  - generic [ref=e591]: 9:00 AM – 5:30 PM
+              - gridcell "Saturday, 26 September 2026" [ref=e592]:
+                - time [ref=e593]: "26"
+              - gridcell "Sunday, 27 September 2026" [ref=e594]:
+                - time [ref=e595]: "27"
+                - button "Blood Donation Drive 9:00 AM – 5:30 PM" [ref=e597] [cursor=pointer]:
+                  - generic [ref=e598]: Blood Donation Drive
+                  - generic [ref=e599]: 9:00 AM – 5:30 PM
+              - gridcell "Monday, 28 September 2026" [ref=e600]:
+                - time [ref=e601]: "28"
+              - gridcell "Tuesday, 29 September 2026" [ref=e602]:
+                - time [ref=e603]: "29"
+                - button "Business Society Networking Lunch 12:00 PM – 2:00 PM" [ref=e605] [cursor=pointer]:
+                  - generic [ref=e606]: Business Society Networking Lunch
+                  - generic [ref=e607]: 12:00 PM – 2:00 PM
+              - gridcell "Wednesday, 30 September 2026" [ref=e608]:
+                - time [ref=e609]: "30"
+                - button "Internship Placement Fair 9:00 AM – 5:30 PM" [ref=e611] [cursor=pointer]:
+                  - generic [ref=e612]: Internship Placement Fair
+                  - generic [ref=e613]: 9:00 AM – 5:30 PM
+              - gridcell "Thursday, 1 October 2026" [ref=e614]:
+                - time [ref=e615]: "1"
+                - generic [ref=e616]:
+                  - button "Internship Placement Fair 9:00 AM – 5:30 PM" [ref=e617] [cursor=pointer]:
+                    - generic [ref=e618]: Internship Placement Fair
+                    - generic [ref=e619]: 9:00 AM – 5:30 PM
+                  - button "School of Computing Research Symposium 9:00 AM – 5:00 PM" [ref=e620] [cursor=pointer]:
+                    - generic [ref=e621]: School of Computing Research Symposium
+                    - generic [ref=e622]: 9:00 AM – 5:00 PM
+              - gridcell "Friday, 2 October 2026" [ref=e623]:
+                - time [ref=e624]: "2"
+              - gridcell "Saturday, 3 October 2026" [ref=e625]:
+                - time [ref=e626]: "3"
+              - gridcell "Sunday, 4 October 2026" [ref=e627]:
+                - time [ref=e628]: "4"
+              - gridcell "Monday, 5 October 2026" [ref=e629]:
+                - time [ref=e630]: "5"
+              - gridcell "Tuesday, 6 October 2026" [ref=e631]:
+                - time [ref=e632]: "6"
+                - button "AI & Data Science Career Fair 10:00 AM – 4:00 PM" [ref=e634] [cursor=pointer]:
+                  - generic [ref=e635]: AI & Data Science Career Fair
+                  - generic [ref=e636]: 10:00 AM – 4:00 PM
+              - gridcell "Wednesday, 7 October 2026" [ref=e637]:
+                - time [ref=e638]: "7"
+              - gridcell "Thursday, 8 October 2026" [ref=e639]:
+                - time [ref=e640]: "8"
+              - gridcell "Friday, 9 October 2026" [ref=e641]:
+                - time [ref=e642]: "9"
+                - button "School of Computing Research Symposium 9:00 AM – 5:00 PM" [ref=e644] [cursor=pointer]:
+                  - generic [ref=e645]: School of Computing Research Symposium
+                  - generic [ref=e646]: 9:00 AM – 5:00 PM
+              - gridcell "Saturday, 10 October 2026" [ref=e647]:
+                - time [ref=e648]: "10"
+    - contentinfo "APU website footer" [ref=e80]:
+      - generic [ref=e81]:
+        - region "APU accreditation and social media" [ref=e82]:
+          - generic "APU accreditations and awards" [ref=e649]:
+            - generic [ref=e650]:
+              - img "Premier Digital Tech Institution"
+            - generic [ref=e651]:
+              - img "QS 5 Stars Plus"
+            - generic [ref=e652]:
+              - img "QS World University Rankings"
+            - generic [ref=e653]:
+              - img "Life at Work Awards winner"
+            - generic [ref=e654]:
+              - img "Talentbank Graduate Employability Index"
+          - navigation "APU social media" [ref=e655]:
+            - link "APU on Facebook (opens in a new tab)" [ref=e656] [cursor=pointer]:
+              - /url: https://facebook.com/apuniversity
+            - link "APU on Instagram (opens in a new tab)" [ref=e657] [cursor=pointer]:
+              - /url: https://instagram.com/asiapacificuniversity
+            - link "APU on LinkedIn (opens in a new tab)" [ref=e658] [cursor=pointer]:
+              - /url: https://www.linkedin.com/school/apumalaysia
+            - link "APU on X (opens in a new tab)" [ref=e659] [cursor=pointer]:
+              - /url: https://twitter.com/AsiaPacificU
+            - link "APU on YouTube (opens in a new tab)" [ref=e660] [cursor=pointer]:
+              - /url: https://www.youtube.com/c/AsiaPacificUniversityKualaLumpur
+            - link "APU on TikTok (opens in a new tab)" [ref=e661] [cursor=pointer]:
+              - /url: https://www.tiktok.com/@apumalaysia
+        - navigation "Footer navigation" [ref=e662]:
+          - generic [ref=e663]:
+            - heading "Study" [level=2] [ref=e664]
+            - list [ref=e665]:
+              - listitem [ref=e666]:
+                - link "Courses" [ref=e667] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/our-courses
+              - listitem [ref=e668]:
+                - link "Intake Calendar" [ref=e669] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/intake-calendar
+              - listitem [ref=e670]:
+                - link "Download e-Brochures" [ref=e671] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/download-eBrochures
+              - listitem [ref=e672]:
+                - link "Apply Now" [ref=e673] [cursor=pointer]:
+                  - /url: https://admissions.apu.edu.my/
+              - listitem [ref=e674]:
+                - link "Scholarships & Loan" [ref=e675] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/scholarships-financial-aids
+              - listitem [ref=e676]:
+                - link "APU Holiday Schedule" [ref=e677] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/apu-holiday-schedule
+          - generic [ref=e678]:
+            - heading "Campus" [level=2] [ref=e679]
+            - list [ref=e680]:
+              - listitem [ref=e681]:
+                - link "Campus Living" [ref=e682] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/life-apu
+              - listitem [ref=e683]:
+                - link "Campus Facilities" [ref=e684] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/campus-facilities
+              - listitem [ref=e685]:
+                - link "APU Residence" [ref=e686] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/apu-residence
+              - listitem [ref=e687]:
+                - link "Student Activities" [ref=e688] [cursor=pointer]:
+                  - /url: https://studentaffairold.sites.apiit.edu.my/club-and-society/
+              - listitem [ref=e689]:
+                - link "Sports & Recreation" [ref=e690] [cursor=pointer]:
+                  - /url: https://studentaffairold.sites.apiit.edu.my/sports/
+              - listitem [ref=e691]:
+                - link "Student Services" [ref=e692] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/student-services
+          - generic [ref=e693]:
+            - heading "Hall" [level=2] [ref=e694]
+            - list [ref=e695]:
+              - listitem [ref=e696]:
+                - link "Awards & Recognitions" [ref=e697] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/awards-recognitions
+              - listitem [ref=e698]:
+                - link "News Articles" [ref=e699] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/news-happening
+              - listitem [ref=e700]:
+                - link "DMU - Our Partner in Quality" [ref=e701] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/dmu-our-partner-quality
+              - listitem [ref=e702]:
+                - link "Sustainability @ APU" [ref=e703] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/sustainability-apu
+              - listitem [ref=e704]:
+                - link "Video Gallery" [ref=e705] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/video-gallery
+          - generic [ref=e706]:
+            - heading "International" [level=2] [ref=e707]
+            - list [ref=e708]:
+              - listitem [ref=e709]:
+                - link "Living in Malaysia" [ref=e710] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/study-malaysia
+              - listitem [ref=e711]:
+                - link "International Applications" [ref=e712] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/international-students-application-procedures
+              - listitem [ref=e713]:
+                - link "Study Abroad" [ref=e714] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/study-abroad
+              - listitem [ref=e715]:
+                - link "Student Ambassadors" [ref=e716] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/student-ambassadors
+          - generic [ref=e717]:
+            - heading "About" [level=2] [ref=e718]
+            - list [ref=e719]:
+              - listitem [ref=e720]:
+                - link "The University" [ref=e721] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/the-university
+              - listitem [ref=e722]:
+                - link "Premier Digital Tech University" [ref=e723] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/premier-digital-tech-institution
+              - listitem [ref=e724]:
+                - link "APU Erasmus+ Friends" [ref=e725] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/apu-erasmus-friends-project
+          - generic [ref=e726]:
+            - heading "Connect" [level=2] [ref=e727]
+            - list [ref=e728]:
+              - listitem [ref=e729]:
+                - link "Contact Us" [ref=e730] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/connect
+              - listitem [ref=e731]:
+                - link "Getting There" [ref=e732] [cursor=pointer]:
+                  - /url: https://www.google.com/maps?daddr=3.0554057%2C101.7005614
+              - listitem [ref=e733]:
+                - link "Connect with Counsellors" [ref=e734] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/apu-e-counselling
+              - listitem [ref=e735]:
+                - link "Collaborative Industrial Partners" [ref=e736] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/collaborative-industrial-partners
+              - listitem [ref=e737]:
+                - link "Refund Policy" [ref=e738] [cursor=pointer]:
+                  - /url: https://www.apu.edu.my/fees-refund-policy
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - paragraph [ref=e85]: Copyright 2026 © Asia Pacific University of Technology & Innovation | JPT/BPP(U)1000-801/63/Jld 3(18) DU030(W)
+            - paragraph [ref=e86]: "Registered address as per MOHE registration: Blok A (Aras 3 - 8), Blok B (Aras B, 3 & 5 - 8), Blok D, Blok E (Aras 3 - 6 & 8 - 10), Blok H & J2, Spine, No. 11, Jalan Teknologi 5, Taman Teknologi Malaysia, Bukit Jalil, 57000 Kuala Lumpur, Wilayah Persekutuan Kuala Lumpur."
+          - navigation "Legal links" [ref=e87]:
+            - link "Privacy Policy" [ref=e88] [cursor=pointer]:
+              - /url: https://www.apu.edu.my/privacy-policy
+            - link "Terms of Use" [ref=e89] [cursor=pointer]:
+              - /url: https://www.apu.edu.my/terms-of-use
+  - generic:
+    - complementary "APU assistant":
+      - button "Open APU Assistant" [ref=e96] [cursor=pointer]

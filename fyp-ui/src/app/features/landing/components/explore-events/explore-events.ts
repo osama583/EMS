@@ -55,8 +55,9 @@ export class ExploreEventsComponent {
   readonly variant = input<'public' | 'internal'>('public');
   readonly registeringEventId = signal<string | null>(null);
 
-  // The search box + filter groups, shared with every My Events tab so the two surfaces can
-  // never offer different filters — see EventFilterState.
+  // The search box + filter groups, shared with the landing page, the internal Explore Events
+  // page and every My Events tab so no two surfaces can offer different filters — see
+  // EventFilterState.
   readonly filters = new EventFilterState();
 
   readonly loading = signal(true);
@@ -154,7 +155,11 @@ export class ExploreEventsComponent {
       if (setupDoneFor === current) return;
       setupDoneFor = current;
       this.pageSize.set(current === 'public' ? PUBLIC_PAGE_SIZE : INTERNAL_PAGE_SIZE);
-      if (current === 'internal') this.filters.loadOptions();
+      // The landing page is served Public events only whoever is reading it (see
+      // buildSearchParams), so a Visibility group there could only offer "Public" and an
+      // option that always comes back empty. Every other group applies to both variants.
+      this.filters.hiddenGroups.set(current === 'public' ? ['visibility'] : []);
+      this.filters.loadOptions();
     });
 
     // Re-fetches whenever applied filters, search term, or pagination change — this IS the data
@@ -190,11 +195,14 @@ export class ExploreEventsComponent {
   }
 
   private buildSearchParams(query: EventFilterQuery, page: number, pageSize: number): EventSearchParams {
-    // The public variant offers no filter UI, no auth-aware exclusion, and only ever wants Public-
-    // visibility events — every filter group stays empty there, since the filter dialog is never
-    // reachable on it (see explore-events.html).
+    // The public variant runs the same server-side filter query as the internal one — same groups,
+    // same params, same GET /events/search (every one of which is public: see events.py's
+    // search_events/list_event_schools and catalog.py's list_catalogue). It differs in two things
+    // only: visibility is pinned to Public, so a signed-in reader on the landing page still sees
+    // the front door rather than their internal listing; and there is no auth-aware exclusion of
+    // events they already registered for.
     if (this.variant() === 'public') {
-      return { q: query.q || undefined, visibility: ['Public'], page, pageSize };
+      return { ...toEventSearchParams(query, page, pageSize), visibility: ['Public'] };
     }
     return {
       ...toEventSearchParams(query, page, pageSize),

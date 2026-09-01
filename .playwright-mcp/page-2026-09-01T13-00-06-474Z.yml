@@ -1,0 +1,82 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - link "APU Events home" [ref=e6] [cursor=pointer]:
+        - /url: "#home"
+    - main [ref=e8]:
+      - region [ref=e10]:
+        - generic [ref=e17]:
+          - heading [level=1] [ref=e18]:
+            - generic [ref=e20]: There’s always
+            - generic [ref=e22]: something happening
+            - generic [ref=e24]: at APU
+          - paragraph [ref=e25]: Discover upcoming activities, celebrations and experiences across APU.
+      - region [ref=e27]:
+        - generic [ref=e28]:
+          - generic [ref=e29]:
+            - paragraph [ref=e30]: Life at APU
+            - heading "Study. Connect. Create." [level=2] [ref=e31]
+            - paragraph [ref=e33]: University life is more than lectures. It is where you discover new interests, meet people from around the world and become more of who you want to be.
+          - generic "The APU student experience" [ref=e34]
+        - paragraph [aria-hidden]: More to learn. More to live.
+      - region [ref=e36]
+      - search [ref=e41]:
+        - generic [ref=e44]:
+          - button [ref=e45] [cursor=pointer]:
+            - generic [aria-hidden] [ref=e46]: search
+          - searchbox [ref=e49]
+        - generic:
+          - paragraph:
+            - strong
+      - region [ref=e51]:
+        - generic [ref=e52]:
+          - generic [ref=e53]:
+            - paragraph [ref=e54]: Event Calendar
+            - heading "Plan Your APU Experience" [level=2] [ref=e55]
+          - paragraph [ref=e56]: See what is ahead, organise your month and make space for the experiences that matter.
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - generic [ref=e59]:
+              - generic "Calendar navigation" [ref=e60]:
+                - button "Previous period" [ref=e61] [cursor=pointer]: ‹
+                - button "Next period" [ref=e62] [cursor=pointer]: ›
+              - button "Today" [ref=e63] [cursor=pointer]
+              - generic [ref=e64]:
+                - generic [ref=e65]: Calendar view
+                - combobox "Calendar view" [ref=e66] [cursor=pointer]:
+                  - option "Month view" [selected]
+                  - option "Week view"
+                  - option "Agenda view"
+            - generic:
+              - heading [level=3]
+              - paragraph
+          - search [ref=e68]:
+            - button [ref=e70] [cursor=pointer]:
+              - generic [aria-hidden] [ref=e71]: tune
+            - generic [ref=e73]:
+              - button [ref=e74] [cursor=pointer]:
+                - generic [aria-hidden] [ref=e75]: search
+              - searchbox [ref=e78]
+    - contentinfo "APU website footer" [ref=e80]:
+      - generic [ref=e81]:
+        - region "APU accreditation and social media" [ref=e82]:
+          - generic "APU accreditations and awards"
+          - navigation "APU social media"
+        - navigation "Footer navigation"
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - paragraph [ref=e85]: Copyright 2026 © Asia Pacific University of Technology & Innovation | JPT/BPP(U)1000-801/63/Jld 3(18) DU030(W)
+            - paragraph [ref=e86]: "Registered address as per MOHE registration: Blok A (Aras 3 - 8), Blok B (Aras B, 3 & 5 - 8), Blok D, Blok E (Aras 3 - 6 & 8 - 10), Blok H & J2, Spine, No. 11, Jalan Teknologi 5, Taman Teknologi Malaysia, Bukit Jalil, 57000 Kuala Lumpur, Wilayah Persekutuan Kuala Lumpur."
+          - navigation "Legal links" [ref=e87]:
+            - link "Privacy Policy" [ref=e88] [cursor=pointer]:
+              - /url: https://www.apu.edu.my/privacy-policy
+            - link "Terms of Use" [ref=e89] [cursor=pointer]:
+              - /url: https://www.apu.edu.my/terms-of-use
+  - generic:
+    - complementary "APU assistant":
+      - generic [ref=e90]:
+        - generic [ref=e91]:
+          - button "Need help?" [ref=e92] [cursor=pointer]
+          - button "Dismiss assistant prompt" [ref=e94] [cursor=pointer]:
+            - generic [aria-hidden] [ref=e95]: close
+        - button "Open APU Assistant" [ref=e96] [cursor=pointer]

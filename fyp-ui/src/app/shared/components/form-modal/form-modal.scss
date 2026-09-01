@@ -2,6 +2,14 @@
 .shared-form-modal__backdrop {
   position: fixed;
   z-index: 1000;
+  // A modal must be clickable wherever it is mounted, so it asserts this rather than inheriting it.
+  // `pointer-events` INHERITS, and `position: fixed` does not reset it - a fixed, z-index-1000
+  // overlay escapes its parent visually while still being hit-tested through it. Mounted inside
+  // <app-ai-assistant>, whose :host is `pointer-events: none` so the floating orb does not block
+  // the page behind it, every modal opened from a chat card rendered perfectly and ignored every
+  // click: no scroll, no Cancel, no Register, no way to close it. Nothing about a modal should
+  // depend on which component happens to host it.
+  pointer-events: auto;
   inset: 0;
   display: grid;
   overflow-x: hidden;
