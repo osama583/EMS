@@ -69,7 +69,11 @@ INTENT_DESCRIPTIONS: dict[Intent, str] = {
         "follow-up about the event already being discussed ('when is it', 'is it free', 'what "
         "venue'). A question with its own objective criterion ('the event with the most "
         "registrations', 'the cheapest one') is INFORMATION, not a suggestion - the asker already "
-        "said how to pick."
+        "said how to pick.\n"
+        "  ALSO 'AM I REGISTERED FOR <this event>?', because that badge is printed on the event's "
+        "own card to the person looking at it. It is a fact about ONE named event, so it is "
+        "event_info. 'What am I registered for?' is NOT - that is a list across the My Events "
+        "page rather than a flag on a card, and it is out of scope: return an empty list."
     ),
     "club_suggestion": (
         "Asking the assistant to CHOOSE a club for them - 'suggest a club', 'what club should I "
@@ -81,7 +85,11 @@ INTENT_DESCRIPTIONS: dict[Intent, str] = {
         "A question about a club or clubs as FACT - what a club does, its category, its "
         "description, who its President is, how many members it has, which club is biggest. "
         "Includes a question naming a club directly, and a follow-up about the club already being "
-        "discussed ('what category is it', 'what do they do', 'how many members')."
+        "discussed ('what category is it', 'what do they do', 'how many members').\n"
+        "  ALSO 'AM I IN <this club>?' / 'am I a member of <this club>?', because Discover Clubs "
+        "computes exactly that flag for every card it shows. It is a fact about ONE named club, so "
+        "it is club_info. 'Which clubs am I a member of?' is NOT - that is the My Clubs page, a "
+        "list rather than a flag, and it is out of scope: return an empty list."
     ),
     "page_purpose": (
         "What a NAMED page or section of this app IS or is FOR - 'what is Explore Events', 'what "
@@ -110,7 +118,9 @@ INTENT_DESCRIPTIONS: dict[Intent, str] = {
         "A question about the ASKER themselves - 'who am I', 'what is my name', 'what role do I "
         "have', 'what can I access', 'what pages can I see', 'am I a student'. Their own identity, "
         "roles and access. It is NOT 'what can YOU do' (that is assistant_capability) and NOT "
-        "'what can some other role do', which this assistant does not answer at all."
+        "'what can some other role do', which this assistant does not answer at all. It is also "
+        "NOT 'am I in <a named club>' or 'am I registered for <a named event>' - those are facts "
+        "on that club's or event's card, so they are club_info and event_info."
     ),
     "assistant_capability": (
         "What the ASSISTANT can help with - 'what can you do', 'what can I ask you', 'how can you "

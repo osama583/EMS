@@ -133,9 +133,15 @@ def _system_instruction() -> str:
         "of these is the specific mistake to avoid: it sends an unanswerable question down the "
         "retrieval path, which fails and asks the person to rephrase a question that has no answer "
         "here. An empty list gets them a straight, honest 'that is not something I cover'.",
-        "  A club's PRESIDENT and an event's ORGANISER are the two exceptions: both are printed on "
-        "the card, so 'who is the president of the Photography Club' is club_info and 'who is "
-        "running the hackathon' is event_info.",
+        "  THE LINE IS THE CARD. Everything printed on one event's card or one club's card is "
+        "answerable; anything that is a LIST ACROSS A PAGE is not. So:",
+        "    a club's PRESIDENT and an event's ORGANISER are on the card - 'who is the president "
+        "of the Photography Club' is club_info, 'who is running the hackathon' is event_info;",
+        "    the asker's OWN state is on the card too - 'am I registered for the hackathon' is "
+        "event_info and 'am I in the Coding Society' is club_info, because the card shows the "
+        "viewer that badge;",
+        "    but 'what am I registered for' and 'which clubs am I in' are the My Events and My "
+        "Clubs PAGES - a list, not a card flag - and those are an empty list.",
         "",
         "A QUESTION NAMING A PAGE OF THIS APP IS NEVER OUT OF SCOPE, whoever is asking. The page "
         "list is finite and several entries read as ordinary concepts - Page Visibility, Reports, "

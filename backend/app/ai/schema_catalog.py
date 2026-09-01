@@ -173,8 +173,15 @@ COLUMN_NOTES: dict[str, str] = {
     "clubs.created_by_user_id": "The Club Admin who created the club, NOT the president.",
     "clubs.active": "FALSE means the club is deactivated and does not appear on Discover Clubs at all.",
     "club_members.user_id": (
-        "One member of a club. WHO the members are is not something this assistant answers; the "
-        "member COUNT printed on the club card is. See the SCOPE RULES."
+        "One member of a club. Two uses and no others: the member COUNT printed on every club "
+        "card, and an EXISTS test for whether THE ASKER THEMSELVES is in a club - which is the "
+        "flag Discover Clubs computes per card and hides the viewer's own clubs by. Listing WHO "
+        "the members are is not something this assistant answers. See the SCOPE RULES."
+    ),
+    "event_registration.user_id": (
+        "The REGISTRANT. Readable only as an EXISTS test for whether THE ASKER THEMSELVES is "
+        "registered - the 'Registered' / 'Pending Approval' badge their own event card shows them. "
+        "Never a list, and never anybody else's row."
     ),
     "users.full_name": "Display name. Match people by this, never by guessing an id.",
 }

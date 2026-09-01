@@ -878,7 +878,10 @@ TOPICS: dict[str, Topic] = {topic.key: topic for topic in (
         fields=("title", "categories", "introduction", "date", "start and end time", "venue",
                 "organiser", "school or department", "format", "expected attendance",
                 "how many people have registered", "cost", "how registration is approved",
-                "visibility", "the clubs behind it", "how many sessions it runs over"),
+                "visibility", "the clubs behind it", "how many sessions it runs over",
+                # The card prints "Registered" / "Pending Approval" to the viewer on their own
+                # card, so their OWN state is card data. Anyone else's is not, and never becomes so.
+                "whether the ASKER is already registered for it"),
     ),
     Topic(
         key="clubs",
@@ -887,7 +890,11 @@ TOPICS: dict[str, Topic] = {topic.key: topic for topic in (
         # Discover Clubs only. Manage Clubs is administration, and letting it satisfy this topic is
         # what had the assistant recommending clubs to join to the one role that cannot join any.
         pages=("clubs-discover",),
-        fields=("name", "categories", "description", "current President", "member count"),
+        # The last one is what Discover Clubs itself filters on: the page hides every club the
+        # viewer is already a member of, presides over, or has a pending request for. A suggestion
+        # that cannot see that flag offers them a club the page would never have shown them.
+        fields=("name", "categories", "description", "current President", "member count",
+                "whether the ASKER is already a member or the President of it"),
     ),
 )}
 

@@ -414,20 +414,44 @@ def test_club_only_events_need_membership_not_just_a_login():
     assert "cm_request.user_id = 42" in predicate
 
 
-def test_nobody_can_read_a_roster_or_a_membership_list():
+def test_nobody_can_read_a_row_about_anyone_but_themselves():
     """The change that took rosters out of scope, asserted as an absence of any other path.
 
     There is no caller - not an organiser, not a president, not an administrator - for whom either
-    people-table gets a condition that returns rows about individuals. The ONLY predicate is the
-    count-only marker, which sql_guard proves means aggregate-and-no-identifying-columns."""
+    people-table gets a condition that returns a row about somebody ELSE. Exactly two conditions are
+    permitted on each, and no third:
+
+      PUBLIC_COUNT_ONLY               the number printed on the card, which sql_guard then proves
+                                      means aggregate-and-no-identifying-columns
+      <table>.user_id = <the asker>   their OWN row - the "Registered" badge on their own event
+                                      card, and the flag Discover Clubs hides their own clubs by
+
+    The second is what stops the assistant recommending somebody the club they already run. It is
+    scoped to the caller's own id by construction, so it can never widen into a roster."""
     for principal in (None, _student(), _FakePrincipal((("club-admin", None),), user_id=8)):
         scope_ = scope_rules.build_scope(principal, {"events", "clubs"})
-        registrations = scope_.predicates_for("event_registration")
-        assert registrations in ((), ("PUBLIC_COUNT_ONLY",)), registrations
-        for predicate in scope_.predicates_for("club_members"):
-            assert predicate == "PUBLIC_COUNT_ONLY" or predicate.endswith(
-                f"club_members.user_id = {getattr(principal, 'user_id', None)}"
-            ), f"club_members gained a non-count condition: {predicate}"
+        user_id = getattr(principal, "user_id", None)
+        own_row = {
+            "event_registration": f"event_registration.user_id = {user_id}",
+            "club_members": f"club_members.user_id = {user_id}",
+        }
+        for table, mine in own_row.items():
+            for predicate in scope_.predicates_for(table):
+                assert predicate in ("PUBLIC_COUNT_ONLY", mine), (
+                    f"{table} gained a condition that is neither a public count nor the asker's "
+                    f"own row: {predicate}"
+                )
+
+
+def test_a_guest_has_no_own_row_to_read():
+    """The own-row condition needs an asker. A guest has no id, so they get the count and nothing
+    else - and must never be handed a predicate with 'None' interpolated into it."""
+    scope_ = scope_rules.build_scope(None, {"events", "clubs"})
+    assert scope_.predicates_for("event_registration") == ("PUBLIC_COUNT_ONLY",)
+    assert scope_.predicates_for("club_members") == ()
+    for predicates in scope_.required_predicates.values():
+        for predicate in predicates:
+            assert "None" not in predicate, predicate
 
 
 def test_a_guest_has_no_club_access_at_all():
@@ -590,6 +614,47 @@ def test_the_system_prompt_names_the_seven_capabilities_and_no_more():
                     "analytics, reports", "general knowledge"):
         assert refusal in _SYSTEM_INSTRUCTION, f"the prompt does not name {refusal!r} as out of scope"
     assert "THE CARD IS THE CEILING" in _SYSTEM_INSTRUCTION
+
+
+def test_the_asker_s_own_badge_is_inside_the_ceiling_and_their_lists_are_not():
+    """THE line, and it has to read the same in all three prompts that state it.
+
+    The card shows its viewer "Registered" / "Pending Approval", and Discover Clubs hides the clubs
+    they are already in - so whether THEY are in a particular club or event is card data. Whether
+    anyone else is, is not; and "what am I registered for" is the My Events PAGE, a list rather than
+    a card flag, so it stays out.
+
+    Getting this inconsistent is not hypothetical: the three prompts disagreed, and the assistant
+    volunteered "you're already a member of the APU Coding Society" while refusing to answer "am I
+    in the APU Coding Society?" one question later."""
+    from app.ai.gemini import _SYSTEM_INSTRUCTION
+    from app.ai.query_router import INTENT_DESCRIPTIONS
+
+    # The answering prompt permits the badge and excludes the list.
+    assert "THE ASKER'S OWN BADGE IS ON THE CARD TOO" in _SYSTEM_INSTRUCTION
+    assert "anybody ELSE's membership" in _SYSTEM_INSTRUCTION
+    assert "which clubs am I in" in _SYSTEM_INSTRUCTION
+
+    # The intent vocabulary routes the singular question to the card's own intent, and says plainly
+    # that the plural one is not routed anywhere.
+    assert "AM I REGISTERED FOR <this event>?" in INTENT_DESCRIPTIONS["event_info"]
+    assert "AM I IN <this club>?" in INTENT_DESCRIPTIONS["club_info"]
+    for description in (INTENT_DESCRIPTIONS["event_info"], INTENT_DESCRIPTIONS["club_info"]):
+        assert "out of scope" in description, "the list half of the line must be stated too"
+    # ...and "who am I" must not swallow it, which is what it did before.
+    assert "am I in <a named club>" in INTENT_DESCRIPTIONS["who_am_i"]
+
+
+def test_the_own_row_condition_is_scoped_to_the_asker_and_nothing_else():
+    """The predicate that makes the badge readable is the narrowest thing that can work: one
+    equality against the caller's own id, interpolated from the authenticated principal. It can
+    never widen into a roster, because there is no other row it matches."""
+    scope_ = _student_scope(user_id=42)
+    assert "event_registration.user_id = 42" in scope_.predicates_for("event_registration")
+    assert "club_members.user_id = 42" in scope_.predicates_for("club_members")
+    for table in ("event_registration", "club_members"):
+        for predicate in scope_.predicates_for(table):
+            assert predicate == "PUBLIC_COUNT_ONLY" or predicate.endswith("= 42"), predicate
 
 
 def test_both_prompts_hold_the_card_ceiling():

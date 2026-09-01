@@ -134,15 +134,30 @@ def build_scope(principal, topics: set[str]) -> Scope:
             predicates["request_clubs"] = ("request_clubs.request_id = request.request_id",)
             predicates["club_members"] = (f"club_members.user_id = {user_id}", _COUNT_ONLY)
 
-        # Registrations: the count only, for everybody. See the module docstring.
-        predicates["event_registration"] = (_COUNT_ONLY,)
+        # Registrations: the public COUNT, plus the asker's OWN row - and nothing else, ever.
+        # The own-row half is not a widening: the event card prints "Registered" / "Pending
+        # Approval" to the viewer on their own card, so whether THEY are signed up is card data
+        # exactly like the date and the venue. Without it the assistant recommends an event to
+        # somebody already registered for it, which is the club version of the same bug.
+        predicates["event_registration"] = (
+            (f"event_registration.user_id = {user_id}", _COUNT_ONLY) if user_id is not None
+            else (_COUNT_ONLY,)
+        )
         notes.append(
-            "Registrations: HOW MANY people have registered for an event is PUBLIC - it is the "
-            "same number printed on the event's own card. Answer a count question with an "
-            "aggregate (COUNT) query carrying the marker condition PUBLIC_COUNT_ONLY in its WHERE "
-            "clause; such a query may return counts, event titles and dates, and NOTHING that "
-            "identifies a person. WHO registered is not something this assistant answers for "
-            "anyone, so there is no other condition available for that table."
+            "Registrations, and there are exactly two things you may read:\n"
+            "    HOW MANY people have registered is PUBLIC - the same number printed on the "
+            "event's own card. Answer a count question with an aggregate (COUNT) query carrying "
+            "the marker condition PUBLIC_COUNT_ONLY in its WHERE clause; such a query may return "
+            "counts, event titles and dates, and NOTHING that identifies a person.\n"
+            + (
+                f"    WHETHER THE ASKER THEMSELVES is registered, via "
+                f"event_registration.user_id = {user_id}. Their own card shows them this, so it is "
+                "theirs to see. Use it to say 'you are already registered for this' rather than "
+                "recommending it to them again.\n"
+                if user_id is not None else ""
+            )
+            + "    WHO ELSE registered is not something this assistant answers for anyone, so "
+              "there is no condition available for it and no query that returns it will run."
         )
 
     if "clubs" in topics:
@@ -158,19 +173,29 @@ def build_scope(principal, topics: set[str]) -> Scope:
             # A club row is the public catalogue Discover Clubs shows; only ACTIVE, non-archived
             # clubs appear on it.
             predicates["clubs"] = ("clubs.active AND clubs.archived_at IS NULL",)
-            # Merged rather than overwritten: an events question in the same turn needs the
-            # own-row option for the Club Only visibility branch, and dropping it here would make
-            # the mandatory event condition itself unsatisfiable.
-            predicates["club_members"] = tuple(dict.fromkeys(
-                (*predicates.get("club_members", ()), _COUNT_ONLY)
-            ))
+            # Merged rather than overwritten: an events question in the same turn needs the own-row
+            # option for the Club Only visibility branch, and dropping it here would make the
+            # mandatory event condition itself unsatisfiable. The own-row option is also wanted in
+            # its own right here - see the note below.
+            predicates["club_members"] = tuple(dict.fromkeys((
+                f"club_members.user_id = {user_id}",
+                *predicates.get("club_members", ()),
+                _COUNT_ONLY,
+            )))
             notes.append(
                 "Clubs: a club's name, description, categories, current PRESIDENT and MEMBER COUNT "
                 "are all printed on its card on Discover Clubs, so all of them are answerable. "
                 "Answer a member-count question with an aggregate (COUNT) query over club_members "
                 "carrying the marker condition PUBLIC_COUNT_ONLY; it may return counts and club "
                 "names and NOTHING that identifies a person. WHO the members are is not something "
-                "this assistant answers for anyone."
+                "this assistant answers for anyone.\n"
+                f"    WHETHER THE ASKER THEMSELVES is a member is different, and IS theirs to see: "
+                f"club_members.user_id = {user_id}. Discover Clubs computes exactly this flag for "
+                "every card and HIDES the clubs they are already in, so a suggestion that ignores "
+                "it offers them a club the page would not even have shown them. Read it as a flag "
+                f"per club - EXISTS (... AND cm.user_id = {user_id}) - never as a list of members.\n"
+                f"    PRESIDENCY is on the club row itself: (clubs.user_id = {user_id}) says the "
+                "asker presides over it, which Discover Clubs also hides."
             )
 
     # `users` is readable for NAMES only, and only as a JOIN target - never as the subject of a
