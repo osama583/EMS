@@ -23,9 +23,9 @@
 .skeleton__bone--subheading { width: 24rem; max-width: 100%; height: 0.85rem; }
 .skeleton__bone--search { height: 2.6rem; border-radius: var(--radius-control); }
 .skeleton__bone--pill { width: 7rem; height: 2.6rem; border-radius: var(--radius-control); }
-.skeleton__bone--media { height: 8rem; border-radius: var(--radius-card); }
 .skeleton__bone--banner { height: 5rem; border-radius: var(--radius-container); }
 .skeleton__bone--chip { width: 5.5rem; height: 1.4rem; border-radius: 999px; }
+.skeleton__bone--media { height: 10.5rem; border-radius: 0.9rem; }
 .skeleton__bone--metric { width: 4.5rem; height: 1.9rem; }
 .skeleton__bone--avatar { width: 2.5rem; height: 2.5rem; flex: 0 0 auto; border-radius: 50%; }
 
@@ -44,12 +44,38 @@
 .skeleton__row--head { border-bottom-width: 2px; }
 .skeleton__row:last-child { border-bottom: none; }
 
-.skeleton--cards { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: var(--space-4); }
+/* Cards — the option-card grid (.menu-card-grid): image on top, body beneath.
+   Its metrics, so a menu or a request catalogue hands over without the page
+   reflowing. */
+.skeleton--cards { grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); gap: var(--space-5); }
 .skeleton__card {
   display: grid;
-  padding: var(--space-4);
+  padding: var(--space-3);
   gap: var(--space-3);
   align-content: start;
+  border: 1px solid var(--apu-border);
+  border-radius: 1.25rem;
+  background: var(--apu-white);
+  box-shadow: var(--internal-card-shadow);
+}
+
+/* Events — the OTHER card in this app, and the reason `cards` could not cover
+   both. An event card is a tall full-bleed poster with its text in an overlay
+   pinned to the bottom edge, so the bones end there rather than sitting under a
+   separate image block, and the card carries the real grid's floor height. These
+   are .explore-grid's own metrics, not an approximation: every event surface
+   (Explore, My Events, Created by Me) then swaps placeholder for card without
+   the page moving. */
+.skeleton--events {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15.5rem), 1fr));
+  gap: clamp(1rem, 2vw, 1.5rem);
+}
+.skeleton__poster {
+  display: grid;
+  min-height: clamp(22rem, 34vw, 27rem);
+  padding: var(--space-4);
+  gap: var(--space-3);
+  align-content: end;
   border: 1px solid var(--apu-border);
   border-radius: var(--radius-card);
   background: var(--apu-white);
@@ -90,6 +116,44 @@
   box-shadow: var(--internal-card-shadow);
 }
 
+/* Calendar — a card grid in this slot promised cards and delivered a month, and
+   the month is the one surface whose shape is the information. Seven columns of
+   hairline-divided day cells under a weekday strip, the geometry of .mc-grid /
+   .mc-weekdays. It renders full-bleed inside .mc-shell, so it inherits that
+   shell's --mc-pad-x rather than inventing padding of its own. */
+.skeleton--calendar { gap: 0; }
+
+.skeleton__weekdays,
+.skeleton__month {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.skeleton__weekdays {
+  padding: 0.8rem 0.75rem;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--apu-border);
+  background: var(--apu-surface-muted);
+}
+
+.skeleton__day {
+  display: grid;
+  min-height: clamp(8rem, 10.5vw, 10rem);
+  gap: 0.28rem;
+  align-content: start;
+  padding: 0.7rem;
+  border-right: 1px solid var(--apu-border);
+  border-bottom: 1px solid var(--apu-border);
+}
+/* The shell already draws the outer edge; the last column and last row must not
+   double it. */
+.skeleton__day:nth-child(7n) { border-right: 0; }
+.skeleton__day:nth-last-child(-n + 7) { border-bottom: 0; }
+
+.skeleton__bone--weekday { width: 2.2rem; height: 0.6rem; justify-self: center; }
+.skeleton__bone--daynum { width: 1.75rem; height: 1.75rem; border-radius: 50%; }
+.skeleton__bone--event { height: 1.65rem; }
+
 .skeleton--text { gap: var(--space-2); }
 
 @media (max-width: 48rem) {
@@ -99,6 +163,25 @@
   .skeleton__row { grid-auto-flow: row; gap: var(--space-2); }
   .skeleton__row--head { display: none; }
   .skeleton__bone--heading { width: 11rem; }
+
+  /* Below the calendar's own breakpoint the real month becomes a tap grid with a
+     day panel under it, so the skeleton becomes one too — seven desktop day cells
+     on a phone are seven slivers of a surface that never renders. */
+  .skeleton__weekdays { padding: 0.875rem var(--mc-pad-x, 1.25rem) 0; border-bottom: 0; background: none; }
+  .skeleton__month { gap: 2px; padding: 0.625rem var(--mc-pad-x, 1.25rem) 1.125rem; }
+  .skeleton__day {
+    /* 44px min touch target, matching the cell it stands in for (WCAG 2.5.5). */
+    min-height: 2.75rem;
+    align-content: center;
+    justify-items: center;
+    padding: 0.25rem 0;
+    border: 0;
+  }
+  .skeleton--events { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.65rem; }
+
+  .skeleton__bone--weekday { width: 0.9rem; }
+  .skeleton__bone--daynum { width: 1.25rem; height: 0.8rem; border-radius: var(--radius-control); }
+  .skeleton__bone--event { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

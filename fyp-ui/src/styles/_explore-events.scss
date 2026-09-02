@@ -178,7 +178,6 @@ body.filters-open {
    */
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 15.5rem), 1fr));
   gap: clamp(1rem, 2vw, 1.5rem);
-  margin-top: 2rem;
 }
 
 .explore-card {
@@ -552,12 +551,18 @@ body.filters-open {
   transform: rotate(5deg);
 }
 
+/*
+ * No overflow of its own. app-form-modal's .shared-form-modal__body is the element with the
+ * constrained height (grid-template-rows: auto minmax(0, 1fr) auto) and so the only one that can
+ * actually scroll. Declaring `overflow-y: auto` here as well made this a SECOND scroll container -
+ * one whose height always equals its content, so it never scrolls - and `overscroll-behavior:
+ * contain` on it then refused to chain the wheel up to the body that does. The dialog moved only by
+ * dragging the scrollbar; the wheel and a two-finger trackpad scroll did nothing.
+ */
 .filter-dialog__body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0 2rem;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   padding: 0 clamp(1.25rem, 4vw, 2.5rem) 2rem;
 }
 

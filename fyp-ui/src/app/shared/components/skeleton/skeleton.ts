@@ -7,23 +7,27 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
  *
  * Pick the variant that matches the surface being replaced, so the same kind of
  * page always waits the same way:
- *   table   — a paginated list/table (internal-data-page and friends)
- *   cards   — a responsive card grid (events, clubs, options)
- *   fields  — a stacked form / field list inside a modal or form section
- *   page    — a whole routed page: header + controls + table
- *   detail  — a read view: title banner, then labelled paragraphs
- *   list    — compact stacked rows (mobile record lists, pickers, day agendas)
- *   stats   — a KPI/metric tile row
- *   text    — bare lines, for a paragraph-shaped hole in an existing layout
+ *   table    — a paginated list/table (internal-data-page and friends)
+ *   cards    — a responsive option-card grid (menus, request options, pickers)
+ *   events   — the tall poster-card grid every event surface uses
+ *   fields   — a stacked form / field list inside a modal or form section
+ *   page     — a whole routed page: header + controls + table
+ *   detail   — a read view: title banner, then labelled paragraphs
+ *   list     — compact stacked rows (mobile record lists, pickers, day agendas)
+ *   stats    — a KPI/metric tile row
+ *   calendar — a seven-column grid of day cells (the event calendar)
+ *   text     — bare lines, for a paragraph-shaped hole in an existing layout
  */
 export type SkeletonVariant =
   | 'table'
   | 'cards'
+  | 'events'
   | 'fields'
   | 'page'
   | 'detail'
   | 'list'
   | 'stats'
+  | 'calendar'
   | 'text';
 
 @Component({
@@ -41,7 +45,7 @@ export type SkeletonVariant =
 })
 export class SkeletonComponent {
   readonly variant = input<SkeletonVariant>('text');
-  /** How many rows / cards / fields / lines to draw. */
+  /** How many rows / cards / fields / lines to draw — WEEKS for `calendar`. */
   readonly count = input(4);
   /** Columns per row, for the `table` variant (and the `page` header it wraps). */
   readonly columns = input(4);
@@ -50,6 +54,20 @@ export class SkeletonComponent {
 
   protected readonly rows = computed(() => this.range(this.count()));
   protected readonly cols = computed(() => this.range(this.columns()));
+
+  /** Seven columns: a calendar week is seven days in every view. */
+  protected readonly week = this.range(7);
+  /** `count` weeks of day cells — 6 covers a month, 1 covers the week view. */
+  protected readonly days = computed(() => this.range(this.count() * 7));
+
+  /**
+   * Chips drawn inside one day cell, on a 5-step cycle. A real month is ragged,
+   * and five steps across seven columns shifts the pattern on every row instead
+   * of stacking it into vertical stripes.
+   */
+  protected chipsFor(index: number): readonly number[] {
+    return this.range([1, 0, 2, 1, 3][index % 5]);
+  }
 
   /**
    * Line widths repeat on a 4-step cycle rather than being random, so a skeleton

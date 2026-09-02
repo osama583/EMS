@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AuthService } from '../../../../../core/auth/auth.service';
 import { hasRole, isHeadOfAnyUnit } from '../../../../../core/auth/role-access';
 import { ProposalReviewRecord } from '../../../../../core/proposals/proposal-review.models';
+import { EditableRow } from '../../../../../shared/components/form-controls/form-controls.models';
 import { ProposalSortKey, SortOrder } from '../../../../../core/proposals/proposal-workflow.repository';
 import { ProposalWorkflowService } from '../../../../../core/proposals/proposal-workflow.service';
 import { departmentsAwaitingApplicant, proposalNeedsApplicantAction, userIsApplicantForProposal } from '../../../../../core/proposals/proposal-visibility';
@@ -13,7 +14,6 @@ import { DepartmentRequestKind } from '../../../../../core/departments/departmen
 import { InternalDataPageComponent } from '../../../../../shared/components/internal-data-page/internal-data-page';
 import {
   InternalCellTone,
-  InternalDataCell,
   InternalDataPageConfig,
   InternalDataRecord,
   InternalFilterChange,
@@ -29,6 +29,31 @@ const BUCKET_COPY: Readonly<Record<RecordsHubBucket, { title: string; descriptio
   ongoing: { title: 'Proposals', description: 'Proposals moving through review that are not currently waiting on you.', empty: 'No ongoing proposals found' },
   history: { title: 'Proposals', description: 'Completed proposals — approved, rejected, or cancelled.', empty: 'No proposal history found' },
 };
+
+// --- Schedule cell formatting ---------------------------------------------
+// Module-level and exported so they can be tested without standing up the component's
+// router/auth/http dependencies. All three columns walk the SAME rows in the SAME order, so
+// the second date, the second time and the second location still line up as one reading
+// across the row — nothing is deduplicated or collapsed into a range.
+
+export function joinScheduleRows(rows: readonly EditableRow[], format: (row: EditableRow) => string): string {
+  const parts = rows.map(format).filter(Boolean);
+  return parts.length ? parts.join(', ') : '—';
+}
+
+// Split rather than `new Date(iso)`: that parses a bare date as UTC, which lands on the
+// previous day for anyone west of it.
+export function formatScheduleDate(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  if (!year || !month || !day) return '';
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// The server sends "09:00:00"; the seconds are noise in a list.
+export function formatScheduleTime(start: string, end: string): string {
+  if (!start && !end) return '';
+  return `${start.slice(0, 5)}–${end.slice(0, 5)}`;
+}
 
 // Every list control here (search, status filter, sort, page, page size) is a real server query param
 // — GET /proposals?bucket=&q=&statusLabel=&sort=&order=&page=&pageSize= — computed by proposals.py's
@@ -143,7 +168,9 @@ export class HubProposalsComponent {
       { key: 'proposalId', label: 'Proposal ID', width: '9rem' },
       { key: 'eventTitle', label: 'Event Title', width: '15rem' },
       { key: 'requester', label: 'Requester', width: '13rem' },
-      { key: 'schedule', label: 'Event Schedule', width: '16rem', sortKey: 'schedule' },
+      { key: 'schedule', label: 'Event Date', width: '11rem', sortKey: 'schedule' },
+      { key: 'time', label: 'Time', width: '9rem' },
+      { key: 'location', label: 'Location', width: '12rem' },
       { key: 'pax', label: 'Total Pax', width: '7rem' },
       { key: 'status', label: 'Status', width: '11rem' },
       { key: 'actions', label: 'Actions', actions: true, width: '9rem' },
@@ -151,8 +178,9 @@ export class HubProposalsComponent {
       { key: 'proposalId', label: 'Proposal ID', width: '9rem' },
       { key: 'eventTitle', label: 'Event Title', width: '15rem' },
       { key: 'applicant', label: 'Applicant', width: '12rem' },
-      { key: 'schedule', label: 'Event Schedule', width: '16rem', sortKey: 'schedule' },
-      { key: 'urgency', label: 'Urgency', width: '9rem' },
+      { key: 'schedule', label: 'Event Date', width: '11rem', sortKey: 'schedule' },
+      { key: 'time', label: 'Time', width: '9rem' },
+      { key: 'location', label: 'Location', width: '12rem' },
       { key: 'pax', label: 'Total Pax', width: '6rem' },
       { key: 'status', label: 'Status', width: '11rem' },
       { key: 'actions', label: 'Actions', actions: true, width: '9rem' },
@@ -197,21 +225,28 @@ export class HubProposalsComponent {
     const statusLabel = department ? `Changes requested — ${DEPARTMENT_LABELS[department] ?? department}` : status;
     const isMine = userIsApplicantForProposal(this.auth.user(), item);
     const requesterLabel = isMine ? `${item.applicant} (You)` : item.applicant;
+    const rows = item.scheduleRows ?? [];
+    const urgencyText = this.urgencyText(item);
     return {
       id,
       emphasized:
         status === 'Revision required' ||
         status === 'Changes requested' ||
         item.urgency === 'urgent',
+      rowTone: this.rowTone(item),
       cells: {
         proposalId: { primary: item.proposalId },
         eventTitle: { primary: item.eventTitle },
         applicant: { primary: item.applicant },
         requester: { primary: requesterLabel, badge: true, tone: isMine ? 'blue' : 'neutral' },
-        schedule: { primary: item.schedule },
+        // The urgency text rides on the date rather than in a column of its own: it is a
+        // statement ABOUT this date, and the row's tint alone would leave a colourblind
+        // approver — or a printed copy — with nothing.
+        schedule: { primary: joinScheduleRows(rows, (row) => formatScheduleDate(String(row['date'] ?? ''))), secondary: urgencyText },
+        time: { primary: joinScheduleRows(rows, (row) => formatScheduleTime(String(row['start'] ?? ''), String(row['end'] ?? ''))) },
+        location: { primary: joinScheduleRows(rows, (row) => String(row['location'] ?? '')) },
         pax: { primary: String(item.totalPax) },
         status: { primary: statusLabel, badge: true, tone: this.statusTone(status) },
-        urgency: this.urgencyCell(item),
       },
       mobile: {
         eyebrow: item.proposalId,
@@ -221,6 +256,7 @@ export class HubProposalsComponent {
         initials: item.applicantInitials,
         unread: status === 'Revision required' || status === 'Changes requested',
         details: [
+          ...(urgencyText ? [{ icon: 'priority_high', text: urgencyText }] : []),
           { icon: 'schedule', text: item.schedule },
           { icon: 'groups', text: `${item.totalPax} expected pax` },
         ],
@@ -280,28 +316,33 @@ export class HubProposalsComponent {
   }
 
   /**
-   * The urgency badge. Reads the days-until-event the server already computed rather than
-   * recomputing here, so a row can never disagree with the band the server sorted it into.
-   *
-   * The text is the FACT ("Event in 2 days"), not the band name — "Urgent" tells an approver
-   * nothing they can act on, whereas the number does.
+   * How the whole row is tinted: red for urgent, amber for warning, grey for an event whose
+   * date has already passed with nobody deciding. Reads the band the server already computed
+   * (and already sorted by — urgent rows come back above warning rows above the rest), so a
+   * row can never be one colour here and another in the escalation job.
    */
-  private urgencyCell(item: ProposalReviewRecord): InternalDataCell {
+  private rowTone(item: ProposalReviewRecord): InternalCellTone | undefined {
+    if (item.daysUntilEvent == null) return undefined;
+    if (item.urgency === 'urgent') return 'danger';
+    if (item.urgency === 'warning') return 'warning';
+    if (item.urgency === 'overdue') return 'neutral';
+    return undefined;
+  }
+
+  /**
+   * The words the tint is worth. The text is the FACT ("Event in 2 days"), not the band name —
+   * "Urgent" tells an approver nothing they can act on, whereas the number does.
+   */
+  private urgencyText(item: ProposalReviewRecord): string {
     const days = item.daysUntilEvent;
-    if (item.urgency == null || item.urgency === 'normal' || days == null) {
-      return { primary: '—' };
-    }
+    if (item.urgency == null || item.urgency === 'normal' || days == null) return '';
     if (item.urgency === 'overdue') {
       const late = Math.abs(days);
-      return {
-        primary: late === 1 ? 'Event was yesterday' : `Event was ${late} days ago`,
-        badge: true,
-        tone: 'neutral',
-      };
+      return late === 1 ? 'Event was yesterday' : `Event was ${late} days ago`;
     }
-    const label = days === 0 ? 'Event today' : days === 1 ? 'Event tomorrow' : `Event in ${days} days`;
-    return { primary: label, badge: true, tone: item.urgency === 'urgent' ? 'danger' : 'warning' };
+    return days === 0 ? 'Event today' : days === 1 ? 'Event tomorrow' : `Event in ${days} days`;
   }
+
 
   private statusTone(status: string): InternalCellTone {
     if (status === 'Revision required' || status === 'Changes requested') return 'warning';

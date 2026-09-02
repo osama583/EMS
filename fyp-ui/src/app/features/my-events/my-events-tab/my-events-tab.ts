@@ -57,7 +57,13 @@ const DEFAULT_PAGE_SIZE = 10;
   templateUrl: './my-events-tab.html',
   // .shared-page-width is a plain block, not the gapped grid column Explore Events lays its
   // toolbar/grid/pagination out in, so the footer needs its own room under the last row of cards.
-  styles: '.my-events-tab__pagination { margin-top: var(--space-5); }',
+  // .shared-page-width is a plain block, so the results need their own room under the filter bar —
+  // stated once for the grid and the skeleton that stands in for it, so nothing shifts on arrival.
+  styles: `
+    .my-events-tab__pagination { margin-top: var(--space-5); }
+    .explore-grid,
+    app-skeleton { margin-top: var(--space-5); }
+  `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MyEventsTabComponent {

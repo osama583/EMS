@@ -12,3 +12,12 @@ export const EVENT_IMAGE_PLACEHOLDER =
       </g>
     </svg>`,
   );
+
+// <img (error)> handler for a stored event image whose bytes are gone — an upload made before
+// event_image's bytes moved into the database (migration 045), whose file only ever existed on one
+// machine's backend/var/uploads. The row still points at it, so the URL resolves to a 404; show the
+// same camera tile a proposal with no image at all gets, rather than the browser's broken-image icon.
+export function onEventImageError(event: Event): void {
+  const img = event.target as HTMLImageElement;
+  if (img.src !== EVENT_IMAGE_PLACEHOLDER) img.src = EVENT_IMAGE_PLACEHOLDER;
+}

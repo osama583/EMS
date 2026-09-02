@@ -77,7 +77,15 @@
     </div>
 
     @if (loading()) {
-      <app-skeleton variant="cards" label="Loading calendar…" [count]="9" />
+      <!-- The skeleton takes the shape of the view being loaded: the month and week grids wait as
+           a grid of day cells, the day view as the list of rows it actually is. -->
+      @if (viewMode() === 'day') {
+        <div class="mc-dayview">
+          <app-skeleton variant="list" label="Loading calendar…" [count]="5" />
+        </div>
+      } @else {
+        <app-skeleton variant="calendar" label="Loading calendar…" [count]="viewMode() === 'week' ? 1 : 6" />
+      }
     } @else if (loadError()) {
       <p class="mc-empty">{{ loadError() }}</p>
     } @else if (viewMode() === 'month') {

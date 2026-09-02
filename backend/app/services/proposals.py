@@ -30,6 +30,9 @@ from .workflow.constants import (
     min_event_lead_days,
     stage_for_client,
 )
+# Straight from the module rather than the workflow package, and safe from a cycle:
+# nothing under services/workflow imports this module back.
+from .workflow.tasks import unallocated_row_count
 
 # Cleared and rebuilt on every content save, children first.
 CHILD_TABLES = (
@@ -613,10 +616,12 @@ def write_children(cur, request_id: int, payload: dict) -> None:
         if not (row.get("time") and row.get("activity")):
             continue
         cur.execute(
-            'INSERT INTO brief_agenda (request_id, "time", activity, location, pic, notes) '
-            "VALUES (%s, %s, %s, %s, %s, %s)",
+            'INSERT INTO brief_agenda (request_id, agenda_date, "time", activity, location, pic, notes) '
+            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
             (
                 request_id,
+                # Only multi-day events ask for a per-row date; a single-day agenda stores NULL.
+                row.get("date") or None,
                 row["time"],
                 row["activity"],
                 row.get("location") or "",
@@ -895,12 +900,24 @@ def load_applicant(cur, user_id: int) -> dict:
 _UNCONFIRMED_TASK_STATUSES = ("pending", "resubmitted")
 
 
-def _department_confirmations(cur, request_id: int) -> list[dict[str, Any]]:
-    """One entry per department_review task, in the client's DepartmentConfirmation shape.
+def _department_confirmations(
+    cur, request_id: int, *, with_allocation: bool = False
+) -> list[dict[str, Any]]:
+    """One entry per department task, in the client's DepartmentConfirmation shape.
 
-    Empty outside department_review (and after, once every task is terminal -
-    the proposal itself has moved on to completed_approved/completed_rejected
-    by then, so an empty list here is correct, not a gap).
+    Keyed off the task rows' stage_code, not the request status, so it keeps
+    reporting through implementation - where every task is approved and the
+    applicant is watching the staff work it down. Empty only when there are no
+    task rows at all (nothing was routed, or the proposal never reached the
+    departments).
+
+    `with_allocation` adds `fullyAllocated`: whether every row this department
+    was asked to fulfil actually has someone (or a cafeteria order) on it. A
+    task can be confirmed and NOT fully allocated - that is the state a
+    premature approval leaves behind, and the department view keeps its actions
+    on screen for it rather than treating the department as finished. Costs one
+    count per task, so only the single-proposal projection asks for it; the list
+    pages have no use for it and would pay it per row.
     """
     return [
         {
@@ -909,6 +926,15 @@ def _department_confirmations(cur, request_id: int) -> list[dict[str, Any]]:
             "status": row["status"],
             "comment": row["comment"],
             "confirmedAt": row["resolved_at"],
+            **(
+                {
+                    "fullyAllocated": not unallocated_row_count(
+                        cur, request_id, row["requirement_name"]
+                    )
+                }
+                if with_allocation
+                else {}
+            ),
         }
         for row in fetch_all(
             cur,
@@ -965,6 +991,18 @@ def project_list_item(cur, request: dict) -> dict[str, Any]:
         "schedule": "; ".join(
             f"{r['date']} · {r['start_time']}-{r['end_time']} · {r['location']}" for r in schedule
         ),
+        # The same rows unjoined, so a list page can put the date, the time and the
+        # location in three separate columns instead of parsing them back out of the
+        # string above (which stays, for the readers that still show one line).
+        "scheduleRows": [
+            {
+                "date": str(r["date"]),
+                "start": str(r["start_time"]),
+                "end": str(r["end_time"]),
+                "location": r["location"],
+            }
+            for r in schedule
+        ],
         "workflow": {
             "stage": stage_for_client(request["status"]),
             "departmentConfirmations": _department_confirmations(cur, request_id),
@@ -1045,7 +1083,9 @@ def project(cur, request: dict, *, include_children: bool = True) -> dict[str, A
             "stage": stage_for_client(request["status"]),
             "resumeStage": stage_for_client(request["resume_stage"]),
             "reviewerComment": request["reviewer_comment"],
-            "departmentConfirmations": _department_confirmations(cur, request_id),
+            "departmentConfirmations": _department_confirmations(
+                cur, request_id, with_allocation=True
+            ),
         },
     }
 
@@ -1103,12 +1143,15 @@ def project(cur, request: dict, *, include_children: bool = True) -> dict[str, A
         )
         projected["agenda"] = [
             {
+                # "" not None: the form's Date column is a select whose options are the schedule's
+                # dates, and it matches on the string value.
+                "date": str(r["agenda_date"]) if r["agenda_date"] else "",
                 "time": str(r["time"]), "activity": r["activity"], "location": r["location"],
                 "pic": r["pic"], "notes": r["notes"] or "",
             }
             for r in fetch_all(
                 cur,
-                'SELECT "time", activity, location, pic, notes FROM brief_agenda '
+                'SELECT agenda_date, "time", activity, location, pic, notes FROM brief_agenda '
                 "WHERE request_id = %s ORDER BY brief_agenda_id",
                 (request_id,),
             )

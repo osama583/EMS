@@ -125,11 +125,63 @@
 .created-by-me-info__stat span { color: var(--apu-text-muted); font-size: .78rem; }
 .created-by-me-info__stat strong { color: var(--apu-navy-900); font-size: 1.15rem; }
 
+.created-by-me-info__toolbar {
+  display: flex;
+  margin-bottom: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 .created-by-me-info__section-title {
-  margin: 0 0 var(--space-2);
+  margin: 0;
   color: var(--apu-navy-900);
   font-size: 1rem;
 }
+
+/* Small on purpose: it narrows one list inside a dialog, so it should not read as
+   the page-level search bar behind it. */
+.created-by-me-info__search {
+  display: flex;
+  width: min(15rem, 55%);
+  align-items: center;
+  gap: .4rem;
+  padding: .35rem .6rem;
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-control);
+  background: #fff;
+  color: var(--apu-text-muted);
+}
+.created-by-me-info__search:focus-within { border-color: var(--apu-blue-600); }
+.created-by-me-info__search .material-symbols-rounded { font-size: 1.05rem; }
+.created-by-me-info__search input {
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--apu-navy-900);
+  font: inherit;
+  font-size: .85rem;
+  outline: 0;
+}
+
+/* The decision date is the only sortable column — the header toggles direction
+   rather than offering a column vocabulary, same as every other date sort here. */
+.created-by-me-info__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+.created-by-me-info__sort:hover { color: var(--apu-blue-600); }
+.created-by-me-info__sort .material-symbols-rounded { font-size: .95rem; }
+.created-by-me-info__decided { color: var(--apu-text-muted); font-variant-numeric: tabular-nums; }
 
 .created-by-me-info__table-wrap {
   overflow-x: auto;
@@ -137,17 +189,38 @@
   border-radius: var(--radius-card);
 }
 
+/* table-layout: fixed is what stops the overflow, not any one column's width. Under
+   auto layout the columns size themselves from their content, so a long reason and a
+   long email between them pushed the table to 974px inside a 759px dialog and Name and
+   Email scrolled off the left edge. Fixed layout makes the declared widths binding and
+   the table can never be wider than the space it has. */
 .created-by-me-info__table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: .88rem;
 }
+
+/* Percentages, not rems: the columns are conditional — Reason only for manual-approval
+   events, Payment only for paid ones — and a short row of percentages scales up to fill
+   the width, where a row of rems would leave a gap. */
+.created-by-me-info__table .col-name { width: 14%; }
+.created-by-me-info__table .col-email { width: 19%; }
+.created-by-me-info__table .col-reason { width: 21%; }
+.created-by-me-info__table .col-status { width: 19%; }
+.created-by-me-info__table .col-decided { width: 14%; }
+.created-by-me-info__table .col-payment { width: 13%; }
 
 .created-by-me-info__table th,
 .created-by-me-info__table td {
   padding: .65rem .85rem;
   text-align: left;
-  white-space: nowrap;
+  vertical-align: top;
+  line-height: 1.45;
+  /* Every column wraps now. An email address has no spaces to break at, so it needs
+     permission to break mid-word or it would push its column open again. */
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .created-by-me-info__table th {
@@ -169,15 +242,154 @@
   border-radius: 999px;
   font-size: .78rem;
   font-weight: 700;
+  text-align: left;
+  /* The cells opt into breaking mid-word so a long email cannot force its column
+     open. A label must not inherit that — it was splitting the pill as
+     "Registere / d". If it still outgrows its column it wraps between words, which
+     is how "Awaiting your decision" is meant to read. */
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
 }
 
 .created-by-me-info__status[data-status='confirmed'] { background: rgb(20 132 89 / 12%); color: #0f7a4f; }
 .created-by-me-info__status[data-status='pending'] { background: rgb(217 152 0 / 12%); color: #8a5c00; }
 .created-by-me-info__status[data-status='rejected'] { background: rgb(217 45 63 / 12%); color: #d92d3f; }
 
+/* Payment holds one thing: the way in to the receipt. It carried a status badge as
+   well, which said in words what the Status column and the receipt itself already
+   say, and took a second line of the row to do it. */
+.created-by-me-info__no-proof { color: var(--apu-text-soft); }
+
+.created-by-me-info__proof {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--apu-blue-600);
+  cursor: pointer;
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 700;
+}
+.created-by-me-info__proof:hover { text-decoration: underline; }
+.created-by-me-info__proof .material-symbols-rounded { font-size: 1rem; }
+
+/* The receipt itself. */
+.created-by-me-proof__meta { margin: 0 0 var(--space-3); color: var(--apu-text-muted); font-size: .9rem; }
+.created-by-me-proof__image {
+  display: block;
+  /* Capped, not stretched. width: 100% blew a small receipt up to the dialog's width —
+     a phone screenshot of a transfer became an unreadable smear, and a 1-pixel
+     placeholder became an empty box that read as a broken image. max-height is measured
+     against the dialog rather than the viewport, because the modal body is about 26rem
+     tall here and a 60vh ceiling let a tall receipt scroll inside it instead of fit. */
+  max-width: 100%;
+  max-height: min(60vh, 26rem);
+  margin: 0 auto;
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-card);
+  background: #f7f9fc;
+}
+.created-by-me-proof__zoom {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+.created-by-me-proof__zoom-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  margin-top: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--apu-blue-600);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+.created-by-me-proof__zoom-link:hover { text-decoration: underline; }
+.created-by-me-proof__zoom-link .material-symbols-rounded { font-size: 1.1rem; }
+
+/* Above the dialog it was opened from (z-index 1000), so the receipt is not
+   clipped by the modal's own scroll box. */
+.created-by-me-proof__lightbox {
+  position: fixed;
+  z-index: 1300;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(1rem, 4vw, 3rem);
+  background: rgb(2 14 29 / 88%);
+  backdrop-filter: blur(8px);
+  cursor: zoom-out;
+}
+.created-by-me-proof__lightbox figure {
+  position: relative;
+  display: grid;
+  max-width: min(72rem, 94vw);
+  max-height: 92vh;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: var(--radius-container);
+  background: var(--apu-navy-950);
+  box-shadow: var(--shadow-overlay);
+  cursor: default;
+}
+.created-by-me-proof__lightbox img { display: block; max-width: 100%; max-height: min(80vh, 54rem); object-fit: contain; }
+.created-by-me-proof__lightbox figcaption { padding: .9rem 1.1rem; color: #fff; font-weight: 700; }
+.created-by-me-proof__lightbox button {
+  position: absolute;
+  top: .75rem;
+  right: .75rem;
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 50%;
+  background: rgb(3 19 39 / 72%);
+  color: #fff;
+  cursor: pointer;
+}
+.created-by-me-proof__lightbox button:hover,
+.created-by-me-proof__lightbox button:focus-visible { background: var(--apu-blue-600); outline: 0; }
+
+.created-by-me-proof__file,
+.created-by-me-proof__missing {
+  display: flex;
+  margin: 0;
+  padding: var(--space-4);
+  align-items: center;
+  gap: .6rem;
+  border: 1px solid var(--apu-border);
+  border-radius: var(--radius-card);
+  background: #f7f9fc;
+  color: var(--apu-navy-900);
+  font-size: .92rem;
+  line-height: 1.5;
+}
+.created-by-me-proof__file { color: var(--apu-blue-600); font-weight: 700; text-decoration: none; }
+.created-by-me-proof__file:hover { text-decoration: underline; }
+.created-by-me-proof__missing { color: var(--apu-text-muted); }
+.created-by-me-proof__missing .material-symbols-rounded,
+.created-by-me-proof__file .material-symbols-rounded { flex: 0 0 auto; font-size: 1.3rem; }
+
 @media (max-width: 48rem) {
+  .created-by-me-info__toolbar { flex-direction: column; align-items: stretch; }
+  .created-by-me-info__search { width: 100%; }
+  /* Six proportional columns on a phone are six slivers, so the table goes back to
+     sizing itself and the wrapper scrolls it sideways. */
+  .created-by-me-info__table { table-layout: auto; }
   .created-by-me-info__table th,
-  .created-by-me-info__table td { white-space: normal; }
+  .created-by-me-info__table td { min-width: 7rem; }
 }
 
 /* Club attribution on the card — an event can belong to one or more clubs (request_clubs),

@@ -170,6 +170,7 @@ _STATUS_LABEL_SQL = f"""
         WHEN r.status = 'fmb_review' THEN 'F&B review'
         WHEN r.status = 'cfo_review' THEN 'CFO review'
         WHEN r.status = 'department_review' THEN 'Department review'
+        WHEN r.status = 'implementation' THEN 'Implementation'
         WHEN r.status = 'resubmission_required' THEN 'Revision required'
         WHEN r.status = 'completed_approved' THEN 'Approved'
         WHEN r.status = 'completed_rejected' THEN 'Rejected'

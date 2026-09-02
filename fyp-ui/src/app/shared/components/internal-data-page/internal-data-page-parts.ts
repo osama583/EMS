@@ -168,7 +168,7 @@ export class InternalResetButtonComponent {
       </thead>
       <tbody>
         @for (record of records(); track record.id) {
-          <tr [class.shared-data-table__row--emphasized]="record.emphasized">
+          <tr [class.shared-data-table__row--emphasized]="record.emphasized" [attr.data-row-tone]="record.rowTone ?? null">
             @for (column of columns(); track column.key) {
               @if (column.actions) {
                 <td data-actions>
@@ -303,7 +303,7 @@ export class InternalPageStateComponent {
   selector: 'app-internal-mobile-record-list',
   template: `
     @for (record of records(); track record.id) {
-      <article class="shared-mobile-card" [class.shared-mobile-card--unread]="record.mobile.unread">
+      <article class="shared-mobile-card" [class.shared-mobile-card--unread]="record.mobile.unread" [attr.data-row-tone]="record.rowTone ?? null">
         <button
           type="button"
           class="shared-mobile-card__open"

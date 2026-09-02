@@ -599,7 +599,8 @@ def proposal_bucket_counts(cur, scope: Scope) -> dict[str, int]:
         SELECT count(*) FILTER (WHERE r.status = 'cfo_review') AS inbox,
                count(*) FILTER (
                    WHERE r.status IN ('submitted', 'hos_hod_review', 'fmb_review',
-                                      'department_review', 'resubmission_required')
+                                      'department_review', 'implementation',
+                                      'resubmission_required')
                ) AS ongoing,
                count(*) FILTER (
                    WHERE r.status = 'completed_approved'
@@ -658,7 +659,7 @@ def proposal_totals(cur, scope: Scope) -> dict[str, int]:
         SELECT count(*) AS created,
                count(*) FILTER (
                    WHERE r.status IN ('submitted', 'hos_hod_review', 'fmb_review',
-                                      'cfo_review', 'department_review',
+                                      'cfo_review', 'department_review', 'implementation',
                                       'resubmission_required')
                ) AS action,
                count(*) FILTER (WHERE r.status = 'completed_approved') AS completed,
@@ -686,6 +687,7 @@ _STATUS_LABELS: tuple[tuple[str, str], ...] = (
     ("fmb_review", "F&B review"),
     ("cfo_review", "CFO review"),
     ("department_review", "Department review"),
+    ("implementation", "Implementation"),
     ("completed_approved", "Approved"),
     ("completed_rejected", "Rejected"),
     ("cancelled", "Cancelled"),

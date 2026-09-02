@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Observable, finalize, forkJoin, switchMap } from 'rxjs';
+import { Observable, concatMap, finalize, forkJoin, from, switchMap, toArray } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import { AuthUser } from '../../../core/auth/auth.models';
 import { hasRole } from '../../../core/auth/role-access';
@@ -378,7 +378,7 @@ interface StagedFmbOrder extends FmbSelectionDraft {
       primaryLabel="Confirm Approval"
       secondaryLabel="Cancel"
       [loading]="confirming() || assigning() || staffUsersLoading() || sendingStagedOrders()"
-      [disabled]="assignmentRequired() && !allRowsStaged()"
+      [disabled]="!allRowsAllocated()"
       (close)="approveConfirm.set(false)"
       (cancel)="approveConfirm.set(false)"
       (submit)="confirmApprove()"
@@ -392,6 +392,12 @@ interface StagedFmbOrder extends FmbSelectionDraft {
           <p class="prv-action-modal__info">
             <span class="material-symbols-rounded" aria-hidden="true">restaurant</span>
             {{ stagedOrders().length }} order{{ stagedOrders().length === 1 ? '' : 's' }} will be sent to their cafeterias now.
+          </p>
+        }
+        @if (fmbRowsAwaitingOrder().length) {
+          <p class="prv-action-modal__warn prv-action-modal__warn--amber">
+            <span class="material-symbols-rounded" aria-hidden="true">error</span>
+            No cafeteria order yet for {{ fmbRowsAwaitingOrder().length === 1 ? '' : 'these requests: ' }}{{ fmbRowsAwaitingOrder()[0]['item'] }}@for (row of fmbRowsAwaitingOrder().slice(1); track row['id']) {, {{ row['item'] }}}. Approving covers every request, so create one for each first.
           </p>
         }
         @if (assignmentRequired()) {
@@ -697,10 +703,34 @@ export class ProposalDepartmentViewComponent {
   private approveTaskId = signal<number | null>(null);
   private readonly initialRowAssignees = signal<ReadonlyMap<number, ReadonlySet<number>>>(new Map());
   readonly rowAssigneeSelections = signal<ReadonlyMap<number, readonly number[]>>(new Map());
-  readonly allRowsStaged = computed(() => {
-    if (!this.assignmentRequired()) return true;
-    const selections = this.rowAssigneeSelections();
-    return this.requestRows().every((row) => (selections.get(Number(row['id'])) ?? []).length > 0);
+  // Food rows with no LIVE cafeteria order placed against them. Staged-but-unsent orders are
+  // deliberately excluded here — this drives canAct(), and counting them would make the Workflow
+  // Actions card vanish the moment F&B staged its first order, mid-flow.
+  // waterNormal rows are excluded too: an order can only reference a request_fmb row, so
+  // requiring one for mineral water would block every water request (same rule as the server's
+  // unallocated_row_count()).
+  private readonly fmbRowsWithoutOrder = computed<readonly EditableRow[]>(() => {
+    if (!this.isFmbCreateOrderView()) return [];
+    const selections = this.proposal()?.fmbSelections ?? [];
+    return this.requestRows().filter((row) => row['department'] === 'fmb'
+      && !selections.some((order) => order.requestFmbId === Number(row['id']) && order.status !== 'cancelled'));
+  });
+
+  // The Approve gate: every request this department owns has someone (an assignee) or something
+  // (a cafeteria order, placed or staged) lined up against it. Approving means "we will fulfil
+  // ALL of this" — a department that has allocated one of three requests has not decided yet, and
+  // the server refuses the same approval in tasks.py's assert_work_allocated().
+  readonly fmbRowsAwaitingOrder = computed<readonly EditableRow[]>(() => {
+    const staged = this.stagedOrders();
+    return this.fmbRowsWithoutOrder().filter((row) => !staged.some((order) => order.requestFmbId === Number(row['id'])));
+  });
+
+  readonly allRowsAllocated = computed(() => {
+    if (this.assignmentRequired()) {
+      const selections = this.rowAssigneeSelections();
+      return this.requestRows().every((row) => (selections.get(Number(row['id'])) ?? []).length > 0);
+    }
+    return this.fmbRowsAwaitingOrder().length === 0;
   });
 
   readonly confirming = signal(false);
@@ -820,7 +850,13 @@ export class ProposalDepartmentViewComponent {
     if (!proposal) return false;
     const department = this.departments()[0];
     if (!department) return false;
-    return !proposal.workflow.departmentConfirmations.find((entry) => entry.department === department)?.confirmed;
+    const entry = proposal.workflow.departmentConfirmations.find((candidate) => candidate.department === department);
+    if (!entry?.confirmed) return true;
+    // Confirmed, but not actually finished: a task approved while some of its requests were still
+    // unallocated leaves the proposal parked in this department's inbox. Hiding the actions card
+    // there is what made it unrecoverable — there was no action left that could complete it.
+    // Undefined (a projection that didn't compute it) means "no reason to doubt it".
+    return entry.fullyAllocated === false;
   });
 
   readonly commentRequired = computed(() => this.comment().trim().length === 0);
@@ -976,10 +1012,21 @@ export class ProposalDepartmentViewComponent {
           if (!already.has(staffId)) calls.push(this.rowAssignments.assignToRow(taskId, department, rowId, staffId));
         }
       }
-      if (!calls.length) { this.toast.info('Nothing to assign', 'No new team members were selected.'); return; }
+      // Nothing new to assign still means "approve" — every row already has someone, which is
+      // exactly the state the confirm below is waiting for. Returning early here is what left a
+      // task that had been assigned but never confirmed with no way forward.
+      if (!calls.length) { this.confirmDepartmentTask(proposal.id, department); return; }
       this.assigning.set(true);
-      forkJoin(calls).pipe(finalize(() => this.assigning.set(false)), takeUntilDestroyed(this.destroyRef)).subscribe({
-        next: () => { this.toast.success('Work assigned', 'Assigned team members will see it in their Inbox.'); this.actionComplete.emit(proposal.id); },
+      // Sequential, not forkJoin: the server only treats the task as approved once its LAST row
+      // has an assignee, and two assignments committing concurrently can each fail to see the
+      // other's row, leaving a fully staffed task stuck at pending.
+      from(calls).pipe(
+        concatMap((call) => call),
+        toArray(),
+        finalize(() => this.assigning.set(false)),
+        takeUntilDestroyed(this.destroyRef),
+      ).subscribe({
+        next: () => this.confirmDepartmentTask(proposal.id, department),
         error: (err) => this.toast.error('Could not assign this work', apiErrorMessage(err, 'Please try again.')),
       });
       return;

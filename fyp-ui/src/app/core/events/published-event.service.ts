@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, map, of, shareReplay } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { MasterCalendarDay, MasterCalendarEventDetail, MasterCalendarSummary } from './master-calendar.models';
-import { EventRegistration, EventSearchParams, EventSearchResponse, PendingEventRegistration, PendingEventRegistrationPage, PublishedEvent, RegistrationResult, VenueBookingsResponse } from './published-event.models';
+import { EventRegistration, EventSearchParams, EventSearchResponse, PendingEventRegistration, PendingEventRegistrationPage, PublishedEvent, RegistrationListPage, RegistrationListQuery, RegistrationResult, VenueBookingsResponse } from './published-event.models';
 import { eventSearchHttpParams } from './event-search-params';
 import { EventRegistrationApi, RegisteredEventsResponse, RegistrationHistoryPage, RegistrationHistoryQuery, SavedEventsResponse } from './event-engagement.models';
 
@@ -125,12 +125,6 @@ export class PublishedEventService implements EventRegistrationApi {
   getPendingApprovalEventOptions(): Observable<readonly string[]> {
     return this.http.get<readonly string[]>(`${this.baseUrl}/me/pending-approvals/events`);
   }
-  getPendingRegistrations(id: string): Observable<readonly EventRegistration[]> {
-    return this.http
-      .get<readonly EventRegistration[]>(`${this.baseUrl}/${encodeURIComponent(id)}/registrations`)
-      .pipe(map((rows) => rows.filter((row) => row.status === 'pending')));
-  }
-
   getMyRegistration(eventId: string): Observable<EventRegistration | null> {
     return this.http.get<EventRegistration | null>(`${this.baseUrl}/${encodeURIComponent(eventId)}/registrations/mine`);
   }
@@ -237,8 +231,16 @@ export class PublishedEventService implements EventRegistrationApi {
 
   // Full attendee list for one of my events, every status included (not just pending — see
   // getPendingRegistrations above for that narrower view).
-  getAllRegistrations(id: string): Observable<readonly EventRegistration[]> {
-    return this.http.get<readonly EventRegistration[]>(`${this.baseUrl}/${encodeURIComponent(id)}/registrations`);
+  // The organiser's attendee list, one page at a time. It used to return every
+  // registration for the event and leave the browser to search, sort and slice them —
+  // 200 rows fetched to show ten.
+  getAllRegistrations(id: string, query: RegistrationListQuery): Observable<RegistrationListPage> {
+    let params = new HttpParams().set('page', query.page).set('pageSize', query.pageSize);
+    if (query.q) params = params.set('q', query.q);
+    if (query.order) params = params.set('order', query.order);
+    return this.http.get<RegistrationListPage>(
+      `${this.baseUrl}/${encodeURIComponent(id)}/registrations`, { params },
+    );
   }
 
   // Registrations I have already approved/rejected as organiser — the resolved counterpart to

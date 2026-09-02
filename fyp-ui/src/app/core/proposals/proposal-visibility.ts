@@ -175,6 +175,15 @@ function userIsRelatedToProposal(user: AuthUser, proposal: ProposalReviewRecord,
 // applies at all (the server alone decides that, e.g. via the pax threshold for F&B/CFO).
 const REVIEWER_STAGE_ORDER: readonly ProposalStage[] = [ProposalStage.HosHodReview, ProposalStage.FmbReview, ProposalStage.CfoReview, ProposalStage.DepartmentReview];
 
+// Where the proposal sits on REVIEWER_STAGE_ORDER. ResubmissionRequired is not ON the chain — the
+// proposal is parked BESIDE the stage that sent it back, which is exactly what the server stamps into
+// `resumeStage` — so indexOf(stage) scores it -1, i.e. below every reviewer, silently stripping the
+// relation from reviewers who had already seen it.
+function chainIndexFor(proposal: ProposalReviewRecord): number {
+  const { stage, resumeStage } = proposal.workflow;
+  return REVIEWER_STAGE_ORDER.indexOf(stage === ProposalStage.ResubmissionRequired ? resumeStage ?? stage : stage);
+}
+
 function reviewerHasRelation(user: AuthUser, proposal: ProposalReviewRecord): boolean {
   const roleStage = reviewerStageForUser(user);
   if (!roleStage) return false;
@@ -182,8 +191,9 @@ function reviewerHasRelation(user: AuthUser, proposal: ProposalReviewRecord): bo
   // own unit so a School of Computing HOS doesn't see School of Business proposals in Ongoing.
   if (roleStage === ProposalStage.HosHodReview && departmentFor(user) !== proposal.applicantDepartment) return false;
   if (proposal.workflow.rejectedBy && user.roles.some((r) => r.roleCode === proposal.workflow.rejectedBy)) return true;
-  const currentIndex = REVIEWER_STAGE_ORDER.indexOf(proposal.workflow.stage);
-  const roleIndex = REVIEWER_STAGE_ORDER.indexOf(roleStage);
-  return proposal.workflow.stage === ProposalStage.Approved
-    || currentIndex >= roleIndex;
+  // Terminal stages are off the chain in the other direction: it has already been through. Keep every
+  // reviewer who saw it able to open it from History — what the server's _VISIBLE_SQL grants them via
+  // their permanent workflow_history row.
+  if (TERMINAL_STAGES.includes(proposal.workflow.stage)) return true;
+  return chainIndexFor(proposal) >= REVIEWER_STAGE_ORDER.indexOf(roleStage);
 }

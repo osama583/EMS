@@ -35,6 +35,7 @@ import { ToastService, apiErrorMessage } from '../../../../shared/components/toa
 import { EventCategoryService, EventFormatService } from '../../../../core/event-catalog/event-catalog.service';
 import { resolveDepartmentRowLabels } from '../../../../core/departments/department-request-columns';
 import { SkeletonComponent } from '../../../../shared/components/skeleton/skeleton';
+import { ProposalFieldComponent } from '../../../../shared/components/proposal-field/proposal-field';
 
 type RequirementKey = 'logistics' | 'transportation' | 'photoVideo' | 'soundLight' | 'fmb' | 'campusTour' | 'waterNormal' | 'fundingPurchase';
 type RowCollection = 'coOwners' | 'schedule' | 'organizers' | 'importantPeople' | 'guests' | 'agenda' | 'discussions';
@@ -42,8 +43,13 @@ type TableEditorCollection = Exclude<RowCollection, 'coOwners'>;
 
 interface ProposalStep { readonly label: string; readonly icon: string; }
 interface RequestDefinition { readonly key: RequirementKey; readonly label: string; readonly columns: readonly EditableTableColumn[]; }
-interface ProposalReviewItem { readonly label: string; readonly value: string; readonly wide?: boolean; }
-interface ProposalReviewSection { readonly title: string; readonly icon: string; readonly items: readonly ProposalReviewItem[]; }
+/**
+ * One card on the Final Review step. The cards sit in a justified flex row, so `basis` — derived
+ * from the value's own length — is what decides how much of the row a value gets; the row then
+ * grows to fill, which is what keeps the step free of the holes a fixed column count leaves.
+ */
+interface ReviewField { readonly label: string; readonly value: string; readonly basis: string; readonly columns: string; }
+interface ProposalReviewSection { readonly title: string; readonly icon: string; readonly fields: readonly ReviewField[]; }
 
 const option = (label: string): SelectOption => ({ value: label, label });
 const options = (...labels: string[]): readonly SelectOption[] => labels.map(option);
@@ -70,7 +76,7 @@ const OUTSIDE_UNIVERSITY = 'outside';
 
 @Component({
   selector: 'app-event-proposal',
-  imports: [SkeletonComponent, FormFieldComponent, SearchableDropdownComponent, ProposalTableComponent, ValidationMessageComponent, StepIndicatorComponent, FormModalComponent, EventImageUploadComponent, LoadingStateComponent, OptionPickerGridComponent, ReviewerCommentsDrawerComponent],
+  imports: [SkeletonComponent, ProposalFieldComponent, FormFieldComponent, SearchableDropdownComponent, ProposalTableComponent, ValidationMessageComponent, StepIndicatorComponent, FormModalComponent, EventImageUploadComponent, LoadingStateComponent, OptionPickerGridComponent, ReviewerCommentsDrawerComponent],
   templateUrl: './event-proposal.html',
   styleUrl: './event-proposal.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -598,44 +604,69 @@ export class EventProposalComponent implements OnDestroy {
       const count = this.requestRows()[definition.key].length;
       return `${definition.label}${count ? ` (${count} request${count === 1 ? '' : 's'})` : ''}`;
     }).join(', ');
-    const sections: ProposalReviewSection[] = [
+    const sections: readonly ProposalReviewSection[] = [
       {
-        title: 'Event Overview', icon: 'event', items: [
-          this.reviewItem('Event Title', this.eventTitle()),
-          this.reviewItem('Short Introduction', this.shortIntro(), true),
-          ...(this.publicity().trim() ? [this.reviewItem('Promotion / Publicity', this.publicity(), true)] : []),
-        ].filter(this.hasReviewValue),
+        title: 'Event Overview', icon: 'event', fields: this.reviewFields([
+          ['Event Title', this.eventTitle()],
+          ['Short Introduction', this.shortIntro()],
+          ['Promotion / Publicity', this.publicity()],
+        ]),
       },
       {
-        title: 'Schedule & Attendance', icon: 'calendar_month', items: [
-          ...(schedules.length ? [this.reviewItem('Event Schedule', schedules.map((row) => `${row['date']} · ${row['start']}–${row['end']} · ${row['location']}`).join('\n'), true)] : []),
-          ...(this.totalPax() > 0 ? [this.reviewItem('Total Expected Pax', String(this.totalPax()))] : []),
-          ...(guests.length ? [this.reviewItem('Audience', guests.map((row) => `${row['guestType']}: ${row['count']}`).join(', '), true)] : []),
-          ...(organizers.length ? [this.reviewItem('Organizer / PIC', organizers.map((row) => String(row['name'])).join(', '), true)] : []),
-          ...(importantPeople.length ? [this.reviewItem('Speakers, VIPs & Partners', importantPeople.map((row) => `${row['name']} (${row['type']})`).join(', '), true)] : []),
-        ].filter(this.hasReviewValue),
+        title: 'Schedule & Attendance', icon: 'calendar_month', fields: this.reviewFields([
+          ['Event Schedule', schedules.map((row) => `${row['date']} · ${row['start']}–${row['end']} · ${row['location']}`).join('\n')],
+          ['Total Expected Pax', this.totalPax() > 0 ? String(this.totalPax()) : ''],
+          ['Audience', guests.map((row) => `${row['guestType']}: ${row['count']}`).join(', ')],
+          ['Organizer / PIC', organizers.map((row) => String(row['name'])).join(', ')],
+          ['Speakers, VIPs & Partners', importantPeople.map((row) => `${row['name']} (${row['type']})`).join(', ')],
+        ]),
       },
       {
-        title: 'Event Requirements', icon: 'checklist', items: [
-          ...(requestedServices ? [this.reviewItem('Departments / Services', requestedServices, true)] : []),
-          ...(this.totalCost() > 0 ? [this.reviewItem('Total Expected Cost', this.currency(this.totalCost()))] : []),
-          ...(this.showCostFields() && this.cost() !== null ? [this.reviewItem('Event Cost', this.cost()! > 0 ? this.currency(this.cost()!) : 'Free')] : []),
-          ...(agenda.length ? [this.reviewItem('Agenda', agenda.map((row) => `${this.isMultiDay() && row['date'] ? row['date'] + ' · ' : ''}${row['time']} · ${row['activity']} · ${row['location']}`).join('\n'), true)] : []),
-          ...(discussions.length ? [this.reviewItem('Discussion Topics', discussions.map((row) => String(row['topic'])).join(', '), true)] : []),
-        ],
+        title: 'Event Requirements', icon: 'checklist', fields: this.reviewFields([
+          ['Departments / Services', requestedServices],
+          ['Total Expected Cost', this.totalCost() > 0 ? this.currency(this.totalCost()) : ''],
+          ['Event Cost', this.showCostFields() && this.cost() !== null ? (this.cost()! > 0 ? this.currency(this.cost()!) : 'Free') : ''],
+          ['Agenda', agenda.map((row) => `${this.isMultiDay() && row['date'] ? row['date'] + ' · ' : ''}${row['time']} · ${row['activity']} · ${row['location']}`).join('\n')],
+          ['Discussion Topics', discussions.map((row) => String(row['topic'])).join(', ')],
+        ]),
       },
       {
-        title: 'Purpose & Outcomes', icon: 'target', items: [
-          this.reviewItem('Goals & Objectives', this.goals(), true),
-          this.reviewItem('Expected Benefits', this.benefits(), true),
-        ].filter(this.hasReviewValue),
+        title: 'Purpose & Outcomes', icon: 'target', fields: this.reviewFields([
+          ['Goals & Objectives', this.goals()],
+          ['Expected Benefits', this.benefits()],
+        ]),
       },
     ];
-    return sections.filter((section) => section.items.length > 0);
+    return sections.filter((section) => section.fields.length > 0);
   });
 
-  private readonly hasReviewValue = (item: ProposalReviewItem): boolean => item.value.trim().length > 0;
-  private reviewItem(label: string, value: string, wide = false): ProposalReviewItem { return { label, value: value.trim(), wide }; }
+  /**
+   * Drop the answers that were never given, then size each survivor from its own value. The width
+   * tiers are starting points, not final widths — every card in a row grows to share whatever is
+   * left, so the row ends flush no matter which answers a proposal happens to carry.
+   */
+  private reviewFields(entries: readonly (readonly [string, string])[]): readonly ReviewField[] {
+    const fields = entries
+      .map(([label, value]) => [label, value.trim()] as const)
+      .filter(([, value]) => value.length > 0)
+      .map(([label, value]) => ({
+        label,
+        value,
+        // Past ~320 characters a value stops sharing: a paragraph next to a two-word answer drags
+        // the whole row to the paragraph's height and leaves the short card mostly empty. It takes
+        // the row instead, and its text runs in ~30rem columns — a newspaper measure, and three or
+        // four lines tall rather than a dozen.
+        basis: value.length > 320 ? '100%'
+          : value.length <= 24 ? '9rem'
+          : value.length <= 60 ? '15rem'
+          : value.length <= 140 ? '22rem'
+          : '30rem',
+        columns: value.length > 320 ? '30rem' : 'auto',
+      }));
+    // Row-takers sink to the end of their section, otherwise a two-word answer that happens to be
+    // declared between two paragraphs is left alone on a row of its own.
+    return [...fields.filter((field) => field.basis !== '100%'), ...fields.filter((field) => field.basis === '100%')];
+  }
 
   error(key: string): string { return this.errors()[`${this.currentStep()}.${key}`] ?? ''; }
   tableErrors(key: string): Readonly<Record<string, string>> {

@@ -54,6 +54,31 @@ describe('SkeletonComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('.skeleton__card').length).toBe(6);
   });
 
+  it('renders a poster per count for the events variant', async () => {
+    const fixture = await render({ variant: 'events', count: 5 });
+
+    expect(fixture.nativeElement.querySelectorAll('.skeleton__poster').length).toBe(5);
+  });
+
+  it('draws seven columns per week for the calendar variant', async () => {
+    const fixture = await render({ variant: 'calendar', count: 6 });
+    const host: HTMLElement = fixture.nativeElement;
+
+    expect(host.querySelectorAll('.skeleton__weekdays .skeleton__bone').length).toBe(7);
+    expect(host.querySelectorAll('.skeleton__day').length).toBe(42);
+  });
+
+  it('staggers the calendar chips so the month does not read as vertical stripes', async () => {
+    const fixture = await render({ variant: 'calendar', count: 2 });
+    const perDay = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.skeleton__day'),
+    ).map((day) => day.querySelectorAll('.skeleton__bone--event').length);
+
+    // Week two must not repeat week one column for column — that is what a cycle
+    // length coprime with the seven-column grid buys.
+    expect(perDay.slice(0, 7)).not.toEqual(perDay.slice(7, 14));
+  });
+
   it('renders a label and a control for every field', async () => {
     const fixture = await render({ variant: 'fields', count: 3 });
     const host: HTMLElement = fixture.nativeElement;

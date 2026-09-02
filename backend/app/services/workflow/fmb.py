@@ -28,6 +28,7 @@ from .authorization import heads_unit, is_cafeteria_manager_of, is_cafeteria_sta
 from .constants import (
     FMB_REQUIREMENT,
     FMB_UNIT_CODE,
+    IMPLEMENTATION,
     SEL_APPROVED,
     SEL_CANCELLED,
     SEL_FULFILLED,
@@ -38,7 +39,7 @@ from .constants import (
     SEL_TERMINAL,
     TASK_COMPLETED,
 )
-from .tasks import check_all_tasks_resolved, find_task
+from .tasks import recompute_department_phase, find_task
 
 
 def _project_selection(row: dict) -> dict:
@@ -136,18 +137,42 @@ def create_selection(
     cafeteria_unit_code: str,
     fmb_option_id: int,
     quantity: int,
+    request_fmb_id: int | None = None,
     menu_item_label: str | None = None,
     notes: str | None = None,
 ) -> dict:
-    """F&B places one cafeteria order under this proposal's food request."""
+    """F&B places one cafeteria order against ONE of this proposal's food requests.
+
+    `request_fmb_id` names which request row this order fulfils. It matters:
+    tasks.unallocated_row_count() refuses the F&B approval until every food row
+    has an order, and it can only tell them apart if each order says which row
+    it belongs to. Without it every order landed on whichever row came first,
+    so a proposal asking for lunch AND dinner looked fully ordered the moment
+    lunch was.
+
+    Omitted, or naming something that is not a food row on this proposal, it
+    falls back to the first food row - which is what every caller did before,
+    and what the mineral-water rows F&B's order table also lists still need,
+    since an order can only reference request_fmb.
+    """
     if not heads_unit(cur, actor_user_id, FMB_UNIT_CODE):
         raise Forbidden("Only F&B can place a cafeteria order.")
     if quantity is None or int(quantity) <= 0:
         raise WorkflowError("An order needs a quantity of at least one.")
 
-    fmb_row = fetch_one(
-        cur, "SELECT request_fmb_id FROM request_fmb WHERE request_id = %s", (request_id,)
-    )
+    fmb_row = None
+    if request_fmb_id is not None:
+        fmb_row = fetch_one(
+            cur,
+            "SELECT request_fmb_id FROM request_fmb WHERE request_fmb_id = %s AND request_id = %s",
+            (int(request_fmb_id), request_id),
+        )
+    if fmb_row is None:
+        fmb_row = fetch_one(
+            cur,
+            "SELECT request_fmb_id FROM request_fmb WHERE request_id = %s ORDER BY request_fmb_id",
+            (request_id,),
+        )
     if fmb_row is None:
         raise NotFound("This proposal has no food request to add an order to.")
 
@@ -218,6 +243,11 @@ def approve_selection(cur, selection_id: int, actor_user_id: int) -> dict:
         new_status=SEL_APPROVED,
     )
     check_fmb_task_resolved(cur, request_id)
+    # Accepting an order can be the last department decision outstanding, and
+    # check_fmb_task_resolved() no-ops until every order is TERMINAL - which is
+    # delivery, far later. Recompute here or the request would sit in
+    # department_review until the food arrived.
+    recompute_department_phase(cur, request_id)
     return _project_selection(load_selection(cur, selection_id))
 
 
@@ -232,6 +262,16 @@ def send_selection_back(cur, selection_id: int, actor_user_id: int, comment: str
         raise Forbidden("You do not manage the cafeteria this order belongs to.")
     if selection["status"] != SEL_PENDING:
         raise WorkflowError("This order is not awaiting your review.")
+    # The cafeteria and F&B are both departments deciding, so this hand-off ends
+    # when the request leaves department_review. Past that the event is public
+    # and the order is the staff's to prepare, not the manager's to renegotiate.
+    request_id = request_id_for_selection(cur, selection_id)
+    status = fetch_one(cur, "SELECT status FROM request WHERE request_id = %s", (request_id,))
+    if status and status["status"] == IMPLEMENTATION:
+        raise WorkflowError(
+            "This event's departments have all approved and the work is under way. "
+            "Cancel the order instead if it cannot be prepared as ordered."
+        )
     comment = (comment or "").strip()
     if not comment:
         raise WorkflowError("Explain what needs to change so F&B can fix this order.")
@@ -462,7 +502,7 @@ def check_fmb_task_resolved(cur, request_id: int) -> None:
         previous_status=task["status"],
         new_status=TASK_COMPLETED,
     )
-    check_all_tasks_resolved(cur, request_id)
+    recompute_department_phase(cur, request_id)
 
 
 def shared_pool_for_staff(cur, staff_user_id: int) -> list[dict]:

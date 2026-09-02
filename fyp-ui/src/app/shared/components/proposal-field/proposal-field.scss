@@ -31,6 +31,9 @@
 }
 
 .prv-field__value {
+  /* Multi-line values (an event schedule, an agenda) arrive newline-joined and must keep their
+     lines; everything else is a single line and is unaffected. */
+  white-space: pre-line;
   color: var(--apu-navy-900);
   font-size: 0.87rem;
   font-weight: 600;

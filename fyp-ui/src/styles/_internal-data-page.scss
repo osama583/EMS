@@ -240,6 +240,24 @@
   background: rgb(42 131 255 / 4%);
 }
 
+// Whole-row tint for a state that belongs to the record rather than to one column
+// (InternalDataRecord.rowTone). Tuned to sit UNDER the text, not compete with it: the
+// tint carries the urgency at a glance and the accent stripe survives a greyscale
+// print, while the row still says why in words — colour is never the only signal.
+.shared-data-table tbody tr[data-row-tone='danger'] { background: rgb(190 58 58 / 7%); }
+.shared-data-table tbody tr[data-row-tone='danger']:hover { background: rgb(190 58 58 / 12%); }
+.shared-data-table tbody tr[data-row-tone='warning'] { background: rgb(255 198 74 / 18%); }
+.shared-data-table tbody tr[data-row-tone='warning']:hover { background: rgb(255 198 74 / 26%); }
+.shared-data-table tbody tr[data-row-tone='neutral'] { background: rgb(15 35 60 / 6%); }
+.shared-data-table tbody tr[data-row-tone='neutral']:hover { background: rgb(15 35 60 / 10%); }
+
+// Inset rather than border-left: a real border on a <td> would shift the cell's own
+// padding and misalign the first column against untinted rows.
+.shared-data-table tbody tr[data-row-tone] > td:first-child { box-shadow: inset 0.2rem 0 0 var(--row-tone-accent); }
+.shared-data-table tbody tr[data-row-tone='danger'] > td:first-child { --row-tone-accent: #a62f2f; }
+.shared-data-table tbody tr[data-row-tone='warning'] > td:first-child { --row-tone-accent: #e09118; }
+.shared-data-table tbody tr[data-row-tone='neutral'] > td:first-child { --row-tone-accent: var(--apu-text-muted); }
+
 .shared-data-table :where([data-actions]) {
   text-align: center;
   white-space: nowrap;
@@ -515,6 +533,23 @@
   background: var(--apu-blue-600);
   content: '';
 }
+
+// Same rowTone as the table row, on the card the narrow layout shows instead.
+.shared-mobile-card[data-row-tone='danger'] { border-color: rgb(190 58 58 / 30%); background: rgb(190 58 58 / 7%); }
+.shared-mobile-card[data-row-tone='warning'] { border-color: rgb(224 145 24 / 34%); background: rgb(255 198 74 / 18%); }
+.shared-mobile-card[data-row-tone='neutral'] { border-color: rgb(15 35 60 / 18%); background: rgb(15 35 60 / 6%); }
+
+.shared-mobile-card[data-row-tone]::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.2rem;
+  background: var(--row-tone-accent);
+  content: '';
+}
+
+.shared-mobile-card[data-row-tone='danger'] { --row-tone-accent: #a62f2f; }
+.shared-mobile-card[data-row-tone='warning'] { --row-tone-accent: #e09118; }
+.shared-mobile-card[data-row-tone='neutral'] { --row-tone-accent: var(--apu-text-muted); }
 
 .shared-mobile-card__open {
   display: grid;

@@ -677,9 +677,8 @@ body.calendar-filter-open {
   transform: rotate(5deg);
 }
 
+/* Same as .filter-dialog__body: the modal body owns the scroll, this must not claim it too. */
 .calendar-filter-dialog__body {
-  overflow-y: auto;
-  overscroll-behavior: contain;
   padding: 1.5rem clamp(1.25rem, 4vw, 2rem) 2rem;
 }
 

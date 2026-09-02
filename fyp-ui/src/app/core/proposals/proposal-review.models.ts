@@ -87,6 +87,9 @@ export interface ProposalReviewRecord {
   readonly guests?: readonly EditableRow[];
   readonly agenda?: readonly EditableRow[];
   readonly discussions?: readonly EditableRow[];
+  // The exception in this block: list rows carry scheduleRows too (proposals.py's
+  // project_list_item), because the proposal tables show date, time and location as three
+  // separate columns rather than the joined `schedule` string above.
   readonly scheduleRows?: readonly EditableRow[];
   readonly eventImage?: EventImageAsset | null;
   readonly eventVisibility?: EventVisibility;

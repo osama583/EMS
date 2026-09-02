@@ -24,9 +24,10 @@
     GET  /events/me/saved/search       my saved events, searched/filtered/paginated (My Events > Saved)
     GET/PUT /events/me/reminders       notification preferences
 
-An event is "published" when its proposal reached completed_approved with public
-visibility - there is no separate events table, which is why this reads from
-`request`.
+An event is "published" once its proposal reached implementation - every
+department approved and assigned, the work is with the staff - and stays
+published through completed_approved. There is no separate events table, which
+is why this reads from `request`.
 
 Discovery is deliberately open (no auth): a public events listing is public.
 Everything under /me and the attendee list require a token.
@@ -52,6 +53,13 @@ bp = Blueprint("events", __name__, url_prefix="/events")
 
 # One definition of "published", used by every query below so the list and the detail view can never
 # disagree about what is visible.
+#
+# Publication starts at implementation, NOT at completed_approved: by then every department has
+# approved and assigned, so the event is confirmed and nothing can send it back (see
+# recompute_department_phase and the send-back guards in services/workflow). Waiting for the last
+# staff member to tick their final row would keep a fully confirmed event out of Explore - and
+# out of registration - until the eve of the event, or past it.
+_PUBLISHED_STATUSES = "('implementation', 'completed_approved')"
 _GUEST_VISIBLE = "('Public')"
 _INTERNAL_VISIBLE = "('Public', 'Internal')"
 
@@ -99,13 +107,13 @@ def _published_clause(include_internal: bool, owner_clause: str | None = None) -
     tiers = f"r.event_visibility IN {visible}"
     if include_internal:
         tiers = f"({tiers} OR {_CLUB_MEMBER_VISIBLE})"
-    status_and_visibility = f"r.status = 'completed_approved' AND {tiers}"
+    status_and_visibility = f"r.status IN {_PUBLISHED_STATUSES} AND {tiers}"
     if not owner_clause:
         return status_and_visibility
     # my_organized_events() is the one caller that passes owner_clause: this is the caller's own
     # organiser dashboard, so ownership is REQUIRED, not merely one way in among others - otherwise
     # every other public/club/internal event in the system would show up on it too.
-    return f"r.status = 'completed_approved' AND ({owner_clause})"
+    return f"r.status IN {_PUBLISHED_STATUSES} AND ({owner_clause})"
 
 
 # Column list matches the frontend's PublishedEvent model field for field, so no client-side remapping
@@ -800,33 +808,87 @@ def cancel_registration(event_id: int):
     return "", 204
 
 
+# 'cancelled' registrations exist in the data but are never part of the attendee
+# list: they never counted toward capacity and there is nothing to report or act
+# on. This used to be a client-side filter over every row of the event, which
+# meant the browser was handed them only to throw them away.
+_ATTENDEE_STATUSES = ("registered", "pending_approval", "rejected")
+
+
 @bp.get("/<int:event_id>/registrations")
 @require_auth
 def list_registrations(event_id: int):
-    """The attendee list. Organiser only.
+    """The attendee list. Organiser only. Searched, sorted and paginated in SQL.
 
     The mock exposed this to any caller, handing out every registrant's name and
     email for any event id.
+
+    It also returned EVERY registration in one array and left the browser to
+    search, sort and slice them. An event with 200 attendees therefore shipped
+    200 rows - each with a signed receipt URL minted for it - to draw the ten
+    the organiser was looking at. ?q/?order/?page/?pageSize now do that work
+    here, same convention as pending_approvals().
+
+    `counts` rides along because the panel's tiles describe the EVENT, not the
+    page: they must keep reading 49 registered / 20 awaiting / 2 rejected while
+    the reader searches and pages through, so they cannot be counted from
+    `items` any more.
     """
     principal = current_principal()
+    where = ["request_id = %s", "status = ANY(%s)"]
+    params: list = [event_id, list(_ATTENDEE_STATUSES)]
+
+    search = (request.args.get("q") or "").strip()
+    if search:
+        where.append(
+            "(registrant_name ILIKE %s OR registrant_email ILIKE %s OR reason_for_attending ILIKE %s)"
+        )
+        params.extend([f"%{search}%"] * 3)
+    where_sql = " AND ".join(where)
+
     with transaction() as cur:
         _load_published(cur, event_id, include_internal=True, principal=principal)
         if not wf.is_proposal_owner(cur, event_id, principal.user_id) and not principal.is_admin:
             raise Forbidden("Only the event's organiser can see who has registered.")
+
+        total = fetch_one(
+            cur, f"SELECT count(*) AS c FROM event_registration WHERE {where_sql}", params
+        )["c"]
+        # One pass for all three tiles, and deliberately not narrowed by ?q=.
+        tallies = fetch_all(
+            cur,
+            "SELECT status, count(*) AS c FROM event_registration "
+            " WHERE request_id = %s AND status = ANY(%s) GROUP BY status",
+            (event_id, list(_ATTENDEE_STATUSES)),
+        )
+        limit, offset = pagination()
         rows = fetch_all(
             cur,
-            """SELECT event_registration_id AS id, registrant_name AS name,
-                      registrant_email AS email, reason_for_attending AS reason,
-                      status, payment_status AS "paymentStatus",
-                      payment_proof_url AS "paymentProofUrl",
-                      payment_proof_file_name AS "paymentProofFileName",
-                      registered_at AS "registeredAt"
-                 FROM event_registration WHERE request_id = %s ORDER BY registered_at""",
-            (event_id,),
+            f"""SELECT event_registration_id AS id, registrant_name AS name,
+                       registrant_email AS email, reason_for_attending AS reason,
+                       status, payment_status AS "paymentStatus",
+                       payment_proof_url AS "paymentProofUrl",
+                       payment_proof_file_name AS "paymentProofFileName",
+                       registered_at AS "registeredAt",
+                       decided_at AS "decidedAt"
+                  FROM event_registration WHERE {where_sql}
+                 ORDER BY {date_order('coalesce(decided_at, registered_at)')},
+                          event_registration_id ASC
+                 LIMIT %s OFFSET %s""",
+            [*params, limit, offset],
         )
     for row in rows:
         row["status"] = _STATUS_TO_REGISTRATION_STATUS.get(row["status"], row["status"])
-    return jsonify(_sign_proofs(rows))
+
+    counted = {row["status"]: row["c"] for row in tallies}
+    return jsonify({
+        **paged(_sign_proofs(rows), total),
+        "counts": {
+            "confirmed": counted.get("registered", 0),
+            "pending": counted.get("pending_approval", 0),
+            "rejected": counted.get("rejected", 0),
+        },
+    })
 
 
 REGISTRATION_DECISIONS = ("approve", "reject")
@@ -1552,7 +1614,7 @@ def set_reminders():
 
 # ============================================================================
 # Master event calendar The university-wide calendar (/app/event-calendar).
-_MASTER_CALENDAR_STATUSES = ("department_review", "completed_approved")
+_MASTER_CALENDAR_STATUSES = ("department_review", "implementation", "completed_approved")
 
 # Roles that see everything regardless of the event's visibility tier.
 _FULL_VISIBILITY_ROLES = ("cfo",)

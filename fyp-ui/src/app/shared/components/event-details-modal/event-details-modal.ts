@@ -103,7 +103,7 @@ import { EVENT_IMAGE_PLACEHOLDER } from '../../event-image-placeholder';
                   </div>
                 </header>
                 <dl>
-                  <div><dt>Cost</dt><dd>RM {{ item.cost!.toFixed(2) }}</dd></div>
+                  <div class="event-details__payment-cost"><dt>Cost</dt><dd>RM {{ item.cost!.toFixed(2) }}</dd></div>
                   @if (item.bankAccountName) { <div><dt>Account Name</dt><dd>{{ item.bankAccountName }}</dd></div> }
                   @if (item.bankAccountNumber) { <div><dt>Account Number</dt><dd>{{ item.bankAccountNumber }}</dd></div> }
                 </dl>

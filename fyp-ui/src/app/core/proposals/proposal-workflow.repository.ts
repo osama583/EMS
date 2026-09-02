@@ -333,6 +333,10 @@ export class ApiProposalWorkflowRepository implements ProposalWorkflowRepository
     return this.http
       .post(this.ordersUrl, {
         requestId: id,
+        // Which food row this order fulfils. The server's approval gate counts rows with no
+        // order against them, so dropping this (as this call used to) made every order look
+        // like it covered the first row and the rest look uncovered forever.
+        requestFmbId: draft.requestFmbId,
         cafeteriaCode: draft.cafeteriaCode,
         fmbOptionId: fmbOptionRowId(draft.fmbOptionId),
         menuItemLabel: draft.menuItemLabel,

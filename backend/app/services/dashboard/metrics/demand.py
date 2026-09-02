@@ -202,13 +202,15 @@ def pipeline_conversion(cur, scope: Scope, *, request_filter: str = "", extra: d
           JOIN request r ON r.request_id = h.request_id
          WHERE h.created_at >= %(from)s AND h.created_at < %(to)s
            AND h.new_status IN ('submitted', 'hos_hod_review', 'fmb_review',
-                                'cfo_review', 'department_review', 'completed_approved')
+                                'cfo_review', 'department_review', 'implementation',
+                                'completed_approved')
            {request_filter}
       GROUP BY 1
         """,
         scope.params(**(extra or {})),
     )
-    order = ["submitted", "hos_hod_review", "fmb_review", "cfo_review", "department_review", "completed_approved"]
+    order = ["submitted", "hos_hod_review", "fmb_review", "cfo_review", "department_review",
+             "implementation", "completed_approved"]
     found = {r["stage"]: int(r["entered"]) for r in rows}
     return [{"stage": stage, "value": found.get(stage, 0)} for stage in order]
 

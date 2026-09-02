@@ -5,6 +5,10 @@ export enum ProposalStage {
   FmbReview = 'fmb-review',
   CfoReview = 'cfo-review',
   DepartmentReview = 'department-review',
+  // Every department approved and assigned; the work is in staff inboxes. The event is PUBLISHED
+  // from here (see _published_clause in api/events.py) rather than at Approved, and nothing sends
+  // a proposal back out of this stage.
+  Implementation = 'implementation',
   ResubmissionRequired = 'resubmission-required',
   Approved = 'approved',
   Rejected = 'rejected',
@@ -23,6 +27,11 @@ export interface DepartmentConfirmation {
   readonly comment?: string;
   readonly confirmedAt?: string;
   readonly confirmedBy?: string;
+  // Whether every row this department was asked to fulfil actually has an assignee (or, for F&B, a
+  // cafeteria order). Detail reads only — the list projection does not compute it. `confirmed &&
+  // fullyAllocated === false` is a department that approved before finishing: it still owns work,
+  // so its actions must stay on screen or the proposal sits in its inbox with no way out.
+  readonly fullyAllocated?: boolean;
 }
 
 export interface ProposalWorkflowState {
@@ -45,6 +54,7 @@ export function stageLabel(stage: ProposalStage): string {
     case ProposalStage.FmbReview: return 'F&B review';
     case ProposalStage.CfoReview: return 'CFO review';
     case ProposalStage.DepartmentReview: return 'Department review';
+    case ProposalStage.Implementation: return 'Implementation';
     case ProposalStage.ResubmissionRequired: return 'Revision required';
     case ProposalStage.Approved: return 'Approved';
     case ProposalStage.Rejected: return 'Rejected';

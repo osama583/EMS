@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { ProposalReviewRecord } from '../../../core/proposals/proposal-review.models';
+import { onEventImageError } from '../../event-image-placeholder';
 import { ProposalSectionComponent } from '../proposal-section/proposal-section';
 import { ProposalSummaryGridComponent } from './proposal-summary-grid';
 import { ProposalSummaryField } from './proposal-summary-layout';
@@ -27,7 +28,7 @@ import { ProposalSummaryField } from './proposal-summary-layout';
     >
       <app-proposal-summary-grid [fields]="fields()" />
       @if (proposal().eventImage; as image) {
-        <img class="prv-event-image" [src]="image.url" [alt]="proposal().eventTitle + ' event image'" />
+        <img class="prv-event-image" [src]="image.url" [alt]="proposal().eventTitle + ' event image'" (error)="onImageError($event)" />
       }
     </app-proposal-section>
   `,
@@ -36,6 +37,7 @@ import { ProposalSummaryField } from './proposal-summary-layout';
 })
 export class ProposalOverviewComponent {
   readonly proposal = input.required<ProposalReviewRecord>();
+  readonly onImageError = onEventImageError;
 
   /**
    * Declaration order is the reading order, and it is preserved through packing - the page must

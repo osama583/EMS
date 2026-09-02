@@ -207,17 +207,27 @@
   overflow-wrap: anywhere;
 }
 
-// Distinct from the neutral gray cards used elsewhere in this modal (.event-details__summary-card,
-// dl > div) — this one is a hard registration requirement (the backend rejects registration
-// without it, see events.py's POST /events/{id}/registrations), so it gets the same warning/error
-// visual language as a required form field rather than reading as just another info box.
+// Distinct from the neutral gray cards used elsewhere in this modal
+// (.event-details__summary-card, dl > div) — this one is a hard registration
+// requirement: the backend rejects a registration without it, see events.py's
+// POST /events/{id}/registrations.
+//
+// Paying for a ticket is still a step, not a fault. This block used to be painted in
+// --form-error throughout - red border, red wash, red icon, red heading, red dashed
+// upload - so a dialog that had not yet been touched opened looking like something
+// had already gone wrong. It also swallowed the one state that genuinely IS an
+// error: --invalid turned the control red when it was red already, so a rejected
+// file changed nothing the reader could see.
+//
+// Red now means only "you got this wrong", green only "done", and the panel itself
+// sits in the app's own blue as the actionable part of registering.
 .event-details__payment {
   display: grid;
   gap: .75rem;
   padding: 1.1rem 1.2rem 1.2rem;
-  border: 1px solid rgb(201 54 79 / 22%);
+  border: 1px solid rgb(42 131 255 / 16%);
   border-radius: 16px;
-  background: linear-gradient(180deg, rgb(201 54 79 / 6%), rgb(201 54 79 / 2%));
+  background: linear-gradient(180deg, rgb(42 131 255 / 5%), rgb(42 131 255 / 1%));
 }
 
 .event-details__payment-head {
@@ -233,20 +243,20 @@
   height: 2.15rem;
   place-items: center;
   border-radius: .6rem;
-  background: rgb(201 54 79 / 12%);
-  color: var(--form-error);
+  background: rgb(42 131 255 / 12%);
+  color: var(--apu-blue-700);
   font-size: 1.15rem;
 }
 
 .event-details__payment-head > div { min-width: 0; }
 
+// A tracked-out uppercase micro-label is how an alert announces itself. Without the
+// red behind it that is just a small heading shouting, so it reads as a heading.
 .event-details__payment h3 {
   margin: 0;
-  color: var(--form-error);
-  font-size: .82rem;
-  font-weight: 800;
-  letter-spacing: .025em;
-  text-transform: uppercase;
+  color: var(--apu-navy-950);
+  font-size: .95rem;
+  font-weight: 700;
 }
 
 .event-details__payment-subtitle {
@@ -267,6 +277,16 @@
   background: none;
 }
 
+// With the red gone the section needs something to look at, and the amount is the
+// fact the reader came for. Spend the emphasis here rather than on the frame.
+.event-details__payment-cost dd {
+  color: var(--apu-navy-950);
+  font-size: 1.25rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.01em;
+}
+
 .event-details__payment-proof-field {
   display: grid;
   gap: .4rem;
@@ -283,18 +303,19 @@
 
 .event-details__payment-required { color: var(--form-error); font-weight: 800; }
 
-// The upload control itself, styled as a required control (dashed border, error-tinted) rather
-// than a plain secondary button — matches this section's "this blocks registration" weight.
+// A dashed dropzone, neutral at rest. The dash already says "put a file here"; the
+// colour does not also have to say "problem". It answers the pointer in blue, and
+// keeps red in reserve for --invalid below.
 .event-details__payment-upload {
   display: flex;
   align-items: center;
   gap: .7rem;
   width: 100%;
   padding: .8rem .95rem;
-  border: 1.5px dashed rgb(201 54 79 / 40%);
+  border: 1.5px dashed rgb(15 35 60 / 24%);
   border-radius: var(--radius-control);
   background: var(--apu-white);
-  color: var(--form-error);
+  color: var(--apu-blue-700);
   text-align: left;
   cursor: pointer;
   transition: border-color 180ms var(--ease-standard), background 180ms var(--ease-standard);
@@ -302,8 +323,8 @@
 
 .event-details__payment-upload:hover,
 .event-details__payment-upload:focus-visible {
-  border-color: var(--form-error);
-  background: var(--form-error-soft);
+  border-color: var(--apu-blue-600);
+  background: rgb(42 131 255 / 6%);
   outline: 0;
 }
 
@@ -326,7 +347,12 @@
   font-weight: 500;
 }
 
-.event-details__payment-upload--invalid { border-color: var(--form-error); box-shadow: var(--form-error-ring); }
+// The only red in the block, and now the only thing it can mean.
+.event-details__payment-upload--invalid {
+  border-color: var(--form-error);
+  background: var(--form-error-soft);
+  box-shadow: var(--form-error-ring);
+}
 
 .event-details__payment-proof {
   display: flex;

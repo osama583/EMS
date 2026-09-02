@@ -19,7 +19,7 @@
   </section>
 
 @if (loading()) {
-  <app-internal-page-state [loading]="true" [showClear]="false" />
+  <app-skeleton variant="events" label="Loading your events…" [count]="pageSize()" />
 } @else if (error()) {
   <app-internal-page-state icon="error" title="Unable to load events" [description]="error()" [showClear]="false" />
 } @else if (items().length === 0) {
@@ -104,41 +104,70 @@
       }
     </section>
 
-    <h3 class="created-by-me-info__section-title">Registrants</h3>
+    <div class="created-by-me-info__toolbar">
+      <h3 class="created-by-me-info__section-title">Registrants</h3>
+      <!-- Searched by the server, so this box narrows the whole attendee list rather
+           than the page of it currently on screen. -->
+      <label class="created-by-me-info__search">
+        <span class="material-symbols-rounded" aria-hidden="true">search</span>
+        <input
+          type="search"
+          placeholder="Search registrants"
+          aria-label="Search registrants by name, email or reason"
+          [value]="registrationSearch()"
+          (input)="setRegistrationSearch($any($event.target).value)"
+        />
+      </label>
+    </div>
 
     @if (registrationsLoading()) {
       <app-internal-page-state [loading]="true" [showClear]="false" />
     } @else if (registrationsError()) {
       <app-internal-page-state icon="error" title="Unable to load registrants" [description]="registrationsError()" [showClear]="false" />
-    } @else if (visibleRegistrations().length === 0) {
-      <app-internal-page-state icon="group_off" title="No one has registered yet" [showClear]="false" />
+    } @else if (registrations().length === 0) {
+      <app-internal-page-state
+        icon="group_off"
+        [title]="registrationSearch() ? 'No registrants match that search' : 'No one has registered yet'"
+        [description]="registrationSearch() ? 'Try a different name, email or reason.' : 'Registrations will appear here as people sign up.'"
+        [showClear]="false"
+      />
     } @else {
       <div class="created-by-me-info__table-wrap">
         <table class="created-by-me-info__table">
           <thead>
             <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Email</th>
-              @if (event.registrationMode === 'Manual') { <th scope="col">Reason</th> }
-              <th scope="col">Status</th>
-              @if (!event.isFree) { <th scope="col">Payment</th> }
+              <th scope="col" class="col-name">Name</th>
+              <th scope="col" class="col-email">Email</th>
+              @if (event.registrationMode === 'Manual') { <th scope="col" class="col-reason">Reason</th> }
+              <th scope="col" class="col-status">Status</th>
+              <th scope="col" class="col-decided" [attr.aria-sort]="registrationOrder() === 'asc' ? 'ascending' : 'descending'">
+                <button type="button" class="created-by-me-info__sort" (click)="toggleRegistrationOrder()">
+                  Decided
+                  <span class="material-symbols-rounded" aria-hidden="true">
+                    {{ registrationOrder() === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
+                  </span>
+                </button>
+              </th>
+              @if (!event.isFree) { <th scope="col" class="col-payment">Payment</th> }
             </tr>
           </thead>
           <tbody>
-            @for (row of visibleRegistrations(); track row.id) {
+            @for (row of registrations(); track row.id) {
               <tr>
                 <td>{{ row.name }}</td>
                 <td>{{ row.email }}</td>
                 @if (event.registrationMode === 'Manual') { <td>{{ row.reason || '—' }}</td> }
                 <td><span class="created-by-me-info__status" [attr.data-status]="row.status">{{ registrationStatusLabel(row.status) }}</span></td>
+                <td class="created-by-me-info__decided">{{ decisionDateLabel(row) }}</td>
                 @if (!event.isFree) {
                   <td>
                     @if (row.paymentProofUrl) {
-                      <button type="button" class="created-by-me-info__proof" [disabled]="openingProofFor() === row.id" (click)="openPaymentProof(row)">
-                        {{ openingProofFor() === row.id ? 'Opening…' : (paymentStatusLabel(row.paymentStatus) || 'View proof') }}
+                      <button type="button" class="created-by-me-info__proof" (click)="openProof(row)">
+                        <span class="material-symbols-rounded" aria-hidden="true">receipt_long</span>
+                        View receipt
                       </button>
                     } @else {
-                      {{ paymentStatusLabel(row.paymentStatus) || '—' }}
+                      <span class="created-by-me-info__no-proof">—</span>
                     }
                   </td>
                 }
@@ -147,6 +176,93 @@
           </tbody>
         </table>
       </div>
+
+      @if (registrationTotalPages() > 1) {
+        <app-internal-pagination
+          paginationLabel="Registrant pages"
+          rowsPerPageLabel="Registrants per page"
+          [totalPages]="registrationTotalPages()"
+          [page]="registrationPage()"
+          [pageSize]="registrationPageSize()"
+          [pageSizeOptions]="pageSizeOptions"
+          (pageChange)="setRegistrationPage($event)"
+          (pageSizeChange)="setRegistrationPageSize($event)"
+        />
+      }
     }
   </app-form-modal>
+}
+
+<!-- The receipt, shown where it was asked for. It used to be fetched as a blob and handed to
+     window.open() from the response callback — a call that is no longer inside the click's own
+     stack, which is exactly what a browser's popup blocker stops. The URL the API returns is
+     already signed and time-boxed, so it can go straight into an <img> with no fetch and no
+     Authorization header, the same way Records > Registrations has always shown these. -->
+@if (proofTarget(); as proof) {
+  <app-form-modal
+    [open]="true"
+    title="Payment receipt"
+    [hidePrimary]="true"
+    secondaryLabel="Close"
+    (close)="closeProof()"
+    (cancel)="closeProof()"
+    (submit)="closeProof()"
+  >
+    <p class="created-by-me-proof__meta">
+      {{ proof.name || proof.email }}
+      @if (proof.paymentProofFileName) { · {{ proof.paymentProofFileName }} }
+    </p>
+
+    @if (proofUnavailable()) {
+      <!-- The row still cites a file the storage no longer holds. That is a fact about one
+           receipt, not a failure of the page, so it is said plainly and the payment status the
+           reader came to check stays on screen behind it. -->
+      <p class="created-by-me-proof__missing">
+        <span class="material-symbols-rounded" aria-hidden="true">image_not_supported</span>
+        This receipt is no longer in storage. The payment status on this row is unaffected.
+      </p>
+    } @else if (isPdfProof(proof)) {
+      <!-- A bank receipt is often a PDF, which an <img> cannot render. A real anchor opens in
+           the click's own stack, so this one is not popup-blocked either. -->
+      <a class="created-by-me-proof__file" [href]="proof.paymentProofUrl" target="_blank" rel="noopener">
+        <span class="material-symbols-rounded" aria-hidden="true">picture_as_pdf</span>
+        Open the PDF receipt
+      </a>
+    } @else {
+      <button type="button" class="created-by-me-proof__zoom" (click)="openZoom()" aria-label="Zoom in on this receipt">
+        <img
+          class="created-by-me-proof__image"
+          [src]="proof.paymentProofUrl"
+          [alt]="'Payment receipt from ' + (proof.name || proof.email)"
+          (error)="onProofError()"
+        />
+      </button>
+      <button type="button" class="created-by-me-proof__zoom-link" (click)="openZoom()">
+        <span class="material-symbols-rounded" aria-hidden="true">zoom_in</span>
+        View full size
+      </button>
+    }
+  </app-form-modal>
+}
+
+<!-- Full-size receipt. A bank transfer screenshot is often unreadable at dialog width —
+     the reference number and amount are the whole point of opening it. -->
+@if (zoomOpen() && proofTarget(); as proof) {
+  <div
+    class="created-by-me-proof__lightbox"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Payment receipt, full size"
+    tabindex="-1"
+    (click)="closeZoom()"
+    (keydown.escape)="closeZoom()"
+  >
+    <figure (click)="$event.stopPropagation()">
+      <img [src]="proof.paymentProofUrl" [alt]="'Payment receipt from ' + (proof.name || proof.email)" />
+      <figcaption>{{ proof.name || proof.email }}</figcaption>
+      <button type="button" aria-label="Close the full-size receipt" (click)="closeZoom()">
+        <span class="material-symbols-rounded" aria-hidden="true">close</span>
+      </button>
+    </figure>
+  </div>
 }

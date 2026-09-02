@@ -34,72 +34,73 @@ PHASE = {                       # band colour, active-cell colour
     6: ("#a3c6ea", "#74b9a6"),
 }
 
-WEEKS = ["W1 Apr 27", "W3 May 11", "W5 May 25", "W7 Jun 8", "W9 Jun 22",
-         "W11 Jul 6", "W13 Jul 20", "W15 Aug 3", "W17 Aug 17", "W19 Aug 31"]
+WEEKS = ["W1 Jun 10", "W2 Jun 17", "W3 Jun 24", "W4 Jul 1", "W5 Jul 8",
+         "W6 Jul 15", "W7 Jul 22", "W8 Jul 29", "W9 Aug 5", "W10 Aug 12",
+         "W11 Aug 19", "W12 Aug 26", "W13 Sep 2"]
 
 # (phase number, band label, [(task, [column indexes, 0-based])])
 PART_1 = [
     (1, "Phase 1 — System and Database Design", [
         ("4.2.1 Design Overview & Rationale", [0]),
         ("4.2.2 System Architecture & Layering", [0]),
-        ("4.2.3 Security and Identity Design (RBAC)", [0]),
-        ("4.2.4–4.2.6 Use Case, Activity & Sequence Diagrams", [0, 1]),
-        ("4.3.1 ERD & 4.3.2 Data Dictionary", [0, 1]),
+        ("4.2.3 Security and Identity Design (RBAC)", [0, 1]),
+        ("4.2.4–4.2.6 Use Case, Activity & Sequence Diagrams", [1]),
+        ("4.3.1 ERD & 4.3.2 Data Dictionary", [1]),
     ]),
     (2, "Phase 2 — Backend Development (Flask REST API)", [
-        ("Database Schema Implementation (PostgreSQL)", [1]),
-        ("Authentication, JWT & Password Hashing", [1]),
-        ("Role-within-Unit Authorisation Model", [1, 2]),
-        ("Event Proposal & Workflow State Machine", [1, 2]),
-        ("Departmental Task Generation & Assignment", [2]),
-        ("Approval Escalation & Notification Jobs", [2]),
+        ("Database Schema Implementation (PostgreSQL)", [2]),
+        ("Authentication, JWT & Password Hashing", [2]),
+        ("Role-within-Unit Authorisation Model", [2, 3]),
+        ("Event Proposal & Workflow State Machine", [3]),
+        ("Departmental Task Generation & Assignment", [3, 4]),
+        ("Approval Escalation & Notification Jobs", [4]),
     ]),
     (3, "Phase 3 — Frontend Development (Angular)", [
-        ("4.4 Design Tokens & Shared Component Library", [3]),
-        ("4.5.1 Public Access & Authentication Screens", [3]),
-        ("4.5.2–4.5.3 Attendee Screens & Application Shell", [3]),
-        ("4.5.4 Event Proposal Submission Form", [3, 4]),
-        ("4.5.5–4.5.6 Proposal Tracking & Task Handling", [4]),
-        ("4.5.7–4.5.8 Cafeteria and Clubs Modules", [4]),
+        ("4.4 Design Tokens & Shared Component Library", [5]),
+        ("4.5.1 Public Access & Authentication Screens", [5]),
+        ("4.5.2–4.5.3 Attendee Screens & Application Shell", [5, 6]),
+        ("4.5.4 Event Proposal Submission Form", [6]),
+        ("4.5.5–4.5.6 Proposal Tracking & Task Handling", [6, 7]),
+        ("4.5.7–4.5.8 Cafeteria and Clubs Modules", [7]),
     ]),
 ]
 
 PART_2 = [
     (4, "Phase 4 — AI Assistant and Role Dashboards", [
-        ("4.5.9 Role Dashboards (HOD, CFO, Cafeteria)", [5]),
-        ("4.5.10–4.5.11 Registrations & System Administration", [5]),
-        ("4.5.12 AI Assistant, Query Guard & Access Log", [5]),
+        ("4.5.9 Role Dashboards (HOD, CFO, Cafeteria)", [8]),
+        ("4.5.10–4.5.11 Registrations & System Administration", [8]),
+        ("4.5.12 AI Assistant, Query Guard & Access Log", [8]),
     ]),
     (5, "Phase 5 — Testing and Evaluation", [
-        ("5.2.1 Unit Test Scenarios (Eight Feature Areas)", [6]),
-        ("5.2.2 UAT Instrument Preparation", [6]),
-        ("5.3.1 Unit Testing Results & Defect Correction", [6, 7]),
-        ("5.3.2 UAT Sessions with Five Role-Based Testers", [7]),
+        ("5.2.1 Unit Test Scenarios (Eight Feature Areas)", [9]),
+        ("5.2.2 UAT Instrument Preparation", [9]),
+        ("5.3.1 Unit Testing Results & Defect Correction", [9]),
+        ("5.3.2 UAT Sessions with Five Role-Based Testers", [9]),
     ]),
     (6, "Phase 6 — Chapter 4 to 6 Documentation", [
-        ("Chapter 4 — Design and Implementation Write-up", [7, 8]),
-        ("4.6 Sample Code Listings & Annotation", [8]),
-        ("Chapter 5 — Results and Discussion Write-up", [8]),
-        ("Chapter 6 — Evaluation, Limitations & Recommendation", [8, 9]),
-        ("Appendices Update & Gantt Chart (Appendix D)", [9]),
-        ("Full Report Proofreading & Turnitin Check", [9]),
+        ("Chapter 4 — Design and Implementation Write-up", [10]),
+        ("4.6 Sample Code Listings & Annotation", [10]),
+        ("Chapter 5 — Results and Discussion Write-up", [10, 11]),
+        ("Chapter 6 — Evaluation, Limitations & Recommendation", [11]),
+        ("Appendices Update & Gantt Chart (Appendix E)", [11]),
+        ("Full Report Proofreading & Turnitin Check", [11]),
     ]),
     (6, "Phase 7 — Final Submission", [
-        ("Final FYP Submission (Deadline: Sep 11, 2026)", [9]),
+        ("Final FYP Submission (Deadline: Sep 2, 2026)", [12]),
     ]),
 ]
 
 LEGEND = [(1, "Phase 1: Design"), (2, "Phase 2: Backend"), (3, "Phase 3: Frontend"),
           (4, "Phase 4: AI & Dashboards"), (5, "Phase 5: Testing"), (6, "Phase 6: Documentation")]
 
-NOTE = ("Note: Shaded cells (\u00b7) indicate active weeks for each task. Each column spans two "
-        "weeks. This chart covers FYP Part 2, continuing from the Part 1 timeline in Figures 140 "
-        "and 141.")
+NOTE = ("Note: Shaded cells (\u00b7) indicate active weeks for each task. This chart covers FYP "
+        "Part 2, from 10 June 2026 to the submission on 2 September 2026, continuing from the "
+        "Part 1 timeline in the two preceding figures.")
 
 CSS = f"""
   html,body{{margin:0;padding:0;background:{PAGE};}}
   body{{font-family:"Times New Roman",Georgia,serif;color:{TEXT};}}
-  table{{border-collapse:collapse;width:1036px;table-layout:fixed;}}
+  table{{border-collapse:collapse;width:1240px;table-layout:fixed;}}
   col.task{{width:255px;}}
   th{{background:{HEAD};color:#161616;font-weight:400;font-size:15px;
      border:1px solid {GRID};padding:9px 6px;text-align:center;}}
@@ -149,7 +150,7 @@ def render(html_path: pathlib.Path, png_path: pathlib.Path) -> None:
     subprocess.run([CHROME, "--headless=new", "--disable-gpu", "--hide-scrollbars",
                     f"--user-data-dir={pathlib.Path.home()}/.gantt-chrome",
                     "--force-device-scale-factor=2",
-                    "--window-size=1100,1400",
+                    "--window-size=1320,1500",
                     f"--screenshot={png_path}", uri],
                    check=True, capture_output=True)
 

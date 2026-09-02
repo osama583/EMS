@@ -38,9 +38,13 @@ public.
 column at all — it has to become a reference. That is why this endpoint exists
 rather than the client inlining base64 the way the JSON mock allowed.
 
-Files land on local disk under UPLOAD_DIR. For a real deployment this should be
-object storage (S3 or Supabase Storage); the URL contract below does not change
-when it moves, only the implementation of _store.
+WHERE THE BYTES LIVE. In the upload_file table, next to the rows that reference
+them. They used to live only on local disk under UPLOAD_DIR, which is gitignored
+while the database is shared and remote - so the /api/v1/uploads/{key} pointer
+travelled between machines and checkouts and the file did not, and every image
+uploaded somewhere else resolved to a 404 forever. The URL contract is unchanged;
+only _store and serve moved. Disk is still read as a fallback so files written
+before the move keep serving (scripts/backfill_uploads.py folds them in).
 """
 from __future__ import annotations
 
@@ -52,7 +56,8 @@ import pathlib
 import re
 import time
 
-from flask import Blueprint, jsonify, request, send_from_directory
+import psycopg2
+from flask import Blueprint, Response, jsonify, request
 
 from ..config import config
 from ..db import fetch_one, transaction
@@ -97,14 +102,16 @@ _KEY = re.compile(r"^[0-9a-f]{32}\.(png|jpg|webp|gif|pdf)$")
 URL_PREFIX = "/api/v1/uploads/"
 
 
-def _store(data: bytes, extension: str) -> str:
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    # Content-addressed: re-uploading the same image reuses one file rather than
-    # accumulating duplicates.
+def _store(data: bytes, mime: str, extension: str) -> str:
+    # Content-addressed: re-uploading the same image reuses one row rather than
+    # accumulating duplicates, so the same key is safe to insert twice.
     key = hashlib.sha256(data).hexdigest()[:32] + extension
-    path = UPLOAD_DIR / key
-    if not path.exists():
-        path.write_bytes(data)
+    with transaction() as cur:
+        cur.execute(
+            "INSERT INTO upload_file (storage_key, content_type, content) VALUES (%s, %s, %s) "
+            "ON CONFLICT (storage_key) DO NOTHING",
+            (key, mime, psycopg2.Binary(data)),
+        )
     return key
 
 
@@ -151,7 +158,7 @@ def upload():
     if not _matches_magic(raw, mime):
         raise BadRequest("That file's contents do not match the type it claims to be.")
 
-    key = _store(raw, allowed[mime])
+    key = _store(raw, mime, allowed[mime])
     return jsonify({"storageKey": key, "url": f"{URL_PREFIX}{key}"}), 201
 
 
@@ -225,20 +232,49 @@ def _is_private(key: str) -> bool:
     return row is not None
 
 
+def _read(key: str) -> tuple[bytes, str] | None:
+    """The file's bytes and content type, or None if this deployment has neither.
+
+    The table is authoritative; disk is only consulted for files written before
+    the bytes moved into the database, so an upload made against an older build
+    keeps serving instead of 404ing the moment it is deployed.
+    """
+    with transaction() as cur:
+        row = fetch_one(
+            cur, "SELECT content, content_type FROM upload_file WHERE storage_key = %s", (key,)
+        )
+    if row is not None:
+        return bytes(row["content"]), row["content_type"]
+    path = UPLOAD_DIR / key
+    if path.exists():
+        extension = pathlib.Path(key).suffix
+        return path.read_bytes(), _MIME_BY_EXTENSION.get(extension, "application/octet-stream")
+    return None
+
+
+# The inverse of the KINDS maps above, for a legacy on-disk file whose declared
+# type was never recorded anywhere but its extension.
+_MIME_BY_EXTENSION = {extension: mime for mime, extension in DOCUMENT_TYPES.items()}
+
+
 @bp.get("/<key>")
 @limiter.exempt
 def serve(key: str):
     """Serve a stored file.
 
-    The key is matched against a strict pattern before touching the filesystem,
-    so no caller-supplied path can escape the upload directory.
+    The key is matched against a strict pattern before it reaches storage, so no
+    caller-supplied path can escape the upload directory on the disk fallback.
 
     An event image serves to anyone, guests included - the landing page needs it.
     A payment receipt serves only against a valid, unexpired signature minted by
     an endpoint that had already established the caller may see it.
     """
-    if not _KEY.match(key) or not (UPLOAD_DIR / key).exists():
+    if not _KEY.match(key):
         raise NotFound("File not found.")
+    stored = _read(key)
+    if stored is None:
+        raise NotFound("File not found.")
+    content, content_type = stored
 
     if _is_private(key):
         expires = request.args.get("expires", "")
@@ -253,8 +289,8 @@ def serve(key: str):
             raise Forbidden("This file needs a valid access link.")
         # Private and time-boxed, so it must not be cached by a shared proxy or
         # left in the disk cache after the link dies.
-        response = send_from_directory(UPLOAD_DIR, key, max_age=0)
-        response.headers["Cache-Control"] = "private, no-store"
-        return response
+        return Response(content, mimetype=content_type, headers={"Cache-Control": "private, no-store"})
 
-    return send_from_directory(UPLOAD_DIR, key, max_age=31536000)
+    # Content-addressed, so the bytes behind a key never change and the response
+    # can be cached for as long as the browser is willing to keep it.
+    return Response(content, mimetype=content_type, headers={"Cache-Control": "public, max-age=31536000, immutable"})

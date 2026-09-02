@@ -99,6 +99,10 @@
 .request-quantity-indicator span { flex: 1 1 auto; min-width: 0; }
 .request-quantity-indicator--warning { border-color: #f4d47a; background: #fff3cd; color: #9a6500; }
 .request-quantity-indicator--warning strong,.request-quantity-indicator--warning .material-symbols-rounded { color: #b87800; }
+/* The request tables wait as themselves: the section header is local data so it
+   stays real, and only the table area shimmers — inside the same bordered box
+   the .proposal-table arrives in, so nothing shifts when the catalogue lands. */
+.request-table-skeleton { overflow: hidden; border: 1px solid var(--apu-border); border-radius: var(--radius-card); background: var(--apu-white); }
 .proposal-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
 .proposal-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .proposal-grid--2 > :first-child { grid-column: 1 / -1; }
@@ -117,11 +121,23 @@
 .proposal-radio { display: flex; padding: var(--space-3); gap: var(--space-3); border: 1px solid var(--apu-border); border-radius: var(--radius-card); }
 .proposal-radio legend { padding-inline: .35rem; font-size: var(--type-label); font-weight: 700; }
 .proposal-radio label { display: flex; align-items: center; gap: .45rem; }
-.proposal-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
-.proposal-summary article { display: grid; min-width: 0; padding: var(--space-3); gap: .35rem; border: 1px solid var(--apu-border); border-radius: var(--radius-card); background: var(--apu-surface-muted); }
-.proposal-summary article span { color: var(--apu-text-muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; }
-.proposal-summary article strong { overflow-wrap: anywhere; white-space: pre-line; }
-.proposal-summary__wide { grid-column: span 3; }
+/*
+ * Review layout.
+ *
+ * Final Review verifies entered data rather than re-entering it, so it drops the form's
+ * one-field-per-row rhythm: sections stack full width, and their cards are JUSTIFIED the way a
+ * line of type is. Each card starts at a width taken from its own value's length and then grows
+ * to share whatever the row has left, so every row ends flush against both edges.
+ *
+ * Two earlier attempts failed the same way — a grid of section columns, then a balanced column
+ * flow — because both make a section an atomic block of a fixed width, and four sections of
+ * honestly different lengths leave whichever column runs out first as dead space. Nothing here
+ * has a fixed width, so there is nothing to strand: the step is as tall as its content, no taller.
+ */
+.proposal-review__sections { display: grid; gap: var(--space-5); }
+.review-fields { display: flex; flex-wrap: wrap; gap: .5rem; }
+.proposal-review__section > h4 { display: flex; margin: 0 0 .5rem; padding-bottom: .3rem; align-items: center; gap: .4rem; border-bottom: 1px solid var(--apu-border); color: var(--apu-text-muted); font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.proposal-review__section > h4 .material-symbols-rounded { color: var(--apu-blue-600); font-size: 1.05rem; }
 .proposal-actions {
   position: sticky; z-index: 10; bottom: var(--space-3); display: grid; min-height: 4.5rem;
   padding: var(--space-3) var(--space-4);
@@ -142,12 +158,10 @@
 .proposal-modal header p,.proposal-modal header h2 { margin: 0; }
 .proposal-modal header p { color: var(--apu-blue-600); font-size: .75rem; font-weight: 700; text-transform: uppercase; }
 .proposal-modal header button { display: grid; width: 2.75rem; height: 2.75rem; place-items: center; border: 0; border-radius: 50%; background: var(--apu-surface-muted); cursor: pointer; }
-.proposal-modal .proposal-summary { padding: var(--space-4); }
 .proposal-modal footer { justify-content: flex-end; border-top: 1px solid var(--apu-border); border-bottom: 0; }
 .proposal-toast { position: fixed; z-index: 120; right: var(--space-4); bottom: var(--space-4); padding: .85rem 1.1rem; border-radius: var(--radius-pill); background: var(--apu-navy-950); color: var(--apu-white); box-shadow: var(--shadow-overlay); font-weight: 600; }
 .proposal-field-target { animation: proposal-field-attention 1.8s var(--ease-standard); }
 @keyframes proposal-field-attention { 0%,100% { box-shadow: none; } 25%,70% { box-shadow: 0 0 0 .3rem rgb(42 131 255 / 16%), 0 .7rem 1.8rem rgb(42 131 255 / 12%); } }
-@media(max-width:64rem){.proposal-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.proposal-summary__wide{grid-column:span 2}}
 @media(max-width:64rem){
   .proposal-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
@@ -195,8 +209,8 @@
   .co-requesters-section__header{justify-items:stretch}
   .co-requesters-section__header .table-control{width:100%;min-width:0}
 
-  .proposal-grid,.proposal-grid--2,.requirement-grid,.proposal-summary{grid-template-columns:1fr}
-  .proposal-grid--2>:first-child,.proposal-summary__wide{grid-column:auto}
+  .proposal-grid,.proposal-grid--2,.requirement-grid{grid-template-columns:1fr}
+  .proposal-grid--2>:first-child{grid-column:auto}
   .requirement-grid label{min-height:3.25rem;padding:var(--space-2)}
 
   /*
@@ -259,7 +273,6 @@
   .proposal-modal header,.proposal-modal footer{padding:var(--space-3)}
   .proposal-modal header h2{font-size:1.1rem}
   .proposal-modal header button{width:2.35rem;height:2.35rem}
-  .proposal-modal .proposal-summary{grid-template-columns:1fr;padding:var(--space-3)}
   .proposal-modal footer .table-control{flex:1 1 0;min-width:0}
 
   .proposal-toast{right:var(--space-3);left:var(--space-3);bottom:var(--space-3);text-align:center}

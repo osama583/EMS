@@ -632,3 +632,187 @@ def test_flatten_requests_carries_a_raw_deadline_for_row_assignable_kinds(cur):
     logistics_row = next(row for row in rows if row["department"] == "logistics")
     assert "deadline" in logistics_row
     assert logistics_row["deadline"] == f"{day}T09:00:00"
+
+
+def test_agenda_rows_keep_the_day_they_belong_to(cur):
+    """A multi-day event's agenda rows carry a Date column (agendaColumns() in
+    event-proposal.ts). brief_agenda had nowhere to put it until migration 044,
+    so reopening a saved draft showed that column as '-'."""
+    day_one = (date.today() + timedelta(days=30)).isoformat()
+    day_two = (date.today() + timedelta(days=31)).isoformat()
+    venue = a_venue(cur)
+    request_id = create_proposal(
+        cur, "student.computing@demo.apu.edu.my",
+        scheduleRows=[
+            {"date": day_one, "start": "09:00", "end": "17:00", "locationKind": "inside", "venueId": venue},
+            {"date": day_two, "start": "09:00", "end": "17:00", "locationKind": "inside", "venueId": venue},
+        ],
+        agenda=[
+            {"date": day_one, "time": "09:00", "activity": "Opening", "location": "Hall", "pic": "Ali"},
+            {"date": day_two, "time": "10:00", "activity": "Closing", "location": "Hall", "pic": "Ali"},
+            # A single-day agenda sends no date at all, and must still save.
+            {"time": "11:00", "activity": "Undated", "location": "Hall", "pic": "Ali"},
+        ],
+    )
+    agenda = proposals.project(cur, wf.load_request(cur, request_id))["agenda"]
+    assert [row["date"] for row in agenda] == [day_one, day_two, ""]
+
+
+# --- The implementation stage --------------------------------------------
+def test_approving_every_department_reaches_implementation_not_completion(cur):
+    """Departments decide, THEN staff carry out. Assigning is approving, so the
+    last assignment is what ends department review - the work still has to be
+    done before the proposal completes."""
+    request_id = create_proposal(
+        cur, "hoshod@demo.apu.edu.my", selectedRequirements=["logistics", "soundLight"]
+    )
+    wf.submit(cur, request_id)
+    assert status_of(cur, request_id) == "department_review"
+
+    logistics_head = principal_for(cur, "logistics.manager@demo.apu.edu.my")
+    logistics_staff = principal_for(cur, "logistics.staff@demo.apu.edu.my")
+    task = wf.find_task(cur, request_id, "logistics")
+    wf.assign_staff(cur, task["request_task_id"], logistics_staff.user_id, logistics_head.user_id)
+    # One department down, one to go.
+    assert status_of(cur, request_id) == "department_review"
+
+    av_head = principal_for(cur, "av.manager@demo.apu.edu.my")
+    av_staff = principal_for(cur, "av.technician@demo.apu.edu.my")
+    av_task = wf.find_task(cur, request_id, "soundLight")
+    wf.assign_staff(cur, av_task["request_task_id"], av_staff.user_id, av_head.user_id)
+
+    assert status_of(cur, request_id) == "implementation"
+
+
+def test_implementation_completes_once_the_staff_finish(cur):
+    request_id = create_proposal(cur, "hoshod@demo.apu.edu.my", selectedRequirements=["logistics"])
+    wf.submit(cur, request_id)
+    head = principal_for(cur, "logistics.manager@demo.apu.edu.my")
+    staff = principal_for(cur, "logistics.staff@demo.apu.edu.my")
+
+    task = wf.find_task(cur, request_id, "logistics")
+    wf.assign_staff(cur, task["request_task_id"], staff.user_id, head.user_id)
+    assert status_of(cur, request_id) == "implementation"
+
+    wf.update_task_status(cur, task["request_task_id"], "preparing", staff.user_id)
+    assert status_of(cur, request_id) == "implementation"
+    wf.update_task_status(cur, task["request_task_id"], "completed", staff.user_id)
+    assert status_of(cur, request_id) == "completed_approved"
+
+
+def test_a_department_cannot_send_back_once_implementation_started(cur):
+    """Every manager has approved and the event is public by this point. The
+    staff have no say in the application either - they only work their rows."""
+    from app.errors import WorkflowError
+
+    request_id = create_proposal(cur, "hoshod@demo.apu.edu.my", selectedRequirements=["logistics"])
+    wf.submit(cur, request_id)
+    head = principal_for(cur, "logistics.manager@demo.apu.edu.my")
+    staff = principal_for(cur, "logistics.staff@demo.apu.edu.my")
+    task = wf.find_task(cur, request_id, "logistics")
+    wf.assign_staff(cur, task["request_task_id"], staff.user_id, head.user_id)
+    assert status_of(cur, request_id) == "implementation"
+
+    with pytest.raises(WorkflowError):
+        wf.send_task_back(cur, request_id, "logistics", head.user_id, "Please change the venue.")
+    assert status_of(cur, request_id) == "implementation"
+
+
+def test_a_food_order_awaiting_its_cafeteria_holds_department_review(cur):
+    """F&B and the cafeteria are BOTH departments deciding. Creating the order
+    satisfies the F&B task's allocation check, so the task reads 'approved'
+    while its manager has not accepted yet - that is still department review,
+    and accepting is what releases it."""
+    day = (date.today() + timedelta(days=30)).isoformat()
+    request_id = create_proposal(
+        cur, "student.computing@demo.apu.edu.my", selectedRequirements=["fmb"],
+        requestRows={"fmb": [{
+            "foodType": "fmb:1", "quantity": 20, "date": day,
+            "start": "12:00", "venueId": a_venue(cur),
+        }]},
+    )
+    wf.submit(cur, request_id)
+    wf.approve(cur, request_id, principal_for(cur, "hoshod@demo.apu.edu.my"))
+
+    fmb_principal = principal_for(cur, "fmb@demo.apu.edu.my")
+    selection = wf.create_selection(
+        cur, request_id, fmb_principal.user_id,
+        cafeteria_unit_code="cafeteria__atrium_cafeteria", fmb_option_id=1, quantity=10,
+    )
+    # F&B signs off its own task - the live order is all assert_work_allocated
+    # requires, so this succeeds while the cafeteria has not answered yet.
+    wf.approve_task(cur, request_id, "fmb", fmb_principal.user_id)
+    assert wf.find_task(cur, request_id, "fmb")["status"] == "approved"
+    assert status_of(cur, request_id) == "department_review"
+
+    manager = principal_for(cur, "cafeteria.manager@demo.apu.edu.my")
+    wf.approve_selection(cur, selection["id"], manager.user_id)
+    assert status_of(cur, request_id) == "implementation"
+
+
+def test_a_cafeteria_order_cannot_be_pushed_back_once_implementation_started(cur):
+    from app.errors import WorkflowError
+
+    request_id, selection_id = _place_and_approve_order(cur)
+    wf.approve_task(cur, request_id, "fmb", principal_for(cur, "fmb@demo.apu.edu.my").user_id)
+    assert status_of(cur, request_id) == "implementation"
+
+    manager = principal_for(cur, "cafeteria.manager@demo.apu.edu.my")
+    with pytest.raises(WorkflowError):
+        wf.send_selection_back(cur, selection_id, manager.user_id, "Wrong quantity.")
+
+
+def _to_implementation(cur, **overrides) -> int:
+    """A proposal driven to implementation: one department, staff assigned."""
+    request_id = create_proposal(
+        cur, "hoshod@demo.apu.edu.my", selectedRequirements=["logistics"], **overrides
+    )
+    wf.submit(cur, request_id)
+    head = principal_for(cur, "logistics.manager@demo.apu.edu.my")
+    staff = principal_for(cur, "logistics.staff@demo.apu.edu.my")
+    task = wf.find_task(cur, request_id, "logistics")
+    wf.assign_staff(cur, task["request_task_id"], staff.user_id, head.user_id)
+    return request_id
+
+
+def _is_published(cur, request_id: int, *, include_internal: bool, principal=None) -> bool:
+    """Ask the events module's own definition of published, rather than a copy
+    of it - the point of the test is that THAT clause moved."""
+    from app.api.events import _published_clause, _viewer_params
+
+    row = fetch_one(
+        cur,
+        "SELECT count(*) AS c FROM request r WHERE r.request_id = %(rid)s "
+        f"AND {_published_clause(include_internal)}",
+        {"rid": request_id, **_viewer_params(include_internal, principal)},
+    )
+    return row["c"] == 1
+
+
+def test_a_public_event_is_published_from_implementation(cur):
+    """The whole point of the stage: Explore Events and registration open while
+    the staff are still working, not after the last row is ticked."""
+    request_id = _to_implementation(cur, eventVisibility="Public")
+    assert status_of(cur, request_id) == "implementation"
+    assert _is_published(cur, request_id, include_internal=False)
+
+
+def test_department_review_is_not_yet_published(cur):
+    """The gate is the status, not the visibility tier: the same Public event is
+    invisible while a department still owes a decision."""
+    request_id = create_proposal(
+        cur, "hoshod@demo.apu.edu.my", selectedRequirements=["logistics"],
+        eventVisibility="Public",
+    )
+    wf.submit(cur, request_id)
+    assert status_of(cur, request_id) == "department_review"
+    assert not _is_published(cur, request_id, include_internal=False)
+
+
+def test_implementation_still_respects_the_visibility_tier(cur):
+    """Publishing earlier must not publish more widely - an Internal event in
+    implementation stays hidden from signed-out callers."""
+    request_id = _to_implementation(cur, eventVisibility="Internal")
+    viewer = principal_for(cur, "student.computing@demo.apu.edu.my")
+    assert _is_published(cur, request_id, include_internal=True, principal=viewer)
+    assert not _is_published(cur, request_id, include_internal=False)

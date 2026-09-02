@@ -315,12 +315,9 @@ button:focus-visible {
   }
 }
 
-/* Shared review-summary composition used by proposal review surfaces. */
-.proposal-review__sections {
-  display: grid;
-  gap: var(--space-4);
-}
-
+/* Shared review-summary composition used by proposal review surfaces. The sections CONTAINER is
+   laid out by event-proposal.scss, the only template that renders one — a `display: grid` here
+   would silently win over the column flow it sets. */
 .proposal-review__section {
   display: grid;
   gap: var(--space-2);
@@ -340,10 +337,14 @@ button:focus-visible {
   font-size: 1.2rem;
 }
 
+/* The cards are flex items of .review-fields (event-proposal.scss), but .prv-field lives inside
+   app-proposal-field, whose host is `display: contents` — so the sizing has to be set here, on the
+   card itself. --field-basis / --field-columns are set per card on the host and inherit in. */
+/* Cards in a row share the row's height, so the content is pinned to the top of each: labels
+   line up across the row and the slack collects at the bottom, out of the reading path. */
+.review-fields .prv-field { flex: 1 1 var(--field-basis, 15rem); min-width: 0; align-content: start; }
+.review-fields .prv-field__value { columns: var(--field-columns, auto); column-gap: var(--space-4); }
+
 .proposal-review__sections--preview {
   padding: var(--space-4);
-}
-
-.proposal-modal .proposal-review__sections--preview .proposal-summary {
-  padding: 0;
 }

@@ -501,6 +501,11 @@ def create_order():
             cafeteria_unit_code=str(cafeteria_code),
             fmb_option_id=int(option_id),
             quantity=int(quantity),
+            # Which food row this order fulfils - optional for older callers, but
+            # without it the approval gate cannot tell a covered row from a bare one.
+            request_fmb_id=(
+                int(payload["requestFmbId"]) if payload.get("requestFmbId") is not None else None
+            ),
             menu_item_label=payload.get("menuItemLabel"),
             notes=payload.get("notes"),
         )

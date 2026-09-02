@@ -83,7 +83,17 @@
         @if (!selectedDefinitions().length) {
           <section class="proposal-empty"><span class="material-symbols-rounded">playlist_remove</span><h3>No requirements selected yet</h3><p>Return to Required for Event and select the services your event needs.</p><button type="button" class="table-control" (click)="goToStep(2)">Choose requirements</button></section>
         } @else if (requestCatalogLoading()) {
-          <app-skeleton variant="cards" label="Loading request options…" [count]="4" />
+          @for (definition of selectedDefinitions(); track definition.key) {
+            <section class="proposal-request-table" aria-busy="true">
+              <header class="proposal-request-table__header">
+                <div><h3>{{ definition.label }}</h3><p>Complete the service details required by the reviewing department.</p></div>
+                <button type="button" class="table-control table-control--primary" disabled><span class="material-symbols-rounded" aria-hidden="true">add</span>Add {{ definition.label }} Request</button>
+              </header>
+              <div class="request-table-skeleton">
+                <app-skeleton variant="table" [count]="requestRows()[definition.key].length || 2" [columns]="definition.columns.length" [label]="'Loading ' + definition.label + ' requests…'" />
+              </div>
+            </section>
+          }
         } @else {
           @for (definition of selectedDefinitions(); track definition.key) {
             <section class="proposal-request-table">
@@ -209,9 +219,9 @@
         <section class="proposal-card">
           <div class="proposal-card__title"><h3>Event Purpose & Summary</h3><p>Explain the event’s purpose and expected impact.</p></div>
           <div class="proposal-grid">
-            <app-form-field class="proposal-grid--full" controlId="short-intro" label="Short Introduction" type="textarea" [required]="true" [value]="shortIntro()" [error]="error('shortIntro')" (valueChange)="setShortIntro($event)" />
-            <app-form-field class="proposal-grid--full" controlId="goals" label="Goals & Objectives" type="textarea" [required]="true" [value]="goals()" [error]="error('goals')" (valueChange)="setGoals($event)" />
-            <app-form-field class="proposal-grid--full" controlId="benefits" label="Expected Benefits" type="textarea" [required]="true" [value]="benefits()" [error]="error('benefits')" (valueChange)="setBenefits($event)" />
+            <app-form-field class="proposal-grid--full" controlId="short-intro" label="Short Introduction" type="textarea" [required]="true" [maxLength]="1000" [value]="shortIntro()" [error]="error('shortIntro')" (valueChange)="setShortIntro($event)" />
+            <app-form-field class="proposal-grid--full" controlId="goals" label="Goals & Objectives" type="textarea" [required]="true" [maxLength]="1000" [value]="goals()" [error]="error('goals')" (valueChange)="setGoals($event)" />
+            <app-form-field class="proposal-grid--full" controlId="benefits" label="Expected Benefits" type="textarea" [required]="true" [maxLength]="1000" [value]="benefits()" [error]="error('benefits')" (valueChange)="setBenefits($event)" />
           </div>
         </section>
         <section class="proposal-card">
@@ -264,8 +274,10 @@
             @for (section of reviewSections(); track section.title) {
               <section class="proposal-review__section" [attr.aria-labelledby]="'review-' + $index">
                 <h4 [id]="'review-' + $index"><span class="material-symbols-rounded" aria-hidden="true">{{ section.icon }}</span>{{ section.title }}</h4>
-                <div class="proposal-summary">
-                  @for (item of section.items; track item.label) { <article [class.proposal-summary__wide]="item.wide"><span>{{ item.label }}</span><strong>{{ item.value }}</strong></article> }
+                <div class="review-fields">
+                  @for (field of section.fields; track field.label) {
+                    <app-proposal-field [label]="field.label" [value]="field.value" [style.--field-basis]="field.basis" [style.--field-columns]="field.columns" />
+                  }
                 </div>
               </section>
             }
@@ -370,9 +382,9 @@
     @for (section of reviewSections(); track section.title) {
       <section class="proposal-review__section">
         <h4><span class="material-symbols-rounded" aria-hidden="true">{{ section.icon }}</span>{{ section.title }}</h4>
-        <div class="proposal-summary">
-          @for (item of section.items; track item.label) {
-            <article [class.proposal-summary__wide]="item.wide"><span>{{ item.label }}</span><strong>{{ item.value }}</strong></article>
+        <div class="review-fields">
+          @for (field of section.fields; track field.label) {
+            <app-proposal-field [label]="field.label" [value]="field.value" [style.--field-basis]="field.basis" [style.--field-columns]="field.columns" />
           }
         </div>
       </section>

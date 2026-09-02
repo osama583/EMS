@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { EVENT_IMAGE_UPLOAD_API, EventImageUploadApi } from '../../../core/events/event-image-upload.service';
 import { EventImageAsset } from '../../../core/events/published-event.models';
+import { onEventImageError } from '../../event-image-placeholder';
 import { ValidationMessageComponent } from '../validation-message/validation-message';
 
 @Component({
@@ -33,7 +34,7 @@ import { ValidationMessageComponent } from '../validation-message/validation-mes
 
       @if (value(); as image) {
         <div class="event-image-upload__preview">
-          <img [src]="image.url" alt="Selected event image preview" />
+          <img [src]="image.url" alt="Selected event image preview" (error)="onImageError($event)" />
           <div class="event-image-upload__preview-copy">
             <strong>{{ image.fileName }}</strong>
             <span>{{ readableSize(image.sizeBytes) }}</span>
@@ -68,6 +69,7 @@ export class EventImageUploadComponent {
   readonly error = signal('');
   readonly uploading = signal(false);
   readonly maxFileSizeMb = 5;
+  readonly onImageError = onEventImageError;
   private readonly allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
   chooseFile(): void { this.fileInput()?.nativeElement.click(); }

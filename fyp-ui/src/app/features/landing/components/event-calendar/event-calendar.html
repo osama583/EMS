@@ -61,7 +61,7 @@
     </div>
 
     @if (loading()) {
-      <app-skeleton variant="cards" label="Loading calendar…" [count]="9" />
+      <app-skeleton variant="calendar" label="Loading calendar…" [count]="6" />
     } @else if (loadError()) {
       <p class="calendar-empty">{{ loadError() }}</p>
     } @else if (viewMode() === 'month') {

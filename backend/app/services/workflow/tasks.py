@@ -12,7 +12,11 @@ Lifecycle of one task:
             -> completed (assigned staff finishes)
     or      -> resubmitted (manager sends back) -> pending (applicant resubmits)
 
-When every task reaches a terminal state the whole proposal auto-completes.
+The stage has two halves, and request.status names which one it is in.
+department_review is the departments deciding; once none of them owes a
+decision the request moves to implementation, where the same task rows carry
+staff work and the event is published. Every task terminal auto-completes the
+proposal. See recompute_department_phase().
 """
 from __future__ import annotations
 
@@ -23,15 +27,22 @@ from . import history
 from .authorization import authorize_department_task, heads_unit
 from .constants import (
     COMPLETED_APPROVED,
+    DEPARTMENT_REVIEW,
     FLAT_ROLE_FOR_REQUIREMENT,
     FMB_REQUIREMENT,
+    IMPLEMENTATION,
     MAX_ASSIGNEES_PER_ROW,
     NON_WORKFLOW_REQUIREMENTS,
     ROW_ASSIGNABLE_REQUIREMENTS,
+    SEL_CANCELLED,
+    SEL_PENDING,
+    SEL_RESUBMITTED,
     TABLE_FOR_REQUIREMENT,
     TASK_APPROVED,
     TASK_CANCELLED,
     TASK_COMPLETED,
+    TASK_PENDING,
+    TASK_RESUBMITTED,
     TASK_TERMINAL,
     UNIT_CODE_FOR_REQUIREMENT,
     WATER_REQUIREMENT,
@@ -133,15 +144,83 @@ def _complete_request(cur, request_id: int, comment: str | None = None) -> None:
     dispatch.proposal_fully_approved(cur, request_id)
 
 
-def check_all_tasks_resolved(cur, request_id: int) -> None:
-    """Auto-complete the proposal once every department task is terminal."""
+def _request_status(cur, request_id: int) -> str | None:
+    row = fetch_one(cur, "SELECT status FROM request WHERE request_id = %s", (request_id,))
+    return row["status"] if row else None
+
+
+def _cafeteria_orders_undecided(cur, request_id: int) -> bool:
+    """Whether any food order is still waiting on a cafeteria manager.
+
+    F&B and the cafeteria are BOTH departments deciding, so their hand-off
+    belongs to department review even though it happens under an already
+    approved F&B task - assert_work_allocated() only requires an order to
+    exist, not that its manager has accepted it.
+    """
+    return fetch_one(
+        cur,
+        """SELECT count(*) AS c FROM request_fmb_selection s
+             JOIN request_fmb f ON f.request_fmb_id = s.request_fmb_id
+            WHERE f.request_id = %s AND s.status IN (%s, %s)""",
+        (request_id, SEL_PENDING, SEL_RESUBMITTED),
+    )["c"] > 0
+
+
+def _enter_implementation(cur, request_id: int) -> None:
+    row = fetch_one(cur, "SELECT status FROM request WHERE request_id = %s", (request_id,))
+    # Only ever forward, and only from the phase it succeeds. Guarding on the
+    # current status keeps this idempotent: it is called after every task
+    # action, most of which do not change the phase at all.
+    if row is None or row["status"] != DEPARTMENT_REVIEW:
+        return
+    cur.execute(
+        "UPDATE request SET status = %s, updated_at = now() WHERE request_id = %s",
+        (IMPLEMENTATION, request_id),
+    )
+    history.record(
+        cur,
+        request_id,
+        action="implementation",
+        actor_user_id=None,
+        actor_role="system",
+        comment="Every department approved and assigned. The event is now published.",
+        previous_status=DEPARTMENT_REVIEW,
+        new_status=IMPLEMENTATION,
+    )
+
+
+def recompute_department_phase(cur, request_id: int) -> None:
+    """Advance the request across the two halves of the department stage.
+
+    One set of request_task rows backs three request statuses:
+
+        department_review   a department still owes a decision - a task is
+                            pending or sent back, or a food order has not been
+                            accepted by its cafeteria manager.
+        implementation      every department has decided and assigned. The work
+                            sits in staff inboxes and the event is PUBLISHED
+                            (see _published_clause in api/events.py).
+        completed_approved  every task is terminal.
+
+    Called after every action that can change a task or order status, so it must
+    stay cheap and idempotent. It only ever moves forward: nothing sends a
+    request back to department_review once it is published.
+    """
     tasks = fetch_all(
         cur,
         "SELECT status FROM request_task WHERE request_id = %s AND stage_code = 'department_review'",
         (request_id,),
     )
-    if tasks and all(t["status"] in TASK_TERMINAL for t in tasks):
+    if not tasks:
+        return
+    if all(t["status"] in TASK_TERMINAL for t in tasks):
         _complete_request(cur, request_id)
+        return
+    if any(t["status"] in (TASK_PENDING, TASK_RESUBMITTED) for t in tasks):
+        return
+    if _cafeteria_orders_undecided(cur, request_id):
+        return
+    _enter_implementation(cur, request_id)
 
 
 def find_task(cur, request_id: int, requirement_name: str) -> dict:
@@ -165,6 +244,67 @@ def load_task(cur, task_id: int) -> dict:
     return row
 
 
+def unallocated_row_count(cur, request_id: int, requirement_name: str) -> int:
+    """How many of this department's requested rows still have nothing lined up
+    to fulfil them - no assignee for the five row-assignable departments, no
+    live cafeteria order for F&B.
+
+    This is the whole point of a department's approval: "yes, we will do this"
+    is a claim about EVERY row the applicant asked for, not just the first one
+    somebody happened to staff. Approving with rows left over used to be
+    possible and left the proposal parked in that department's inbox with the
+    task already marked approved - no action left to take, and nothing to move
+    it on. A department with nothing routable (F&B on a water-only proposal,
+    or any requirement with no rows) has zero unallocated rows, not a block.
+    """
+    if requirement_name in ROW_ASSIGNABLE_REQUIREMENTS:
+        table, pk_column = TABLE_FOR_REQUIREMENT[requirement_name]
+        return fetch_one(
+            cur,
+            f"""SELECT count(*) AS c FROM {table} d
+                 WHERE d.request_id = %s
+                   AND NOT EXISTS (
+                        SELECT 1 FROM request_row_assignment a
+                         WHERE a.requirement_name = %s AND a.row_id = d.{pk_column}
+                   )""",
+            (request_id, requirement_name),
+        )["c"]
+    if requirement_name == FMB_REQUIREMENT:
+        # Cancelled orders do not count - cancelling the only order for a row
+        # puts that row back to unfulfilled, which is exactly what it is.
+        # request_mineral_water rows are deliberately NOT counted: an order can
+        # only be placed against a request_fmb row, so requiring one for water
+        # would deadlock every water request.
+        return fetch_one(
+            cur,
+            """SELECT count(*) AS c FROM request_fmb f
+                WHERE f.request_id = %s
+                  AND NOT EXISTS (
+                       SELECT 1 FROM request_fmb_selection s
+                        WHERE s.request_fmb_id = f.request_fmb_id AND s.status <> %s
+                  )""",
+            (request_id, SEL_CANCELLED),
+        )["c"]
+    return 0
+
+
+def assert_work_allocated(cur, request_id: int, requirement_name: str) -> None:
+    """Refuse an approval that leaves some of this department's rows unclaimed."""
+    outstanding = unallocated_row_count(cur, request_id, requirement_name)
+    if not outstanding:
+        return
+    noun = "request" if outstanding == 1 else "requests"
+    if requirement_name == FMB_REQUIREMENT:
+        raise WorkflowError(
+            f"{outstanding} food {noun} still {'has' if outstanding == 1 else 'have'} no "
+            "cafeteria order. Place an order for every request before approving."
+        )
+    raise WorkflowError(
+        f"{outstanding} {noun} still {'has' if outstanding == 1 else 'have'} nobody assigned. "
+        "Assign a team member to every request before approving."
+    )
+
+
 def approve_task(cur, request_id: int, requirement_name: str, actor_user_id: int) -> dict:
     """Department manager approves their task.
 
@@ -178,6 +318,17 @@ def approve_task(cur, request_id: int, requirement_name: str, actor_user_id: int
     authorize_department_task(cur, task, actor_user_id)
     if task["status"] in TASK_TERMINAL:
         raise WorkflowError("This task is already " + task["status"] + ".")
+    assert_work_allocated(cur, request_id, requirement_name)
+    if task["status"] == TASK_APPROVED:
+        # Already approved and, per the check above, now fully allocated. Nothing left to record:
+        # the manager's assign-then-confirm flow would otherwise stamp a second 'approve' into the
+        # audit trail on every single approval, since assigning the last row approves the task by
+        # itself. Re-approving a HALF-allocated task is still how it gets finished - that path
+        # raises above and only reaches here once the missing work is in - and
+        # THAT is the moment the department finished, so the phase is recomputed
+        # on this path too.
+        recompute_department_phase(cur, request_id)
+        return load_task(cur, task["request_task_id"])
 
     previous = task["status"]
     cur.execute(
@@ -217,8 +368,10 @@ def approve_task(cur, request_id: int, requirement_name: str, actor_user_id: int
                 previous_status=TASK_APPROVED,
                 new_status=TASK_COMPLETED,
             )
-            check_all_tasks_resolved(cur, request_id)
 
+    # This approval may have been the last one outstanding, which is what moves
+    # the request to implementation and publishes the event.
+    recompute_department_phase(cur, request_id)
     return load_task(cur, task["request_task_id"])
 
 
@@ -230,6 +383,15 @@ def send_task_back(cur, request_id: int, requirement_name: str, actor_user_id: i
     """
     task = find_task(cur, request_id, requirement_name)
     authorize_department_task(cur, task, actor_user_id)
+    # Sending back is a DEPARTMENT's action, and departments have finished
+    # deciding by the time the request is in implementation: the work is with
+    # the staff and the event is public. Without this a manager could push an
+    # already approved task back and un-publish a live event.
+    if _request_status(cur, request_id) == IMPLEMENTATION:
+        raise WorkflowError(
+            "Every department has approved this proposal and the work is under way. "
+            "It can no longer be sent back."
+        )
     comment = (comment or "").strip()
     if not comment:
         # A department cannot reject, so this comment is the entire message to
@@ -340,6 +502,9 @@ def assign_staff(cur, task_id: int, staff_user_id: int, assigned_by_user_id: int
         previous_status=previous,
         new_status=TASK_APPROVED,
     )
+    # Assigning IS approving, so this can be the last department decision the
+    # request was waiting on - the usual way it reaches implementation.
+    recompute_department_phase(cur, task["request_id"])
     return load_task(cur, task_id)
 
 
@@ -453,7 +618,14 @@ def assign_to_row(
         comment=f"row {row_id}",
     )
 
-    if task["status"] not in TASK_TERMINAL and task["status"] != TASK_APPROVED:
+    # "Assigning IS approving" - but only once the LAST row has someone on it. Flipping to
+    # approved on the first assignee is what let a manager staff one of three requests and have
+    # the task read as decided, with the other two silently unowned.
+    if (
+        task["status"] not in TASK_TERMINAL
+        and task["status"] != TASK_APPROVED
+        and not unallocated_row_count(cur, task["request_id"], requirement_name)
+    ):
         previous = task["status"]
         cur.execute(
             """UPDATE request_task SET status = %s, resolved_at = now(), resolved_by_user_id = %s
@@ -471,6 +643,7 @@ def assign_to_row(
             previous_status=previous,
             new_status=TASK_APPROVED,
         )
+        recompute_department_phase(cur, task["request_id"])
     return load_task(cur, task_id)
 
 
@@ -500,20 +673,12 @@ def rows_fully_staffed(cur, task_id: int, requirement_name: str) -> bool:
     """Whether every row of this task's requirement has at least one assignee -
     the gate the Approve modal's [disabled] uses before it will let the
     manager approve. A task with zero rows counts as staffed (nothing to
-    assign), matching how the rest of this module treats an empty request."""
-    table, pk_column = TABLE_FOR_REQUIREMENT[requirement_name]
+    assign), matching how the rest of this module treats an empty request.
+
+    Shares unallocated_row_count() with the server-side gate in approve_task, so
+    the button the manager sees and the rule the server enforces cannot drift."""
     task = load_task(cur, task_id)
-    unstaffed = fetch_one(
-        cur,
-        f"""SELECT count(*) AS c FROM {table} d
-             WHERE d.request_id = %s
-               AND NOT EXISTS (
-                    SELECT 1 FROM request_row_assignment a
-                     WHERE a.requirement_name = %s AND a.row_id = d.{pk_column}
-               )""",
-        (task["request_id"], requirement_name),
-    )
-    return unstaffed["c"] == 0
+    return unallocated_row_count(cur, task["request_id"], requirement_name) == 0
 
 
 def update_row_status(cur, row_assignment_id: int, status: str, actor_user_id: int) -> dict:
@@ -604,7 +769,7 @@ def update_row_status(cur, row_assignment_id: int, status: str, actor_user_id: i
                 previous_status=task["status"],
                 new_status=TASK_COMPLETED,
             )
-            check_all_tasks_resolved(cur, task["request_id"])
+            recompute_department_phase(cur, task["request_id"])
     return fetch_one(cur, "SELECT * FROM request_row_assignment WHERE request_row_assignment_id = %s", (row_assignment_id,))
 
 
@@ -685,7 +850,7 @@ def update_task_status(cur, task_id: int, status: str, actor_user_id: int) -> di
         new_status=status,
     )
     if status == TASK_COMPLETED:
-        check_all_tasks_resolved(cur, task["request_id"])
+        recompute_department_phase(cur, task["request_id"])
     return load_task(cur, task_id)
 
 

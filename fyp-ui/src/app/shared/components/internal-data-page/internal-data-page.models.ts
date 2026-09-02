@@ -85,6 +85,10 @@ export interface InternalMobileRecord {
 export interface InternalDataRecord {
   readonly id: string | number;
   readonly emphasized?: boolean;
+  // Tints the whole row (and its mobile card) instead of one cell — for a state that describes the
+  // record rather than any single column, e.g. a proposal whose event is days away. Colour alone is
+  // never the only signal: the row that sets this must still say why in one of its cells.
+  readonly rowTone?: InternalCellTone;
   readonly cells: Readonly<Record<string, InternalDataCell>>;
   readonly mobile: InternalMobileRecord;
   readonly actionKeys?: readonly string[];

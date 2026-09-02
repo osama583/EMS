@@ -10,7 +10,7 @@
   />
 
   @if (showSkeleton()) {
-    <app-skeleton variant="cards" label="Loading events…" [count]="pageSize()" />
+    <app-skeleton variant="events" label="Loading events…" [count]="pageSize()" />
   } @else if (error()) {
     <app-internal-page-state icon="error" title="Unable to load events" [description]="error()" [showClear]="false" />
   } @else if (entries().length === 0) {

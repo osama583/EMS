@@ -103,8 +103,9 @@ EXCLUDED_COLUMNS: dict[str, frozenset[str]] = {
 # `status`, which is precisely the fact a wrong query gets wrong. Keyed "table.column".
 COLUMN_NOTES: dict[str, str] = {
     "request.status": (
-        "Proposal workflow state. Only 'completed_approved' means the event is PUBLISHED and "
-        "visible as a real event. Every other value ('draft', 'submitted', 'hos_hod_review', "
+        "Proposal workflow state. 'implementation' (every department approved and assigned, "
+        "staff carrying the work out) and 'completed_approved' both mean the event is PUBLISHED "
+        "and visible as a real event. Every other value ('draft', 'submitted', 'hos_hod_review', "
         "'fmb_review', 'cfo_review', 'department_review', 'resubmission_required', "
         "'completed_rejected', 'cancelled') is an in-flight or dead PROPOSAL and must never be "
         "presented as an event."

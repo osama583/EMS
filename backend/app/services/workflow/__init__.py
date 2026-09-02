@@ -35,7 +35,7 @@ update_task_status = tasks.update_task_status
 tasks_for_request = tasks.tasks_for_request
 find_task = tasks.find_task
 load_task = tasks.load_task
-check_all_tasks_resolved = tasks.check_all_tasks_resolved
+recompute_department_phase = tasks.recompute_department_phase
 applicant_resubmit_task = tasks.applicant_resubmit_task
 row_assignments_for_task = tasks.row_assignments_for_task
 assign_to_row = tasks.assign_to_row
@@ -89,7 +89,7 @@ __all__ = [
     "tasks_for_request",
     "find_task",
     "load_task",
-    "check_all_tasks_resolved",
+    "recompute_department_phase",
     "applicant_resubmit_task",
     "row_assignments_for_task",
     "assign_to_row",

@@ -19,6 +19,10 @@ HOS_HOD_REVIEW = "hos_hod_review"
 FMB_REVIEW = "fmb_review"
 CFO_REVIEW = "cfo_review"
 DEPARTMENT_REVIEW = "department_review"
+# Every department has approved and assigned; the work is in staff inboxes and
+# the event is published. Departments decide at DEPARTMENT_REVIEW, staff carry
+# out at IMPLEMENTATION - see recompute_department_phase() in tasks.py.
+IMPLEMENTATION = "implementation"
 RESUBMISSION_REQUIRED = "resubmission_required"
 COMPLETED_APPROVED = "completed_approved"
 COMPLETED_REJECTED = "completed_rejected"
@@ -125,6 +129,7 @@ STAGE_FOR_CLIENT = {
     FMB_REVIEW: "fmb-review",
     CFO_REVIEW: "cfo-review",
     DEPARTMENT_REVIEW: "department-review",
+    IMPLEMENTATION: "implementation",
     RESUBMISSION_REQUIRED: "resubmission-required",
     COMPLETED_APPROVED: "approved",
     COMPLETED_REJECTED: "rejected",

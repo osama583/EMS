@@ -488,6 +488,7 @@ _STAGE_LABEL = {
     "fmb_review": "F&B review",
     "cfo_review": "CFO review",
     "department_review": "department review",
+    "implementation": "implementation",
 }
 
 
@@ -507,14 +508,16 @@ def escalation_decision_due(cur, proposal: dict, *, urgent: bool) -> int:
 
     At department_review the holders are the departments that have not
     responded - each gets its own email about its own task, since none of them
-    can act for another.
+    can act for another. Implementation is chased the same way: the department
+    head owns their staff's delivery, and it is still their task that has not
+    reached 'completed'.
     """
     stage = proposal["status"]
     label = _STAGE_LABEL.get(stage, stage)
     schedule = _schedule_line(cur, proposal["request_id"])
     sent = 0
 
-    if stage == "department_review":
+    if stage in ("department_review", "implementation"):
         targets = recipients.department_heads_for_request(cur, proposal["request_id"])
     else:
         targets = recipients.reviewers_for_stage(cur, stage, proposal["applicant_user_id"])

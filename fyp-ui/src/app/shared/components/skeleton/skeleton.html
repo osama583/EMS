@@ -29,6 +29,19 @@
     </div>
   }
 
+  @case ('events') {
+    <div class="skeleton skeleton--events" aria-hidden="true">
+      @for (card of rows(); track card) {
+        <article class="skeleton__poster">
+          <span class="skeleton__bone skeleton__bone--chip"></span>
+          <span class="skeleton__bone skeleton__bone--title"></span>
+          <span class="skeleton__bone" [style.width]="width(card)"></span>
+          <span class="skeleton__bone" [style.width]="width(card + 1)"></span>
+        </article>
+      }
+    </div>
+  }
+
   @case ('fields') {
     <div class="skeleton skeleton--fields" aria-hidden="true">
       @for (field of rows(); track field) {
@@ -101,6 +114,24 @@
           <span class="skeleton__bone skeleton__bone--metric"></span>
         </div>
       }
+    </div>
+  }
+
+  @case ('calendar') {
+    <div class="skeleton skeleton--calendar" aria-hidden="true">
+      <div class="skeleton__weekdays">
+        @for (day of week; track day) { <span class="skeleton__bone skeleton__bone--weekday"></span> }
+      </div>
+      <div class="skeleton__month">
+        @for (day of days(); track day) {
+          <div class="skeleton__day">
+            <span class="skeleton__bone skeleton__bone--daynum"></span>
+            @for (chip of chipsFor(day); track chip) {
+              <span class="skeleton__bone skeleton__bone--event"></span>
+            }
+          </div>
+        }
+      </div>
     </div>
   }
 

@@ -69,10 +69,37 @@ export interface EventRegistration {
   readonly name: string;
   readonly reason: string;
   readonly registeredAt: string;
+  // When the organiser approved or rejected this registration. NULL for rows decided
+  // before migration 039 recorded it, and for automatic-approval events, where the
+  // registration IS the decision — both fall back to registeredAt for display.
+  readonly decidedAt: string | null;
   readonly status: 'confirmed' | 'pending' | 'rejected';
   readonly paymentProofUrl: string | null;
   readonly paymentProofFileName: string | null;
   readonly paymentStatus: PaymentStatus;
+}
+
+/** What the organiser's attendee panel asks the server for. */
+export interface RegistrationListQuery {
+  readonly q?: string;
+  readonly order?: 'asc' | 'desc';
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+/**
+ * One page of an event's attendees.
+ *
+ * `counts` is deliberately not derived from `items`: the panel's tiles describe the
+ * event, so they must hold still while the reader searches and pages.
+ */
+export interface RegistrationListPage {
+  readonly items: readonly EventRegistration[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly totalPages: number;
+  readonly counts: { readonly confirmed: number; readonly pending: number; readonly rejected: number };
 }
 
 export interface RegistrationResult { readonly status: RegistrationStatus; readonly message: string; }

@@ -68,6 +68,11 @@ OVERDUE_STATUS = {
     "fmb_review": "overdue_fmb",
     "cfo_review": "overdue_cfo",
     "department_review": "overdue_department",
+    # Deliberately the same bucket: implementation is the second half of the
+    # department stage, and a proposal that would go overdue before the split
+    # must still go overdue after it. Which departments had not finished is
+    # recorded separately, as it is for department_review.
+    "implementation": "overdue_department",
 }
 
 # Stages that can go overdue. 'submitted' is deliberately absent: it is a
@@ -290,7 +295,7 @@ def mark_proposal_overdue(cur, proposal: dict) -> str:
     new_status = OVERDUE_STATUS[stage]
 
     note = f"No decision was recorded before the event date ({proposal['first_date']:%d %b %Y})."
-    if stage == "department_review":
+    if stage in ("department_review", "implementation"):
         pending = pending_department_labels(cur, proposal["request_id"])
         if pending:
             note += " Still awaiting: " + ", ".join(pending) + "."

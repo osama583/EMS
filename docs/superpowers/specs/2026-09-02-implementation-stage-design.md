@@ -47,11 +47,26 @@ terminal? It becomes a phase recompute over the same task rows:
 | Condition | Status |
 |---|---|
 | every task terminal (`completed`/`cancelled`) | `completed_approved` |
-| no task `pending` or `resubmitted` | `implementation` |
+| no task and no cafeteria order `pending` or `resubmitted` | `implementation` |
 | otherwise | `department_review` |
 
-It runs at the four sites that call it today, **plus after `approve_task()`**,
-which has no such call now and is the moment the last manager approves.
+The cafeteria manager's approval of a food order is part of department review,
+not of implementation: F&B and the cafeteria are both departments deciding.
+So an approved F&B task with an order still awaiting its cafeteria manager
+keeps the whole request in `department_review`.
+
+That gap is real, not theoretical: `assert_work_allocated()` only requires a
+live order to EXIST, so the F&B head can approve the task the moment F&B
+places the order, before its cafeteria has answered.
+
+It runs at the sites that call the old completion check, plus at every action
+that can be the last department decision - none of which had such a call:
+
+- `approve_task()`, on both its return paths
+- `assign_staff()` and `assign_to_row()`, because assigning IS approving (the
+  usual way a task reaches `approved` in practice)
+- `approve_selection()`, where the old `check_fmb_task_resolved()` no-ops until
+  every order is terminal, which is delivery - far too late
 
 Entering implementation always means every row of work has an assignee.
 `approve_task()` already refuses to approve a task with unallocated rows via
@@ -71,11 +86,13 @@ staff's. One guard in the service covers the single route that reaches it
 This closes the question of a published event un-publishing itself: no path
 returns a request from `implementation` to `department_review`.
 
-**Deliberately left open:** the cafeteria manager's push-back of one order to
-F&B. The F&B *task* can be approved while an individual order is still
-`pending` - on EVT-07322 the task was approved at 06:09 and the order at 07:41.
-That exchange is internal to two departments, never reaches the applicant and
-never changes `request.status`, so it stays available during implementation.
+`send_selection_back()` - the cafeteria manager pushing one food order back to
+F&B - is frozen on the same condition, for the same reason: both are
+departments deciding, and implementation begins only once they have.
+
+Staff never had either action. They approve, prepare and complete their own
+rows; they cannot reject a request or ask the applicant for changes, and that
+does not change here.
 
 ### Publication
 
@@ -157,6 +174,9 @@ In `test_workflow_e2e.py`, against the real database:
   `completed_approved`
 - completing every row then completes the request
 - a department send-back during implementation is refused
+- a cafeteria order send-back during implementation is refused
+- an approved F&B task with an order still pending its cafeteria manager keeps
+  the request in `department_review`
 - a task that skips to `completed` (water-only F&B) still lets the phase advance
 
 For publication, covering the tier rules rather than only the happy path:
@@ -171,5 +191,4 @@ For publication, covering the tier rules rather than only the happy path:
 
 - Re-stamping `request_task.stage_code`.
 - Any change to how staff progress their rows.
-- Freezing the cafeteria/F&B order loop.
 - A distinct overdue status for implementation.
