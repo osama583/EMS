@@ -100,11 +100,11 @@ def body_paragraph(model, text: str):
     return new
 
 
-def picture_paragraph(doc, path: str):
+def picture_paragraph(doc, path: str, width=None):
     """Build the picture in a scratch paragraph, then hand back its XML."""
     para = doc.add_paragraph()
     para.alignment = 1                                   # centred
-    para.add_run().add_picture(path, width=FIG_WIDTH)
+    para.add_run().add_picture(path, width=width or FIG_WIDTH)
     element = para._p
     element.getparent().remove(element)
     return element

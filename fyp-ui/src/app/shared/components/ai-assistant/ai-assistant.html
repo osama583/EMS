@@ -1,5 +1,6 @@
 <aside class="ai-assistant" [class.ai-assistant--open]="open()" [class.ai-assistant--expanded]="open() && expanded()" aria-label="APU assistant">
   <app-event-details-modal [open]="!!selectedCardEvent()" [event]="selectedCardEvent()" (close)="closeCardEvent()" (registered)="onCardEventRegistered($event)" />
+  <app-club-details-modal [open]="!!selectedCardClub()" [club]="selectedCardClub()" [viewerUserId]="currentUserId()" (close)="closeCardClub()" (joined)="onCardClubJoined($event)" />
   @if (open()) {
     <section id="apu-ai-chat" class="ai-chat" [class.ai-chat--expanded]="expanded()" [class.ai-chat--sidebar-collapsed]="expanded() && sidebarCollapsed()" role="dialog" [attr.aria-modal]="expanded() ? 'true' : 'false'" aria-labelledby="ai-chat-title">
       @if (expanded()) {
@@ -163,7 +164,7 @@
           }
           @if (typing()) { <div class="ai-chat__typing" role="status" aria-label="Assistant is typing"><i></i><i></i><i></i></div> }
 
-          @if (!hasInteracted()) {
+          @if (!hasInteracted() && cardPages().length) {
             <div class="ai-suggestions" aria-label="Suggested questions">
               <p class="ai-suggestions__label">What would you like to know?</p>
               <div class="ai-suggestions__track">

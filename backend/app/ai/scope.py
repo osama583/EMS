@@ -791,8 +791,9 @@ FUNCTIONS: dict[str, Function] = {fn.key: fn for fn in (
         "See what the assistant declined to answer, for whom, and why.",
         ("Open Internal Directory, then AI Access Log.",
          "Filter by person, topic or reason.",
-         "A permissions refusal points at a Page Visibility grant; an unsupported one points at a "
-         "capability the assistant does not have."),
+         "Out of user scope points at a Page Visibility grant; blocked as harmful means somebody "
+         "tried to break the assistant; needs fixing is not a refusal at all - the assistant meant "
+         "to answer and broke."),
         aliases=("review declined questions", "see the ai access log", "see refused questions")),
     _fn("configure_policies", "Change an approval rule", ("admin-settings-policies",),
         "Adjust how proposals are routed and the policy numbers behind that routing.",

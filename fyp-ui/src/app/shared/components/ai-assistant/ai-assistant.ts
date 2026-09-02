@@ -8,6 +8,10 @@ import { PublishedEvent, RegistrationResult } from '../../../core/events/publish
 import { PublishedEventService } from '../../../core/events/published-event.service';
 import { EVENT_IMAGE_PLACEHOLDER } from '../../event-image-placeholder';
 import { EventDetailsModalComponent } from '../event-details-modal/event-details-modal';
+import { ClubDetailsModalComponent } from '../club-details-modal/club-details-modal';
+import { AuthService } from '../../../core/auth/auth.service';
+import { ClubService } from '../../../core/clubs/club.service';
+import { ClubRecord } from '../../../core/clubs/club.models';
 import { AiOrbAwarenessService } from './ai-orb-awareness.service';
 
 interface SuggestionCard { readonly icon: string; readonly title: string; readonly description: string; readonly prompt: string; }
@@ -108,7 +112,7 @@ function randomBetween(min: number, max: number): number { return min + Math.ran
 
 @Component({
   selector: 'app-ai-assistant',
-  imports: [EventDetailsModalComponent],
+  imports: [EventDetailsModalComponent, ClubDetailsModalComponent],
   templateUrl: './ai-assistant.html',
   styleUrl: './ai-assistant.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -120,6 +124,8 @@ export class AiAssistantComponent implements OnDestroy {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly publishedEventService = inject(PublishedEventService);
+  private readonly clubService = inject(ClubService);
+  private readonly auth = inject(AuthService);
   readonly launcher = viewChild<ElementRef<HTMLButtonElement>>('launcher');
   readonly composer = viewChild<ElementRef<HTMLTextAreaElement>>('composer');
   readonly messageArea = viewChild<ElementRef<HTMLElement>>('messageArea');
@@ -143,12 +149,17 @@ export class AiAssistantComponent implements OnDestroy {
   // the server knows which questions this particular reader can actually have answered. The list
   // used to be fixed and proposal-shaped, so most readers were offered questions that would then
   // be refused.
-  readonly suggestionCards = signal<readonly SuggestionCard[]>(FALLBACK_SUGGESTION_CARDS);
+  // Starts EMPTY, not with the fallback. The fallback is the failure path, and rendering it
+  // up front made every open flash three cards and then swap them for the real eight - a
+  // visible content change on a panel the reader is already looking at. Nothing shows until
+  // the fetch settles; the suggestion block is hidden while this is empty.
+  readonly suggestionCards = signal<readonly SuggestionCard[]>([]);
   readonly cardPages = computed(() => paginateCards(this.suggestionCards()));
   private suggestionsRequested = false;
   // Card click opens the event details modal on top of the chat (chat stays open) instead of
   // navigating away — see openEventFromCard().
   readonly selectedCardEvent = signal<PublishedEvent | null>(null);
+  readonly selectedCardClub = signal<ClubRecord | null>(null);
 
   // The active conversation drives everything the template renders — created lazily (see
   // ensureConversationId()) so opening the panel for the first time never writes an empty conversation
@@ -242,6 +253,16 @@ export class AiAssistantComponent implements OnDestroy {
       this.error.set('');
       this.showHistory.set(false);
       this.activeConversationId.set(this.store.activeId());
+      // The opening cards belong to the PREVIOUS user and must be re-fetched, not kept. They are
+      // requested once per component instance, and <app-ai-assistant> lives in app.html - the root
+      // shell, which a login or logout navigates under rather than destroying. So the guard stayed
+      // true for the life of the tab: a Student opened the panel, signed out, signed back in as a
+      // Lecturer, and was still offered "Find Me a Club" for a Discover Clubs page granted only to
+      // students. Clicking one asked a question the assistant then refused, which is precisely what
+      // computing the list from page access is supposed to make impossible.
+      this.suggestionsRequested = false;
+      this.suggestionCards.set([]);
+      if (this.open()) this.loadSuggestions();
       // Deferred to a macrotask, outside this effect's own synchronous run: calling send() in-line
       // here re-enters signal writes (typing/draft/pendingMessage) while Angular is still flushing
       // THIS effect, which risks the effect being re-scheduled before the recovered request has a
@@ -308,8 +329,8 @@ export class AiAssistantComponent implements OnDestroy {
     if (this.suggestionsRequested) return;
     this.suggestionsRequested = true;
     this.assistant.suggestions().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (cards) => { if (cards.length) this.suggestionCards.set(cards); },
-      error: () => { /* keep the fallback cards */ },
+      next: (cards) => this.suggestionCards.set(cards.length ? cards : FALLBACK_SUGGESTION_CARDS),
+      error: () => this.suggestionCards.set(FALLBACK_SUGGESTION_CARDS),
     });
   }
 
@@ -327,6 +348,7 @@ export class AiAssistantComponent implements OnDestroy {
     // scroll-lock held (see FormModalComponent.lockPage()) with no visible way back to it, since the
     // chat surface that owned the card is now hidden.
     this.selectedCardEvent.set(null);
+    this.selectedCardClub.set(null);
     // Leaving full-page mode via the close button needs to actually navigate off /assistant —
     // otherwise the URL still says /assistant while the panel has collapsed to the floating widget.
     if (wasFullPage && isAssistantUrl(this.router.url)) void this.router.navigateByUrl(this.pageBeforeAssistant());
@@ -470,14 +492,36 @@ export class AiAssistantComponent implements OnDestroy {
     this.closePanel();
   }
 
-  // Carries the club id through as `?club=<id>`, which Discover Clubs uses to open that club's join
-  // dialog on arrival (see ClubDiscoverComponent.openClubFromQueryParam).
+  // Opens the club's own popup, the way an event card does - it used to navigate to Discover Clubs
+  // with `?club=<id>`, which threw the reader out of the conversation to read three lines and press
+  // one button, and did nothing at all for a club they were already in (Discover lists only
+  // JOINABLE clubs, so a member's own club landed them on an unfiltered list with no explanation).
+  //
+  // Fetched WITH viewerUserId, because the whole point is that the join action is shown only to
+  // someone who can take it: `GET /clubs?viewerUserId=` is what carries viewerIsMember /
+  // viewerIsPresident / viewerHasPendingRequest, and the same call Discover Clubs already makes.
+  // A signed-out reader has no viewer perspective and no join action, so they still go to /login.
   openClubFromCard(clubId: string): void {
-    const underApp = this.router.url.startsWith('/app');
-    void this.router.navigate([underApp ? '/app/clubs/discover' : '/login'], {
-      queryParams: underApp && clubId ? { club: clubId } : undefined,
+    const viewerUserId = this.currentUserId();
+    if (!viewerUserId) { void this.router.navigate(['/login']); this.closePanel(); return; }
+    this.clubService.getClubs({ activeOnly: true, viewerUserId }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (clubs) => {
+        const club = clubs.find((item) => item.id === clubId);
+        if (club) this.selectedCardClub.set(club);
+      },
+      error: () => { /* Club no longer available - nothing to open. */ },
     });
-    this.closePanel();
+  }
+
+  currentUserId(): string { return this.auth.user()?.id ?? ''; }
+
+  closeCardClub(): void { this.selectedCardClub.set(null); }
+
+  // The card's own copy is now stale (the request is pending), and the popup closes on success -
+  // so the only thing to do is stop offering the action if they open it again in this session.
+  onCardClubJoined(clubId: string): void {
+    this.selectedCardClub.update((club) =>
+      club && club.id === clubId ? { ...club, viewerHasPendingRequest: true } : club);
   }
   // Seed/demo event images are frequently an external placeholder URL (placehold.co) that a browser
   // extension, ad-blocker, or offline network can fail to load — same risk EventCardComponent guards

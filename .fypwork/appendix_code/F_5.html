@@ -1,0 +1,104 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+html,body{margin:0;padding:0;background:#fff;}
+body{font-family:"Segoe UI",Arial,sans-serif;}
+.wrap{width:1180px;border:1px solid #d7dde5;border-radius:6px;overflow:hidden;}
+.hd{background:#1b2a41;color:#fff;padding:11px 18px;display:flex;
+    justify-content:space-between;align-items:center;font-size:15px;}
+.hd .lbl{font-weight:700;}
+.hd .lbl span{font-family:Consolas,"Courier New",monospace;font-weight:400;
+              color:#a8c4e6;margin-left:10px;}
+.hd .src{font-size:12.5px;color:#c3d3e8;font-family:Consolas,"Courier New",monospace;}
+.desc{background:#f2f5f9;border-bottom:1px solid #dde3ea;color:#20344d;
+      padding:10px 18px;font-size:13.5px;}
+table.code{border-collapse:collapse;width:100%;background:#fff;}
+td.ln{background:#f0f2f5;color:#8b95a3;text-align:right;padding:0 11px;width:1%;
+      font-family:Consolas,"Courier New",monospace;font-size:12.5px;
+      user-select:none;border-right:1px solid #e2e6ec;}
+td.cd{padding:0 0 0 14px;font-family:Consolas,"Courier New",monospace;font-size:12.5px;
+      white-space:pre;color:#1f2933;}
+tr{height:21px;}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.cd .hll { background-color: #ffffcc }
+.cd { background: #f8f8f8; }
+.cd .c { color: #3D7B7B; font-style: italic } /* Comment */
+.cd .err { border: 1px solid #F00 } /* Error */
+.cd .k { color: #008000; font-weight: bold } /* Keyword */
+.cd .o { color: #666 } /* Operator */
+.cd .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.cd .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.cd .cp { color: #9C6500 } /* Comment.Preproc */
+.cd .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.cd .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.cd .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.cd .gd { color: #A00000 } /* Generic.Deleted */
+.cd .ge { font-style: italic } /* Generic.Emph */
+.cd .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.cd .gr { color: #E40000 } /* Generic.Error */
+.cd .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.cd .gi { color: #008400 } /* Generic.Inserted */
+.cd .go { color: #717171 } /* Generic.Output */
+.cd .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.cd .gs { font-weight: bold } /* Generic.Strong */
+.cd .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.cd .gt { color: #04D } /* Generic.Traceback */
+.cd .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.cd .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.cd .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.cd .kp { color: #008000 } /* Keyword.Pseudo */
+.cd .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.cd .kt { color: #B00040 } /* Keyword.Type */
+.cd .m { color: #666 } /* Literal.Number */
+.cd .s { color: #BA2121 } /* Literal.String */
+.cd .na { color: #687822 } /* Name.Attribute */
+.cd .nb { color: #008000 } /* Name.Builtin */
+.cd .nc { color: #00F; font-weight: bold } /* Name.Class */
+.cd .no { color: #800 } /* Name.Constant */
+.cd .nd { color: #A2F } /* Name.Decorator */
+.cd .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.cd .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.cd .nf { color: #00F } /* Name.Function */
+.cd .nl { color: #767600 } /* Name.Label */
+.cd .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.cd .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.cd .nv { color: #19177C } /* Name.Variable */
+.cd .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.cd .w { color: #BBB } /* Text.Whitespace */
+.cd .mb { color: #666 } /* Literal.Number.Bin */
+.cd .mf { color: #666 } /* Literal.Number.Float */
+.cd .mh { color: #666 } /* Literal.Number.Hex */
+.cd .mi { color: #666 } /* Literal.Number.Integer */
+.cd .mo { color: #666 } /* Literal.Number.Oct */
+.cd .sa { color: #BA2121 } /* Literal.String.Affix */
+.cd .sb { color: #BA2121 } /* Literal.String.Backtick */
+.cd .sc { color: #BA2121 } /* Literal.String.Char */
+.cd .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.cd .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.cd .s2 { color: #BA2121 } /* Literal.String.Double */
+.cd .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.cd .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.cd .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.cd .sx { color: #008000 } /* Literal.String.Other */
+.cd .sr { color: #A45A77 } /* Literal.String.Regex */
+.cd .s1 { color: #BA2121 } /* Literal.String.Single */
+.cd .ss { color: #19177C } /* Literal.String.Symbol */
+.cd .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.cd .fm { color: #00F } /* Name.Function.Magic */
+.cd .vc { color: #19177C } /* Name.Variable.Class */
+.cd .vg { color: #19177C } /* Name.Variable.Global */
+.cd .vi { color: #19177C } /* Name.Variable.Instance */
+.cd .vm { color: #19177C } /* Name.Variable.Magic */
+.cd .il { color: #666 } /* Literal.Number.Integer.Long */</style></head><body>
+<div class="wrap">
+  <div class="hd">
+    <div class="lbl">F.5<span>identity.py</span></div>
+    <div class="src">backend/app/services/identity.py | lines 95-148</div>
+  </div>
+  <div class="desc">Resolving which pages a caller may open, from the grant tables.</div>
+  <table class="code"><tr><td class="ln">95</td><td class="cd"><span class="k">def</span><span class="w"> </span><span class="nf">_satisfies_grant</span><span class="p">(</span><span class="n">roles</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span> <span class="n">grant</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span></td></tr><tr><td class="ln">96</td><td class="cd">    <span class="n">role_codes</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">grant</span><span class="p">[</span><span class="s2">"role_codes"</span><span class="p">]</span> <span class="ow">or</span> <span class="p">())</span></td></tr><tr><td class="ln">97</td><td class="cd">    <span class="n">unit_codes</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">grant</span><span class="p">[</span><span class="s2">"unit_codes"</span><span class="p">]</span> <span class="ow">or</span> <span class="p">())</span></td></tr><tr><td class="ln">98</td><td class="cd">    <span class="k">if</span> <span class="n">grant</span><span class="p">[</span><span class="s2">"grant_type"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"role"</span><span class="p">:</span></td></tr><tr><td class="ln">99</td><td class="cd">        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">"roleCode"</span><span class="p">]</span> <span class="ow">in</span> <span class="n">role_codes</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">roles</span><span class="p">)</span></td></tr><tr><td class="ln">100</td><td class="cd">    <span class="k">if</span> <span class="n">grant</span><span class="p">[</span><span class="s2">"grant_type"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"unit"</span><span class="p">:</span></td></tr><tr><td class="ln">101</td><td class="cd">        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">"unitCode"</span><span class="p">]</span> <span class="ow">in</span> <span class="n">unit_codes</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">roles</span><span class="p">)</span></td></tr><tr><td class="ln">102</td><td class="cd">    <span class="k">if</span> <span class="n">grant</span><span class="p">[</span><span class="s2">"grant_type"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"cafeteria"</span><span class="p">:</span></td></tr><tr><td class="ln">103</td><td class="cd">        <span class="c1"># Names the group, not its members: any listed role held in ANY cafeteria,</span></td></tr><tr><td class="ln">104</td><td class="cd">        <span class="c1"># including outlets created after this grant was written. Cafeteria staff</span></td></tr><tr><td class="ln">105</td><td class="cd">        <span class="c1"># all see the same pages, so enumerating outlets only went stale.</span></td></tr><tr><td class="ln">106</td><td class="cd">        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span></td></tr><tr><td class="ln">107</td><td class="cd">            <span class="n">r</span><span class="p">[</span><span class="s2">"roleCode"</span><span class="p">]</span> <span class="ow">in</span> <span class="n">role_codes</span> <span class="ow">and</span> <span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">"unitCode"</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">CAFETERIA_UNIT_PREFIX</span><span class="p">)</span></td></tr><tr><td class="ln">108</td><td class="cd">            <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">roles</span></td></tr><tr><td class="ln">109</td><td class="cd">        <span class="p">)</span></td></tr><tr><td class="ln">110</td><td class="cd">    <span class="c1"># unit_role: cross-product WITHIN the row - any listed role held in any listed unit.</span></td></tr><tr><td class="ln">111</td><td class="cd">    <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">"roleCode"</span><span class="p">]</span> <span class="ow">in</span> <span class="n">role_codes</span> <span class="ow">and</span> <span class="n">r</span><span class="p">[</span><span class="s2">"unitCode"</span><span class="p">]</span> <span class="ow">in</span> <span class="n">unit_codes</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">roles</span><span class="p">)</span></td></tr><tr><td class="ln">112</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">113</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">114</td><td class="cd"><span class="k">def</span><span class="w"> </span><span class="nf">nav_tree_for</span><span class="p">(</span><span class="n">user_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">roles</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span></td></tr><tr><td class="ln">115</td><td class="cd"><span class="w">    </span><span class="sd">"""Ordered, permission-filtered sidebar tree.</span></td></tr><tr><td class="ln">116</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">117</td><td class="cd"><span class="sd">    A page with zero grant rows is visible to nobody - fail closed. A folder the</span></td></tr><tr><td class="ln">118</td><td class="cd"><span class="sd">    user cannot see hides all of its children, even ones they would otherwise</span></td></tr><tr><td class="ln">119</td><td class="cd"><span class="sd">    pass.</span></td></tr><tr><td class="ln">120</td><td class="cd"><span class="sd">    """</span></td></tr><tr><td class="ln">121</td><td class="cd">    <span class="n">roles</span> <span class="o">=</span> <span class="n">roles</span> <span class="k">if</span> <span class="n">roles</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">roles_for</span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span></td></tr><tr><td class="ln">122</td><td class="cd">    <span class="n">pages</span> <span class="o">=</span> <span class="n">query</span><span class="p">(</span><span class="n">_NAV_PAGES_SQL</span><span class="p">)</span></td></tr><tr><td class="ln">123</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">124</td><td class="cd">    <span class="n">grants_by_page</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span></td></tr><tr><td class="ln">125</td><td class="cd">    <span class="k">for</span> <span class="n">grant</span> <span class="ow">in</span> <span class="n">query</span><span class="p">(</span><span class="n">_NAV_GRANTS_SQL</span><span class="p">):</span></td></tr><tr><td class="ln">126</td><td class="cd">        <span class="n">grants_by_page</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">grant</span><span class="p">[</span><span class="s2">"page_code"</span><span class="p">],</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">grant</span><span class="p">)</span></td></tr><tr><td class="ln">127</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">128</td><td class="cd">    <span class="k">def</span><span class="w"> </span><span class="nf">visible</span><span class="p">(</span><span class="n">page</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span></td></tr><tr><td class="ln">129</td><td class="cd">        <span class="n">grants</span> <span class="o">=</span> <span class="n">grants_by_page</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">page</span><span class="p">[</span><span class="s2">"page_code"</span><span class="p">],</span> <span class="p">[])</span></td></tr><tr><td class="ln">130</td><td class="cd">        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">_satisfies_grant</span><span class="p">(</span><span class="n">roles</span><span class="p">,</span> <span class="n">g</span><span class="p">)</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">grants</span><span class="p">)</span></td></tr><tr><td class="ln">131</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">132</td><td class="cd">    <span class="k">def</span><span class="w"> </span><span class="nf">build</span><span class="p">(</span><span class="n">parent_code</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span></td></tr><tr><td class="ln">133</td><td class="cd">        <span class="k">return</span> <span class="p">[</span></td></tr><tr><td class="ln">134</td><td class="cd">            <span class="p">{</span></td></tr><tr><td class="ln">135</td><td class="cd">                <span class="s2">"pageCode"</span><span class="p">:</span> <span class="n">page</span><span class="p">[</span><span class="s2">"page_code"</span><span class="p">],</span></td></tr><tr><td class="ln">136</td><td class="cd">                <span class="s2">"label"</span><span class="p">:</span> <span class="n">page</span><span class="p">[</span><span class="s2">"label"</span><span class="p">],</span></td></tr><tr><td class="ln">137</td><td class="cd">                <span class="s2">"entryType"</span><span class="p">:</span> <span class="n">page</span><span class="p">[</span><span class="s2">"entry_type"</span><span class="p">],</span></td></tr><tr><td class="ln">138</td><td class="cd">                <span class="s2">"icon"</span><span class="p">:</span> <span class="n">page</span><span class="p">[</span><span class="s2">"icon"</span><span class="p">],</span></td></tr><tr><td class="ln">139</td><td class="cd">                <span class="s2">"routePath"</span><span class="p">:</span> <span class="n">page</span><span class="p">[</span><span class="s2">"route_path"</span><span class="p">],</span></td></tr><tr><td class="ln">140</td><td class="cd">                <span class="s2">"children"</span><span class="p">:</span> <span class="n">build</span><span class="p">(</span><span class="n">page</span><span class="p">[</span><span class="s2">"page_code"</span><span class="p">])</span> <span class="k">if</span> <span class="n">page</span><span class="p">[</span><span class="s2">"entry_type"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"folder"</span> <span class="k">else</span> <span class="p">[],</span></td></tr><tr><td class="ln">141</td><td class="cd">            <span class="p">}</span></td></tr><tr><td class="ln">142</td><td class="cd">            <span class="k">for</span> <span class="n">page</span> <span class="ow">in</span> <span class="n">pages</span></td></tr><tr><td class="ln">143</td><td class="cd">            <span class="k">if</span> <span class="n">page</span><span class="p">[</span><span class="s2">"parent_page_code"</span><span class="p">]</span> <span class="o">==</span> <span class="n">parent_code</span> <span class="ow">and</span> <span class="n">visible</span><span class="p">(</span><span class="n">page</span><span class="p">)</span></td></tr><tr><td class="ln">144</td><td class="cd">        <span class="p">]</span></td></tr><tr><td class="ln">145</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">146</td><td class="cd">    <span class="k">return</span> <span class="n">build</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span></td></tr><tr><td class="ln">147</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">148</td><td class="cd">&nbsp;</td></tr></table>
+</div></body></html>

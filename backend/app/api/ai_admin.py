@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-from ..ai import schema_catalog
+from ..ai import schema_catalog, topic_access
 from ..db import query, query_one, transaction
 from ..logging_setup import audit
 from ..security import require_admin
@@ -35,11 +35,9 @@ DEFAULT_PAGE_SIZE = 25
 # The rows-per-page choices the client offers (PAGE_SIZE_OPTIONS in internal-data-page.models.ts).
 ALLOWED_PAGE_SIZES = (5, 10, 15, 25)
 
-# The outcomes a row can carry.
-VALID_OUTCOMES = (
-    "page_denied", "how_to_page_denied", "out_of_scope", "unsupported",
-    "harmful", "unrelated_question",
-)
+# The outcomes a row can carry - the three refusal reasons plus system_failure, which is not a
+# refusal at all. Defined once in ai/topic_access.py, where the writes are.
+VALID_OUTCOMES = topic_access.ALL_OUTCOMES
 
 
 @bp.get("/ai-access-log")
@@ -75,7 +73,8 @@ def list_ai_access_log():
         SELECT denial_id AS "denialId", user_id AS "userId", user_email AS "userEmail",
                user_roles AS "userRoles", topic, topic_label AS "topicLabel",
                required_pages AS "requiredPages", question, ai_response AS "aiResponse",
-               outcome, reason, created_at::text AS "createdAt"
+               outcome, reason, conversation_context AS "conversationContext",
+               created_at::text AS "createdAt"
           FROM ai_access_denial{where}
       ORDER BY {date_order("created_at")}, denial_id DESC
          LIMIT %(limit)s OFFSET %(offset)s

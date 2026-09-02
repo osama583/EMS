@@ -40,6 +40,48 @@ log = logging.getLogger(__name__)
 TOPIC_LABEL: dict[str, str] = {key: topic.label for key, topic in TOPICS.items()}
 
 
+# --- The four outcomes -------------------------------------------------------------------------
+#
+# THREE REASONS A QUESTION IS REFUSED, and one that is not a refusal at all. The old set had six
+# (page_denied, how_to_page_denied, out_of_scope, unsupported, harmful, unrelated_question) and
+# they did not survive contact with a real log: `out_of_scope` alone held 45% of the rows and mixed
+# genuine refusals with pipeline crashes, so the one number an administrator actually wants - "is
+# the assistant refusing correctly, or is it broken?" - could not be read off it at all.
+#
+#   NO_ACCESS       They asked for something in this system, and they cannot have it. Their role
+#                   does not reach the page, OR nobody reaches it (a roster, someone else's
+#                   requests). Both are the same fact to an administrator: the asker wanted
+#                   something and the system said no. The two still READ differently to the asker -
+#                   denial_document sends an internal account to an administrator and
+#                   out_of_scope_document deliberately does not - and that distinction is kept
+#                   where it belongs, in the wording, not smeared across the log's categories.
+#
+#   HARMFUL         An ATTACK. Injection, "ignore your instructions", jailbreaking, probing the
+#                   schema, claiming authority to pry something loose, or pushing after a refusal.
+#                   The test is INTENT, not subject matter: someone who asks who else is going
+#                   because they are curious is NO_ACCESS, and only someone working to make the
+#                   assistant break its own rules is harmful. Keeping the bar there is what makes a
+#                   red row worth reading - the old reviewer flagged four questions harmful and all
+#                   four were ordinary ones it had merely answered imperfectly.
+#
+#   UNRELATED       Nothing to do with this app. General knowledge, maths, life advice, a chat with
+#                   ChatGPT that landed in the wrong window.
+#
+#   SYSTEM_FAILURE  NOT A REFUSAL - the assistant meant to answer and could not. Retrieval did not
+#                   converge, a how-to resolved to no function, a page name matched nothing. These
+#                   are bugs, and filing them as refusals is how 28 of them hid inside a
+#                   permissions log. Displayed apart from the three above for that reason.
+NO_ACCESS = "no_access"
+HARMFUL = "harmful"
+UNRELATED = "unrelated"
+SYSTEM_FAILURE = "system_failure"
+
+# What the classifier may return, having read the turn WITH its conversation. SYSTEM_FAILURE is
+# absent deliberately: it is a fact about the backend, never a judgement about the question.
+REFUSAL_REASONS: tuple[str, ...] = (NO_ACCESS, HARMFUL, UNRELATED)
+ALL_OUTCOMES: tuple[str, ...] = (*REFUSAL_REASONS, SYSTEM_FAILURE)
+
+
 # --- The gate ----------------------------------------------------------------------------------
 
 def topic_allowed(principal, topic: str) -> bool:
@@ -365,7 +407,28 @@ def user_context_document(principal, intents: set[str]) -> str:
 
 # --- The audit log ------------------------------------------------------------------------------
 
-def log_review_rejection(principal, question: str, answer: str, *, flag: str, reason: str | None) -> None:
+# How many prior turns are stored beside a refused question. THE QUESTION ALONE IS NOT JUDGEABLE,
+# and the log proved it: "u do not know ?", "no i wont login" and "are you freaking stupid" were
+# all filed as permission refusals, and not one of them can be understood without the turn before
+# it. Three is what it takes to see a request, its refusal, and the follow-up - which is also
+# exactly the span that separates someone puzzled from someone pushing.
+CONTEXT_TURNS = 3
+
+
+def conversation_context(history: list[dict] | None) -> str | None:
+    """The last few turns, as the administrator will read them in the log. None when this was the
+    opening turn, so an empty string never occupies the column and 'no context' stays visible as
+    what it is."""
+    if not history:
+        return None
+    return "\n".join(
+        f"Asker: {turn['question']}\nAssistant: {turn['answer'][:400]}"
+        for turn in history[-CONTEXT_TURNS:]
+    )[:4000]
+
+
+def log_review_rejection(principal, question: str, answer: str, *, flag: str, reason: str | None,
+                         context: str | None = None) -> None:
     """The AI security reviewer refused an already-generated answer (see sql_llm.review_answer).
 
     Distinct from every other writer here in that the answer EXISTS - the refusal happened after
@@ -387,27 +450,24 @@ def log_review_rejection(principal, question: str, answer: str, *, flag: str, re
                 """
                 INSERT INTO ai_access_denial
                        (user_id, user_email, user_roles, topic, topic_label, required_pages,
-                        question, ai_response, outcome, reason)
-                VALUES (%s, %s, %s, NULL, NULL, NULL, %s, %s, %s, %s)
+                        question, ai_response, outcome, reason, conversation_context)
+                VALUES (%s, %s, %s, NULL, NULL, NULL, %s, %s, %s, %s, %s)
                 """,
-                (user_id, email, roles, question[:1000], answer[:2000], flag, reason),
+                (user_id, email, roles, question[:1000], answer[:2000], flag, reason, context),
             )
     except Exception as exc:  # noqa: BLE001 - an audit write must never break ask(); see _log_refusals
         log.warning("ai.review_rejection.log_failed", extra={"flag": flag, "error": str(exc)})
     log.info("ai.review_rejected", extra={"user_id": user_id, "flag": flag})
 
 
-def _log_refusals(principal, rows: list[tuple[str, str | None, str | None, str | None, str | None]], question: str) -> None:
-    """Write refusal rows to ai_access_denial - the shared body behind log_denials(),
-    log_function_denial() and log_unanswerable().
+def _log_refusals(principal, rows: list[tuple[str, str | None, str | None, str | None, str | None]],
+                  question: str, context: str | None = None) -> None:
+    """Write rows to ai_access_denial - the shared body behind log_denials(),
+    log_function_denial(), log_refused() and log_system_failure().
 
-    Each row is (outcome, topic, topic_label, required_pages, reason). `outcome` is what turns this
-    from a pure page-denial log into the "why did the assistant not answer" log the admin page needs:
-      page_denied         - the caller cannot reach any page the topic's data lives on
-      how_to_page_denied  - the caller cannot perform the ACTION they asked how to perform
-      out_of_scope        - the question is outside the seven things this assistant does
-      unsupported         - an in-scope shape with no definition behind it yet (the actionable one:
-                            it names the page or function somebody should write)
+    Each row is (outcome, topic, topic_label, required_pages, reason), where `outcome` is one of the
+    four defined at the top of this module: NO_ACCESS, HARMFUL and UNRELATED say why a question was
+    REFUSED, and SYSTEM_FAILURE says the assistant tried to answer and broke.
 
     Never raises: an audit-log write failing must not turn a correctly-refused question into a 500 -
     the refusal itself already happened and is what actually protects the data, so a lost log row is
@@ -419,6 +479,11 @@ def _log_refusals(principal, rows: list[tuple[str, str | None, str | None, str |
 
     user_id = getattr(principal, "user_id", None)
     email = getattr(principal, "email", None)
+    # Snapshotted for the same reason log_review_rejection snapshots them: a role revoked next week
+    # must not rewrite what this row says was true when the question was asked. Only the reviewer
+    # recorded them before, so 89 of the first 93 rows say nothing about who was asking - which is
+    # half of what "should this have been refused?" turns on.
+    roles = ", ".join(sorted({code for code, _unit in getattr(principal, "assignments", ()) or ()})) or None
     try:
         # One transaction for every topic this question was refused for - a write, so transaction()
         # (which commits); query() runs in read_cursor() and rolls back, which would silently
@@ -428,51 +493,74 @@ def _log_refusals(principal, rows: list[tuple[str, str | None, str | None, str |
                 cur.execute(
                     """
                     INSERT INTO ai_access_denial
-                           (user_id, user_email, topic, topic_label, required_pages, question,
-                            outcome, reason)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                           (user_id, user_email, user_roles, topic, topic_label, required_pages,
+                            question, outcome, reason, conversation_context)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
-                    (user_id, email, topic, topic_label, required_pages, question[:1000], outcome, reason),
+                    (user_id, email, roles, topic, topic_label, required_pages, question[:1000],
+                     outcome, reason, context),
                 )
     except Exception as exc:  # noqa: BLE001 - see docstring: audit write must never break ask()
         log.warning("ai.access_denial.log_failed", extra={"rows": len(rows), "error": str(exc)})
     log.info("ai.access_denied", extra={"user_id": user_id, "outcomes": [r[0] for r in rows]})
 
 
-def log_denials(principal, topics: list[str], question: str) -> None:
-    """A data topic was refused because the caller can reach none of the pages it lives on."""
+def log_denials(principal, topics: list[str], question: str, context: str | None = None) -> None:
+    """A data topic was refused because the caller can reach none of the pages it lives on.
+
+    NO_ACCESS with no model involved: page visibility already answered this, and a fact does not
+    need classifying."""
     _log_refusals(
         principal,
         [
-            ("page_denied", t, TOPIC_LABEL.get(t, t), ", ".join(scope.topic_pages(t)), None)
+            (NO_ACCESS, t, TOPIC_LABEL.get(t, t), ", ".join(scope.topic_pages(t)),
+             "Their role does not reach any page this lives on")
             for t in topics
         ],
         question,
+        context,
     )
 
 
-def log_function_denial(principal, function_key: str, question: str) -> None:
-    """The caller asked HOW to do something they cannot do."""
+def log_function_denial(principal, function_key: str, question: str,
+                        context: str | None = None) -> None:
+    """The caller asked HOW to do something they cannot do. Also a fact, also NO_ACCESS."""
     fn = scope.FUNCTIONS.get(function_key)
     _log_refusals(
         principal,
         [(
-            "how_to_page_denied",
+            NO_ACCESS,
             f"how_to:{function_key}",
             fn.name if fn else function_key.replace("_", " "),
             ", ".join(fn.pages) if fn else None,
-            None,
+            "They cannot perform the action they asked how to perform",
         )],
         question,
+        context,
     )
 
 
-def log_unanswerable(principal, question: str, *, reason: str, unsupported: bool = False) -> None:
-    """Nothing was refused - the assistant simply has no answer. Recorded so the admin page can
-    distinguish "blocked by access" from "we never built this", which is the difference between a
-    permissions fix and a backlog item."""
+def log_refused(principal, question: str, *, reason: str, outcome: str = NO_ACCESS,
+                context: str | None = None) -> None:
+    """A question the assistant would not answer, in the category the classifier judged it - it
+    reads the turn WITH the conversation, which is the only way "u do not know ?" is judgeable at
+    all. Defaults to NO_ACCESS, which is both the commonest case and the safest wrong answer: it
+    files an unclear turn as an ordinary refusal rather than accusing somebody of an attack."""
     _log_refusals(
         principal,
-        [("unsupported" if unsupported else "out_of_scope", None, None, None, reason)],
+        [(outcome if outcome in REFUSAL_REASONS else NO_ACCESS, None, None, None, reason)],
         question,
+        context,
     )
+
+
+def log_system_failure(principal, question: str, *, reason: str,
+                       context: str | None = None) -> None:
+    """NOT a refusal - the assistant meant to answer this and could not. Retrieval did not
+    converge, or a how-to resolved to no function.
+
+    Kept out of the three refusal reasons deliberately. These rows are a bug list, and filing them
+    as refusals is how 17 pipeline crashes came to sit in a permissions log describing perfectly
+    ordinary questions ("what are the events im registered to ?") as though someone had been told
+    no on purpose."""
+    _log_refusals(principal, [(SYSTEM_FAILURE, None, None, None, reason)], question, context)

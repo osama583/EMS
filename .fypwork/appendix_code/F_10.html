@@ -1,0 +1,104 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+html,body{margin:0;padding:0;background:#fff;}
+body{font-family:"Segoe UI",Arial,sans-serif;}
+.wrap{width:1180px;border:1px solid #d7dde5;border-radius:6px;overflow:hidden;}
+.hd{background:#1b2a41;color:#fff;padding:11px 18px;display:flex;
+    justify-content:space-between;align-items:center;font-size:15px;}
+.hd .lbl{font-weight:700;}
+.hd .lbl span{font-family:Consolas,"Courier New",monospace;font-weight:400;
+              color:#a8c4e6;margin-left:10px;}
+.hd .src{font-size:12.5px;color:#c3d3e8;font-family:Consolas,"Courier New",monospace;}
+.desc{background:#f2f5f9;border-bottom:1px solid #dde3ea;color:#20344d;
+      padding:10px 18px;font-size:13.5px;}
+table.code{border-collapse:collapse;width:100%;background:#fff;}
+td.ln{background:#f0f2f5;color:#8b95a3;text-align:right;padding:0 11px;width:1%;
+      font-family:Consolas,"Courier New",monospace;font-size:12.5px;
+      user-select:none;border-right:1px solid #e2e6ec;}
+td.cd{padding:0 0 0 14px;font-family:Consolas,"Courier New",monospace;font-size:12.5px;
+      white-space:pre;color:#1f2933;}
+tr{height:21px;}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.cd .hll { background-color: #ffffcc }
+.cd { background: #f8f8f8; }
+.cd .c { color: #3D7B7B; font-style: italic } /* Comment */
+.cd .err { border: 1px solid #F00 } /* Error */
+.cd .k { color: #008000; font-weight: bold } /* Keyword */
+.cd .o { color: #666 } /* Operator */
+.cd .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.cd .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.cd .cp { color: #9C6500 } /* Comment.Preproc */
+.cd .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.cd .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.cd .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.cd .gd { color: #A00000 } /* Generic.Deleted */
+.cd .ge { font-style: italic } /* Generic.Emph */
+.cd .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.cd .gr { color: #E40000 } /* Generic.Error */
+.cd .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.cd .gi { color: #008400 } /* Generic.Inserted */
+.cd .go { color: #717171 } /* Generic.Output */
+.cd .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.cd .gs { font-weight: bold } /* Generic.Strong */
+.cd .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.cd .gt { color: #04D } /* Generic.Traceback */
+.cd .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.cd .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.cd .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.cd .kp { color: #008000 } /* Keyword.Pseudo */
+.cd .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.cd .kt { color: #B00040 } /* Keyword.Type */
+.cd .m { color: #666 } /* Literal.Number */
+.cd .s { color: #BA2121 } /* Literal.String */
+.cd .na { color: #687822 } /* Name.Attribute */
+.cd .nb { color: #008000 } /* Name.Builtin */
+.cd .nc { color: #00F; font-weight: bold } /* Name.Class */
+.cd .no { color: #800 } /* Name.Constant */
+.cd .nd { color: #A2F } /* Name.Decorator */
+.cd .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.cd .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.cd .nf { color: #00F } /* Name.Function */
+.cd .nl { color: #767600 } /* Name.Label */
+.cd .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.cd .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.cd .nv { color: #19177C } /* Name.Variable */
+.cd .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.cd .w { color: #BBB } /* Text.Whitespace */
+.cd .mb { color: #666 } /* Literal.Number.Bin */
+.cd .mf { color: #666 } /* Literal.Number.Float */
+.cd .mh { color: #666 } /* Literal.Number.Hex */
+.cd .mi { color: #666 } /* Literal.Number.Integer */
+.cd .mo { color: #666 } /* Literal.Number.Oct */
+.cd .sa { color: #BA2121 } /* Literal.String.Affix */
+.cd .sb { color: #BA2121 } /* Literal.String.Backtick */
+.cd .sc { color: #BA2121 } /* Literal.String.Char */
+.cd .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.cd .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.cd .s2 { color: #BA2121 } /* Literal.String.Double */
+.cd .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.cd .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.cd .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.cd .sx { color: #008000 } /* Literal.String.Other */
+.cd .sr { color: #A45A77 } /* Literal.String.Regex */
+.cd .s1 { color: #BA2121 } /* Literal.String.Single */
+.cd .ss { color: #19177C } /* Literal.String.Symbol */
+.cd .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.cd .fm { color: #00F } /* Name.Function.Magic */
+.cd .vc { color: #19177C } /* Name.Variable.Class */
+.cd .vg { color: #19177C } /* Name.Variable.Global */
+.cd .vi { color: #19177C } /* Name.Variable.Instance */
+.cd .vm { color: #19177C } /* Name.Variable.Magic */
+.cd .il { color: #666 } /* Literal.Number.Integer.Long */</style></head><body>
+<div class="wrap">
+  <div class="hd">
+    <div class="lbl">F.10<span>auth.py</span></div>
+    <div class="src">backend/app/api/auth.py | lines 170-195</div>
+  </div>
+  <div class="desc">Password reset without disclosing whether an account exists.</div>
+  <table class="code"><tr><td class="ln">170</td><td class="cd">    <span class="n">generic_message</span> <span class="o">=</span> <span class="s2">"If that email address is registered, a reset link has been sent."</span></td></tr><tr><td class="ln">171</td><td class="cd">    <span class="k">if</span> <span class="ow">not</span> <span class="n">email</span><span class="p">:</span></td></tr><tr><td class="ln">172</td><td class="cd">        <span class="k">raise</span> <span class="n">BadRequest</span><span class="p">(</span><span class="s2">"Email is required."</span><span class="p">)</span></td></tr><tr><td class="ln">173</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">174</td><td class="cd">    <span class="n">user</span> <span class="o">=</span> <span class="n">query_one</span><span class="p">(</span></td></tr><tr><td class="ln">175</td><td class="cd">        <span class="s2">"SELECT user_id, full_name, email FROM users "</span></td></tr><tr><td class="ln">176</td><td class="cd">        <span class="s2">"WHERE lower(email) = </span><span class="si">%s</span><span class="s2"> AND is_active AND archived_at IS NULL"</span><span class="p">,</span></td></tr><tr><td class="ln">177</td><td class="cd">        <span class="p">(</span><span class="n">email</span><span class="p">,),</span></td></tr><tr><td class="ln">178</td><td class="cd">    <span class="p">)</span></td></tr><tr><td class="ln">179</td><td class="cd">    <span class="k">if</span> <span class="n">user</span><span class="p">:</span></td></tr><tr><td class="ln">180</td><td class="cd">        <span class="n">token</span> <span class="o">=</span> <span class="n">secrets</span><span class="o">.</span><span class="n">token_urlsafe</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span></td></tr><tr><td class="ln">181</td><td class="cd">        <span class="n">expires_at</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">minutes</span><span class="o">=</span><span class="n">_RESET_TOKEN_TTL_MINUTES</span><span class="p">)</span></td></tr><tr><td class="ln">182</td><td class="cd">        <span class="k">with</span> <span class="n">transaction</span><span class="p">()</span> <span class="k">as</span> <span class="n">cur</span><span class="p">:</span></td></tr><tr><td class="ln">183</td><td class="cd">            <span class="n">cur</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">"DELETE FROM password_reset_token WHERE user_id = </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="p">(</span><span class="n">user</span><span class="p">[</span><span class="s2">"user_id"</span><span class="p">],))</span></td></tr><tr><td class="ln">184</td><td class="cd">            <span class="n">cur</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span></td></tr><tr><td class="ln">185</td><td class="cd">                <span class="s2">"INSERT INTO password_reset_token (user_id, token_hash, expires_at) VALUES (</span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2">, </span><span class="si">%s</span><span class="s2">)"</span><span class="p">,</span></td></tr><tr><td class="ln">186</td><td class="cd">                <span class="p">(</span><span class="n">user</span><span class="p">[</span><span class="s2">"user_id"</span><span class="p">],</span> <span class="n">_hash_reset_token</span><span class="p">(</span><span class="n">token</span><span class="p">),</span> <span class="n">expires_at</span><span class="p">),</span></td></tr><tr><td class="ln">187</td><td class="cd">            <span class="p">)</span></td></tr><tr><td class="ln">188</td><td class="cd">        <span class="n">notifications</span><span class="o">.</span><span class="n">password_reset_requested</span><span class="p">(</span></td></tr><tr><td class="ln">189</td><td class="cd">            <span class="n">email</span><span class="o">=</span><span class="n">user</span><span class="p">[</span><span class="s2">"email"</span><span class="p">],</span></td></tr><tr><td class="ln">190</td><td class="cd">            <span class="n">full_name</span><span class="o">=</span><span class="n">user</span><span class="p">[</span><span class="s2">"full_name"</span><span class="p">],</span></td></tr><tr><td class="ln">191</td><td class="cd">            <span class="n">reset_link</span><span class="o">=</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">frontend_url</span><span class="si">}</span><span class="s2">/reset-password?token=</span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span></td></tr><tr><td class="ln">192</td><td class="cd">            <span class="n">expiry_minutes</span><span class="o">=</span><span class="n">_RESET_TOKEN_TTL_MINUTES</span><span class="p">,</span></td></tr><tr><td class="ln">193</td><td class="cd">        <span class="p">)</span></td></tr><tr><td class="ln">194</td><td class="cd">        <span class="n">audit</span><span class="p">(</span><span class="s2">"auth.password_reset.requested"</span><span class="p">,</span> <span class="n">actor_user_id</span><span class="o">=</span><span class="n">user</span><span class="p">[</span><span class="s2">"user_id"</span><span class="p">])</span></td></tr><tr><td class="ln">195</td><td class="cd">&nbsp;</td></tr></table>
+</div></body></html>

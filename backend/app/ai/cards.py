@@ -66,6 +66,18 @@ def _normalise(text: str) -> str:
     return _NON_ALNUM.sub(" ", _APOSTROPHE.sub("", text.lower())).strip()
 
 
+# A title that is nothing but a common English word matches PROSE rather than a mention of the
+# thing. A club named "as" carded itself under "I can't help with that, as it's outside what I
+# cover", and would equally card under "the hackathon runs as a 36-hour event" - a correct answer,
+# still wearing an unrelated card. This is the length guard below one rung up: a genuinely short
+# name ("AI", "MMU", "3D") is not a stopword and still matches.
+_STOPWORD_TITLES = frozenset(
+    "a an and are as at be been but by can do for from had has have he her him his i if in is it "
+    "its me my no not of on or our so than that the their them then there they this to up us was "
+    "we were what when where which who will with you your".split()
+)
+
+
 def _names_in(answer: str, titles: dict[str, int]) -> list[int]:
     """The ids whose titles appear in `answer`, longest title first.
 
@@ -80,9 +92,10 @@ def _names_in(answer: str, titles: dict[str, int]) -> list[int]:
     found: list[tuple[int, int]] = []
     for title, entity_id in titles.items():
         needle = _normalise(title)
-        if len(needle) < 2:
-            # A one-character title cannot be matched reliably against prose; skipping it costs a
-            # card, where a false match puts a completely unrelated card under the answer.
+        if len(needle) < 2 or needle in _STOPWORD_TITLES:
+            # A one-character or stopword title cannot be matched reliably against prose; skipping
+            # it costs a card, where a false match puts a completely unrelated card under the
+            # answer.
             continue
         if f" {needle} " in haystack:
             found.append((len(needle), entity_id))

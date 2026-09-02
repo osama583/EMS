@@ -1,0 +1,104 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+html,body{margin:0;padding:0;background:#fff;}
+body{font-family:"Segoe UI",Arial,sans-serif;}
+.wrap{width:1180px;border:1px solid #d7dde5;border-radius:6px;overflow:hidden;}
+.hd{background:#1b2a41;color:#fff;padding:11px 18px;display:flex;
+    justify-content:space-between;align-items:center;font-size:15px;}
+.hd .lbl{font-weight:700;}
+.hd .lbl span{font-family:Consolas,"Courier New",monospace;font-weight:400;
+              color:#a8c4e6;margin-left:10px;}
+.hd .src{font-size:12.5px;color:#c3d3e8;font-family:Consolas,"Courier New",monospace;}
+.desc{background:#f2f5f9;border-bottom:1px solid #dde3ea;color:#20344d;
+      padding:10px 18px;font-size:13.5px;}
+table.code{border-collapse:collapse;width:100%;background:#fff;}
+td.ln{background:#f0f2f5;color:#8b95a3;text-align:right;padding:0 11px;width:1%;
+      font-family:Consolas,"Courier New",monospace;font-size:12.5px;
+      user-select:none;border-right:1px solid #e2e6ec;}
+td.cd{padding:0 0 0 14px;font-family:Consolas,"Courier New",monospace;font-size:12.5px;
+      white-space:pre;color:#1f2933;}
+tr{height:21px;}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.cd .hll { background-color: #ffffcc }
+.cd { background: #f8f8f8; }
+.cd .c { color: #3D7B7B; font-style: italic } /* Comment */
+.cd .err { border: 1px solid #F00 } /* Error */
+.cd .k { color: #008000; font-weight: bold } /* Keyword */
+.cd .o { color: #666 } /* Operator */
+.cd .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.cd .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.cd .cp { color: #9C6500 } /* Comment.Preproc */
+.cd .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.cd .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.cd .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.cd .gd { color: #A00000 } /* Generic.Deleted */
+.cd .ge { font-style: italic } /* Generic.Emph */
+.cd .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.cd .gr { color: #E40000 } /* Generic.Error */
+.cd .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.cd .gi { color: #008400 } /* Generic.Inserted */
+.cd .go { color: #717171 } /* Generic.Output */
+.cd .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.cd .gs { font-weight: bold } /* Generic.Strong */
+.cd .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.cd .gt { color: #04D } /* Generic.Traceback */
+.cd .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.cd .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.cd .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.cd .kp { color: #008000 } /* Keyword.Pseudo */
+.cd .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.cd .kt { color: #B00040 } /* Keyword.Type */
+.cd .m { color: #666 } /* Literal.Number */
+.cd .s { color: #BA2121 } /* Literal.String */
+.cd .na { color: #687822 } /* Name.Attribute */
+.cd .nb { color: #008000 } /* Name.Builtin */
+.cd .nc { color: #00F; font-weight: bold } /* Name.Class */
+.cd .no { color: #800 } /* Name.Constant */
+.cd .nd { color: #A2F } /* Name.Decorator */
+.cd .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.cd .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.cd .nf { color: #00F } /* Name.Function */
+.cd .nl { color: #767600 } /* Name.Label */
+.cd .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.cd .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.cd .nv { color: #19177C } /* Name.Variable */
+.cd .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.cd .w { color: #BBB } /* Text.Whitespace */
+.cd .mb { color: #666 } /* Literal.Number.Bin */
+.cd .mf { color: #666 } /* Literal.Number.Float */
+.cd .mh { color: #666 } /* Literal.Number.Hex */
+.cd .mi { color: #666 } /* Literal.Number.Integer */
+.cd .mo { color: #666 } /* Literal.Number.Oct */
+.cd .sa { color: #BA2121 } /* Literal.String.Affix */
+.cd .sb { color: #BA2121 } /* Literal.String.Backtick */
+.cd .sc { color: #BA2121 } /* Literal.String.Char */
+.cd .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.cd .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.cd .s2 { color: #BA2121 } /* Literal.String.Double */
+.cd .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.cd .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.cd .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.cd .sx { color: #008000 } /* Literal.String.Other */
+.cd .sr { color: #A45A77 } /* Literal.String.Regex */
+.cd .s1 { color: #BA2121 } /* Literal.String.Single */
+.cd .ss { color: #19177C } /* Literal.String.Symbol */
+.cd .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.cd .fm { color: #00F } /* Name.Function.Magic */
+.cd .vc { color: #19177C } /* Name.Variable.Class */
+.cd .vg { color: #19177C } /* Name.Variable.Global */
+.cd .vi { color: #19177C } /* Name.Variable.Instance */
+.cd .vm { color: #19177C } /* Name.Variable.Magic */
+.cd .il { color: #666 } /* Literal.Number.Integer.Long */</style></head><body>
+<div class="wrap">
+  <div class="hd">
+    <div class="lbl">F.3<span>decorators.py</span></div>
+    <div class="src">backend/app/security/decorators.py | lines 32-76</div>
+  </div>
+  <div class="desc">Authenticating a request and loading its roles from the database.</div>
+  <table class="code"><tr><td class="ln">32</td><td class="cd"><span class="k">def</span><span class="w"> </span><span class="nf">authenticate</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span></td></tr><tr><td class="ln">33</td><td class="cd"><span class="w">    </span><span class="sd">"""Resolve the bearer token to a Principal on `g`. Idempotent."""</span></td></tr><tr><td class="ln">34</td><td class="cd">    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="s2">"principal"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span></td></tr><tr><td class="ln">35</td><td class="cd">        <span class="k">return</span></td></tr><tr><td class="ln">36</td><td class="cd">    <span class="n">claims</span> <span class="o">=</span> <span class="n">decode_token</span><span class="p">(</span><span class="n">_bearer_token</span><span class="p">(),</span> <span class="n">expected_type</span><span class="o">=</span><span class="n">ACCESS</span><span class="p">)</span></td></tr><tr><td class="ln">37</td><td class="cd">    <span class="n">principal</span> <span class="o">=</span> <span class="n">load_principal</span><span class="p">(</span><span class="n">claims</span><span class="p">[</span><span class="s2">"user_id"</span><span class="p">])</span></td></tr><tr><td class="ln">38</td><td class="cd">    <span class="n">g</span><span class="o">.</span><span class="n">principal</span> <span class="o">=</span> <span class="n">principal</span></td></tr><tr><td class="ln">39</td><td class="cd">    <span class="n">g</span><span class="o">.</span><span class="n">user_id</span> <span class="o">=</span> <span class="n">principal</span><span class="o">.</span><span class="n">user_id</span></td></tr><tr><td class="ln">40</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">41</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">42</td><td class="cd"><span class="k">def</span><span class="w"> </span><span class="nf">authenticate_optional</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span></td></tr><tr><td class="ln">43</td><td class="cd"><span class="w">    </span><span class="sd">"""authenticate() for endpoints that are public but personalise their response when the caller</span></td></tr><tr><td class="ln">44</td><td class="cd"><span class="sd">    happens to be signed in (/ai/ask, the event discovery routes).</span></td></tr><tr><td class="ln">45</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">46</td><td class="cd"><span class="sd">    NO credential offered -&gt; guest, and the endpoint serves its public tier. That is the whole</span></td></tr><tr><td class="ln">47</td><td class="cd"><span class="sd">    reason this exists rather than authenticate().</span></td></tr><tr><td class="ln">48</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">49</td><td class="cd"><span class="sd">    A credential that does not VERIFY -&gt; 401, exactly like any protected route. It used to be</span></td></tr><tr><td class="ln">50</td><td class="cd"><span class="sd">    swallowed and treated as a guest, on the reasoning that a public endpoint should never refuse</span></td></tr><tr><td class="ln">51</td><td class="cd"><span class="sd">    anyone. That was wrong in a way that was invisible from the server: an expired access token is</span></td></tr><tr><td class="ln">52</td><td class="cd"><span class="sd">    what a signed-in user sends, so their request came back 200 with the signed-out answer, and</span></td></tr><tr><td class="ln">53</td><td class="cd"><span class="sd">    because it was never a 401, auth.interceptor.ts never ran its refresh-and-replay - the one</span></td></tr><tr><td class="ln">54</td><td class="cd"><span class="sd">    mechanism that recovers an expired session. The user stayed silently downgraded to a guest for</span></td></tr><tr><td class="ln">55</td><td class="cd"><span class="sd">    the life of that tab while every other page in the app refreshed normally and worked.</span></td></tr><tr><td class="ln">56</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">57</td><td class="cd"><span class="sd">    On /ai/ask that surfaced as a wrong authorization answer, not just missing personalisation: a</span></td></tr><tr><td class="ln">58</td><td class="cd"><span class="sd">    guest holds no assignments, so ai/topic_access.py denied `clubs` (and kept `events`, its one</span></td></tr><tr><td class="ln">59</td><td class="cd"><span class="sd">    a guest-open topic, now ai/scope.py's VISITOR areas) and the assistant told a signed-in student "an administrator has not granted</span></td></tr><tr><td class="ln">60</td><td class="cd"><span class="sd">    your role" about pages their role is in fact granted - see tests/test_auth_wiring.py.</span></td></tr><tr><td class="ln">61</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">62</td><td class="cd"><span class="sd">    Unauthorized from decode_token/load_principal therefore propagates: expired, malformed, wrong</span></td></tr><tr><td class="ln">63</td><td class="cd"><span class="sd">    token type, archived or deactivated account. Each one means "your session is over, refresh or</span></td></tr><tr><td class="ln">64</td><td class="cd"><span class="sd">    sign in again", which is a thing the client can act on, and none of them is a guest."""</span></td></tr><tr><td class="ln">65</td><td class="cd">    <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">g</span><span class="p">,</span> <span class="s2">"principal"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span></td></tr><tr><td class="ln">66</td><td class="cd">        <span class="k">return</span></td></tr><tr><td class="ln">67</td><td class="cd">    <span class="n">header</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"Authorization"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span></td></tr><tr><td class="ln">68</td><td class="cd">    <span class="n">scheme</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">token</span> <span class="o">=</span> <span class="n">header</span><span class="o">.</span><span class="n">partition</span><span class="p">(</span><span class="s2">" "</span><span class="p">)</span></td></tr><tr><td class="ln">69</td><td class="cd">    <span class="k">if</span> <span class="n">scheme</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">"bearer"</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">token</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span></td></tr><tr><td class="ln">70</td><td class="cd">        <span class="k">return</span></td></tr><tr><td class="ln">71</td><td class="cd">    <span class="n">claims</span> <span class="o">=</span> <span class="n">decode_token</span><span class="p">(</span><span class="n">token</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span> <span class="n">expected_type</span><span class="o">=</span><span class="n">ACCESS</span><span class="p">)</span></td></tr><tr><td class="ln">72</td><td class="cd">    <span class="n">principal</span> <span class="o">=</span> <span class="n">load_principal</span><span class="p">(</span><span class="n">claims</span><span class="p">[</span><span class="s2">"user_id"</span><span class="p">])</span></td></tr><tr><td class="ln">73</td><td class="cd">    <span class="n">g</span><span class="o">.</span><span class="n">principal</span> <span class="o">=</span> <span class="n">principal</span></td></tr><tr><td class="ln">74</td><td class="cd">    <span class="n">g</span><span class="o">.</span><span class="n">user_id</span> <span class="o">=</span> <span class="n">principal</span><span class="o">.</span><span class="n">user_id</span></td></tr><tr><td class="ln">75</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">76</td><td class="cd">&nbsp;</td></tr></table>
+</div></body></html>

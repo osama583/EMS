@@ -82,6 +82,9 @@ CATALOGUE: tuple[Suggestion, ...] = (
           "How do I save an event?", _SAVED_PAGES),
 
     # --- Ungated: the app itself, and the reader's own account -------------------------------
+    # These are the fallback set. They sit last on purpose: with the gated cards above filling the
+    # limit, a reader who holds clubs and events never sees them, and a reader who holds neither
+    # opens the panel on these instead of on nothing.
     _card("help_center", "What Is This Page For?", "Ask what any part of the app does.",
           "What is Explore Events for?"),
     _card("account_circle", "Who Am I?", "Check your account, your role and what you can reach.",
@@ -89,6 +92,42 @@ CATALOGUE: tuple[Suggestion, ...] = (
     _card("quiz", "What Can You Do?", "See what I can help you with.",
           "What can you help me with?"),
 )
+
+
+# The how-to half of the fallback pair, as (function key, card title). BUILT per caller rather than
+# listed in CATALOGUE, because a how-to is only answerable when the caller can reach the page its
+# action happens on - a static "How do I submit a proposal?" card shown to someone without the
+# proposal form invites exactly the refusal this module exists to prevent, which is the same reason
+# every other card here names its pages.
+#
+# First reachable one wins, so the card describes something the reader can actually go and do.
+# Ordered widest-consequence first; the how-tos already in CATALOGUE sit at the tail, and a
+# duplicate is dropped by the prompt de-dupe rather than by keeping two lists in step.
+_FALLBACK_FUNCTIONS: tuple[str, ...] = (
+    "submit_proposal",
+    "review_proposal",
+    "track_request",
+    "manage_clubs",
+    "decide_join_request",
+    "cancel_proposal",
+    "register_event",
+    "join_club",
+    "save_event",
+)
+
+
+def _how_to_card(principal) -> Suggestion | None:
+    """A how-to card for a function THIS caller can actually perform, or None if they can perform
+    none of them.
+
+    `pages` is empty on the result because the reachability check has already happened here - the
+    card is only built at all when scope.can_use() says the steps would be released."""
+    for key in _FALLBACK_FUNCTIONS:
+        if scope.can_use(principal, key):
+            name = scope.FUNCTIONS[key].name
+            return _card("menu_book", f"How to {name[0].lower() + name[1:]}",
+                         f"The steps, and where it happens.", f"How do I {name[0].lower() + name[1:]}?")
+    return None
 
 
 def _visible(suggestion: Suggestion, principal) -> bool:
@@ -104,9 +143,11 @@ def suggestions_for(principal, *, limit: int = DEFAULT_LIMIT) -> list[dict]:
     Never empty: the three ungated cards at the tail always survive, so an account that reaches
     nothing still opens the panel on something real to click rather than on a bare prompt.
     """
+    how_to = _how_to_card(principal)
+    catalogue = (*CATALOGUE, how_to) if how_to else CATALOGUE
     chosen: list[dict] = []
     seen: set[str] = set()
-    for suggestion in CATALOGUE:
+    for suggestion in catalogue:
         if len(chosen) >= limit:
             break
         if suggestion.prompt in seen or not _visible(suggestion, principal):

@@ -65,25 +65,29 @@ def _get_executor() -> ThreadPoolExecutor:
     return _executor
 
 
-def _run(app, question: str, answer: str, principal, user_context: str, data_summary: str) -> None:
+def _run(app, question: str, answer: str, principal, user_context: str, data_summary: str,
+         context: str | None) -> None:
     """The worker body. Needs its own app context because it runs on a thread with none of the
     request's - topic_access.log_review_rejection() writes through the normal database pool, which
     reads config off the app."""
     try:
         with app.app_context():
             verdict = review_answer(
-                question, answer, user_context=user_context, data_summary=data_summary
+                question, answer, user_context=user_context, data_summary=data_summary,
+                context=context,
             )
             if verdict["approved"]:
                 return
             topic_access.log_review_rejection(
-                principal, question, answer, flag=verdict["flag"], reason=verdict.get("reason")
+                principal, question, answer, flag=verdict["flag"], reason=verdict.get("reason"),
+                context=context,
             )
     except Exception as exc:  # noqa: BLE001 - a background review must never surface anywhere
         log.warning("ai.review_queue.failed", extra={"error": str(exc)})
 
 
-def submit(question: str, answer: str, principal, *, user_context: str, data_summary: str) -> None:
+def submit(question: str, answer: str, principal, *, user_context: str, data_summary: str,
+           context: str | None = None) -> None:
     """Queue one completed interaction for review. Returns immediately and never raises.
 
     `principal` is captured as-is: it is a frozen dataclass of already-resolved identity, so the
@@ -91,6 +95,7 @@ def submit(question: str, answer: str, principal, *, user_context: str, data_sum
     answer against a state that was not true when it was given."""
     try:
         app = current_app._get_current_object()  # noqa: SLF001 - the documented way to escape the context
-        _get_executor().submit(_run, app, question, answer, principal, user_context, data_summary)
+        _get_executor().submit(_run, app, question, answer, principal, user_context, data_summary,
+                               context)
     except Exception as exc:  # noqa: BLE001 - a saturated/failed pool drops the review, never the answer
         log.warning("ai.review_queue.not_submitted", extra={"error": str(exc)})

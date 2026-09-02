@@ -1,0 +1,104 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+html,body{margin:0;padding:0;background:#fff;}
+body{font-family:"Segoe UI",Arial,sans-serif;}
+.wrap{width:1180px;border:1px solid #d7dde5;border-radius:6px;overflow:hidden;}
+.hd{background:#1b2a41;color:#fff;padding:11px 18px;display:flex;
+    justify-content:space-between;align-items:center;font-size:15px;}
+.hd .lbl{font-weight:700;}
+.hd .lbl span{font-family:Consolas,"Courier New",monospace;font-weight:400;
+              color:#a8c4e6;margin-left:10px;}
+.hd .src{font-size:12.5px;color:#c3d3e8;font-family:Consolas,"Courier New",monospace;}
+.desc{background:#f2f5f9;border-bottom:1px solid #dde3ea;color:#20344d;
+      padding:10px 18px;font-size:13.5px;}
+table.code{border-collapse:collapse;width:100%;background:#fff;}
+td.ln{background:#f0f2f5;color:#8b95a3;text-align:right;padding:0 11px;width:1%;
+      font-family:Consolas,"Courier New",monospace;font-size:12.5px;
+      user-select:none;border-right:1px solid #e2e6ec;}
+td.cd{padding:0 0 0 14px;font-family:Consolas,"Courier New",monospace;font-size:12.5px;
+      white-space:pre;color:#1f2933;}
+tr{height:21px;}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.cd .hll { background-color: #ffffcc }
+.cd { background: #f8f8f8; }
+.cd .c { color: #3D7B7B; font-style: italic } /* Comment */
+.cd .err { border: 1px solid #F00 } /* Error */
+.cd .k { color: #008000; font-weight: bold } /* Keyword */
+.cd .o { color: #666 } /* Operator */
+.cd .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.cd .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.cd .cp { color: #9C6500 } /* Comment.Preproc */
+.cd .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.cd .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.cd .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.cd .gd { color: #A00000 } /* Generic.Deleted */
+.cd .ge { font-style: italic } /* Generic.Emph */
+.cd .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.cd .gr { color: #E40000 } /* Generic.Error */
+.cd .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.cd .gi { color: #008400 } /* Generic.Inserted */
+.cd .go { color: #717171 } /* Generic.Output */
+.cd .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.cd .gs { font-weight: bold } /* Generic.Strong */
+.cd .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.cd .gt { color: #04D } /* Generic.Traceback */
+.cd .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.cd .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.cd .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.cd .kp { color: #008000 } /* Keyword.Pseudo */
+.cd .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.cd .kt { color: #B00040 } /* Keyword.Type */
+.cd .m { color: #666 } /* Literal.Number */
+.cd .s { color: #BA2121 } /* Literal.String */
+.cd .na { color: #687822 } /* Name.Attribute */
+.cd .nb { color: #008000 } /* Name.Builtin */
+.cd .nc { color: #00F; font-weight: bold } /* Name.Class */
+.cd .no { color: #800 } /* Name.Constant */
+.cd .nd { color: #A2F } /* Name.Decorator */
+.cd .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.cd .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.cd .nf { color: #00F } /* Name.Function */
+.cd .nl { color: #767600 } /* Name.Label */
+.cd .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.cd .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.cd .nv { color: #19177C } /* Name.Variable */
+.cd .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.cd .w { color: #BBB } /* Text.Whitespace */
+.cd .mb { color: #666 } /* Literal.Number.Bin */
+.cd .mf { color: #666 } /* Literal.Number.Float */
+.cd .mh { color: #666 } /* Literal.Number.Hex */
+.cd .mi { color: #666 } /* Literal.Number.Integer */
+.cd .mo { color: #666 } /* Literal.Number.Oct */
+.cd .sa { color: #BA2121 } /* Literal.String.Affix */
+.cd .sb { color: #BA2121 } /* Literal.String.Backtick */
+.cd .sc { color: #BA2121 } /* Literal.String.Char */
+.cd .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.cd .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.cd .s2 { color: #BA2121 } /* Literal.String.Double */
+.cd .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.cd .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.cd .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.cd .sx { color: #008000 } /* Literal.String.Other */
+.cd .sr { color: #A45A77 } /* Literal.String.Regex */
+.cd .s1 { color: #BA2121 } /* Literal.String.Single */
+.cd .ss { color: #19177C } /* Literal.String.Symbol */
+.cd .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.cd .fm { color: #00F } /* Name.Function.Magic */
+.cd .vc { color: #19177C } /* Name.Variable.Class */
+.cd .vg { color: #19177C } /* Name.Variable.Global */
+.cd .vi { color: #19177C } /* Name.Variable.Instance */
+.cd .vm { color: #19177C } /* Name.Variable.Magic */
+.cd .il { color: #666 } /* Literal.Number.Integer.Long */</style></head><body>
+<div class="wrap">
+  <div class="hd">
+    <div class="lbl">F.6<span>db.py</span></div>
+    <div class="src">backend/app/db.py | lines 61-96</div>
+  </div>
+  <div class="desc">Pooled access with every value bound as a query parameter.</div>
+  <table class="code"><tr><td class="ln">61</td><td class="cd"><span class="nd">@contextmanager</span></td></tr><tr><td class="ln">62</td><td class="cd"><span class="k">def</span><span class="w"> </span><span class="nf">get_connection</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">psycopg2</span><span class="o">.</span><span class="n">extensions</span><span class="o">.</span><span class="n">connection</span><span class="p">]:</span></td></tr><tr><td class="ln">63</td><td class="cd">    <span class="k">if</span> <span class="n">_pool</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span></td></tr><tr><td class="ln">64</td><td class="cd">        <span class="n">init_pool</span><span class="p">()</span></td></tr><tr><td class="ln">65</td><td class="cd">    <span class="k">assert</span> <span class="n">_pool</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span></td></tr><tr><td class="ln">66</td><td class="cd">    <span class="n">conn</span> <span class="o">=</span> <span class="n">_pool</span><span class="o">.</span><span class="n">getconn</span><span class="p">()</span></td></tr><tr><td class="ln">67</td><td class="cd">    <span class="k">try</span><span class="p">:</span></td></tr><tr><td class="ln">68</td><td class="cd">        <span class="k">yield</span> <span class="n">conn</span></td></tr><tr><td class="ln">69</td><td class="cd">    <span class="k">finally</span><span class="p">:</span></td></tr><tr><td class="ln">70</td><td class="cd">        <span class="n">_pool</span><span class="o">.</span><span class="n">putconn</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span></td></tr><tr><td class="ln">71</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">72</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">73</td><td class="cd"><span class="nd">@contextmanager</span></td></tr><tr><td class="ln">74</td><td class="cd"><span class="k">def</span><span class="w"> </span><span class="nf">transaction</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">psycopg2</span><span class="o">.</span><span class="n">extensions</span><span class="o">.</span><span class="n">cursor</span><span class="p">]:</span></td></tr><tr><td class="ln">75</td><td class="cd"><span class="w">    </span><span class="sd">"""Yield a cursor inside a transaction. Commits on success, rolls back on error."""</span></td></tr><tr><td class="ln">76</td><td class="cd">    <span class="k">with</span> <span class="n">get_connection</span><span class="p">()</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span></td></tr><tr><td class="ln">77</td><td class="cd">        <span class="k">try</span><span class="p">:</span></td></tr><tr><td class="ln">78</td><td class="cd">            <span class="k">with</span> <span class="n">conn</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cur</span><span class="p">:</span></td></tr><tr><td class="ln">79</td><td class="cd">                <span class="k">yield</span> <span class="n">cur</span></td></tr><tr><td class="ln">80</td><td class="cd">            <span class="n">conn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span></td></tr><tr><td class="ln">81</td><td class="cd">        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span></td></tr><tr><td class="ln">82</td><td class="cd">            <span class="n">conn</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span></td></tr><tr><td class="ln">83</td><td class="cd">            <span class="k">raise</span></td></tr><tr><td class="ln">84</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">85</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">86</td><td class="cd"><span class="nd">@contextmanager</span></td></tr><tr><td class="ln">87</td><td class="cd"><span class="k">def</span><span class="w"> </span><span class="nf">read_cursor</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">psycopg2</span><span class="o">.</span><span class="n">extensions</span><span class="o">.</span><span class="n">cursor</span><span class="p">]:</span></td></tr><tr><td class="ln">88</td><td class="cd">    <span class="k">with</span> <span class="n">get_connection</span><span class="p">()</span> <span class="k">as</span> <span class="n">conn</span><span class="p">:</span></td></tr><tr><td class="ln">89</td><td class="cd">        <span class="k">try</span><span class="p">:</span></td></tr><tr><td class="ln">90</td><td class="cd">            <span class="k">with</span> <span class="n">conn</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span> <span class="k">as</span> <span class="n">cur</span><span class="p">:</span></td></tr><tr><td class="ln">91</td><td class="cd">                <span class="k">yield</span> <span class="n">cur</span></td></tr><tr><td class="ln">92</td><td class="cd">        <span class="k">finally</span><span class="p">:</span></td></tr><tr><td class="ln">93</td><td class="cd">            <span class="c1"># Reads still open a transaction in Postgres; end it so the pooled</span></td></tr><tr><td class="ln">94</td><td class="cd">            <span class="c1"># connection does not sit "idle in transaction".</span></td></tr><tr><td class="ln">95</td><td class="cd">            <span class="n">conn</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span></td></tr><tr><td class="ln">96</td><td class="cd">&nbsp;</td></tr></table>
+</div></body></html>

@@ -1,0 +1,35 @@
+.club-details { display: grid; gap: var(--space-4); }
+
+.club-details__image {
+  width: 100%;
+  max-height: 15rem;
+  border-radius: var(--radius-card);
+  object-fit: cover;
+}
+
+.club-details__meta { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); }
+
+.club-details__summary-card {
+  display: grid;
+  gap: .2rem;
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--apu-surface-muted);
+
+  span { color: var(--apu-text-muted); font-size: .75rem; letter-spacing: .04em; text-transform: uppercase; }
+  strong { color: var(--apu-navy-950); }
+}
+
+.club-details__about {
+  h3 { margin: 0 0 .35rem; color: var(--apu-navy-950); font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; }
+  p { margin: 0; }
+}
+
+// The line that replaces the join button. Reads as a statement of standing, not an error.
+.club-details__standing {
+  margin: 0;
+  padding: var(--space-3);
+  border-left: 3px solid #1bacff;
+  border-radius: var(--radius-card);
+  background: rgb(27 172 255 / 8%);
+}

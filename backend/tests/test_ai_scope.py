@@ -1133,6 +1133,15 @@ def test_a_one_character_title_never_matches():
     assert cards._names_in("It runs on 1 October at 1pm", {"1": 99}) == []
 
 
+def test_a_stopword_title_never_matches():
+    """A club literally named "as" carded itself under "I can't help with that, as it's outside
+    what I cover" - and would card just as wrongly under a correct answer that happens to use the
+    word. A real short name is not a stopword and must still match."""
+    assert cards._names_in("I can't help with that, as it's outside what I cover.", {"as": 99}) == []
+    assert cards._names_in("The hackathon runs as a 36-hour event.", {"as": 99}) == []
+    assert cards._names_in("The AI Society meets on Fridays.", {"AI": 5}) == [5]
+
+
 def test_a_longer_title_wins_over_a_substring():
     """Longest-first matching, so a club named "Coding" does not swallow "APU Coding Society"."""
     assert cards._names_in("Try the APU Coding Society.", {"APU Coding Society": 1, "Coding": 2})[0] == 1
@@ -1362,3 +1371,111 @@ def test_the_suggestion_panel_is_never_empty():
     from app.ai.suggestions import suggestions_for
 
     assert suggestions_for(None)
+
+
+def test_suggestion_cards_follow_page_visibility():
+    """A card must never invite a question the assistant would then refuse, so the card list is
+    computed from the same reachability check that releases the answer. Revoking Discover Clubs
+    must drop the club cards on the next open, with nothing to keep in sync by hand."""
+    from app.ai import suggestions
+
+    principal = _FakePrincipal((("student", _representative_unit("student")),))
+    titles = lambda: {c["title"] for c in suggestions.suggestions_for(principal)}
+    assert "Find Me a Club" in titles()
+
+    real = identity.has_page_access
+    try:
+        identity.has_page_access = lambda a, page: False if page == "clubs-discover" else real(a, page)
+        assert "Find Me a Club" not in titles(), "club cards must go with Discover Clubs"
+        assert "Suggest an Event" in titles(), "revoking clubs must not touch the event cards"
+
+        blocked = {"clubs-discover", "explore-events", "event-calendar", "my-events"}
+        identity.has_page_access = lambda a, page: False if page in blocked else real(a, page)
+        fallback = titles()
+        assert "What Is This Page For?" in fallback, "the page-purpose fallback always survives"
+        assert any(t.startswith("How to") for t in fallback), "so does a how-to they can actually perform"
+    finally:
+        identity.has_page_access = real
+
+
+def test_the_fallback_how_to_names_something_the_caller_can_actually_do():
+    """The how-to fallback is BUILT, not listed, precisely so it cannot offer steps that would be
+    withheld: a static card would hand "How do I submit a proposal?" to someone without the
+    proposal form and land them on a refusal."""
+    from app.ai import scope, suggestions
+
+    principal = _FakePrincipal((("student", _representative_unit("student")),))
+    card = suggestions._how_to_card(principal)
+    assert card is not None
+    assert any(scope.can_use(principal, key) for key in suggestions._FALLBACK_FUNCTIONS)
+
+    real = identity.has_page_access
+    try:
+        identity.has_page_access = lambda a, page: False
+        assert suggestions._how_to_card(principal) is None, "no reachable function, no card"
+    finally:
+        identity.has_page_access = real
+
+
+# --- The access log's four outcomes --------------------------------------------------------------
+#
+# The taxonomy replaced six categories that did not survive three days of real use: `out_of_scope`
+# held 45% of the rows and mixed genuine refusals with pipeline crashes, so "is the assistant
+# refusing correctly, or is it broken?" could not be read off the log at all. These tests hold the
+# line the replacement draws.
+
+def test_the_classifier_cannot_blame_the_backend():
+    """SYSTEM_FAILURE is a fact about the backend, never a judgement about a question. Letting the
+    classifier return it would let a model decide its own crashes were the asker's fault - and put
+    a bug back inside the refusal reasons, which is the mix this taxonomy exists to end."""
+    assert topic_access.SYSTEM_FAILURE not in topic_access.REFUSAL_REASONS
+    assert set(topic_access.ALL_OUTCOMES) == set(topic_access.REFUSAL_REASONS) | {
+        topic_access.SYSTEM_FAILURE
+    }
+
+
+def test_the_admin_filter_offers_every_outcome_that_can_be_written():
+    """An outcome the backend writes but the admin page cannot filter to is a row nobody ever
+    reads. They are one list for that reason."""
+    from app.api import ai_admin
+
+    assert set(ai_admin.VALID_OUTCOMES) == set(topic_access.ALL_OUTCOMES)
+
+
+def test_the_reviewer_only_flags_attacks():
+    """The reviewer used to carry three flags and duplicated the classifier on two of them - the
+    same question logged twice, once before generation and once after. It keeps only the verdict
+    the classifier cannot reach: whether the finished ANSWER leaked, or the question was an
+    attack."""
+    from app.ai import sql_llm
+
+    assert sql_llm._VALID_FLAGS == {topic_access.HARMFUL}
+
+
+def test_conversation_context_carries_the_turns_before():
+    """A refused question is frequently not judgeable alone - 'u do not know ?' and 'no i wont
+    login' were both filed as permission refusals, and both are obvious with the turn before
+    them."""
+    history = [
+        {"question": "who is in the coding club?", "answer": "That is not something I can share."},
+        {"question": "u do not know ?", "answer": "I cannot look up club members."},
+    ]
+    context = topic_access.conversation_context(history)
+    assert "who is in the coding club?" in context
+    assert "That is not something I can share." in context
+
+
+def test_conversation_context_is_none_on_the_opening_turn():
+    """None rather than "", so 'this question opened the conversation' stays visible as a fact
+    instead of rendering as an empty context block."""
+    assert topic_access.conversation_context([]) is None
+    assert topic_access.conversation_context(None) is None
+
+
+def test_conversation_context_keeps_only_the_recent_turns():
+    """Three turns is a request, its refusal, and the follow-up - enough to tell someone puzzled
+    from someone pushing, without dragging in an abandoned subject from twenty turns ago."""
+    history = [{"question": f"q{i}", "answer": f"a{i}"} for i in range(10)]
+    context = topic_access.conversation_context(history)
+    assert "q9" in context and "q7" in context
+    assert "q6" not in context

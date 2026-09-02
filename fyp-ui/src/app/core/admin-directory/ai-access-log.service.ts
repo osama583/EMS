@@ -15,14 +15,14 @@ export interface AiAccessDenial {
   readonly question: string;
   readonly createdAt: string;
   /**
-   * Why the interaction did not go through. Two groups, with different fixes:
-   *   page_denied | how_to_page_denied   the backend refused BEFORE generating an answer, because
-   *                                      Page Visibility does not grant the pages involved. Fixed
-   *                                      by granting a page.
-   *   out_of_scope | unsupported | harmful | unrelated_question
-   *                                      a capability gap or a blocked attempt. The last three can
-   *                                      come from the AI security reviewer, which judges an answer
-   *                                      AFTER it was generated (backend: ai/sql_llm.review_answer).
+   * Why the interaction did not go through. THREE REFUSAL REASONS, plus one that is not a refusal:
+   *   no_access       they asked this system for something they cannot have - their role does not
+   *                   reach it, or nobody does. Fixed by granting a page, or not at all.
+   *   harmful         an attempt on the assistant itself: injection, "ignore your instructions",
+   *                   probing, claiming authority, pushing after a refusal. INTENT is the test -
+   *                   wanting a roster you cannot have is no_access, not an attack.
+   *   unrelated       nothing to do with this app.
+   *   system_failure  NOT a refusal. The assistant meant to answer and broke. A bug list.
    */
   readonly outcome: string;
   /** Free-text detail for the outcomes that have no page list. */
@@ -35,6 +35,12 @@ export interface AiAccessDenial {
   readonly aiResponse: string | null;
   /** The asker's roles as they were WHEN ASKED - snapshotted, since assignments change later. */
   readonly userRoles: string | null;
+  /**
+   * The turns immediately before this one, or null when it opened the conversation. A refused
+   * question is frequently not judgeable alone - "u do not know ?" and "no i wont login" were both
+   * filed as permission refusals - and pressing a refused request again is only visible here.
+   */
+  readonly conversationContext: string | null;
 }
 
 export interface AiAccessDenialPage {

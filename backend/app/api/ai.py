@@ -125,20 +125,23 @@ def _clean_history(raw: object) -> list[dict]:
     return turns
 
 
-def _review(question: str, answer: str, principal, *, user_context: str, data_summary: str) -> None:
+def _review(question: str, answer: str, principal, *, user_context: str, data_summary: str,
+            context: str | None = None) -> None:
     """Hand the completed interaction to the independent security reviewer.
 
     ASYNCHRONOUS, and deliberately so. Called inline it added ~1.2s of blocking model call to every
     request - a tax paid by every correctly-answered question to catch the rare bad one, on a check
     that fails open anyway. The reviewer judges a FINISHED interaction, so nothing in the response
     depends on its verdict; only the audit log does. See ai/review_queue.py for the trade-off."""
-    review_queue.submit(question, answer, principal, user_context=user_context, data_summary=data_summary)
+    review_queue.submit(question, answer, principal, user_context=user_context,
+                        data_summary=data_summary, context=context)
 
 
 def _answer(question, answer, principal, *, user_context, data_summary, started_at,
-            navigation=None, event_cards=None, club_cards=None):
+            navigation=None, event_cards=None, club_cards=None, context=None):
     """Review, log the total, and return the response. One exit shape for every path."""
-    _review(question, answer, principal, user_context=user_context, data_summary=data_summary)
+    _review(question, answer, principal, user_context=user_context, data_summary=data_summary,
+            context=context)
     log.info(
         "ai.ask.complete",
         extra={"total_elapsed_ms": round((time.perf_counter() - started_at) * 1000, 1)},
@@ -169,6 +172,10 @@ def ask():
     if len(question) > 1000:
         raise BadRequest("question must be 1000 characters or fewer.")
     history = _clean_history(payload.get("history"))
+    # Stored beside every log row and shown to the reviewer. A refused question is not judgeable on
+    # its own - "u do not know ?" and "no i wont login" both went into the log as permission
+    # decisions, and both are obvious the moment the turn before them is visible.
+    context = topic_access.conversation_context(history)
     log.info("ai.ask.step", extra={"step": 1, "description": "Received user question", "elapsed_ms": 0.0})
 
     # --- Step 2: authenticate and load the caller's real context --------------------------------
@@ -206,25 +213,30 @@ def ask():
     step_started_at = time.perf_counter()
     denied = topic_access.denied_topics(principal, reading.topics)
     if denied:
-        topic_access.log_denials(principal, denied, question)
+        topic_access.log_denials(principal, denied, question, context)
         reading = reading.without({i for i in reading.intents if INTENT_TOPIC.get(i) in denied})
     user_context = topic_access.user_context_document(principal, set(reading.intents))
     _step(4, f"Denied topics: {denied or ['none']}", step_started_at)
 
     # --- Step 5: nothing in scope, and nothing was denied -> genuinely out of scope --------------
-    # Recorded rather than silently answered: /app/admin/ai-access-log needs to distinguish
-    # "blocked by permissions" (fix a grant) from "never supported" (build the feature, or don't).
+    # Recorded rather than silently answered, in the category the CLASSIFIER judged - it is the one
+    # step that read this turn with the conversation in front of it, and whether "who else is
+    # going?" is curiosity or the third attempt at the same refusal is only visible from there.
+    # Defaults to no_access when it offered nothing, which files an unclear turn as an ordinary
+    # refusal rather than accusing anybody of an attack.
     if not reading.intents and not denied:
         step_started_at = time.perf_counter()
-        topic_access.log_unanswerable(
+        topic_access.log_refused(
             principal, question,
+            outcome=reading.refusal_reason or topic_access.NO_ACCESS,
             reason="Outside the assistant's scope - not events, clubs, a page, a how-to, or the asker",
+            context=context,
         )
         answer = generate_answer(
             question, [topic_access.out_of_scope_document(principal)], history, asker=principal
         )
         _step(5, "Out of scope: declined", step_started_at)
-        return _answer(question, answer, principal, user_context=user_context,
+        return _answer(question, answer, principal, user_context=user_context, context=context,
                        data_summary="No data was retrieved (out of scope).",
                        started_at=request_started_at)
 
@@ -234,7 +246,7 @@ def ask():
     # Event Calendar for" depending on whether the asker can read event rows.
     if reading.knowledge_intents and not reading.data_intents:
         step_started_at = time.perf_counter()
-        chunks, navigation = _knowledge_chunks(question, reading, principal)
+        chunks, navigation = _knowledge_chunks(question, reading, principal, context)
         if denied:
             chunks.append(topic_access.denial_document(principal, denied))
 
@@ -249,7 +261,7 @@ def ask():
             temperature=GREETING_TEMPERATURE if bare_greeting else FACTUAL_TEMPERATURE,
         )
         _step(6, f"Answered from definitions: {sorted(reading.knowledge_intents)}", step_started_at)
-        return _answer(question, answer, principal, user_context=user_context,
+        return _answer(question, answer, principal, user_context=user_context, context=context,
                        data_summary="Page/function definitions and account facts only; no rows were read.",
                        started_at=request_started_at, navigation=navigation)
 
@@ -260,7 +272,7 @@ def ask():
             question, [topic_access.denial_document(principal, denied)], history, asker=principal
         )
         _step(7, f"All requested topics denied: {denied}", step_started_at)
-        return _answer(question, answer, principal, user_context=user_context,
+        return _answer(question, answer, principal, user_context=user_context, context=context,
                        data_summary="No data was retrieved (topic denied by page visibility).",
                        started_at=request_started_at)
 
@@ -277,7 +289,7 @@ def ask():
         )
         answer = generate_sql_answer(question, document, history=history, asker=principal)
         _step(8, f"Suggestion stage '{stage}': asked a question, no query run", step_started_at)
-        return _answer(question, answer, principal, user_context=user_context,
+        return _answer(question, answer, principal, user_context=user_context, context=context,
                        data_summary=f"Suggestion stage '{stage}': asked a question, no data read.",
                        started_at=request_started_at)
 
@@ -311,11 +323,15 @@ def ask():
         data_summary = result_document
     elif outcome.impossible:
         # The model judged the question unanswerable from the schema it was given: on-domain, but
-        # asking for something the card does not carry. The most actionable kind of log row.
-        topic_access.log_unanswerable(
+        # asking for something the card does not carry - an organiser's email, a roster. A REFUSAL
+        # rather than a failure, and NO_ACCESS is what it is: they asked this system for something
+        # and cannot have it. An adversarial reading of the same turn still wins, because someone
+        # probing for exactly this is the case the classifier was given context to catch.
+        topic_access.log_refused(
             principal, question,
+            outcome=reading.refusal_reason or topic_access.NO_ACCESS,
             reason="About events or clubs, but asks for something the card and details do not show",
-            unsupported=True,
+            context=context,
         )
         result_document = topic_access.out_of_scope_document(principal)
         data_summary = "No data retrieved: the question is not expressible against what the card shows."
@@ -326,7 +342,9 @@ def ask():
             "ai.ask.retrieval_failed",
             extra={"reason": outcome.failure_reason, "attempts": outcome.attempts},
         )
-        topic_access.log_unanswerable(principal, question, reason=f"Retrieval failed: {outcome.failure_reason}")
+        topic_access.log_system_failure(
+            principal, question, reason=f"Retrieval failed: {outcome.failure_reason}", context=context
+        )
         result_document = topic_access.unanswerable_document()
         data_summary = "No data retrieved: the query could not be generated or validated."
 
@@ -342,7 +360,15 @@ def ask():
     # event card opens the details dialog with its Register button, a club card lands on Discover
     # Clubs with that club's join dialog already open.
     step_started_at = time.perf_counter()
-    event_cards, club_cards = cards.build(answer, topics, user_id=user_id)
+    # ONLY A REAL RESULT GETS CARDED, for the same reason the navigation fallback below is
+    # suppressed on a refusal - and it is the same `outcome.ok`. A refusal names no event and no
+    # club, so anything matched out of its prose is a coincidence rather than a mention: "I can't
+    # help with that, as it's outside what I cover" carded a club literally named "as". Building
+    # cards from text that was never about an entity is how an answer acquires an illustration it
+    # does not have.
+    event_cards, club_cards = (
+        cards.build(answer, topics, user_id=user_id) if outcome.ok else ([], [])
+    )
     # A page card is the "take me there" fallback for an answer with nothing clickable in it -
     # "where do I find events" is prose otherwise. It is suppressed in three cases:
     #
@@ -366,13 +392,14 @@ def ask():
     # claim was grounded, so anything the answering model was given and it is not shown reads to it
     # as invented. False flags are not free: they bury the real incidents in a log an administrator
     # is supposed to be able to trust.
-    return _answer(question, answer, principal, user_context=user_context,
+    return _answer(question, answer, principal, user_context=user_context, context=context,
                    data_summary="\n\n---\n\n".join([data_summary, *extra_chunks]),
                    started_at=request_started_at, navigation=navigation,
                    event_cards=event_cards, club_cards=club_cards)
 
 
-def _knowledge_chunks(question: str, reading, principal) -> tuple[list[str], list[dict]]:
+def _knowledge_chunks(question: str, reading, principal,
+                      context: str | None = None) -> tuple[list[str], list[dict]]:
     """The CONTEXT for a knowledge turn, and the navigation cards that go under it.
 
     Every branch reads a DEFINITION out of ai/scope.py. None of them improvises, and none of them
@@ -407,10 +434,10 @@ def _knowledge_chunks(question: str, reading, principal) -> tuple[list[str], lis
         page_codes = scope.pages_named(question)
         if not page_codes:
             chunks.append(scope.unknown_page_document(question))
-            topic_access.log_unanswerable(
+            topic_access.log_system_failure(
                 principal, question,
                 reason="Asked what a page is for, but the name matches no page in scope.PAGES",
-                unsupported=True,
+                context=context,
             )
         for page_code in page_codes:
             chunks.append(scope.page_definition_document(principal, page_code))
@@ -421,21 +448,21 @@ def _knowledge_chunks(question: str, reading, principal) -> tuple[list[str], lis
     if "how_to" in reading.intents:
         # Three-way, because a how-to is gated on where its ACTION happens. NO RESOLVABLE FUNCTION
         # NOW REFUSES rather than improvising: a function that does not exist is a function that
-        # does not exist, and the log row (`unsupported`) names the one somebody should write.
+        # does not exist, and the log row (`system_failure`) names the one somebody should write.
         function_key = scope.function_named(question)
         if function_key is None:
             chunks.append(scope.unknown_function_document(principal))
-            topic_access.log_unanswerable(
+            topic_access.log_system_failure(
                 principal, question,
                 reason="How-to question matching no function in scope.FUNCTIONS",
-                unsupported=True,
+                context=context,
             )
         elif scope.can_use(principal, function_key):
             chunks.append(scope.function_definition_document(principal, function_key))
             navigation.extend(topic_access.function_cards(principal, function_key))
         else:
             chunks.append(scope.function_denied_document(principal, function_key))
-            topic_access.log_function_denial(principal, function_key, question)
+            topic_access.log_function_denial(principal, function_key, question, context)
 
     return chunks, navigation
 

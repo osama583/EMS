@@ -53,6 +53,8 @@ export class AiAccessLogComponent {
       // Only a reviewer rejection has a generated answer to show; the pre-generation refusals
       // never produced one, so an em dash is the truth rather than a missing value.
       response: { primary: row.aiResponse ?? '—', secondary: row.userRoles ?? undefined },
+      // What was being said just before. Judging "u do not know ?" without it is guesswork.
+      context: { primary: row.conversationContext ?? 'Opening question', secondary: undefined },
       when: { primary: this.formatDate(row.createdAt) },
     },
     mobile: {
@@ -63,6 +65,7 @@ export class AiAccessLogComponent {
       details: [
         { icon: 'lock', text: row.requiredPages ? `Needs any of: ${row.requiredPages}` : (row.reason ?? 'No page would grant this') },
         ...(row.aiResponse ? [{ icon: 'smart_toy', text: row.aiResponse }] : []),
+        ...(row.conversationContext ? [{ icon: 'forum', text: row.conversationContext }] : []),
         { icon: 'schedule', text: this.formatDate(row.createdAt) },
       ],
     },
@@ -75,7 +78,7 @@ export class AiAccessLogComponent {
     mobileListLabel: 'Denial cards',
     header: {
       title: 'AI Access Log',
-      description: 'Questions the AI assistant did not answer, and why. Page Visibility may not grant that person the pages the answer would come from — grant the page — or the assistant does not support the question yet, which is a capability gap rather than a permissions one. Rows flagged by the security reviewer also show the answer it blocked.',
+      description: 'Questions the AI assistant did not answer, and why. Three reasons mean it refused: out of user scope (they cannot have it — grant the page, or not), blocked as harmful (someone tried to break the assistant), and unrelated. The fourth, needs fixing, is not a refusal at all — the assistant meant to answer and broke. Each row carries the turns before it, because a question like “u do not know ?” cannot be judged on its own.',
       countLabel: `${this.total()} denial${this.total() === 1 ? '' : 's'}`,
       countIcon: 'gpp_maybe',
       primaryActionLabel: 'Clear log',
@@ -86,6 +89,7 @@ export class AiAccessLogComponent {
       { key: 'asker', label: 'Asked by' },
       { key: 'topic', label: 'Topic' },
       { key: 'question', label: 'Question' },
+      { key: 'context', label: 'Conversation before' },
       { key: 'outcome', label: 'Why refused' },
       { key: 'response', label: 'Assistant said' },
       { key: 'when', label: 'When', sortKey: 'when' },
@@ -100,10 +104,12 @@ export class AiAccessLogComponent {
 
   /**
    * The category filter, offering exactly the outcomes the backend can write (see
-   * api/ai_admin.VALID_OUTCOMES). Grouped in the labels by what an admin would DO about each: the
-   * two "no access" values are fixed by granting a page, the middle two by building something, and
-   * the last two are the assistant correctly declining - a blocked attack is the system working,
-   * not a defect to fix.
+   * api/ai_admin.VALID_OUTCOMES, which reads them off ai/topic_access.py).
+   *
+   * THREE REASONS A QUESTION WAS REFUSED, then a fourth that is not a refusal at all, and the
+   * separator says so. `system_failure` means the assistant MEANT to answer and broke - a bug
+   * list, not a permissions decision - and it is listed apart because mixing the two is what the
+   * previous six categories did: 31 of the first 93 rows were crashes filed as refusals.
    */
   readonly filters = computed(() => [
     {
@@ -112,12 +118,10 @@ export class AiAccessLogComponent {
       value: this.outcomeFilter(),
       options: [
         { value: 'all', label: 'All reasons' },
-        { value: 'page_denied', label: 'No access to that page' },
-        { value: 'how_to_page_denied', label: 'No access to that action' },
-        { value: 'out_of_scope', label: 'Outside scope' },
-        { value: 'unsupported', label: 'Not supported yet' },
+        { value: 'no_access', label: 'Out of user scope' },
         { value: 'harmful', label: 'Blocked as harmful' },
-        { value: 'unrelated_question', label: 'Unrelated question' },
+        { value: 'unrelated', label: 'Unrelated question' },
+        { value: 'system_failure', label: 'Needs fixing (not a refusal)' },
       ],
     },
   ]);
@@ -212,12 +216,10 @@ export class AiAccessLogComponent {
    */
   private outcomeLabel(outcome: string): string {
     switch (outcome) {
-      case 'page_denied': return 'No access to that page';
-      case 'how_to_page_denied': return 'No access to that action';
-      case 'out_of_scope': return 'Outside scope';
-      case 'unsupported': return 'Not supported yet';
+      case 'no_access': return 'Out of user scope';
       case 'harmful': return 'Blocked as harmful';
-      case 'unrelated_question': return 'Unrelated question';
+      case 'unrelated': return 'Unrelated question';
+      case 'system_failure': return 'Needs fixing (not a refusal)';
       default: return outcome;
     }
   }
@@ -229,7 +231,8 @@ export class AiAccessLogComponent {
    */
   private outcomeTone(outcome: string): 'warning' | 'danger' | 'neutral' {
     if (outcome === 'harmful') return 'danger';
-    if (outcome === 'page_denied' || outcome === 'how_to_page_denied') return 'warning';
+    // A crash is the row an admin can actually act on, so it reads louder than a correct refusal.
+    if (outcome === 'system_failure') return 'warning';
     return 'neutral';
   }
 

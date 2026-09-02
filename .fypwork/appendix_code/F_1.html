@@ -1,0 +1,104 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+html,body{margin:0;padding:0;background:#fff;}
+body{font-family:"Segoe UI",Arial,sans-serif;}
+.wrap{width:1180px;border:1px solid #d7dde5;border-radius:6px;overflow:hidden;}
+.hd{background:#1b2a41;color:#fff;padding:11px 18px;display:flex;
+    justify-content:space-between;align-items:center;font-size:15px;}
+.hd .lbl{font-weight:700;}
+.hd .lbl span{font-family:Consolas,"Courier New",monospace;font-weight:400;
+              color:#a8c4e6;margin-left:10px;}
+.hd .src{font-size:12.5px;color:#c3d3e8;font-family:Consolas,"Courier New",monospace;}
+.desc{background:#f2f5f9;border-bottom:1px solid #dde3ea;color:#20344d;
+      padding:10px 18px;font-size:13.5px;}
+table.code{border-collapse:collapse;width:100%;background:#fff;}
+td.ln{background:#f0f2f5;color:#8b95a3;text-align:right;padding:0 11px;width:1%;
+      font-family:Consolas,"Courier New",monospace;font-size:12.5px;
+      user-select:none;border-right:1px solid #e2e6ec;}
+td.cd{padding:0 0 0 14px;font-family:Consolas,"Courier New",monospace;font-size:12.5px;
+      white-space:pre;color:#1f2933;}
+tr{height:21px;}
+
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.cd .hll { background-color: #ffffcc }
+.cd { background: #f8f8f8; }
+.cd .c { color: #3D7B7B; font-style: italic } /* Comment */
+.cd .err { border: 1px solid #F00 } /* Error */
+.cd .k { color: #008000; font-weight: bold } /* Keyword */
+.cd .o { color: #666 } /* Operator */
+.cd .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.cd .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.cd .cp { color: #9C6500 } /* Comment.Preproc */
+.cd .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.cd .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.cd .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.cd .gd { color: #A00000 } /* Generic.Deleted */
+.cd .ge { font-style: italic } /* Generic.Emph */
+.cd .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.cd .gr { color: #E40000 } /* Generic.Error */
+.cd .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.cd .gi { color: #008400 } /* Generic.Inserted */
+.cd .go { color: #717171 } /* Generic.Output */
+.cd .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.cd .gs { font-weight: bold } /* Generic.Strong */
+.cd .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.cd .gt { color: #04D } /* Generic.Traceback */
+.cd .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.cd .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.cd .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.cd .kp { color: #008000 } /* Keyword.Pseudo */
+.cd .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.cd .kt { color: #B00040 } /* Keyword.Type */
+.cd .m { color: #666 } /* Literal.Number */
+.cd .s { color: #BA2121 } /* Literal.String */
+.cd .na { color: #687822 } /* Name.Attribute */
+.cd .nb { color: #008000 } /* Name.Builtin */
+.cd .nc { color: #00F; font-weight: bold } /* Name.Class */
+.cd .no { color: #800 } /* Name.Constant */
+.cd .nd { color: #A2F } /* Name.Decorator */
+.cd .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.cd .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.cd .nf { color: #00F } /* Name.Function */
+.cd .nl { color: #767600 } /* Name.Label */
+.cd .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.cd .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.cd .nv { color: #19177C } /* Name.Variable */
+.cd .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.cd .w { color: #BBB } /* Text.Whitespace */
+.cd .mb { color: #666 } /* Literal.Number.Bin */
+.cd .mf { color: #666 } /* Literal.Number.Float */
+.cd .mh { color: #666 } /* Literal.Number.Hex */
+.cd .mi { color: #666 } /* Literal.Number.Integer */
+.cd .mo { color: #666 } /* Literal.Number.Oct */
+.cd .sa { color: #BA2121 } /* Literal.String.Affix */
+.cd .sb { color: #BA2121 } /* Literal.String.Backtick */
+.cd .sc { color: #BA2121 } /* Literal.String.Char */
+.cd .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.cd .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.cd .s2 { color: #BA2121 } /* Literal.String.Double */
+.cd .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.cd .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.cd .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.cd .sx { color: #008000 } /* Literal.String.Other */
+.cd .sr { color: #A45A77 } /* Literal.String.Regex */
+.cd .s1 { color: #BA2121 } /* Literal.String.Single */
+.cd .ss { color: #19177C } /* Literal.String.Symbol */
+.cd .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.cd .fm { color: #00F } /* Name.Function.Magic */
+.cd .vc { color: #19177C } /* Name.Variable.Class */
+.cd .vg { color: #19177C } /* Name.Variable.Global */
+.cd .vi { color: #19177C } /* Name.Variable.Instance */
+.cd .vm { color: #19177C } /* Name.Variable.Magic */
+.cd .il { color: #666 } /* Literal.Number.Integer.Long */</style></head><body>
+<div class="wrap">
+  <div class="hd">
+    <div class="lbl">F.1<span>passwords.py</span></div>
+    <div class="src">backend/app/security/passwords.py | lines 16-41</div>
+  </div>
+  <div class="desc">Password hashing with a configurable bcrypt cost factor.</div>
+  <table class="code"><tr><td class="ln">16</td><td class="cd"><span class="k">def</span><span class="w"> </span><span class="nf">hash_password</span><span class="p">(</span><span class="n">plaintext</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span></td></tr><tr><td class="ln">17</td><td class="cd">    <span class="n">encoded</span> <span class="o">=</span> <span class="n">plaintext</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">)</span></td></tr><tr><td class="ln">18</td><td class="cd">    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">encoded</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">MAX_PASSWORD_BYTES</span><span class="p">:</span></td></tr><tr><td class="ln">19</td><td class="cd">        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Password exceeds </span><span class="si">{</span><span class="n">MAX_PASSWORD_BYTES</span><span class="si">}</span><span class="s2"> bytes."</span><span class="p">)</span></td></tr><tr><td class="ln">20</td><td class="cd">    <span class="k">return</span> <span class="n">bcrypt</span><span class="o">.</span><span class="n">hashpw</span><span class="p">(</span><span class="n">encoded</span><span class="p">,</span> <span class="n">bcrypt</span><span class="o">.</span><span class="n">gensalt</span><span class="p">(</span><span class="n">rounds</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">bcrypt_rounds</span><span class="p">))</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">)</span></td></tr><tr><td class="ln">21</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">22</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">23</td><td class="cd"><span class="k">def</span><span class="w"> </span><span class="nf">verify_password</span><span class="p">(</span><span class="n">plaintext</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">hashed</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span></td></tr><tr><td class="ln">24</td><td class="cd"><span class="w">    </span><span class="sd">"""Constant-time check. Returns False rather than raising on a malformed hash."""</span></td></tr><tr><td class="ln">25</td><td class="cd">    <span class="k">if</span> <span class="ow">not</span> <span class="n">hashed</span><span class="p">:</span></td></tr><tr><td class="ln">26</td><td class="cd">        <span class="c1"># Still burn a comparison so a user with no password set is not</span></td></tr><tr><td class="ln">27</td><td class="cd">        <span class="c1"># distinguishable from a wrong password by response time.</span></td></tr><tr><td class="ln">28</td><td class="cd">        <span class="n">bcrypt</span><span class="o">.</span><span class="n">checkpw</span><span class="p">(</span><span class="sa">b</span><span class="s2">"x"</span><span class="p">,</span> <span class="n">bcrypt</span><span class="o">.</span><span class="n">hashpw</span><span class="p">(</span><span class="sa">b</span><span class="s2">"x"</span><span class="p">,</span> <span class="n">bcrypt</span><span class="o">.</span><span class="n">gensalt</span><span class="p">(</span><span class="n">rounds</span><span class="o">=</span><span class="mi">4</span><span class="p">)))</span></td></tr><tr><td class="ln">29</td><td class="cd">        <span class="k">return</span> <span class="kc">False</span></td></tr><tr><td class="ln">30</td><td class="cd">    <span class="k">try</span><span class="p">:</span></td></tr><tr><td class="ln">31</td><td class="cd">        <span class="k">return</span> <span class="n">bcrypt</span><span class="o">.</span><span class="n">checkpw</span><span class="p">(</span><span class="n">plaintext</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">)[:</span><span class="n">MAX_PASSWORD_BYTES</span><span class="p">],</span> <span class="n">hashed</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"utf-8"</span><span class="p">))</span></td></tr><tr><td class="ln">32</td><td class="cd">    <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span></td></tr><tr><td class="ln">33</td><td class="cd">        <span class="k">return</span> <span class="kc">False</span></td></tr><tr><td class="ln">34</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">35</td><td class="cd">&nbsp;</td></tr><tr><td class="ln">36</td><td class="cd"><span class="k">def</span><span class="w"> </span><span class="nf">needs_rehash</span><span class="p">(</span><span class="n">hashed</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span></td></tr><tr><td class="ln">37</td><td class="cd"><span class="w">    </span><span class="sd">"""True when a stored hash predates the current cost factor."""</span></td></tr><tr><td class="ln">38</td><td class="cd">    <span class="k">try</span><span class="p">:</span></td></tr><tr><td class="ln">39</td><td class="cd">        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">hashed</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"$"</span><span class="p">)[</span><span class="mi">2</span><span class="p">])</span> <span class="o">&lt;</span> <span class="n">config</span><span class="o">.</span><span class="n">bcrypt_rounds</span></td></tr><tr><td class="ln">40</td><td class="cd">    <span class="k">except</span> <span class="p">(</span><span class="ne">IndexError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span></td></tr><tr><td class="ln">41</td><td class="cd">        <span class="k">return</span> <span class="kc">True</span></td></tr></table>
+</div></body></html>
