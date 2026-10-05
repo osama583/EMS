@@ -79,14 +79,17 @@ _OPTION_CATALOGUES: dict[str, tuple[str, str]] = {
 INSIDE, OUTSIDE = "inside", "outside"
 
 # Requirements whose location must be a catalogue venue, never free text, with the label the applicant
-# sees for each.
+# sees for each. photoVideo is NOT here: unlike a stage or a tray of food, a photographer/videographer
+# is not delivered to a fixed campus location - they go wherever the event itself is, so their row
+# follows the same Inside/Outside choice as the event schedule (see PHOTO_VIDEO_LABEL below).
 VENUE_ONLY_REQUIREMENTS = {
     "logistics": "Logistics",
     "soundLight": "Sound & Light",
     "fmb": "Food",
     "waterNormal": "Mineral Water",
-    "photoVideo": "Photography / Videography",
 }
+
+PHOTO_VIDEO_LABEL = "Photography / Videography"
 
 
 def _venue_ref(venue_option_id: int | None) -> str:
@@ -253,9 +256,24 @@ def validate(cur, payload: dict, *, draft: bool, applicant: dict | None = None) 
                 if not row.get("venueId"):
                     errors.append(f"{label} row {index} needs a university venue.")
 
+        # Photography/Videography follows the crew, not a fixed delivery point - same Inside/Outside
+        # choice and the same "is it actually filled in" check as an event schedule row.
+        import logging as _lg; _lg.getLogger("app").warning("PHOTOVIDEO_DEBUG rows=%r", _rows(request_rows, "photoVideo"))
+        for index, row in enumerate(_rows(request_rows, "photoVideo"), start=1):
+            outside = str(row.get("locationKind") or "").strip().lower() == OUTSIDE
+            located = bool(str(row.get("location") or "").strip()) if outside else bool(row.get("venueId"))
+            if not located:
+                what = "an external location" if outside else "a university venue"
+                errors.append(f"{PHOTO_VIDEO_LABEL} row {index} needs {what}.")
+
+        # Total Expected Pax is COMPUTED from the guest table plus Important People (see
+        # event-proposal.ts's totalPax) - there is no field to type it into, so demanding at least
+        # one made an empty guest table an unexplained 422 on submit. Zero is a legitimate answer:
+        # an event may genuinely not track attendees up front. Only a NEGATIVE count is wrong, and
+        # the per-row check in the form already refuses that.
         total_pax = payload.get("totalPax")
-        if total_pax is None or _as_int(total_pax, default=-1) <= 0:
-            errors.append("Total expected pax must be at least one.")
+        if total_pax is not None and _as_int(total_pax, default=0) < 0:
+            errors.append("Total expected pax cannot be negative.")
 
     visibility = _text(payload, "eventVisibility")
     if visibility and visibility not in EVENT_VISIBILITIES:
@@ -696,11 +714,14 @@ def _write_transportation_rows(cur, request_id: int, rows: list[dict]) -> None:
 
 
 def _write_photo_video_rows(cur, request_id: int, rows: list[dict]) -> None:
+    # Unlike the other three VENUE_ONLY_REQUIREMENTS, the crew goes wherever the event itself is
+    # happening rather than being delivered to a fixed campus location - so this is the one
+    # requirement `allow_outside` is passed for. See VENUE_ONLY_REQUIREMENTS's comment.
     for row in rows:
         if not row.get("service"):
             continue
         option_id, label, _ = _resolve_option(cur, row.get("service"), "photoVideo")
-        venue_id, location, _ = _resolve_location(cur, row)
+        venue_id, location, _ = _resolve_location(cur, row, allow_outside=True)
         cur.execute(
             """INSERT INTO request_photography_videography
                    (request_id, option_id, service, "date", start_time, end_time, location,
@@ -900,8 +921,102 @@ def load_applicant(cur, user_id: int) -> dict:
 _UNCONFIRMED_TASK_STATUSES = ("pending", "resubmitted")
 
 
+# Who is actually working each department task, for the Application Monitoring sub-status popover.
+# request_row_assignment (not task_assignment) is where staff are assigned: one row per requested ROW,
+# so a task with three rows and two people collapses to those two distinct names.
+_ASSIGNEES_SELECT = """,
+                       (SELECT array_agg(DISTINCT u.full_name)
+                          FROM request_row_assignment ra
+                          JOIN users u ON u.user_id = ra.staff_user_id
+                         WHERE ra.request_task_id = t.request_task_id) AS assignees"""
+
+
+def implementation_items(cur, request_id: int) -> list[dict[str, Any]]:
+    """One entry per REQUESTED ITEM once the departments are done working - Application Monitoring's
+    implementation breakdown.
+
+    A finer grain than _department_confirmations() on purpose. Department review asks one question per
+    DEPARTMENT ("has Logistics approved?"), but implementation is the departments' staff working
+    individual items down, and four logistics items can each be at a different step. Rolling those
+    into one 'Logistics' line is exactly the detail this page exists to show.
+
+    Two different tables answer "where is this item", because the app routes the two families
+    differently (see workflow/constants.py):
+
+        the 5 ROW_ASSIGNABLE_REQUIREMENTS  request_row_assignment, keyed (requirement_name, row_id)
+        fmb / waterNormal                  request_fmb_selection - a cafeteria ORDER, which carries
+                                           its own status and needs no staff assignment at all
+
+    Driven off flatten_requests() rather than off the assignment rows, so an item nobody has picked up
+    still appears (as 'Not assigned'); querying the assignments alone would silently hide precisely the
+    items an administrator most needs to see.
+    """
+    rows = flatten_requests(cur, request_id)
+    if not rows:
+        return []
+
+    assignments: dict[tuple[str, int], dict[str, Any]] = {}
+    for row in fetch_all(
+        cur,
+        """SELECT ra.requirement_name, ra.row_id, ra.status,
+                  array_agg(DISTINCT u.full_name) AS staff
+             FROM request_row_assignment ra
+             JOIN request_task t ON t.request_task_id = ra.request_task_id
+             LEFT JOIN users u ON u.user_id = ra.staff_user_id
+            WHERE t.request_id = %s
+         GROUP BY ra.requirement_name, ra.row_id, ra.status""",
+        (request_id,),
+    ):
+        assignments[(row["requirement_name"], row["row_id"])] = row
+
+    # Cafeteria orders hang off the applicant's food request, so they are keyed by request_fmb_id -
+    # and one request can be fanned out across several cafeterias, each its own order.
+    orders: dict[int, list[dict[str, Any]]] = {}
+    for row in fetch_all(
+        cur,
+        """SELECT s.request_fmb_id, s.menu_item_label, s.quantity, s.status, u.description AS cafeteria
+             FROM request_fmb_selection s
+             JOIN request_fmb f ON f.request_fmb_id = s.request_fmb_id
+             LEFT JOIN unit u ON u.code = s.unit_code
+            WHERE f.request_id = %s
+         ORDER BY s.request_fmb_selection_id""",
+        (request_id,),
+    ):
+        orders.setdefault(row["request_fmb_id"], []).append(row)
+
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        department, row_id = row["department"], row["id"]
+        if department in ("fmb", "waterNormal"):
+            placed = orders.get(row_id, [])
+            if not placed:
+                items.append({
+                    "department": department, "item": row["item"], "detail": row["quantity"],
+                    "status": "unordered", "assignees": [],
+                })
+                continue
+            for order in placed:
+                items.append({
+                    "department": department,
+                    "item": order["menu_item_label"] or row["item"],
+                    "detail": f"{order['quantity']} × {order['cafeteria'] or 'cafeteria'}",
+                    "status": order["status"],
+                    "assignees": [],
+                })
+            continue
+        assignment = assignments.get((department, row_id))
+        items.append({
+            "department": department,
+            "item": row["item"],
+            "detail": row["quantity"],
+            "status": assignment["status"] if assignment else "unassigned",
+            "assignees": [name for name in (assignment["staff"] if assignment else []) if name],
+        })
+    return items
+
+
 def _department_confirmations(
-    cur, request_id: int, *, with_allocation: bool = False
+    cur, request_id: int, *, with_allocation: bool = False, with_assignees: bool = False
 ) -> list[dict[str, Any]]:
     """One entry per department task, in the client's DepartmentConfirmation shape.
 
@@ -935,10 +1050,12 @@ def _department_confirmations(
                 if with_allocation
                 else {}
             ),
+            **({"assignees": row["assignees"] or []} if with_assignees else {}),
         }
         for row in fetch_all(
             cur,
-            """SELECT t.status, t.comment, t.resolved_at, er.requirement_name
+            f"""SELECT t.status, t.comment, t.resolved_at, er.requirement_name{_ASSIGNEES_SELECT
+                       if with_assignees else ''}
                  FROM request_task t
                  JOIN event_requirements er ON er.requirement_id = t.requirement_id
                 WHERE t.request_id = %s AND t.stage_code = 'department_review'
@@ -949,7 +1066,48 @@ def _department_confirmations(
 
 
 # --- Projection -----------------------------------------------------------
-def project_list_item(cur, request: dict) -> dict[str, Any]:
+def _acted_by(cur, request_id: int, user_id: int | None) -> bool:
+    """Durable "did this caller ever decide this proposal" - the same workflow_history EXISTS
+    predicate api/proposals.py's _VISIBLE_SQL and the 'acted-on' list filter use server-side, so a
+    reviewer whose live stage relation has since moved on (see proposal-visibility.ts's
+    reviewerHasRelation, which has no such fallback for a non-terminal proposal) can still be told
+    by the client that they are allowed to open it."""
+    if user_id is None:
+        return False
+    row = fetch_one(
+        cur,
+        "SELECT 1 FROM workflow_history WHERE request_id = %s AND actor_user_id = %s LIMIT 1",
+        (request_id, user_id),
+    )
+    return row is not None
+
+
+def _applicant_unit_codes(cur, applicant_user_id: int | None) -> list[str]:
+    """The applicant's OWN school/department unit codes, straight off user_unit_roles.
+
+    This is the authoritative answer to "whose school is this proposal from", and the same join
+    api/proposals.py's _VISIBLE_SQL uses to let a head of school see their students' proposals. The
+    request.applicant_department_or_school TEXT column is not: it is a free-text snapshot the form
+    fills in, it is NULL on proposals that predate it, and proposal-visibility.ts was comparing it
+    against a role's DISPLAY LABEL - so a head of school was denied their own school's proposal
+    whenever that column happened to be empty.
+    """
+    if applicant_user_id is None:
+        return []
+    return [
+        row["unit_code"]
+        for row in fetch_all(
+            cur,
+            "SELECT DISTINCT unit_code FROM user_unit_roles "
+            "WHERE user_id = %s AND unit_code IS NOT NULL",
+            (applicant_user_id,),
+        )
+    ]
+
+
+def project_list_item(
+    cur, request: dict, *, user_id: int | None = None, with_assignees: bool = False
+) -> dict[str, Any]:
     """One proposal, shaped for the Inbox/Ongoing/History/Drafts TABLE rows only - every page
     list_proposals() backs (see api/proposals.py).
 
@@ -984,6 +1142,7 @@ def project_list_item(cur, request: dict) -> dict[str, Any]:
         "applicant": request["applicant_name"],
         "applicantInitials": initials,
         "applicantEmail": request["applicant_email"],
+        "applicantDepartment": request["applicant_department_or_school"],
         "shortIntroduction": request["short_introduction"],
         "category": categories[0]["category_name"] if categories else "",
         "totalPax": request["total_pax"],
@@ -1005,12 +1164,23 @@ def project_list_item(cur, request: dict) -> dict[str, Any]:
         ],
         "workflow": {
             "stage": stage_for_client(request["status"]),
-            "departmentConfirmations": _department_confirmations(cur, request_id),
+            "departmentConfirmations": _department_confirmations(
+                cur, request_id, with_assignees=with_assignees
+            ),
         },
+        "actedByMe": _acted_by(cur, request_id, user_id),
+        "applicantUnitCodes": _applicant_unit_codes(cur, request["applicant_user_id"]),
+        # Only once the departments have handed over: before that the per-item steps do not exist yet,
+        # and department-level confirmations are the whole story.
+        **(
+            {"implementationItems": implementation_items(cur, request_id)}
+            if with_assignees and request["status"] == "implementation"
+            else {}
+        ),
     }
 
 
-def project(cur, request: dict, *, include_children: bool = True) -> dict[str, Any]:
+def project(cur, request: dict, *, include_children: bool = True, user_id: int | None = None) -> dict[str, Any]:
     """One proposal, shaped for the client."""
     request_id = request["request_id"]
     categories = [
@@ -1087,6 +1257,8 @@ def project(cur, request: dict, *, include_children: bool = True) -> dict[str, A
                 cur, request_id, with_allocation=True
             ),
         },
+        "actedByMe": _acted_by(cur, request_id, user_id),
+        "applicantUnitCodes": _applicant_unit_codes(cur, request["applicant_user_id"]),
     }
 
     if include_children:
@@ -1311,6 +1483,10 @@ def _read_requirement_rows(cur, request_id: int) -> dict[str, list[dict[str, Any
             "id": r["request_photography_videography_id"], "service": _option_ref(r["option_id"], "photoVideo"),
             "date": str(r["date"]), "start": str(r["start_time"]), "end": str(r["end_time"]),
             "location": r["location"], "venueId": _venue_ref(r["venue_option_id"]),
+            # A row written before Outside existed for this requirement has no venue_option_id but a
+            # real venue label in `location` (frozen from the catalogue) - that is still INSIDE, not
+            # an address. Only a genuinely typed address (no venue link ever resolved) is OUTSIDE.
+            "locationKind": OUTSIDE if r["venue_option_id"] is None and r["location"] else INSIDE,
             "notes": r["notes"] or "",
         }
         for r in fetch_all(

@@ -47,12 +47,23 @@ WHAT IS CHECKED, and why each one exists:
   9. LIMIT. Enforced by sql_runner.py rather than here (it appends one when absent), since a
      missing LIMIT is a resource concern, not an authorization one.
 
-STRING LITERALS are blanked before rules 4, 5, 7 and 8 run - the ones that read identifiers. Those
-rules treat a dot as qualification, and a literal is full of dots that are not: an email in a WHERE
-clause ('student.computing@demo.apu.edu.my') parses as student.computing, and rule 5 then rejects a
-valid query for a column "computing" on a table "student". Rules 2, 3 and 6 (keywords, constructs,
-excluded columns) deliberately still see the literals, since nothing legitimate hides a keyword or
-a credential column name inside a string anyway.
+STRING LITERALS are blanked before rules 2, 3, 4, 5, 7 and 8 run. Two different reasons:
+
+  rules 4/5/7/8 read IDENTIFIERS, and a literal is full of dots that are not qualification - an
+  email in a WHERE clause ('student.computing@demo.apu.edu.my') parses as student.computing, and
+  rule 5 then rejects a valid query for a column "computing" on a table "student";
+
+  rules 2/3 read OPERATIONS, and a keyword inside a literal is search text, not a statement. This
+  is newer, and it is a bug fix: a real event called "Grant Writing Workshop for Staff" made the
+  model write ILIKE '%grant%', which tripped the GRANT rule, and the assistant told the asker three
+  times that it had no such event while the workshop sat published in the table. The same collision
+  is waiting in 'comment', 'set', 'copy', 'call' and 'do', all of which appear in event titles.
+  Blanking first costs nothing: a keyword OUTSIDE a literal is still fatal, so an injected
+  `; GRANT ...` is rejected exactly as it was.
+
+Rule 6 (excluded columns) is the one that still sees literals, deliberately - it is the backstop
+for an UNQUALIFIED `password`, which rule 5 cannot resolve without a full parser, and no legitimate
+search string contains a credential column name.
 
 Returns a reason string on rejection so the caller can log it and, for a repairable fault, feed
 it back to the model for one bounded retry (see sql_runner.py).
@@ -263,16 +274,28 @@ def validate(sql: str, *, allowed_tables: tuple[str, ...], scope) -> str:
     # generated single-purpose query, but not fatal on its own - the stripped text is what every
     # other rule sees, so a hidden payload cannot survive. No separate check needed.
 
+    # A KEYWORD INSIDE A STRING LITERAL IS NOT AN OPERATION, it is somebody's search text. This used
+    # to scan the raw statement on the reasoning that "nothing legitimate hides a keyword inside a
+    # string" - which is false the moment a real event is called "Grant Writing Workshop for Staff":
+    # ILIKE '%grant%' tripped the GRANT rule, and three separate attempts to find that workshop came
+    # back "I don't have that information available right now". Event titles in this database also
+    # contain 'comment', 'set', 'copy', 'call' and 'do'. Blanking the literals first means the scan
+    # reads the statement's STRUCTURE, which is the thing it was always meant to police - and a
+    # keyword outside a literal is still fatal, so `; GRANT ...` is rejected exactly as before.
+    keyword_scan = _STRING_LITERAL.sub(
+        lambda m: "'" + " " * (len(m.group(0)) - 2) + "'", lowered
+    )
+
     # 2. read-only
     if not (lowered.startswith("select") or lowered.startswith("with")):
         raise SqlRejected("Only SELECT queries are allowed.")
     for keyword in _FORBIDDEN_KEYWORDS:
-        if re.search(rf"\b{re.escape(keyword)}\b", lowered):
+        if re.search(rf"\b{re.escape(keyword)}\b", keyword_scan):
             raise SqlRejected(f"Disallowed SQL operation: {keyword.upper()}.")
 
     # 3. dangerous constructs
     for construct in _FORBIDDEN_CONSTRUCTS:
-        if construct in lowered:
+        if construct in keyword_scan:
             raise SqlRejected(f"Disallowed SQL construct: {construct}.")
 
     # 3b. neutralising constructs - a required predicate that is present but inert (see

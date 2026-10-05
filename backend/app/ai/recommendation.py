@@ -106,6 +106,13 @@ def recommend_document(domain: str, preferences: str | None) -> str:
         "EVERY ONE MUST CARRY A REAL REASON tied to what they actually said, drawn from the "
         "candidate's own description. 'It is on Friday' is not a reason. 'You said you like "
         "building things, and this one is a 24-hour build event' is.",
+        "A SHARED CATEGORY IS NOT A REASON. Asked for football, 'it is listed under Sports & "
+        "Wellness' picked out a BLOOD DONATION DRIVE - same category, nothing to do with football, "
+        "and an inter-university football tournament was in the same candidate set. When they name "
+        "a concrete thing, look for that thing in the DESCRIPTION, and prefer a row whose text "
+        "actually mentions it over one that merely shares a category label. If nothing in the set "
+        "genuinely matches what they named, say so plainly - naming the nearest category-mate "
+        "instead reads as not having listened, which is worse than an honest 'nothing yet'.",
         "IF THEY CONSTRAINED THE TIMING - this weekend, this month, next week - state the DATE in "
         "the sentence, so they can see you honoured it.",
         "NEVER INVENT A REASON. You know only what they told you and what the candidate rows say. "

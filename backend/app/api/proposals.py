@@ -51,6 +51,10 @@ from ._helpers import body, pagination, required
 
 bp = Blueprint("proposals", __name__, url_prefix="/proposals")
 
+# The nav page that gates ?scope=all - Application Monitoring (see nav_page). Named once here so the
+# grant that shows the page in the sidebar is the same grant that releases the system-wide feed.
+MONITORING_PAGE_CODE = "history-admin"
+
 
 # --- Visibility -----------------------------------------------------------
 # One predicate, used by both the list and the single-item read, so a proposal
@@ -245,11 +249,23 @@ def _scope_params() -> dict:
     }
 
 
+def _may_monitor() -> bool:
+    """Does this caller hold the Application Monitoring page?
+
+    That page tracks EVERY application in the system, so the people who hold it must be able to open
+    any one of them - the same grant that lists a proposal has to be the grant that opens it, or the
+    table would be full of rows that 404 when clicked. Decided in /app/admin/page-visibility, with no
+    role hardcoded here.
+    """
+    return identity.has_page_access(current_principal().assignments, MONITORING_PAGE_CODE)
+
+
 def _load_visible(cur, request_id: int) -> dict:
     params = {**_scope_params(), "request_id": request_id}
+    where = "TRUE" if _may_monitor() else f"({_VISIBLE_SQL})"
     row = fetch_one(
         cur,
-        f"SELECT r.* FROM request r WHERE r.request_id = %(request_id)s AND ({_VISIBLE_SQL})",
+        f"SELECT r.* FROM request r WHERE r.request_id = %(request_id)s AND {where}",
         params,
     )
     if row is None:
@@ -297,11 +313,28 @@ def list_proposals():
     """
     limit, offset = pagination()
     params = _scope_params()
-    clauses = [f"({_VISIBLE_SQL})"]
+
+    # ?scope=all lifts the per-caller visibility filter for the Application Monitoring page, whose
+    # whole purpose is tracking EVERY application in the system rather than the caller's own. Gated on
+    # the 'history-admin' nav page through the same has_page_access() the sidebar and the assistant
+    # use, so who may do this is decided in /app/admin/page-visibility with no role hardcoded here.
+    # Drafts stay out regardless: an unsubmitted draft is the applicant's private working copy.
+    scope = request.args.get("scope")
+    if scope is not None and scope != "all":
+        raise BadRequest("scope must be 'all'.")
+    monitoring = scope == "all"
+    if monitoring:
+        if not _may_monitor():
+            raise Forbidden("You do not have access to application monitoring.")
+        clauses = ["r.status <> 'draft'"]
+    else:
+        clauses = [f"({_VISIBLE_SQL})"]
 
     bucket = request.args.get("bucket")
     if bucket is not None and bucket not in _BUCKETS:
         raise BadRequest("bucket must be one of: " + ", ".join(_BUCKETS) + ".")
+    if monitoring and bucket == "drafts":
+        raise BadRequest("scope=all does not cover drafts.")
     if bucket == "drafts":
         clauses.append("r.status = 'draft' AND r.applicant_user_id = %(user_id)s")
     elif bucket is not None:
@@ -419,7 +452,9 @@ def list_proposals():
         )
         items = []
         for row in rows:
-            item = svc.project_list_item(cur, row)
+            item = svc.project_list_item(
+                cur, row, user_id=params["user_id"], with_assignees=monitoring
+            )
             item["bucket"] = row["bucket"]
             item["statusLabel"] = row["statusLabel"]
             item["urgency"] = row["urgency"]
@@ -462,10 +497,16 @@ def list_status_labels():
     is always a small, fast result, independent of how many proposals exist.
     """
     bucket = request.args.get("bucket")
-    if bucket not in _BUCKETS:
-        raise BadRequest("bucket must be one of: " + ", ".join(_BUCKETS) + ".")
     params = _scope_params()
-    if bucket == "drafts":
+    # scope=all: every label in the system, for Application Monitoring's status filter. Same page
+    # grant as the list itself, so the dropdown can never offer a status the table cannot show.
+    if request.args.get("scope") == "all":
+        if not _may_monitor():
+            raise Forbidden("You do not have access to application monitoring.")
+        where = "r.status <> 'draft'"
+    elif bucket not in _BUCKETS:
+        raise BadRequest("bucket must be one of: " + ", ".join(_BUCKETS) + ".")
+    elif bucket == "drafts":
         where = "r.status = 'draft' AND r.applicant_user_id = %(user_id)s"
     else:
         params["bucket"] = bucket
@@ -838,7 +879,7 @@ def _flatten_requests_for_task(cur, request_id: int, requirement_name: str, rout
 def get_proposal(request_id: int):
     with transaction() as cur:
         row = _load_visible(cur, request_id)
-        projected = svc.project(cur, row)
+        projected = svc.project(cur, row, user_id=current_principal().user_id)
         projected["tasks"] = wf.tasks_for_request(cur, request_id)
         projected["fmbSelections"] = wf.selections_for_request(cur, request_id)
     return jsonify(projected)

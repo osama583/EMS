@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 # =================================================================================================
 # 1. SQL GENERATION
 # =================================================================================================
-
+# system prompt 3 to suggest event and clubs 
 _SQL_SYSTEM_INSTRUCTION = """You translate a question about this university's EVENTS and CLUBS into
 ONE PostgreSQL SELECT query.
 
@@ -57,6 +57,13 @@ ABSOLUTE RULES:
   question needs, return the single word IMPOSSIBLE instead of guessing.
 - Join only along the relationships the schema states.
 - Always qualify columns with their table or alias (request.event_title, not event_title).
+- ALWAYS RETURN THE ROW'S OWN ID on any query that names events or clubs, aliased exactly
+  `request_id` for an event and `club_id` for a club, even when the question does not ask for it
+  and even in an aggregate (GROUP BY it). It is never shown to the asker; it is what attaches the
+  right CARD to the reply. TITLES ARE NOT UNIQUE - two published events are both called "Business
+  Society Networking Lunch", one on 21 September and one on 29 September - so a reply describing
+  the later one got a card for the earlier one, and the date in the text and the date on the card
+  disagreed on screen. Omit the id and the card has nothing to go on but the title.
 - ALIAS EVERY COLUMN TO SAY WHAT IT MEANS in this particular result, because the step that writes
   the answer sees your column NAMES and nothing else - not your joins, not your WHERE clause. A
   bare `full_name` returned beside a club is ambiguous, and it was once read as "a club you are a
@@ -100,6 +107,17 @@ event or club - it was resolved from the conversation, because the question itse
       LIMIT 1
   If every occurrence is in the past, drop the EXISTS and order by that date DESC instead, so the
   most recent one answers rather than nothing at all.
+
+AN EVENT THAT HAS ALREADY HAPPENED IS NEVER AN ANSWER. Every event query filters to what is still
+to come - `es.date >= CURRENT_DATE` - whether or not the question said "upcoming". Asked "is there
+any event under Sports & Wellness", a query with no date filter returned a futsal tournament from
+April and a badminton championship from July, months after both had finished, and the assistant
+offered them as things the asker could go to. Nobody asking what is on means "what was on".
+  THE ONE EXCEPTION is a question explicitly about the past ("what events happened last semester",
+  "which events have we already run"), where the filter inverts to `es.date < CURRENT_DATE`. A
+  question naming a specific past date the asker supplied themselves is that same case.
+  A RECURRING EVENT is judged by its own occurrences: keep a row when ANY of its dates is still
+  ahead, so a series that has already run twice and runs again next month still answers.
 
 DATES: you do not know what year it is from your own training, and guessing one is how a question
 about "October" became `es.date BETWEEN '2024-10-01' AND '2024-10-31'` against a table whose rows
@@ -271,7 +289,7 @@ def generate_sql(
 # =================================================================================================
 # 2. FINAL ANSWER, GROUNDED IN THE EXECUTED RESULT A different prompt from gemini.py's
 # _SYSTEM_INSTRUCTION, which stays in use for the knowledge-base path.
-
+# system prompt 4 to make it response  
 _SQL_ANSWER_SYSTEM_INSTRUCTION = """You are the assistant embedded in APU Events, a university event
 and club app. A query has already been run for the asker's question, under their own access, and
 you are given its result. Write the reply.
@@ -397,7 +415,7 @@ def generate_sql_answer(
 # =================================================================================================
 # 3. INDEPENDENT SECURITY REVIEWER Runs AFTER the answer exists, never in front of it, so it adds
 # nothing to the latency of producing the reply.
-
+# system prompt 5 tO REVIEW THE ASNWER 
 _REVIEW_SYSTEM_INSTRUCTION = """You are a security reviewer for a university event and club
 management system's chat assistant. You do NOT answer questions. You review one completed
 interaction and decide whether the assistant's answer is acceptable.

@@ -1,0 +1,136 @@
+<section class="option-management">
+  <app-feedback-banner [message]="errorMessage()" tone="error" />
+
+  <nav class="shared-tabs" aria-label="Sections">
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="!showDeleted()" (click)="setDeletedTab(false)">
+      <span class="material-symbols-rounded" aria-hidden="true">list_alt</span>
+      {{ config().header.title }}
+    </button>
+    <button type="button" class="shared-tabs__tab" [class.shared-tabs__tab--active]="showDeleted()" (click)="setDeletedTab(true)">
+      <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+      Deleted
+    </button>
+  </nav>
+
+  <!-- Main tab only: the Deleted tab's own app-internal-data-page renders its "Deleted <kind>"
+       header, so showing this one above it stacked two headers, two view toggles and two Add
+       buttons on the same screen. -->
+  @if (showCardToggle() && !showDeleted()) {
+    <app-internal-page-header [config]="cardHeaderConfig()" (primaryAction)="openAdd()">
+      <div headerTrailing class="option-management__header-actions">
+        <app-view-toggle [mode]="viewMode()" (modeChange)="setViewMode($event)" />
+        <button type="button" class="table-control table-control--primary option-management__add-desktop" (click)="openAdd()">
+          <span class="material-symbols-rounded" aria-hidden="true">add</span>
+          {{ config().header.primaryActionLabel }}
+        </button>
+      </div>
+    </app-internal-page-header>
+
+    @if (!showDeleted()) {
+      <section class="internal-table-workspace__controls option-management__controls">
+        <div workspaceControls class="shared-page-controls">
+          <app-internal-search-field
+            workspaceControlWide
+            [config]="{ ariaLabel: 'Search options', placeholder: 'Search option name or details' }"
+            [value]="search()"
+            (valueChange)="setSearch($event)"
+          />
+          <div workspaceControlRight class="shared-page-controls__right">
+            <app-internal-filter-controls [filters]="filters()" (filterChange)="setFilter($event)" />
+            <div class="shared-page-controls__actions">
+              <button type="button" class="table-control table-control--primary option-management__add-mobile" (click)="openAdd()">
+                <span class="material-symbols-rounded" aria-hidden="true">add</span>
+                {{ config().header.primaryActionLabel }}
+              </button>
+              <app-internal-reset-button (reset)="reset()" />
+            </div>
+          </div>
+        </div>
+      </section>
+    }
+  }
+
+  @if (showDeleted()) {
+    <app-internal-data-page
+      [config]="deletedConfig()" [records]="deletedRecords()" [filters]="[]" [searchValue]="''" [loading]="deletedLoading()"
+      [totalPages]="1" [page]="1" [pageSize]="50" [hideControls]="true"
+      (rowAction)="handleDeletedAction($event)"
+    />
+  } @else if (showCardToggle() && viewMode() === 'card') {
+    <app-option-card-grid
+      [items]="menuCardData()" [loading]="loading()"
+      emptyTitle="No options found" emptyDescription="Add an option or change the search and status filters."
+      (edit)="editMenuItem($event)"
+      (toggleActive)="toggleMenuItemActive($event)"
+      (delete)="deleteMenuItem($event)"
+      (viewDetails)="viewMenuItemDetails($event)"
+    />
+  } @else {
+    <app-internal-data-page
+      [config]="config()" [records]="records()" [filters]="filters()" [searchValue]="search()" [loading]="loading()"
+      [totalPages]="totalPages()" [page]="page()" [pageSize]="pageSize()"
+      [hideHeader]="showCardToggle()"
+      [hideControls]="showCardToggle()"
+      (searchChange)="setSearch($event)" (filterChange)="setFilter($event)" (reset)="reset()"
+      (pageChange)="setPage($event)" (pageSizeChange)="setPageSize($event)" (rowAction)="handleAction($event)"
+      (recordOpen)="handleAction({ action: { key: 'edit', label: 'Edit option', icon: 'edit' }, record: $event })"
+      (primaryAction)="openAdd()"
+    />
+  }
+</section>
+
+<app-form-modal
+  [open]="modalOpen()" [title]="editingId() ? 'Edit ' + kindLabel(selectedKind()) : 'Add ' + kindLabel(selectedKind())"
+  [primaryLabel]="editingId() ? 'Save Changes' : 'Add Option'" [loading]="saving()" [disabled]="!formValid()"
+  (close)="closeModal()" (cancel)="closeModal()" (submit)="save()"
+>
+  <div class="option-management__form">
+    @for (field of fields(); track field.key) {
+      <!-- Consecutive half-width fields flow onto one row (see .option-management__form--pairs). -->
+      <div [class.option-management__field--half]="field.half">
+      @if (field.type === 'multiselect') {
+        <app-searchable-dropdown [controlId]="'option-' + field.key" [label]="field.label" [required]="field.required ?? false" [isMulti]="true" [options]="fieldOptions(field)" [value]="fieldValues(field.key)" (valueChange)="setDraftList(field.key, $any($event))" />
+      } @else if (field.type === 'select') {
+        <app-searchable-dropdown [controlId]="'option-' + field.key" [label]="field.label" [required]="field.required ?? false" [options]="fieldOptions(field)" [value]="$any(fieldValue(field.key))" (valueChange)="setDraft(field.key, $any($event))" />
+      } @else {
+        <app-form-field [controlId]="'option-' + field.key" [label]="field.label" [type]="$any(field.type)" [required]="field.required ?? false" [min]="field.min ?? ''" [step]="field.step ?? ''" [placeholder]="field.placeholder ?? ''" [value]="fieldValue(field.key)" [rows]="4" (valueChange)="setDraft(field.key, $event)" />
+      }
+      </div>
+    }
+    @if (supportsImage()) {
+      <app-image-upload-field
+        controlId="managed-option-image"
+        [label]="imageFieldLabel()"
+        hint="PNG, JPG or WebP · maximum 5 MB"
+        [emptyMessage]="imageEmptyMessage()"
+        [imagePreview]="imagePreview()"
+        [imageFileName]="imageFileName()"
+        [error]="imageError()"
+        (fileSelect)="selectImageFile($event)"
+        (remove)="removeImage()"
+      />
+    }
+    <app-status-toggle [active]="$any(draft()['active'])" label="Active option" description="Only active options appear in applicant dropdowns." (activeChange)="setDraft('active', $event)" />
+  </div>
+</app-form-modal>
+
+<app-delete-confirm-dialog
+  [open]="!!deleteTarget()" [entityKind]="kindLabel(selectedKind())" [entityLabel]="deleteTarget() ? '\'' + deleteTarget()!.label + '\'' : ''"
+  [checkingDependencies]="checkingDeletion()" [preview]="deletePreview()" [deleting]="deleting()"
+  (confirm)="confirmDelete()" (cancel)="cancelDelete()"
+/>
+
+<app-option-item-details-modal
+  [open]="!!detailsTarget()" [item]="detailsTarget()"
+  (close)="closeDetails()"
+/>
+
+<app-confirm-dialog
+  [open]="restoreTarget() !== null"
+  title="Restore item"
+  [message]="restoreMessage()"
+  confirmLabel="Restore"
+  [danger]="false"
+  (confirm)="confirmRestore()"
+  (cancel)="cancelRestore()"
+/>

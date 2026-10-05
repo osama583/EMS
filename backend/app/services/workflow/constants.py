@@ -116,6 +116,9 @@ MAX_ASSIGNEES_PER_ROW: dict[str, int | None] = {
     "photoVideo": None,
     "soundLight": None,
     "campusTour": None,
+    # Water rides on the F&B task rather than a lane of its own, but it is assigned per row like
+    # the five above - no cap, since a large delivery may take more than one person.
+    "waterNormal": None,
 }
 
 HEAD_ROLE_CODES = ("head-of-school", "head-of-department")

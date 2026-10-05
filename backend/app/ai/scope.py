@@ -109,6 +109,13 @@ class Page:
     aliases: tuple[str, ...] = ()
     gated_by: tuple[str, ...] = ()
     audience: str = ""
+    # A page whose EXISTENCE is not public. An ordinary page's purpose is nobody's data, so it is
+    # described to anyone who asks - refusing to explain My Events to the person using the app is a
+    # dead end, not privacy. An ADMINISTRATIVE page is different: "every user account in the system
+    # and the roles each one holds" tells a student how the institution is structured and what is
+    # worth asking an administrator for, which is why the reviewer flagged exactly this answer as a
+    # leak. For a caller who cannot reach one of these, it is ABSENT rather than forbidden.
+    restricted: bool = False
 
     @property
     def gates(self) -> tuple[str, ...]:
@@ -137,9 +144,10 @@ class Page:
 
 
 def _page(code, name, reach, purpose, actions=(), route=None, aliases=(), gated_by=(),
-          audience="") -> Page:
+          audience="", restricted=False) -> Page:
     return Page(code=code, name=name, reach=reach, purpose=purpose, actions=tuple(actions),
-                route=route, aliases=tuple(aliases), gated_by=tuple(gated_by), audience=audience)
+                route=route, aliases=tuple(aliases), gated_by=tuple(gated_by), audience=audience,
+                restricted=restricted)
 
 
 PAGES: dict[str, Page] = {page.code: page for page in (
@@ -264,20 +272,33 @@ PAGES: dict[str, Page] = {page.code: page for page in (
                    "See pending and confirmed registrations",
                    "Cancel a registration",
                    "Look back at past events"),
-          route="/app/events/my-events"),
+          route="/app/events/my-events",
+          # Nobody asks for a page by its label. "where are my saved events", "the events I liked",
+          # "what am I registered for" all mean this page, and matching only on "My Events" sent
+          # every one of them to the out-of-scope refusal - the assistant declining to point at a
+          # page it exists to describe.
+          aliases=("saved events", "saved event", "events i saved", "events i liked",
+                   "liked events", "bookmarked events", "my registrations",
+                   "events i registered for", "events i am registered for",
+                   "registered events", "my saved")),
     _page("event-calendar", "Event Calendar", PAGE,
           "The university-wide master calendar - every published event the viewer may see, laid "
           "out by date. A shared view of the catalogue, not a personal calendar.",
           actions=("See which events fall on which date",
                    "Move between months",
                    "Open a day's event to read its details"),
-          route="/app/event-calendar", aliases=("master calendar",)),
+          route="/app/event-calendar",
+          aliases=("master calendar", "calendar view", "events calendar", "calendar",
+                   "events by date", "monthly view")),
     _page("created-by-me", "Created by Me", PAGE,
           "The published events the viewer proposed or co-owns - their own organiser view of the "
           "events they are running.",
           actions=("See the published events you created",
                    "Search and filter your own events"),
-          route="/app/created-by-me", aliases=("my created events",),
+          route="/app/created-by-me",
+          aliases=("my created events", "events i created", "event i created",
+                   "events i made", "events i organised", "events i organized",
+                   "events i am running", "my own events", "events i proposed"),
           # It has no nav_page row of its own. Holding the proposal form is what makes someone an
           # organiser, and an organiser is precisely who this page exists for.
           gated_by=("proposal-form",),
@@ -329,31 +350,31 @@ PAGES: dict[str, Page] = {page.code: page for page in (
           route="/app/cafeterias/staff-requests-history"),
     _page("admin-directory", "Internal Directory", PAGE,
           "The folder holding the account, unit, role and Page Visibility administration pages.",
-          actions=("Open Users, Units, Roles or Page Visibility",)),
+          actions=("Open Users, Units, Roles or Page Visibility",), restricted=True),
     _page("admin-users", "Users", PAGE,
           "Every user account in the system, and the roles each one holds.",
           actions=("Find an account",
                    "Create an account or change the roles it holds",
                    "Deactivate an account"),
-          route="/app/users"),
+          route="/app/users", restricted=True),
     _page("admin-units", "Units", PAGE,
           "The schools, departments and cafeterias that a role can be scoped to.",
           actions=("See every unit", "Create, rename or deactivate a unit"),
-          route="/app/units"),
+          route="/app/units", restricted=True),
     _page("admin-roles", "Roles", PAGE,
           "The roles an account can hold, and what each one is called.",
           actions=("See every role", "Create or rename a role"),
-          route="/app/roles"),
+          route="/app/roles", restricted=True),
     _page("admin-page-visibility", "Page Visibility", PAGE,
           "Which roles and units can reach which pages. This page also decides what the assistant "
           "will answer for each role - the grant that shows a page is the grant that releases it.",
           actions=("See which roles can reach which pages",
                    "Grant or revoke a page for a role, optionally scoped to a unit"),
-          route="/app/admin/page-visibility", aliases=("page permissions",)),
+          route="/app/admin/page-visibility", aliases=("page permissions",), restricted=True),
     _page("admin-ai-access-log", "AI Access Log", PAGE,
           "Every question the assistant declined, who asked it, which topic it needed and why.",
           actions=("Read the refusal log", "Filter it by person, topic or reason"),
-          route="/app/admin/ai-access-log"),
+          route="/app/admin/ai-access-log", restricted=True),
     _page("manage-clubs", "Clubs", PAGE,
           "The folder holding the club pages - Discover Clubs, My Clubs and the administration "
           "pages.",
@@ -1084,6 +1105,13 @@ def page_definition_document(principal, page_code: str) -> str:
     page = PAGES[page_code]
     page = _twin_page(principal, page) or page
     if not can_reach(principal, page.code):
+        # An ADMINISTRATIVE page the caller cannot reach is absent, not merely locked. Describing
+        # it told a student that a Users page exists, that it lists every account and its roles,
+        # and that an administrator could grant it - three facts about how the institution is run,
+        # handed to someone with no claim on any of them. The reviewer logged that very answer as a
+        # leak. An ordinary page still gets its purpose explained; see Page.restricted.
+        if page.restricted:
+            return unknown_page_document(page.name)  # says "no page by that name", describes nothing
         return _unreachable_page_document(principal, page)
     functions = tuple(fn.name for fn in page.functions if can_use(principal, fn.key))
     lines = [

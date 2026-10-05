@@ -101,8 +101,20 @@ def run(
             "request.short_introduction for events, clubs.description for clubs (`request` has no "
             f"column called `description`). LIMIT {recommendation.CANDIDATE_LIMIT}. The description "
             "is what the answering step reasons from; without it a suggestion has no reason to "
-            "give. Do NOT filter on the asker's stated interests with LIKE or a category condition "
-            "- their wording will not match any literal value, and the query would come back empty."
+            "give.\n"
+            "  DO NOT NARROW THE SET with a WHERE on the asker's stated interests - a vague "
+            "interest ('building things', 'something creative') matches no literal value, and a "
+            "query filtered on it comes back empty while a perfectly good event sits in the table.\n"
+            "  BUT IF THEY NAMED A CONCRETE THING - a sport, a subject, an activity anyone would "
+            "recognise ('football', 'photography', 'robotics') - ORDER the candidate set so rows "
+            "mentioning it come FIRST, without excluding anything:\n"
+            "      ORDER BY (request.event_title ILIKE '%football%'\n"
+            "                OR request.short_introduction ILIKE '%football%') DESC, <date ASC>\n"
+            "  A named thing is usually written down somewhere - 'football' is in an event's blurb "
+            "even when its title is 'The Charity Cup' - and a LIMIT that cuts before that row is "
+            "reached is how the assistant answered 'I like football' with a blood donation drive "
+            "while an inter-university football tournament sat two rows further down. Ordering "
+            "surfaces it; it never hides anything, so a vague interest loses nothing."
         )
     previous_sql: str | None = None
     error: str | None = None

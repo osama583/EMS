@@ -118,6 +118,9 @@ def test_a_food_row_with_no_live_order_blocks_the_fmb_approval(cur):
     cur.execute(
         "DELETE FROM request_fmb_selection WHERE request_fmb_id = ANY(%s)", (rows,)
     )
+    # F&B's gate counts unassigned WATER as well as unordered food, and this test is about food -
+    # so clear the water rows to isolate it (see test_water_rows_need_an_assignee_not_a_cafeteria_order).
+    cur.execute("DELETE FROM request_mineral_water WHERE request_id = %s", (request_id,))
     assert tasks.unallocated_row_count(cur, request_id, "fmb") == len(rows)
     with pytest.raises(WorkflowError, match="no cafeteria order"):
         tasks.assert_work_allocated(cur, request_id, "fmb")
@@ -128,6 +131,8 @@ def test_a_cancelled_order_leaves_its_food_row_unfulfilled(cur):
     the whole request look covered, because every order landed on the first row."""
     request_id, rows = _request_with_several_rows(cur, "request_fmb", "request_fmb_id", "fmb")
     cur.execute("DELETE FROM request_fmb_selection WHERE request_fmb_id = ANY(%s)", (rows,))
+    # Food-only assertion; water is counted by the same gate, so take it out of the picture.
+    cur.execute("DELETE FROM request_mineral_water WHERE request_id = %s", (request_id,))
     menu_item = fetch_one(cur, "SELECT fmb_option_id, label FROM fmb_options LIMIT 1")
     cafeteria = fetch_one(cur, "SELECT code FROM unit WHERE code LIKE 'cafeteria%%' LIMIT 1")
     if menu_item is None or cafeteria is None:
@@ -154,3 +159,66 @@ def test_a_cancelled_order_leaves_its_food_row_unfulfilled(cur):
         (SEL_CANCELLED, rows[0]),
     )
     assert tasks.unallocated_row_count(cur, request_id, "fmb") == 1
+
+
+def test_water_rows_need_an_assignee_not_a_cafeteria_order(cur):
+    """Mineral water rides on F&B's task but is fulfilled by F&B's own staff, not by a cafeteria.
+
+    The applicant already fixed the quantity and whether it carries a logo, so there is nothing for
+    a cafeteria to decide - and request_fmb_selection could not hold a water row anyway, its
+    request_fmb_id being NOT NULL against request_fmb. A water-only proposal used to approve
+    straight through with nobody on it; now the gate holds it until each row has an assignee.
+    """
+    found = fetch_one(
+        cur,
+        """SELECT w.request_id FROM request_mineral_water w
+             WHERE EXISTS (SELECT 1 FROM request_task t
+                             JOIN event_requirements er ON er.requirement_id = t.requirement_id
+                            WHERE t.request_id = w.request_id AND er.requirement_name = 'fmb')
+             GROUP BY w.request_id HAVING count(*) > 0 LIMIT 1""",
+    )
+    if found is None:
+        pytest.skip("No proposal in this database asks for mineral water.")
+    request_id = found["request_id"]
+    # Isolate water: this test is about the water half of F&B's gate.
+    cur.execute("DELETE FROM request_fmb WHERE request_id = %s", (request_id,))
+    water_rows = [
+        r["request_mineral_water_id"]
+        for r in fetch_all(
+            cur,
+            "SELECT request_mineral_water_id FROM request_mineral_water WHERE request_id = %s"
+            " ORDER BY request_mineral_water_id",
+            (request_id,),
+        )
+    ]
+    cur.execute(
+        "DELETE FROM request_row_assignment WHERE requirement_name = 'waterNormal' AND row_id = ANY(%s)",
+        (water_rows,),
+    )
+    assert tasks.unallocated_row_count(cur, request_id, "fmb") == len(water_rows)
+    with pytest.raises(WorkflowError, match="nobody assigned"):
+        tasks.assert_work_allocated(cur, request_id, "fmb")
+
+    task = fetch_one(
+        cur,
+        """SELECT t.request_task_id FROM request_task t
+             JOIN event_requirements er ON er.requirement_id = t.requirement_id
+            WHERE t.request_id = %s AND er.requirement_name = 'fmb'""",
+        (request_id,),
+    )
+    staff = fetch_one(
+        cur,
+        """SELECT u.user_id FROM users u JOIN user_unit_roles r ON r.user_id = u.user_id
+            WHERE r.unit_code = 'food_beverage_services' AND r.role_code = 'staff' LIMIT 1""",
+    )
+    if staff is None:
+        pytest.skip("No F&B staff member in this database to assign.")
+    for row_id in water_rows:
+        cur.execute(
+            """INSERT INTO request_row_assignment
+                   (request_task_id, requirement_name, row_id, staff_user_id, assigned_by_user_id)
+               VALUES (%s, 'waterNormal', %s, %s, %s)""",
+            (task["request_task_id"], row_id, staff["user_id"], staff["user_id"]),
+        )
+    assert tasks.unallocated_row_count(cur, request_id, "fmb") == 0
+    tasks.assert_work_allocated(cur, request_id, "fmb")  # does not raise

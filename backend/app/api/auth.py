@@ -40,7 +40,7 @@ from ..security import (
 )
 from ..security.passwords import MAX_PASSWORD_BYTES
 from ..security.principal import current_principal
-from ..services.email import notifications
+from ..services.email import notifications, render
 from ..services.identity import project_auth_user
 
 log = logging.getLogger(__name__)
@@ -338,23 +338,81 @@ def internal_users():
     return jsonify(users)
 
 
-@bp.post("/register")
+# ---------------------------------------------------------------------------
+# Guest self-registration, in three steps: start -> verify -> (resend).
+#
+# No users row exists until the emailed code is confirmed. The submitted form is
+# staged in pending_registration under a challenge id, so an abandoned signup
+# leaves nothing behind but an expired row, and an address is only really taken
+# once someone has proved they can read mail sent to it.
+#
+# Guests may browse, save and register for public events. They can never submit
+# a proposal or reach any internal page - that is enforced by the
+# 'external-user' role, which @require_internal rejects, not by anything the
+# client sends.
+# ---------------------------------------------------------------------------
+
+#: Youngest age that may hold an account. The registration form applies the same
+#: floor for fast feedback; this copy is the one that actually decides, since a
+#: client can post whatever it likes.
+MINIMUM_AGE = 16
+
+#: The only values the gender field accepts. Anything else is rejected rather
+#: than stored, so the column cannot fill up with free text.
+ALLOWED_GENDERS = ("Male", "Female", "Prefer not to say")
+
+_OTP_TTL_MINUTES = 10
+#: A code may be got wrong this many times before the challenge is burned -
+#: 6 digits is only a million combinations, which is not many for a machine.
+_OTP_MAX_ATTEMPTS = 5
+#: Matches the resend cooldown the form counts down, so the button and the
+#: server agree on when another code may be sent.
+_OTP_RESEND_COOLDOWN_SECONDS = 30
+
+
+def _hash_otp(challenge_id: str, code: str) -> str:
+    """The code is stored hashed, salted with the challenge id.
+
+    Six digits is a small enough space that an unsalted hash of a leaked table
+    would fall to a lookup instantly; binding it to the challenge means the work
+    has to be redone per row.
+    """
+    return hashlib.sha256(f"{challenge_id}:{code}".encode("utf-8")).hexdigest()
+
+
+def _purge_expired_registrations(cur) -> None:
+    cur.execute("DELETE FROM pending_registration WHERE expires_at < now()")
+
+
+def _send_registration_code(*, cur, challenge_id: str, email: str, full_name: str) -> None:
+    """Issues a fresh code for an existing challenge and emails it."""
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    cur.execute(
+        "UPDATE pending_registration SET otp_hash = %s, attempts = 0, last_sent_at = now(), "
+        "expires_at = now() + make_interval(mins => %s) WHERE challenge_id = %s",
+        (_hash_otp(challenge_id, code), _OTP_TTL_MINUTES, challenge_id),
+    )
+    notifications.guest_registration_otp(
+        email=email, full_name=full_name, otp_code=code, expiry_minutes=_OTP_TTL_MINUTES,
+    )
+
+
+@bp.post("/register/start")
 @limiter.limit(config.ratelimit_auth)
-def register():
-    """Self-registration for an EXTERNAL guest account.
+def register_start():
+    """Step 1: stage the submitted form and email a 6-digit code.
 
-    Guests may browse, save and register for public events. They can never
-    submit a proposal or reach any internal page - that is enforced by the
-    'external-user' role, which @require_internal rejects, not by anything the
-    client sends.
-
-    Returns the same envelope as login, so the caller is signed in immediately.
+    Creates no account. Returns the challenge id the client sends back to
+    /register/verify, plus the masked address, so the form can say where the
+    code went without echoing an address the reader may have mistyped.
     """
     body = _json_body()
     email = str(body.get("email", "")).strip().lower()
     password = str(body.get("password", ""))
     first_name = str(body.get("firstName", "")).strip()
     last_name = str(body.get("lastName", "")).strip()
+    gender = str(body.get("gender", "")).strip()
+    raw_age = str(body.get("age", "")).strip()
 
     if not email or not password or not first_name:
         raise BadRequest("Email, password and first name are required.")
@@ -362,36 +420,187 @@ def register():
         raise BadRequest("Choose a password of at least 8 characters.")
     if len(password.encode("utf-8")) > MAX_PASSWORD_BYTES:
         raise BadRequest(f"Password must be at most {MAX_PASSWORD_BYTES} bytes.")
+    if not raw_age.isdigit():
+        raise BadRequest("Age is required.")
+    age = int(raw_age)
+    if age < MINIMUM_AGE:
+        raise BadRequest(f"You must be at least {MINIMUM_AGE} years old to create an account.")
+    # An upper bound as well: the field is free-entry, and a number like 900 is a
+    # typo rather than a person.
+    if age > 120:
+        raise BadRequest("Enter a valid age.")
+    if gender not in ALLOWED_GENDERS:
+        raise BadRequest(f"Gender must be one of: {', '.join(ALLOWED_GENDERS)}.")
 
     full_name = (first_name + " " + last_name).strip()
+    challenge_id = secrets.token_urlsafe(24)
+
     with transaction() as cur:
-        existing = fetch_one(
-            cur, "SELECT user_id FROM users WHERE lower(email) = %s", (email,)
-        )
+        _purge_expired_registrations(cur)
+        existing = fetch_one(cur, "SELECT user_id FROM users WHERE lower(email) = %s", (email,))
         if existing:
-            # Deliberately vague: a precise message would confirm which
-            # addresses already hold an account.
+            # Deliberately vague, as in login(): a precise message would confirm
+            # which addresses already hold an account.
+            raise Conflict("That email address cannot be registered.")
+
+        # Starting again replaces any previous unverified attempt, so only the
+        # newest code is live for an address.
+        cur.execute("DELETE FROM pending_registration WHERE lower(email) = %s", (email,))
+        cur.execute(
+            """INSERT INTO pending_registration
+                   (challenge_id, email, full_name, password_hash, age, gender, otp_hash, expires_at)
+               VALUES (%s, %s, %s, %s, %s, %s, '', now() + make_interval(mins => %s))""",
+            (challenge_id, email, full_name, hash_password(password), age, gender, _OTP_TTL_MINUTES),
+        )
+        _send_registration_code(cur=cur, challenge_id=challenge_id, email=email, full_name=full_name)
+
+    audit("auth.guest.registration_started")
+    return jsonify({
+        "challengeId": challenge_id,
+        "status": "otp-required",
+        "maskedEmail": render.mask_email(email),
+    }), 201
+
+
+@bp.post("/register/verify")
+@limiter.limit(config.ratelimit_auth)
+def register_verify():
+    """Step 2: confirm the code, create the account, and sign the guest in.
+
+    Returns the same envelope as login, so a verified guest is signed in at
+    once rather than being sent back to a form.
+    """
+    body = _json_body()
+    challenge_id = str(body.get("challengeId", "")).strip()
+    otp = str(body.get("otp", "")).strip()
+    if not challenge_id or not otp:
+        raise BadRequest("The challenge id and code are both required.")
+
+    with transaction() as cur:
+        pending = fetch_one(
+            cur,
+            "SELECT *, (expires_at < now()) AS is_expired "
+            "FROM pending_registration WHERE challenge_id = %s FOR UPDATE",
+            (challenge_id,),
+        )
+        if pending is None:
+            return jsonify({"status": "expired", "message": "That signup has expired. Please start again."})
+        # Expiry is decided BY POSTGRES, not by comparing a stored UTC timestamp
+        # against the app server's local clock - those differ by whole hours here,
+        # which made every freshly issued code look already expired.
+        if pending["is_expired"]:
+            cur.execute("DELETE FROM pending_registration WHERE challenge_id = %s", (challenge_id,))
+            return jsonify({"status": "expired", "message": "That code has expired. Please request a new one."})
+        if pending["attempts"] >= _OTP_MAX_ATTEMPTS:
+            cur.execute("DELETE FROM pending_registration WHERE challenge_id = %s", (challenge_id,))
+            return jsonify({"status": "expired", "message": "Too many incorrect codes. Please start again."})
+
+        if not secrets.compare_digest(pending["otp_hash"], _hash_otp(challenge_id, otp)):
+            cur.execute(
+                "UPDATE pending_registration SET attempts = attempts + 1 WHERE challenge_id = %s",
+                (challenge_id,),
+            )
+            remaining = _OTP_MAX_ATTEMPTS - (pending["attempts"] + 1)
+            message = (
+                "That code is not correct. Please check and try again."
+                if remaining > 0
+                else "Too many incorrect codes. Please start again."
+            )
+            return jsonify({"status": "invalid", "message": message})
+
+        # The address is re-checked here, not just at /start: minutes may have
+        # passed, and nothing stopped the same address registering in between.
+        if fetch_one(cur, "SELECT user_id FROM users WHERE lower(email) = %s", (pending["email"],)):
+            cur.execute("DELETE FROM pending_registration WHERE challenge_id = %s", (challenge_id,))
             raise Conflict("That email address cannot be registered.")
 
         cur.execute(
             """INSERT INTO users (full_name, email, password, is_active)
                VALUES (%s, %s, %s, TRUE) RETURNING user_id, full_name, email""",
-            (full_name, email, hash_password(password)),
+            (pending["full_name"], pending["email"], pending["password_hash"]),
         )
         user = dict(cur.fetchone())
         cur.execute(
             "INSERT INTO user_unit_roles (user_id, unit_code, role_code) VALUES (%s, NULL, %s)",
             (user["user_id"], "external-user"),
         )
-        age = body.get("age")
         cur.execute(
-            """INSERT INTO external_user_profile (user_id, age, gender)
-               VALUES (%s, %s, %s)""",
-            (user["user_id"], int(age) if str(age or "").isdigit() else None, body.get("gender")),
+            "INSERT INTO external_user_profile (user_id, age, gender) VALUES (%s, %s, %s)",
+            (user["user_id"], pending["age"], pending["gender"]),
         )
+        cur.execute("DELETE FROM pending_registration WHERE challenge_id = %s", (challenge_id,))
 
     audit("auth.guest.registered", actor_user_id=user["user_id"])
-    return jsonify({"user": project_auth_user(user), **_tokens_for(user["user_id"])}), 201
+    return jsonify({
+        "status": "verified",
+        "message": "Your email address has been verified.",
+        "user": project_auth_user(user),
+        **_tokens_for(user["user_id"]),
+    }), 201
+
+
+@bp.post("/register/resend")
+@limiter.limit(config.ratelimit_auth)
+def register_resend():
+    """Sends a new code for a signup already in progress.
+
+    Each send restarts the expiry window and clears the attempt count, so a
+    reader who mistyped several times is not locked out of a code they have only
+    just been given.
+    """
+    body = _json_body()
+    challenge_id = str(body.get("challengeId", "")).strip()
+    if not challenge_id:
+        raise BadRequest("The challenge id is required.")
+
+    with transaction() as cur:
+        pending = fetch_one(
+            cur,
+            "SELECT challenge_id, email, full_name, (expires_at < now()) AS is_expired, "
+            "GREATEST(0, %s - EXTRACT(EPOCH FROM (now() - last_sent_at)))::int AS cooldown_remaining "
+            "FROM pending_registration WHERE challenge_id = %s FOR UPDATE",
+            (_OTP_RESEND_COOLDOWN_SECONDS, challenge_id),
+        )
+        if pending is None or pending["is_expired"]:
+            return jsonify({"status": "expired", "message": "That signup has expired. Please start again."})
+
+        if pending["cooldown_remaining"] > 0:
+            wait = pending["cooldown_remaining"]
+            return jsonify({"status": "sent", "message": f"Please wait {wait}s before requesting another code."})
+
+        _send_registration_code(
+            cur=cur, challenge_id=challenge_id, email=pending["email"], full_name=pending["full_name"],
+        )
+
+    return jsonify({"status": "sent", "message": "A new code is on its way."})
+
+
+@bp.get("/register/email-status")
+@limiter.limit(config.ratelimit_auth)
+def register_email_status():
+    """Live check for the email field: is this address free, and is there a
+    signup already in progress the reader could resume instead of starting over?
+
+    Unlike the deliberately vague messages elsewhere, this one does tell the
+    caller whether an address is taken - the registration form cannot guide
+    someone through a unique-address field without it, and the same fact is
+    already observable by submitting the form.
+    """
+    email = str(request.args.get("email", "")).strip().lower()
+    if not email:
+        raise BadRequest("Email is required.")
+
+    taken = query_one("SELECT user_id FROM users WHERE lower(email) = %s", (email,))
+    pending = query_one(
+        "SELECT challenge_id FROM pending_registration "
+        "WHERE lower(email) = %s AND expires_at > now()",
+        (email,),
+    )
+    return jsonify({
+        "available": taken is None,
+        "hasPendingChallenge": pending is not None,
+        "challengeId": pending["challenge_id"] if pending else None,
+    })
 
 
 # ---------------------------------------------------------------------------

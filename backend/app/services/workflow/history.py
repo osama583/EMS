@@ -82,7 +82,18 @@ def history_for(cur, request_id: int) -> list[dict[str, Any]]:
         """
         SELECT h.workflow_history_id, h.action, h.actor_user_id, u.full_name AS actor_name,
                h.actor_role, h.comment, h.previous_status, h.new_status, h.created_at,
-               h.request_task_id, er.requirement_name
+               h.request_task_id, er.requirement_name,
+               -- WHICH cafeteria this step belongs to. workflow_history has no link to the
+               -- request_fmb_selection a step acted on, so the only reliable answer is the actor's
+               -- own outlet: a cafeteria manager or staff member holds exactly one. Without it a
+               -- proposal fanned out to two cafeterias shows two identical 'Cafeteria order
+               -- accepted' steps with no way to tell which outlet did what.
+               (SELECT un.description
+                  FROM user_unit_roles uur
+                  JOIN unit un ON un.code = uur.unit_code
+                 WHERE uur.user_id = h.actor_user_id
+                   AND uur.role_code IN ('cafeteria-manager', 'cafeteria-staff')
+                 LIMIT 1) AS actor_unit
           FROM workflow_history h
      LEFT JOIN users u ON u.user_id = h.actor_user_id
      LEFT JOIN event_requirements er ON er.requirement_id = h.requirement_id

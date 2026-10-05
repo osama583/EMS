@@ -181,7 +181,13 @@ def assignable_staff(task_id: int):
     with transaction() as cur:
         task = wf.load_task(cur, task_id)
         wf.authorization.authorize_department_task(cur, task, principal.user_id)
-        if not task["assigned_unit_code"]:
+        # F&B routes by flat role, so its task carries no assigned_unit_code - but its people do
+        # live in a unit, and a water row is assigned to one of them. Falling back to FMB_UNIT_CODE
+        # is what makes the picker offer F&B's own staff instead of an empty list.
+        unit_code = task["assigned_unit_code"] or (
+            FMB_UNIT_CODE if task["assigned_role"] == "fmb" else None
+        )
+        if not unit_code:
             return jsonify([])
         rows = fetch_all(
             cur,
@@ -190,7 +196,7 @@ def assignable_staff(task_id: int):
                  JOIN users u ON u.user_id = uur.user_id
                 WHERE uur.unit_code = %s AND u.is_active AND u.archived_at IS NULL
              ORDER BY u.full_name""",
-            (task["assigned_unit_code"],),
+            (unit_code,),
         )
     return jsonify(rows)
 

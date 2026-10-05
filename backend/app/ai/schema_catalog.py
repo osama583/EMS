@@ -205,8 +205,11 @@ JOIN_NOTES: tuple[str, ...] = (
 # actually enforce authorization, and sql_guard.py verifies they are present.
 BUSINESS_RULES: tuple[str, ...] = (
     "`request` is BOTH the proposal table and the published-event table. An event exists only "
-    "where request.status = 'completed_approved'. EVERY query about events must include that "
-    "condition - a proposal in review is not an event.",
+    "where request.status IN ('implementation', 'completed_approved') - TWO statuses, both of "
+    "which mean published and live on Explore Events ('implementation' is one whose departments "
+    "have all approved while staff carry the work out). EVERY query about events must include "
+    "that condition - a proposal still in review is not an event. Naming only the second status "
+    "made the assistant report that a published football tournament did not exist.",
     "Soft deletes: users, clubs, role, unit and nav_page rows carry archived_at. Always exclude "
     "archived rows (archived_at IS NULL) and, for users/clubs/role/unit, inactive ones "
     "(is_active / active = TRUE) unless the question is explicitly about deactivated records.",
@@ -402,7 +405,7 @@ _TOPIC_GROUPS: dict[str, str] = {
     "clubs": "clubs",
 }
 
-
+# give ai schema 
 def document_for_topics(topics: set[str]) -> str:
     """The DATABASE section of the SQL-generation prompt: only the tables this question's topics
     need, each with its real columns, keys, constraints and hand-written meaning."""

@@ -66,9 +66,18 @@ def _event_visibility_predicates(user_id: int | None) -> tuple[str, ...]:
     Both halves - published status AND visibility - are required together, because either alone is a
     leak: visibility without status exposes proposals still in review, and status without visibility
     exposes Private events to everyone.
+
+    TWO STATUSES MEAN PUBLISHED, not one, and this clause used to name only the second. An event
+    whose departments have all approved sits at 'implementation' while staff carry the work out -
+    it is on Explore Events, open for registration, and to everyone looking at it it is simply a
+    real event. Accepting only 'completed_approved' made the assistant deny the existence of a
+    football tournament the asker had been looking at minutes earlier: "there are no football
+    events", with the event published and visible on the page behind the chat orb. Mirrors
+    api/events.py's _PUBLISHED_STATUSES, which is the list the page itself filters on.
     """
+    published = "request.status IN ('implementation', 'completed_approved')"
     if user_id is None:
-        return ("request.status = 'completed_approved' AND request.event_visibility = 'Public'",)
+        return (f"{published} AND request.event_visibility = 'Public'",)
     # ALIASES ARE SUFFIXED, and that is not cosmetic. `rc` and `cm` are the obvious short names for
     # request_categories and club_members, and the model reaches for them in the OUTER query - a
     # suggestion joins request_categories as `rc` every time. It then has to rename this clause's
@@ -83,7 +92,7 @@ def _event_visibility_predicates(user_id: int | None) -> tuple[str, ...]:
         f"WHERE rc_request.request_id = request.request_id AND cm_request.user_id = {int(user_id)}))"
     )
     return (
-        "request.status = 'completed_approved' AND (request.event_visibility IN "
+        f"{published} AND (request.event_visibility IN "
         f"('Public', 'Internal') OR {club_member})",
     )
 

@@ -445,8 +445,8 @@ def password_reset_completed(*, email: str, full_name: str, support_contact: str
 
 
 def guest_registration_otp(*, email: str, full_name: str, otp_code: str, expiry_minutes: int) -> bool:
-    """2.1b — NOT WIRED UP. No OTP column/verification endpoint exists yet;
-    call this once guest self-registration gains email verification."""
+    """2.1b — Sent by POST /auth/register/start and /auth/register/resend: the
+    code that verifies a guest's email address before the account is created."""
     subject = "Your verification code"
     body = [
         render.paragraph(f"Dear {render.escape_name(full_name)},"),

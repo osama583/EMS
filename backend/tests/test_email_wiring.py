@@ -40,7 +40,6 @@ SCRIPTS = BACKEND / "scripts"
 # the backend capability that has to exist first, so this list is a to-do
 # rather than a permanent exemption.
 KNOWN_UNWIRED = {
-    "guest_registration_otp": "no OTP column / verification endpoint exists",
     "email_changed_notice": "no admin-driven email-change endpoint exists",
 }
 

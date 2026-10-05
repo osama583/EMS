@@ -1,0 +1,162 @@
+<app-internal-data-page
+  [config]="pageConfig()"
+  [records]="records()"
+  [filters]="filterConfigs()"
+  [searchValue]="search()"
+  [loading]="loading()"
+  [totalPages]="totalPages()"
+  [page]="page()"
+  [pageSize]="pageSize()"
+  [sort]="sort()"
+  (searchChange)="updateSearchDraft($event)"
+  (filterChange)="updateFilter($event)"
+  (reset)="resetFilters()"
+  (pageChange)="updatePage($event)"
+  (pageSizeChange)="updatePageSize($event)"
+  (rowAction)="handleRowAction($event)"
+  (recordOpen)="openRecord($event)"
+  (sortChange)="updateSort($event)"
+  (cellClick)="handleCellClick($event)"
+/>
+
+<app-form-modal
+  [open]="trackingProposal() !== null"
+  [title]="trackingProposal() ? trackingProposal()!.proposalId + ' · ' + trackingProposal()!.eventTitle : ''"
+  [hidePrimary]="true"
+  secondaryLabel="Close"
+  (close)="closeTracking()"
+  (cancel)="closeTracking()"
+>
+  <div class="tracking">
+    @if (trackingLoading()) {
+      <p class="tracking__muted">Loading history…</p>
+    } @else if (trackingError()) {
+      <p class="tracking__muted">{{ trackingError() }}</p>
+    } @else if (tracking(); as track) {
+
+      <ol class="tracking__list">
+        @for (step of track.main; track $index) {
+          <li class="tracking__step" [class]="'tracking__step--' + step.tone">
+            <span class="tracking__time">{{ step.at | date: 'd MMM · HH:mm' }}</span>
+            <span class="tracking__dot" aria-hidden="true"></span>
+            <span class="tracking__body">
+              <strong>{{ step.title }}</strong>
+              <small>{{ step.actor }}@if (step.role) { <span> · {{ step.role }}</span> }@if (step.cafeteria) { <span> · {{ step.cafeteria }}</span> }</small>
+              @if (step.description) { <small class="tracking__flow">{{ step.description }}</small> }
+              @if (step.comment) { <em>“{{ step.comment }}”</em> }
+            </span>
+          </li>
+        }
+      </ol>
+
+      @if (track.branches.length) {
+        <p class="tracking__split">
+          <span class="material-symbols-rounded" aria-hidden="true">account_tree</span>
+          Department review — {{ track.branches.length }} department{{ track.branches.length === 1 ? '' : 's' }} decided in parallel
+        </p>
+        <div class="tracking__branches">
+          @for (branch of track.branches; track branch.department) {
+            <section class="tracking__branch">
+              <h3>{{ branch.label }}</h3>
+              <ol class="tracking__list tracking__list--branch">
+                @for (step of branch.steps; track $index) {
+                  <li class="tracking__step" [class]="'tracking__step--' + step.tone">
+                    <span class="tracking__time">{{ step.at | date: 'd MMM · HH:mm' }}</span>
+                    <span class="tracking__dot" aria-hidden="true"></span>
+                    <span class="tracking__body">
+                      <strong>{{ step.title }}</strong>
+                      <small>{{ step.actor }}@if (step.role) { <span> · {{ step.role }}</span> }@if (step.cafeteria) { <span> · {{ step.cafeteria }}</span> }</small>
+                      @if (step.comment) { <em>“{{ step.comment }}”</em> }
+                    </span>
+                  </li>
+                }
+              </ol>
+            </section>
+          }
+        </div>
+      }
+
+      @if (track.implementation.length) {
+        <p class="tracking__split">
+          <span class="material-symbols-rounded" aria-hidden="true">engineering</span>
+          Implementation — the work being carried out
+        </p>
+        <div class="tracking__branches">
+          @for (branch of track.implementation; track branch.department) {
+            <section class="tracking__branch">
+              <h3>{{ branch.label }}</h3>
+              <ol class="tracking__list tracking__list--branch">
+                @for (step of branch.steps; track $index) {
+                  <li class="tracking__step" [class]="'tracking__step--' + step.tone">
+                    <span class="tracking__time">{{ step.at | date: 'd MMM · HH:mm' }}</span>
+                    <span class="tracking__dot" aria-hidden="true"></span>
+                    <span class="tracking__body">
+                      <strong>{{ step.title }}</strong>
+                      <small>{{ step.actor }}@if (step.role) { <span> · {{ step.role }}</span> }@if (step.cafeteria) { <span> · {{ step.cafeteria }}</span> }</small>
+                    </span>
+                  </li>
+                }
+              </ol>
+            </section>
+          }
+        </div>
+      }
+
+      @if (track.ending; as ending) {
+        <ol class="tracking__list">
+          <li class="tracking__step" [class]="'tracking__step--' + ending.tone">
+            <span class="tracking__time">{{ ending.at | date: 'd MMM · HH:mm' }}</span>
+            <span class="tracking__dot" aria-hidden="true"></span>
+            <span class="tracking__body">
+              <strong>{{ ending.title }}</strong>
+              <small>{{ ending.actor }}</small>
+            </span>
+          </li>
+        </ol>
+      }
+
+      @if (track.upcoming.length) {
+        <ol class="tracking__list tracking__list--upcoming">
+          @for (stage of track.upcoming; track stage) {
+            <li class="tracking__step tracking__step--pending">
+              <span class="tracking__time"></span>
+              <span class="tracking__dot" aria-hidden="true"></span>
+              <span class="tracking__body">
+                <strong>{{ stage }}</strong>
+                <small>Not reached yet</small>
+              </span>
+            </li>
+          }
+        </ol>
+      }
+
+      @if (!track.main.length && !track.branches.length && !track.implementation.length && !track.ending) {
+        <p class="tracking__muted">Nothing has happened on this application yet.</p>
+      }
+    }
+  </div>
+</app-form-modal>
+
+<app-popover
+  [open]="subStatusRecordId() !== null"
+  [title]="subStatusTitle()"
+  icon="account_tree"
+  (close)="closeSubStatus()"
+>
+  <ul class="application-monitoring__sub-status">
+    @for (entry of subStatusEntries(); track $index) {
+      <li>
+        <span class="application-monitoring__sub-status-head">
+          <strong>{{ entry.label }}</strong>
+          <span class="application-monitoring__chip" [class]="'application-monitoring__chip--' + entry.tone">{{ entry.status }}</span>
+        </span>
+        <small>
+          @if (entry.detail) { <span>{{ entry.detail }}</span> }
+          @if (entry.assignees) { <span>· {{ entry.assignees }}</span> }
+          @else if (entry.needsAssignee) { <span>· Nobody assigned yet</span> }
+        </small>
+        @if (entry.comment) { <em>“{{ entry.comment }}”</em> }
+      </li>
+    }
+  </ul>
+</app-popover>

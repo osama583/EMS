@@ -366,11 +366,17 @@ def ask():
     # help with that, as it's outside what I cover" carded a club literally named "as". Building
     # cards from text that was never about an entity is how an answer acquires an illustration it
     # does not have.
+    # The RETRIEVED ROWS go with the answer, because the answer was written from them. Matching the
+    # reply's text against every visible title is how a card is chosen, and two published events
+    # genuinely called "Business Society Networking Lunch" made that ambiguous: the reply described
+    # the 29 September one, the card resolved the title to the 21 September one, and the two dates
+    # contradicted each other on screen. The rows carry the ids the model actually saw, so the card
+    # can use that identity instead of re-deriving one from prose.
     event_cards, club_cards = (
-        cards.build(answer, topics, user_id=user_id) if outcome.ok else ([], [])
+        cards.build(answer, topics, user_id=user_id, result_rows=outcome.rows) if outcome.ok else ([], [])
     )
     # A page card is the "take me there" fallback for an answer with nothing clickable in it -
-    # "where do I find events" is prose otherwise. It is suppressed in three cases:
+    # "where do I find events" is prose otherwise. It is suppressed in four cases:
     #
     #   an entity card exists    a specific event's card beats a link to the page listing every one
     #   the answer is a refusal  a refusal offers nothing to click, and a card under one asserts the
@@ -380,9 +386,21 @@ def ask():
     #                            "is it free?") is a one-line fact, and two page cards under it are
     #                            noise - they answer a question about where things live, which is
     #                            not the one being asked
+    #   the query returned NO ROWS
+    #                            same harm as the refusal case, which `outcome.ok` does not catch:
+    #                            a zero result IS a successful query, so an answer saying there are
+    #                            none used to arrive wearing Explore Events and Event Calendar.
+    #                            Asked for something sporty and told there was nothing, the reader
+    #                            got two page links implying the sport events were over there - but
+    #                            the query had already searched that catalogue, which is HOW it
+    #                            returned nothing. The cards point at the same empty set the
+    #                            sentence just described, and reading them as "look here instead"
+    #                            is the only way to read them.
+    empty_result = not outcome.rows
     navigation = (
         topic_access.topic_cards(principal, topics)
-        if outcome.ok and not denied and not reading.subject and not (event_cards or club_cards)
+        if outcome.ok and not denied and not reading.subject and not empty_result
+        and not (event_cards or club_cards)
         else []
     )
     _step(16, f"Cards: {len(event_cards)} event(s), {len(club_cards)} club(s), {len(navigation)} nav",

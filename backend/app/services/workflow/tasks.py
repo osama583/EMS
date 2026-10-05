@@ -30,6 +30,7 @@ from .constants import (
     DEPARTMENT_REVIEW,
     FLAT_ROLE_FOR_REQUIREMENT,
     FMB_REQUIREMENT,
+    FMB_UNIT_CODE,
     IMPLEMENTATION,
     MAX_ASSIGNEES_PER_ROW,
     NON_WORKFLOW_REQUIREMENTS,
@@ -254,9 +255,16 @@ def unallocated_row_count(cur, request_id: int, requirement_name: str) -> int:
     somebody happened to staff. Approving with rows left over used to be
     possible and left the proposal parked in that department's inbox with the
     task already marked approved - no action left to take, and nothing to move
-    it on. A department with nothing routable (F&B on a water-only proposal,
-    or any requirement with no rows) has zero unallocated rows, not a block.
+    it on. A department with nothing routable (any requirement with no rows at
+    all) has zero unallocated rows, not a block.
     """
+    # A water row's assignment records requirement_name='waterNormal', but water has no task of its
+    # own - it rides on F&B's. Callers reaching here from an ASSIGNMENT (update_row_status ->
+    # rows_fully_staffed) therefore ask about 'waterNormal' while the task is 'fmb', and answering
+    # that question needs the F&B branch below: falling through to `return 0` would report a task
+    # with unordered food as fully allocated.
+    if requirement_name == WATER_REQUIREMENT:
+        requirement_name = FMB_REQUIREMENT
     if requirement_name in ROW_ASSIGNABLE_REQUIREMENTS:
         table, pk_column = TABLE_FOR_REQUIREMENT[requirement_name]
         return fetch_one(
@@ -270,12 +278,16 @@ def unallocated_row_count(cur, request_id: int, requirement_name: str) -> int:
             (request_id, requirement_name),
         )["c"]
     if requirement_name == FMB_REQUIREMENT:
-        # Cancelled orders do not count - cancelling the only order for a row
-        # puts that row back to unfulfilled, which is exactly what it is.
-        # request_mineral_water rows are deliberately NOT counted: an order can
-        # only be placed against a request_fmb row, so requiring one for water
-        # would deadlock every water request.
-        return fetch_one(
+        # F&B's task covers TWO kinds of work, allocated in two different ways.
+        #
+        #   food   a cafeteria order (request_fmb_selection). Cancelled orders do not count -
+        #          cancelling the only order for a row puts that row back to unfulfilled.
+        #   water  a STAFF ASSIGNMENT, not an order. The applicant already stated the quantity and
+        #          whether it carries a logo, so there is nothing for a cafeteria to decide; the
+        #          manager's job is to put one of their own people on it. request_fmb_selection
+        #          cannot hold a water row anyway - its request_fmb_id is NOT NULL and points at
+        #          request_fmb - which is why water is assigned rather than ordered.
+        unordered_food = fetch_one(
             cur,
             """SELECT count(*) AS c FROM request_fmb f
                 WHERE f.request_id = %s
@@ -285,6 +297,18 @@ def unallocated_row_count(cur, request_id: int, requirement_name: str) -> int:
                   )""",
             (request_id, SEL_CANCELLED),
         )["c"]
+        unassigned_water = fetch_one(
+            cur,
+            """SELECT count(*) AS c FROM request_mineral_water w
+                WHERE w.request_id = %s
+                  AND NOT EXISTS (
+                       SELECT 1 FROM request_row_assignment a
+                        WHERE a.requirement_name = %s
+                          AND a.row_id = w.request_mineral_water_id
+                  )""",
+            (request_id, WATER_REQUIREMENT),
+        )["c"]
+        return unordered_food + unassigned_water
     return 0
 
 
@@ -295,9 +319,38 @@ def assert_work_allocated(cur, request_id: int, requirement_name: str) -> None:
         return
     noun = "request" if outstanding == 1 else "requests"
     if requirement_name == FMB_REQUIREMENT:
+        # Two kinds of outstanding work, and naming the wrong one sends the manager looking for a
+        # button that is not there: food needs a cafeteria order, water needs a staff assignment.
+        # Counted separately so the message can say which, and say both when both are outstanding.
+        unordered_food = fetch_one(
+            cur,
+            """SELECT count(*) AS c FROM request_fmb f
+                WHERE f.request_id = %s
+                  AND NOT EXISTS (
+                       SELECT 1 FROM request_fmb_selection s
+                        WHERE s.request_fmb_id = f.request_fmb_id AND s.status <> %s
+                  )""",
+            (request_id, SEL_CANCELLED),
+        )["c"]
+        unassigned_water = outstanding - unordered_food
+        parts: list[str] = []
+        if unordered_food:
+            parts.append(
+                f"{unordered_food} food {'request has' if unordered_food == 1 else 'requests have'} "
+                "no cafeteria order"
+            )
+        if unassigned_water:
+            parts.append(
+                f"{unassigned_water} water "
+                f"{'request has' if unassigned_water == 1 else 'requests have'} nobody assigned"
+            )
+        actions = []
+        if unordered_food:
+            actions.append("place an order for every food request")
+        if unassigned_water:
+            actions.append("assign a team member to every water request")
         raise WorkflowError(
-            f"{outstanding} food {noun} still {'has' if outstanding == 1 else 'have'} no "
-            "cafeteria order. Place an order for every request before approving."
+            " and ".join(parts) + ". Please " + " and ".join(actions) + " before approving."
         )
     raise WorkflowError(
         f"{outstanding} {noun} still {'has' if outstanding == 1 else 'have'} nobody assigned. "
@@ -352,7 +405,14 @@ def approve_task(cur, request_id: int, requirement_name: str, actor_user_id: int
         has_food = fetch_one(
             cur, "SELECT 1 FROM request_fmb WHERE request_id = %s", (request_id,)
         )
-        if not has_food:
+        # Water used to fall in here too, so approving a water-only request completed the task on
+        # the spot. It no longer can: water is assigned to F&B staff who then have to fulfil it,
+        # exactly like a logistics row, so the task stays open until they do. Only a task with
+        # neither food nor water has nothing left to happen.
+        has_water = fetch_one(
+            cur, "SELECT 1 FROM request_mineral_water WHERE request_id = %s", (request_id,)
+        )
+        if not has_food and not has_water:
             cur.execute(
                 "UPDATE request_task SET status = %s WHERE request_task_id = %s",
                 (TASK_COMPLETED, task["request_task_id"]),
@@ -535,7 +595,11 @@ def unassign_staff(cur, task_id: int, staff_user_id: int, actor_user_id: int) ->
 # and constants.ROW_ASSIGNABLE_ REQUIREMENTS/MAX_ASSIGNEES_PER_ROW.
 
 def _assert_row_belongs_to_task(cur, task: dict, requirement_name: str, row_id: int) -> None:
-    if requirement_name not in ROW_ASSIGNABLE_REQUIREMENTS:
+    # waterNormal is assignable even though it is not one of the five lanes in
+    # ROW_ASSIGNABLE_REQUIREMENTS: it has no department lane of its own and rides on the F&B task,
+    # but the applicant already fixed its quantity and logo, so there is nothing to order and the
+    # manager's only job is putting one of their people on it.
+    if requirement_name not in ROW_ASSIGNABLE_REQUIREMENTS and requirement_name != WATER_REQUIREMENT:
         raise WorkflowError(f"'{requirement_name}' does not support row-level assignment.")
     table, pk_column = TABLE_FOR_REQUIREMENT[requirement_name]
     row = fetch_one(cur, f"SELECT request_id FROM {table} WHERE {pk_column} = %s", (row_id,))
@@ -573,11 +637,17 @@ def assign_to_row(
     authorize_department_task(cur, task, assigned_by_user_id)
     _assert_row_belongs_to_task(cur, task, requirement_name, row_id)
 
-    if task["assigned_unit_code"]:
+    # F&B carries no assigned_unit_code (it routes by flat role), so without this fallback the
+    # membership check below was skipped entirely for a water row and ANY user could be assigned
+    # one. Same unit the picker offers - see api/tasks.py's assignable_staff.
+    unit_code = task["assigned_unit_code"] or (
+        FMB_UNIT_CODE if task["assigned_role"] == FMB_REQUIREMENT else None
+    )
+    if unit_code:
         belongs = fetch_one(
             cur,
             "SELECT 1 FROM user_unit_roles WHERE user_id = %s AND unit_code = %s",
-            (staff_user_id, task["assigned_unit_code"]),
+            (staff_user_id, unit_code),
         )
         if not belongs:
             raise WorkflowError("That team member does not belong to this department.")

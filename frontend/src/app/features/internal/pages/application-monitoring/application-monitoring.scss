@@ -1,0 +1,164 @@
+// --- Tracking timeline ------------------------------------------------------
+// A time gutter, a rail of dots, and the step itself — the reference design's shape. The rail is
+// drawn on the dot's ::before so it connects consecutive steps without a wrapper element.
+.tracking {
+  display: grid;
+  gap: 1rem;
+  min-width: min(34rem, 80vw);
+}
+
+.tracking__muted { color: var(--apu-navy-500, #64748b); font-size: 0.86rem; margin: 0; }
+
+.tracking__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.tracking__step {
+  display: grid;
+  grid-template-columns: 5.5rem 1.5rem 1fr;
+  align-items: start;
+  column-gap: 0.5rem;
+  padding-bottom: 1.1rem;
+
+  &:last-child { padding-bottom: 0; }
+}
+
+.tracking__time {
+  font-size: 0.75rem;
+  color: var(--apu-navy-500, #64748b);
+  text-align: right;
+  padding-top: 0.05rem;
+  white-space: nowrap;
+}
+
+.tracking__dot {
+  position: relative;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  justify-self: center;
+  margin-top: 0.05rem;
+  background: var(--color-success, #22c55e);
+
+  // The rail down to the next step.
+  &::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 1.2rem;
+    transform: translateX(-50%);
+    width: 2px;
+    height: calc(100% + 1.1rem);
+    background: var(--apu-navy-100, #e2e8f0);
+  }
+}
+
+.tracking__step:last-child .tracking__dot::before { display: none; }
+
+.tracking__step--rejected .tracking__dot { background: var(--color-danger, #ef4444); }
+.tracking__step--attention .tracking__dot { background: var(--color-warning, #f59e0b); }
+.tracking__step--pending .tracking__dot { background: var(--apu-navy-100, #e2e8f0); }
+
+.tracking__body {
+  display: grid;
+  gap: 0.15rem;
+
+  strong { font-size: 0.9rem; color: var(--apu-navy-950, #041f41); }
+  small { font-size: 0.78rem; color: var(--apu-navy-500, #64748b); }
+  em { font-size: 0.78rem; color: var(--apu-navy-700, #334155); }
+}
+
+.tracking__step--pending .tracking__body strong { color: var(--apu-navy-500, #64748b); }
+.tracking__flow { font-variant-numeric: tabular-nums; }
+
+.tracking__split {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.5rem;
+  background: var(--color-info-surface, #eff6ff);
+  color: var(--color-info-text, #1e40af);
+  font-size: 0.8rem;
+  font-weight: 600;
+
+  .material-symbols-rounded { font-size: 1.1rem; }
+}
+
+// The parallel phase: each department gets its own boxed track, so six interleaved logs read as six
+// separate stories rather than one jumbled one.
+.tracking__branches {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.tracking__branch {
+  border: 1px solid var(--apu-navy-100, #e2e8f0);
+  border-radius: 0.6rem;
+  padding: 0.7rem;
+
+  h3 {
+    margin: 0 0 0.6rem;
+    font-size: 0.82rem;
+    color: var(--apu-navy-950, #041f41);
+  }
+}
+
+.tracking__list--branch .tracking__step { grid-template-columns: 4.5rem 1.2rem 1fr; }
+.tracking__list--upcoming { opacity: 0.85; }
+
+@media (max-width: 40rem) {
+  .tracking { min-width: 0; }
+  .tracking__step,
+  .tracking__list--branch .tracking__step { grid-template-columns: 4.2rem 1.2rem 1fr; }
+  .tracking__branches { grid-template-columns: 1fr; }
+}
+
+.application-monitoring__sub-status {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.2rem;
+  min-width: 15rem;
+
+  li {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.55rem 0.6rem;
+    border-radius: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--apu-navy-950, #041f41);
+
+    &:hover { background: var(--color-info-surface, #eff6ff); }
+  }
+
+  small { color: var(--apu-navy-500, #64748b); font-size: 0.78rem; }
+  em { color: var(--apu-navy-700, #334155); font-size: 0.78rem; }
+}
+
+.application-monitoring__sub-status-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.application-monitoring__chip {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+
+  &--success { background: var(--color-success-surface, #dcfce7); color: var(--color-success-text, #166534); }
+  &--warning { background: var(--color-warning-surface, #fef3c7); color: var(--color-warning-text, #92400e); }
+  &--danger { background: var(--color-danger-surface, #fee2e2); color: var(--color-danger-text, #991b1b); }
+  &--blue { background: var(--color-info-surface, #dbeafe); color: var(--color-info-text, #1e40af); }
+  &--neutral { background: var(--apu-navy-100, #e2e8f0); color: var(--apu-navy-700, #334155); }
+}

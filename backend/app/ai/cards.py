@@ -119,7 +119,26 @@ def _occurrence_rank(row: dict, today: date) -> tuple[int, int, int]:
     return (1, -when.toordinal(), row["request_id"])
 
 
-def _best_row_per_title(rows: list[dict]) -> dict[str, int]:
+def _retrieved_ids(result_rows: list[dict] | None, key: str) -> set[int]:
+    """The entity ids the ANSWER was actually written from.
+
+    The retrieval step's rows are the model's input, so an id appearing here is one the model could
+    genuinely have meant - unlike a title, which two different events can share. The SQL prompt asks
+    for the id on every event/club query, but a model can omit it and an older cached answer path
+    may not carry one, so an empty set is normal and simply falls back to the date convention."""
+    found: set[int] = set()
+    for row in result_rows or []:
+        value = row.get(key)
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, int):
+            found.add(value)
+        elif isinstance(value, str) and value.isdigit():
+            found.add(int(value))
+    return found
+
+
+def _best_row_per_title(rows: list[dict], *, prefer: set[int] | None = None) -> dict[str, int]:
     """title -> the request_id a card for that title should point at.
 
     TITLES ARE NOT UNIQUE, and this used to be a dict comprehension that pretended they were: two
@@ -130,15 +149,28 @@ def _best_row_per_title(rows: list[dict]) -> dict[str, int]:
     past, that the reply had never mentioned. Clicking it opened the wrong event.
 
     Matching on the answer TEXT cannot disambiguate this (the text names a title, and both rows
-    have it), so the tie is broken the way the rest of this module already breaks it: an answer
-    recommending an event means a FUTURE one. Same rule as `firstDate`, applied across same-titled
-    events rather than within one.
+    have it), so identity comes from `prefer` - the ids the RETRIEVAL step actually returned, which
+    is the set the model wrote its answer from. An id in there is one the reply could genuinely
+    have meant; one outside it is a row the model never saw. That is the difference between knowing
+    which event was meant and guessing, and it is why the date convention alone was not enough: the
+    reply described the 29 September "Business Society Networking Lunch" while the card resolved
+    the title to the 21 September one, because "soonest upcoming" is a sensible guess and simply
+    the wrong event.
+
+    `prefer` is a TIE-BREAK, not a filter - a title the answer names is still carded when the id is
+    missing (an older answer path, or a model that dropped the column), falling back to the same
+    rule as before: an answer recommending an event means a FUTURE one.
 
     A dropped duplicate is logged rather than silently discarded - two published events sharing a
     title is a data problem, and it is the thing to look at first if a card ever looks wrong."""
     today = date.today()
+    preferred = prefer or set()
     by_title: dict[str, int] = {}
-    for row in sorted(rows, key=lambda r: _occurrence_rank(r, today)):
+    # Retrieved rows first, so a title the answer was actually written about resolves to THAT id;
+    # everything else keeps the soonest-upcoming order behind it.
+    def _rank(row: dict) -> tuple:
+        return (0 if row["request_id"] in preferred else 1, *_occurrence_rank(row, today))
+    for row in sorted(rows, key=_rank):
         title = row["event_title"]
         if title in by_title:
             log.info(
@@ -150,7 +182,8 @@ def _best_row_per_title(rows: list[dict]) -> dict[str, int]:
     return by_title
 
 
-def event_cards(answer: str, *, user_id: int | None) -> list[dict]:
+def event_cards(answer: str, *, user_id: int | None,
+                result_rows: list[dict] | None = None) -> list[dict]:
     """Card data for every published event the answer names, re-read live and re-checked against
     the same visibility rule the discovery endpoints apply."""
     # 'Club Only' is a membership test, not a tier anyone signed-in can read - it resolves
@@ -196,11 +229,18 @@ def event_cards(answer: str, *, user_id: int | None) -> list[dict]:
                  WHERE es.request_id = r.request_id
                  ORDER BY (es.date < CURRENT_DATE), es.date LIMIT 1) AS "endTime"
           FROM request r
-         WHERE r.status = 'completed_approved' AND {visibility}
+         -- BOTH published statuses, matching api/events.py's _PUBLISHED_STATUSES and the row scope
+         -- in ai/scope_rules.py. An event whose departments have all approved sits at
+         -- 'implementation' while staff carry the work out, and it is live on Explore Events the
+         -- whole time. Naming only 'completed_approved' here meant the ANSWER could describe such
+         -- an event correctly while this lookup found nothing to card it with - so a football
+         -- tournament the assistant had just recommended arrived under two generic "go to page"
+         -- links instead of its own card.
+         WHERE r.status IN ('implementation', 'completed_approved') AND {visibility}
         """,
         {"user_id": user_id} if user_id is not None else {},
     )
-    by_title = _best_row_per_title(rows)
+    by_title = _best_row_per_title(rows, prefer=_retrieved_ids(result_rows, "request_id"))
     named = set(_names_in(answer, by_title))
     return [
         {
@@ -220,7 +260,7 @@ def event_cards(answer: str, *, user_id: int | None) -> list[dict]:
     ]
 
 
-def club_cards(answer: str) -> list[dict]:
+def club_cards(answer: str, *, result_rows: list[dict] | None = None) -> list[dict]:
     """Card data for every active club the answer names. Club identity/description is public to any
     signed-in caller (the same information a club's own page shows); membership is not, and none is
     returned here."""
@@ -234,7 +274,14 @@ def club_cards(answer: str) -> list[dict]:
          WHERE c.active AND c.archived_at IS NULL
         """
     )
-    by_title = {row["clubName"]: row["club_id"] for row in rows}
+    # Same identity rule as events: a club the answer was actually written about wins its own name,
+    # rather than whichever same-named row the database happened to return last. Clubs collide far
+    # less often than events, but a dict comprehension keyed on the name is the exact shape that
+    # made the event cards wrong, so it is not left in place to be discovered later.
+    preferred = _retrieved_ids(result_rows, "club_id")
+    by_title: dict[str, int] = {}
+    for row in sorted(rows, key=lambda r: (0 if r["club_id"] in preferred else 1, r["club_id"])):
+        by_title.setdefault(row["clubName"], row["club_id"])
     named = set(_names_in(answer, by_title))
     return [
         {
@@ -249,17 +296,24 @@ def club_cards(answer: str) -> list[dict]:
     ]
 
 
-def build(answer: str, topics: set[str], *, user_id: int | None) -> tuple[list[dict], list[dict]]:
+def build(answer: str, topics: set[str], *, user_id: int | None,
+          result_rows: list[dict] | None = None) -> tuple[list[dict], list[dict]]:
     """(event_cards, club_cards) for this answer, restricted to the topics the question was
     actually about - so a club answer does not sprout event cards because it happened to mention a
-    word that matches an event title."""
+    word that matches an event title.
+
+    `result_rows` is the retrieval step's own output - the rows the answer was written from. It
+    settles WHICH row a shared title means, which the answer text alone cannot: two published
+    events both named "Business Society Networking Lunch" put the reply's date and the card's date
+    in contradiction on screen. Optional, and absent on the knowledge path, which retrieves nothing.
+    """
     events: list[dict] = []
     clubs: list[dict] = []
     try:
         if "events" in topics:
-            events = event_cards(answer, user_id=user_id)
+            events = event_cards(answer, user_id=user_id, result_rows=result_rows)
         if "clubs" in topics:
-            clubs = club_cards(answer)
+            clubs = club_cards(answer, result_rows=result_rows)
     except Exception as exc:  # noqa: BLE001 - decoration must never break a correct answer
         log.warning("ai.cards.failed", extra={"error": str(exc)})
     return events, clubs

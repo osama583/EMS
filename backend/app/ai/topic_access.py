@@ -336,7 +336,7 @@ def unanswerable_document() -> str:
 
 
 # --- Who is asking ------------------------------------------------------------------------------
-
+# give ai token
 def who_am_i_document(principal) -> str:
     """The CONTEXT for "who am I / what role do I have / what can I access".
 
@@ -414,7 +414,7 @@ def user_context_document(principal, intents: set[str]) -> str:
 # exactly the span that separates someone puzzled from someone pushing.
 CONTEXT_TURNS = 3
 
-
+#giev ai history
 def conversation_context(history: list[dict] | None) -> str | None:
     """The last few turns, as the administrator will read them in the log. None when this was the
     opening turn, so an empty string never occupies the column and 'no context' stays visible as

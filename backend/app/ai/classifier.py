@@ -78,6 +78,7 @@ class ClassificationUnavailable(RuntimeError):
 
 
 @dataclass(frozen=True)
+
 class Reading:
     """One turn, fully resolved: what is being asked, about what, and what we already know."""
 
@@ -118,7 +119,7 @@ class Reading:
         return Reading(intents=self.intents - intents, subject=self.subject,
                        preferences=self.preferences, refusal_reason=self.refusal_reason)
 
-
+# system prompt 1 for clasifying
 def _system_instruction() -> str:
     return "\n".join([
         "You read one turn of a chat with the assistant embedded in a university event and club "

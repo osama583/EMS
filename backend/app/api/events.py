@@ -597,7 +597,7 @@ def _guest_user_id(cur, name: str, email: str) -> int:
     truly guest-less record. Reused across repeat visits by email, exactly like
     an account, except it holds a random unusable password hash - it grants no
     login capability, only an identity to attach registrations to. This is a
-    separate concept from POST /auth/register's guest signup (a real password
+    separate concept from POST /auth/register/start's guest signup (a real password
     account); a visitor who later signs up for real with the same email will
     get auth.py's "That email address cannot be registered" conflict, which is
     an accepted trade-off rather than something this endpoint tries to solve.
@@ -1982,10 +1982,15 @@ def venue_bookings():
     date = (request.args.get("date") or "").strip()
     if not venue_id or not date:
         raise BadRequest("venueId and date are required.")
-    try:
-        venue_id_int = int(venue_id)
-    except ValueError:
-        raise BadRequest("venueId must be numeric.")
+    # A venue id is "venue:{n}" everywhere else in this app - it is what api/options.py hands out,
+    # what proposals.py freezes onto a row, and what the form's dropdown holds - so that is what the
+    # client naturally sends here. Requiring a bare integer made the proposal form's own conflict
+    # check 400 on every lookup. The numeric form is still accepted, for a caller that has already
+    # split it.
+    _, _, venue_number = venue_id.rpartition(":")
+    if not venue_number.isdigit():
+        raise BadRequest("venueId must be a venue reference like 'venue:1'.")
+    venue_id_int = int(venue_number)
 
     # A Private event's title is not the caller's business, but its hours are.
     exclude_request = (request.args.get("excludeRequestId") or "").strip()

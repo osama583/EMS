@@ -35,6 +35,8 @@ Runs against the real seeded database, like tests/test_scope_definition.py.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from app.ai import cards, recommendation, schema_catalog, scope, scope_rules, sql_guard, topic_access
@@ -272,6 +274,36 @@ def test_guard_rejects_every_write_operation(sql: str):
     if either has a hole, the other still holds."""
     with pytest.raises(sql_guard.SqlRejected):
         _validate(sql, _guest_scope())
+
+
+@pytest.mark.parametrize("word", ["grant", "comment", "set", "copy", "call", "do", "merge"])
+def test_guard_allows_a_sql_keyword_inside_a_search_string(word: str):
+    """A keyword in a LITERAL is somebody's search text, not an operation.
+
+    "Grant Writing Workshop for Staff" is a real published event, and looking for it makes the model
+    write ILIKE '%grant%'. That tripped the GRANT rule, the retrieval failed, and the assistant told
+    the asker it had no such event - three times - with the workshop sitting published in the table.
+    The same collision waits in every other word here; all of them appear in real event titles.
+    """
+    scope_ = _guest_scope()
+    predicate = scope_.required_predicates["request"][0]
+    sql = (
+        "SELECT request.request_id, request.event_title FROM request "
+        f"WHERE {predicate} AND request.event_title ILIKE '%{word}%' LIMIT 5"
+    )
+    _validate(sql, scope_)  # does not raise
+
+
+def test_guard_still_rejects_a_keyword_outside_a_literal():
+    """The fix above blanks literals before the keyword scan - it must not blind the scan itself."""
+    scope_ = _guest_scope()
+    predicate = scope_.required_predicates["request"][0]
+    with pytest.raises(sql_guard.SqlRejected):
+        _validate(
+            "SELECT request.request_id FROM request "
+            f"WHERE {predicate} AND request.event_title ILIKE '%grant%' DROP TABLE users",
+            scope_,
+        )
 
 
 def test_guard_rejects_a_second_statement():
@@ -1188,6 +1220,55 @@ def test_topic_cards_respect_page_visibility(monkeypatch):
 
 def test_topic_cards_are_capped():
     assert len(topic_access.topic_cards(_student(), {"events", "clubs"})) <= 2
+
+
+def _nav_is_offered(*, ok=True, rows=(1,), denied=(), subject=None, entity_cards=False) -> bool:
+    """The navigation-card decision in api/ai.py step 16, as a callable.
+
+    Kept in step with the source by test_the_navigation_suppression_conditions_are_all_present
+    below, which fails if that expression stops naming any of the four conditions."""
+    return bool(
+        ok and not denied and not subject and not (not rows) and not entity_cards
+    )
+
+
+def test_a_zero_result_offers_no_page_card():
+    """Asked for something sporty and told there was nothing, the reader got Explore Events and
+    Event Calendar underneath - two links implying the sport events were over there. The query had
+    ALREADY searched that catalogue, which is how it returned nothing, so the cards pointed at the
+    same empty set the sentence had just described.
+
+    `outcome.ok` does not catch this: a zero result is a SUCCESSFUL query, so the refusal branch
+    that exists for exactly this harm never fired."""
+    assert _nav_is_offered(rows=()) is False
+    assert _nav_is_offered(rows=(1,)) is True, "a real result still gets its fallback card"
+
+
+def test_a_location_question_still_gets_its_page_card():
+    """The fallback's whole reason for existing - "where do I find events" is prose otherwise - must
+    survive the zero-result suppression."""
+    assert _nav_is_offered(rows=(1,), entity_cards=False) is True
+
+
+@pytest.mark.parametrize(
+    "suppressor",
+    [{"ok": False}, {"denied": ("clubs",)}, {"subject": "APU Hackathon 2026"}, {"entity_cards": True}],
+)
+def test_the_other_suppressors_still_hold(suppressor: dict):
+    """A refusal, a denied topic, a resolved SUBJECT and an existing entity card each suppress the
+    fallback on their own - adding the zero-result case must not have loosened any of them."""
+    assert _nav_is_offered(**suppressor) is False
+
+
+def test_the_navigation_suppression_conditions_are_all_present():
+    """The decision is one inline expression in a long handler, so the helper above can drift from
+    it silently. This pins the source: all four conditions must still be named in it."""
+    source = (Path(__file__).resolve().parents[1] / "app" / "api" / "ai.py").read_text(encoding="utf-8")
+    # Sliced to the terminating "else []" rather than the first ")", which would cut the expression
+    # short at topic_cards(...)'s own closing paren and test almost nothing.
+    decision = source.split("navigation = (")[1].split("else []")[0]
+    for condition in ("outcome.ok", "not denied", "not reading.subject", "not empty_result"):
+        assert condition in decision, f"the navigation decision no longer carries {condition!r}"
 
 
 # --- registration and membership COUNTS are public; identities are not ----------------------------

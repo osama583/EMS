@@ -157,7 +157,7 @@ _FALLBACK = (
     "I couldn't find that one. Try asking by name - like \"tell me about the hackathon\" - or "
     "ask me to suggest something and I'll help you narrow it down."
 )
-
+# system prompt 2 for answering the quesion that is not form the database 
 _SYSTEM_INSTRUCTION = """You are the assistant embedded in APU Events, a university event and club
 app, reachable from the chat orb on every page.
 
